@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/styles.css"],
+  "sourcesContent": ["@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap');\n\n:root {\n  color-scheme: light;\n  --bg-start: #f3f8ff;\n  --bg-mid: #eef6ff;\n  --bg-end: #f7fbff;\n  --text-main: #0f172a;\n  --text-muted: #475569;\n}\n\n* {\n  box-sizing: border-box;\n}\n\nbody {\n  margin: 0;\n  font-family: \"Manrope\", \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;\n  color: var(--text-main);\n  background:\n    radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.16), transparent 42%),\n    radial-gradient(circle at 85% 18%, rgba(14, 165, 233, 0.14), transparent 38%),\n    linear-gradient(155deg, var(--bg-start) 0%, var(--bg-mid) 45%, var(--bg-end) 100%);\n}\n"],
+  "mappings": ";;;AAEA;AACE,gBAAc;AACd,cAAY;AACZ,YAAU;AACV,YAAU;AACV,eAAa;AACb,gBAAc;AAChB;AAEA;AACE,cAAY;AACd;AAEA;AACE,UAAQ;AACR;AAAA,IAAa,SAAS;AAAA,IAAE,UAAU;AAAA,IAAE,MAAM;AAAA,IAAE,MAAM;AAAA,IAAE,OAAO;AAAA,IAAE;AAC7D,SAAO,IAAI;AACX;AAAA,IACE;AAAA,MAAgB,OAAO,GAAG,IAAI,GAAG;AAAA,MAAE,KAAK,EAAE,EAAE,GAAG,EAAE,GAAG,EAAE,KAAK;AAAA,MAAE,YAAY,IAAI;AAAA,IAC7E;AAAA,MAAgB,OAAO,GAAG,IAAI,GAAG;AAAA,MAAE,KAAK,EAAE,EAAE,GAAG,EAAE,GAAG,EAAE,KAAK;AAAA,MAAE,YAAY,IAAI;AAAA,IAC7E;AAAA,MAAgB,MAAM;AAAA,MAAE,IAAI,YAAY,EAAE;AAAA,MAAE,IAAI,UAAU,GAAG;AAAA,MAAE,IAAI,UAAU;AACjF;",
+  "names": []
+}

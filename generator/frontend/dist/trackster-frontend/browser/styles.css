@@ -1,0 +1,42 @@
+@import "https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap";
+
+/* src/styles.css */
+:root {
+  color-scheme: light;
+  --bg-start: #f3f8ff;
+  --bg-mid: #eef6ff;
+  --bg-end: #f7fbff;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family:
+    "Manrope",
+    "Segoe UI",
+    Tahoma,
+    Geneva,
+    Verdana,
+    sans-serif;
+  color: var(--text-main);
+  background:
+    radial-gradient(
+      circle at 10% 10%,
+      rgba(56, 189, 248, 0.16),
+      transparent 42%),
+    radial-gradient(
+      circle at 85% 18%,
+      rgba(14, 165, 233, 0.14),
+      transparent 38%),
+    linear-gradient(
+      155deg,
+      var(--bg-start) 0%,
+      var(--bg-mid) 45%,
+      var(--bg-end) 100%);
+}
+
+/* angular:styles/global:styles */
+/*# sourceMappingURL=styles.css.map */
