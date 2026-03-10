@@ -33395,8 +33395,8 @@ var AppComponent = class _AppComponent {
       vinSuffix: raw.vinSuffix,
       initialDateTime: raw.initialDateTime,
       latencyTime: Number(raw.latencyTime),
-      s3Bucket: raw.s3Bucket,
-      workQueueUrl: raw.workQueueUrl
+      s3Bucket: raw.s3Bucket.trim(),
+      workQueueUrl: raw.workQueueUrl.trim()
     };
   }
   parseResponseBody(response) {
@@ -33532,7 +33532,7 @@ var AppComponent = class _AppComponent {
         \u0275\u0275text(15);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(16, "p")(17, "strong");
-        \u0275\u0275text(18, "Generation TS:");
+        \u0275\u0275text(18, "Timestamp:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(19, "span", 5);
         \u0275\u0275text(20);

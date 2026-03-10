@@ -382,8 +382,8 @@ export class AppComponent {
       vinSuffix: raw.vinSuffix,
       initialDateTime: raw.initialDateTime,
       latencyTime: Number(raw.latencyTime),
-      s3Bucket: raw.s3Bucket,
-      workQueueUrl: raw.workQueueUrl
+      s3Bucket: raw.s3Bucket.trim(),
+      workQueueUrl: raw.workQueueUrl.trim()
     };
   }
 

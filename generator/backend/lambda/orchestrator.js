@@ -151,7 +151,7 @@ module.exports.handler = async (event, context) => {
     const s3Bucket = String(p.s3Bucket || "").trim();
     const workQueueUrl = resolveWorkQueueUrl(p);
 
-    if (!workQueueUrl) {
+    if (SEND_TO_SQS && !workQueueUrl) {
       return httpResp(400, { requestId, error: "workQueueUrl is required" });
     }
 
@@ -192,7 +192,7 @@ module.exports.handler = async (event, context) => {
       });
     }
 
-    console.log(`[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl} send_to_sqs=${SEND_TO_SQS}`);
+    console.log(`[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl || "mock"} send_to_sqs=${SEND_TO_SQS}`);
 
     const allEntries = vehicles.map((v, idx) => ({
       Id: `v-${idx}`,
