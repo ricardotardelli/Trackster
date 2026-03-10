@@ -33098,9 +33098,10 @@ var AppComponent = class _AppComponent {
       dbcFiles: [[...this.dbcOptions], [Validators.required]],
       vinPrefix: ["", [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
       initialDateTime: [this.getCurrentDateTimeLocal(), [Validators.required]],
-      vinSufix: ["", [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
+      vinSuffix: ["", [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
       latencyTime: [5, [Validators.required, Validators.pattern(/^\d+$/)]],
       s3Bucket: ["", [Validators.required]],
+      workQueueUrl: [""],
       engineUrl: ["", [Validators.required, Validators.pattern(/^https?:\/\/.+/i)]],
       payload: ["", [this.jsonValidator]]
     });
@@ -33333,10 +33334,12 @@ var AppComponent = class _AppComponent {
         this.gpsAreas = Array.isArray(config2.gpsAreas) && config2.gpsAreas.length > 0 ? config2.gpsAreas : defaultGpsAreas;
         this.canFrameOptions = Array.isArray(config2.canFrames) && config2.canFrames.length > 0 ? config2.canFrames : defaultCanFrames;
         this.dbcOptions = Array.isArray(config2.dbcFiles) && config2.dbcFiles.length > 0 ? config2.dbcFiles : defaultDbcFiles;
+        this.form.controls.workQueueUrl.setValue(typeof config2.workQueueUrl === "string" ? config2.workQueueUrl : "", { emitEvent: false });
       } catch {
         this.gpsAreas = defaultGpsAreas;
         this.canFrameOptions = defaultCanFrames;
         this.dbcOptions = defaultDbcFiles;
+        this.form.controls.workQueueUrl.setValue("", { emitEvent: false });
       }
       this.suppressFormReset = true;
       this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
@@ -33373,15 +33376,16 @@ var AppComponent = class _AppComponent {
       amountOfTime: Number(raw.amountOfTime),
       generationType: raw.generationTypeAllAtOnce ? "all_at_once" : "over_time",
       numberOfBlocks: Number(raw.numberOfBlocks),
-      blocks_size: Number(raw.sizeOfBlocksBytes),
+      blocksSize: Number(raw.sizeOfBlocksBytes),
       gpsArea: raw.gpsArea,
       canFrames: raw.canFrames.map((frame) => frame.split(" - ")[0].trim()),
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
-      vinSufix: raw.vinSufix,
+      vinSuffix: raw.vinSuffix,
       initialDateTime: raw.initialDateTime,
       latencyTime: Number(raw.latencyTime),
-      s3Bucket: raw.s3Bucket
+      s3Bucket: raw.s3Bucket,
+      workQueueUrl: raw.workQueueUrl
     };
   }
   parseResponseBody(response) {
@@ -33469,7 +33473,7 @@ var AppComponent = class _AppComponent {
           return ctx.onDocumentClick($event);
         }, false, \u0275\u0275resolveDocument);
       }
-    }, standalone: true, features: [\u0275\u0275StandaloneFeature], decls: 172, vars: 92, consts: [[1, "page"], [1, "panel"], [3, "ngSubmit", "formGroup"], [1, "grid"], [1, "status-panel"], [1, "status-value"], [1, "status-value", "status-ok"], [1, "field", "third", "row1"], ["type", "number", "formControlName", "amountOfVehicles", "step", "1", "min", "0"], ["type", "text", "formControlName", "vinPrefix", "placeholder", "Ex: CARFWG"], ["type", "text", "formControlName", "vinSufix", "placeholder", "Ex: ACHDF"], [1, "field", "third", "row2"], ["type", "datetime-local", "formControlName", "initialDateTime"], ["type", "number", "formControlName", "amountOfTime", "step", "0.1", "min", "0"], ["type", "number", "formControlName", "latencyTime", "step", "1", "min", "0"], [1, "field", "third", "row3"], [1, "multi-select"], ["type", "button", 1, "multi-select-trigger", 3, "click"], [1, "multi-select-value"], ["class", "multi-select-caret", 4, "ngIf"], ["class", "multi-select-panel", 4, "ngIf"], [1, "field", "third", "row4"], ["type", "number", "formControlName", "numberOfBlocks", "step", "1", "min", "0"], ["type", "number", "formControlName", "sizeOfBlocksBytes", "step", "1", "min", "0"], [1, "switch-row"], [1, "switch-label"], [1, "switch-control"], ["type", "checkbox", "formControlName", "generationTypeAllAtOnce"], [1, "switch-slider"], [1, "field", "half"], ["type", "text", "formControlName", "s3Bucket", "placeholder", "Ex: my-trackster-bucket"], ["type", "text", "formControlName", "engineUrl", "placeholder", "Ex: https://engine.example.com/api"], [1, "field", "full"], ["rows", "10", "formControlName", "payload", "readonly", ""], [1, "actions"], ["type", "submit", 3, "disabled"], [1, "multi-select-caret"], [1, "multi-select-panel"], ["class", "multi-select-option", 4, "ngFor", "ngForOf"], ["class", "single-select-empty", 4, "ngIf"], [1, "multi-select-option"], ["type", "checkbox", 3, "change", "checked"], [1, "option-label"], [1, "single-select-empty"], ["type", "text", "placeholder", "Type to filter regions...", 1, "single-select-filter", 3, "ngModelChange", "ngModel", "ngModelOptions"], ["type", "button", "class", "single-select-option", 3, "click", 4, "ngFor", "ngForOf"], ["type", "button", 1, "single-select-option", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
+    }, standalone: true, features: [\u0275\u0275StandaloneFeature], decls: 172, vars: 92, consts: [[1, "page"], [1, "panel"], [3, "ngSubmit", "formGroup"], [1, "grid"], [1, "status-panel"], [1, "status-value"], [1, "status-value", "status-ok"], [1, "field", "third", "row1"], ["type", "number", "formControlName", "amountOfVehicles", "step", "1", "min", "0"], ["type", "text", "formControlName", "vinPrefix", "placeholder", "Ex: CARFWG"], ["type", "text", "formControlName", "vinSuffix", "placeholder", "Ex: ACHDF"], [1, "field", "third", "row2"], ["type", "datetime-local", "formControlName", "initialDateTime"], ["type", "number", "formControlName", "amountOfTime", "step", "0.1", "min", "0"], ["type", "number", "formControlName", "latencyTime", "step", "1", "min", "0"], [1, "field", "third", "row3"], [1, "multi-select"], ["type", "button", 1, "multi-select-trigger", 3, "click"], [1, "multi-select-value"], ["class", "multi-select-caret", 4, "ngIf"], ["class", "multi-select-panel", 4, "ngIf"], [1, "field", "third", "row4"], ["type", "number", "formControlName", "numberOfBlocks", "step", "1", "min", "0"], ["type", "number", "formControlName", "sizeOfBlocksBytes", "step", "1", "min", "0"], [1, "switch-row"], [1, "switch-label"], [1, "switch-control"], ["type", "checkbox", "formControlName", "generationTypeAllAtOnce"], [1, "switch-slider"], [1, "field", "half"], ["type", "text", "formControlName", "s3Bucket", "placeholder", "Ex: my-trackster-bucket"], ["type", "text", "formControlName", "engineUrl", "placeholder", "Ex: https://engine.example.com/api"], [1, "field", "full"], ["rows", "10", "formControlName", "payload", "readonly", ""], [1, "actions"], ["type", "submit", 3, "disabled"], [1, "multi-select-caret"], [1, "multi-select-panel"], ["class", "multi-select-option", 4, "ngFor", "ngForOf"], ["class", "single-select-empty", 4, "ngIf"], [1, "multi-select-option"], ["type", "checkbox", 3, "change", "checked"], [1, "option-label"], [1, "single-select-empty"], ["type", "text", "placeholder", "Type to filter regions...", 1, "single-select-filter", 3, "ngModelChange", "ngModel", "ngModelOptions"], ["type", "button", "class", "single-select-option", 3, "click", 4, "ngFor", "ngForOf"], ["type", "button", 1, "single-select-option", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "main", 0)(1, "section", 1)(2, "h1");
         \u0275\u0275text(3, "Trackster - CAN Frames Generator");
@@ -33551,7 +33555,7 @@ var AppComponent = class _AppComponent {
         \u0275\u0275text(67, "Mandatory field (exactly 6 characters).");
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(68, "label", 7)(69, "span");
-        \u0275\u0275text(70, "VIN Trailler");
+        \u0275\u0275text(70, "VIN Trailer");
         \u0275\u0275elementEnd();
         \u0275\u0275element(71, "input", 10);
         \u0275\u0275elementStart(72, "small");
@@ -33704,9 +33708,9 @@ var AppComponent = class _AppComponent {
         \u0275\u0275advance();
         \u0275\u0275textInterpolate1(" ", ctx.f.vinPrefix.value || "Not provided", " ");
         \u0275\u0275advance(4);
-        \u0275\u0275classProp("status-ok", ctx.f.vinSufix.valid)("status-error", !ctx.f.vinSufix.valid);
+        \u0275\u0275classProp("status-ok", ctx.f.vinSuffix.valid)("status-error", !ctx.f.vinSuffix.valid);
         \u0275\u0275advance();
-        \u0275\u0275textInterpolate1(" ", ctx.f.vinSufix.value || "Not provided", " ");
+        \u0275\u0275textInterpolate1(" ", ctx.f.vinSuffix.value || "Not provided", " ");
         \u0275\u0275advance(4);
         \u0275\u0275classProp("status-ok", ctx.f.s3Bucket.valid)("status-error", !ctx.f.s3Bucket.valid);
         \u0275\u0275advance();
@@ -33722,7 +33726,7 @@ var AppComponent = class _AppComponent {
         \u0275\u0275advance(6);
         \u0275\u0275classProp("visible", ctx.f.vinPrefix.touched && ctx.f.vinPrefix.invalid);
         \u0275\u0275advance(6);
-        \u0275\u0275classProp("visible", ctx.f.vinSufix.touched && ctx.f.vinSufix.invalid);
+        \u0275\u0275classProp("visible", ctx.f.vinSuffix.touched && ctx.f.vinSuffix.invalid);
         \u0275\u0275advance(6);
         \u0275\u0275classProp("visible", ctx.f.initialDateTime.touched && ctx.f.initialDateTime.invalid);
         \u0275\u0275advance(6);

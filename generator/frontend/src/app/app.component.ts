@@ -36,9 +36,10 @@ export class AppComponent {
     dbcFiles: [[...this.dbcOptions], [Validators.required]],
     vinPrefix: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
     initialDateTime: [this.getCurrentDateTimeLocal(), [Validators.required]],
-    vinSufix: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
+    vinSuffix: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
     latencyTime: [5, [Validators.required, Validators.pattern(/^\d+$/)]],
     s3Bucket: ['', [Validators.required]],
+    workQueueUrl: [''],
     engineUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/.+/i)]],
     payload: ['', [this.jsonValidator]]
   });
@@ -315,10 +316,12 @@ export class AppComponent {
       this.gpsAreas = Array.isArray(config.gpsAreas) && config.gpsAreas.length > 0 ? config.gpsAreas : defaultGpsAreas;
       this.canFrameOptions = Array.isArray(config.canFrames) && config.canFrames.length > 0 ? config.canFrames : defaultCanFrames;
       this.dbcOptions = Array.isArray(config.dbcFiles) && config.dbcFiles.length > 0 ? config.dbcFiles : defaultDbcFiles;
+      this.form.controls.workQueueUrl.setValue(typeof config.workQueueUrl === 'string' ? config.workQueueUrl : '', { emitEvent: false });
     } catch {
       this.gpsAreas = defaultGpsAreas;
       this.canFrameOptions = defaultCanFrames;
       this.dbcOptions = defaultDbcFiles;
+      this.form.controls.workQueueUrl.setValue('', { emitEvent: false });
     }
 
     this.suppressFormReset = true;
@@ -330,7 +333,7 @@ export class AppComponent {
     this.suppressFormReset = false;
   }
 
-  private async fetchRuntimeConfig(): Promise<{ gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[] }> {
+  private async fetchRuntimeConfig(): Promise<{ gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string }> {
     const stamp = Date.now();
     const candidates = [
       `config.json?t=${stamp}`,
@@ -341,7 +344,7 @@ export class AppComponent {
       try {
         const response = await fetch(url, { cache: 'no-store' });
         if (response.ok) {
-          return await response.json() as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[] };
+          return await response.json() as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string };
         }
       } catch {
         // Try next candidate.
@@ -359,15 +362,16 @@ export class AppComponent {
       amountOfTime: Number(raw.amountOfTime),
       generationType: raw.generationTypeAllAtOnce ? 'all_at_once' : 'over_time',
       numberOfBlocks: Number(raw.numberOfBlocks),
-      blocks_size: Number(raw.sizeOfBlocksBytes),
+      blocksSize: Number(raw.sizeOfBlocksBytes),
       gpsArea: raw.gpsArea,
       canFrames: raw.canFrames.map((frame) => frame.split(' - ')[0].trim()),
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
-      vinSufix: raw.vinSufix,
+      vinSuffix: raw.vinSuffix,
       initialDateTime: raw.initialDateTime,
       latencyTime: Number(raw.latencyTime),
-      s3Bucket: raw.s3Bucket
+      s3Bucket: raw.s3Bucket,
+      workQueueUrl: raw.workQueueUrl
     };
   }
 

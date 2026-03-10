@@ -1,4 +1,5 @@
 ﻿{
+    "workQueueUrl":  "",
     "dbcFiles":  [
                     "dbc_a",
                     "dbc_b",

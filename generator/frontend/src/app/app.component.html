@@ -42,8 +42,8 @@
           </p>
           <p>
             <strong>VIN Trailer:</strong>
-            <span class="status-value" [class.status-ok]="f.vinSufix.valid" [class.status-error]="!f.vinSufix.valid">
-              {{ f.vinSufix.value || 'Not provided' }}
+            <span class="status-value" [class.status-ok]="f.vinSuffix.valid" [class.status-error]="!f.vinSuffix.valid">
+              {{ f.vinSuffix.value || 'Not provided' }}
             </span>
           </p>
           <p>
@@ -79,9 +79,9 @@
         </label>
 
         <label class="field third row1">
-          <span>VIN Trailler</span>
-          <input type="text" formControlName="vinSufix" placeholder="Ex: ACHDF" />
-          <small [class.visible]="f.vinSufix.touched && f.vinSufix.invalid">Mandatory field (exactly 5 characters).</small>
+          <span>VIN Trailer</span>
+          <input type="text" formControlName="vinSuffix" placeholder="Ex: ACHDF" />
+          <small [class.visible]="f.vinSuffix.touched && f.vinSuffix.invalid">Mandatory field (exactly 5 characters).</small>
         </label>
 
         <label class="field third row2">
