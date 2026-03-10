@@ -1,0 +1,213 @@
+<main class="page">
+  <section class="panel">
+    <h1>Trackster - CAN Frames Generator</h1>
+    <br><br>
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="grid">
+        <aside class="status-panel">
+          <h2>Status</h2>
+          <p>
+            <strong>Form:</strong>
+            <span
+              class="status-value"
+              [class.status-ok]="formStatus === 'generated'"
+              [class.status-error]="formStatus === 'error'"
+            >
+              {{ formStatusLabel }}
+            </span>
+          </p>
+          <p>
+            <strong>DBC:</strong>
+            <span class="status-value" [class.status-ok]="f.dbcFiles.valid" [class.status-error]="!f.dbcFiles.valid">
+              {{ f.dbcFiles.value.length }}/{{ dbcOptions.length }} selected
+            </span>
+          </p>
+          <p>
+            <strong>CAN Frames:</strong>
+            <span class="status-value" [class.status-ok]="f.canFrames.valid" [class.status-error]="!f.canFrames.valid">
+              {{ f.canFrames.value.length }}/{{ canFrameOptions.length }} selected
+            </span>
+          </p>
+          <p>
+            <strong>GPS:</strong>
+            <span class="status-value" [class.status-ok]="f.gpsArea.valid" [class.status-error]="!f.gpsArea.valid">
+              {{ f.gpsArea.value || 'Not selected' }}
+            </span>
+          </p>
+          <p>
+            <strong>VIN Prefix:</strong>
+            <span class="status-value" [class.status-ok]="f.vinPrefix.valid" [class.status-error]="!f.vinPrefix.valid">
+              {{ f.vinPrefix.value || 'Not provided' }}
+            </span>
+          </p>
+          <p>
+            <strong>VIN Trailer:</strong>
+            <span class="status-value" [class.status-ok]="f.vinSufix.valid" [class.status-error]="!f.vinSufix.valid">
+              {{ f.vinSufix.value || 'Not provided' }}
+            </span>
+          </p>
+          <p>
+            <strong>S3 Bucket:</strong>
+            <span class="status-value" [class.status-ok]="f.s3Bucket.valid" [class.status-error]="!f.s3Bucket.valid">
+              {{ f.s3Bucket.value || 'Not provided' }}
+            </span>
+          </p>
+          <p>
+            <strong>Engine URL:</strong>
+            <span class="status-value" [class.status-ok]="f.engineUrl.valid" [class.status-error]="!f.engineUrl.valid">
+              {{ f.engineUrl.value || 'Not provided' }}
+            </span>
+          </p>
+          <p>
+            <strong>Generation Type:</strong>
+            <span class="status-value status-ok">
+              {{ f.generationTypeAllAtOnce.value ? 'All at once' : 'Distributed over time' }}
+            </span>
+          </p>
+        </aside>
+
+        <label class="field third row1">
+          <span>Amount of Vehicles</span>
+          <input type="number" formControlName="amountOfVehicles" step="1" min="0" />
+          <small [class.visible]="f.amountOfVehicles.touched && f.amountOfVehicles.invalid">Informe um inteiro maior ou igual a 0.</small>
+        </label>
+
+        <label class="field third row1">
+          <span>VIN Prefix</span>
+          <input type="text" formControlName="vinPrefix" placeholder="Ex: CARFWG" />
+          <small [class.visible]="f.vinPrefix.touched && f.vinPrefix.invalid">Mandatory field (exactly 6 characters).</small>
+        </label>
+
+        <label class="field third row1">
+          <span>VIN Trailler</span>
+          <input type="text" formControlName="vinSufix" placeholder="Ex: ACHDF" />
+          <small [class.visible]="f.vinSufix.touched && f.vinSufix.invalid">Mandatory field (exactly 5 characters).</small>
+        </label>
+
+        <label class="field third row2">
+          <span>Initial DateTime</span>
+          <input type="datetime-local" formControlName="initialDateTime" />
+          <small [class.visible]="f.initialDateTime.touched && f.initialDateTime.invalid">Mandatory date/time field.</small>
+        </label>
+
+        <label class="field third row2">
+          <span>Amount of Time (hours)</span>
+          <input type="number" formControlName="amountOfTime" step="0.1" min="0" />
+          <small [class.visible]="f.amountOfTime.touched && f.amountOfTime.invalid">Informe um numero decimal valido.</small>
+        </label>
+
+        <label class="field third row2">
+          <span>Latency Time (seconds)</span>
+          <input type="number" formControlName="latencyTime" step="1" min="0" />
+          <small [class.visible]="f.latencyTime.touched && f.latencyTime.invalid">Mandatory integer field.</small>
+        </label>
+
+        <div class="field third row3">
+          <span>DBC Files</span>
+          <div class="multi-select" [class.open]="isDbcOpen">
+            <button type="button" class="multi-select-trigger" (click)="toggleDbcOpen()">
+              <span class="multi-select-value">{{ dbcSummary }}</span>
+              <span class="multi-select-caret" *ngIf="isDbcOpen">&#9652;</span>
+              <span class="multi-select-caret" *ngIf="!isDbcOpen">&#9662;</span>
+            </button>
+            <div class="multi-select-panel" *ngIf="isDbcOpen">
+              <label class="multi-select-option" *ngFor="let dbc of dbcOptions">
+                <input type="checkbox" [checked]="isDbcSelected(dbc)" (change)="onDbcToggle(dbc, $any($event.target).checked)" />
+                <span class="option-label">{{ dbc }}</span>
+              </label>
+              <div class="single-select-empty" *ngIf="dbcOptions.length === 0">No DBC files configured.</div>
+            </div>
+          </div>
+          <small [class.visible]="f.dbcFiles.touched && f.dbcFiles.invalid">Select at least one DBC file.</small>
+        </div>
+        <div class="field third row3">
+          <span>GPS Area</span>
+          <div class="multi-select" [class.open]="isGpsOpen">
+            <button type="button" class="multi-select-trigger" (click)="toggleGpsOpen()">
+              <span class="multi-select-value">{{ gpsSummary }}</span>
+              <span class="multi-select-caret" *ngIf="isGpsOpen">&#9652;</span>
+              <span class="multi-select-caret" *ngIf="!isGpsOpen">&#9662;</span>
+            </button>
+            <div class="multi-select-panel" *ngIf="isGpsOpen">
+              <input
+                type="text"
+                class="single-select-filter"
+                placeholder="Type to filter regions..."
+                [(ngModel)]="gpsFilter"
+                [ngModelOptions]="{ standalone: true }"
+              />
+              <button type="button" class="single-select-option" *ngFor="let area of filteredGpsAreas" (click)="selectGpsArea(area)">
+                {{ area }}
+              </button>
+              <div class="single-select-empty" *ngIf="filteredGpsAreas.length === 0">No regions found.</div>
+            </div>
+          </div>
+          <small [class.visible]="f.gpsArea.touched && f.gpsArea.invalid">Select a GPS area.</small>
+        </div>
+        <div class="field third row3">
+          <span>CAN Frames</span>
+          <div class="multi-select" [class.open]="isCanOpen">
+            <button type="button" class="multi-select-trigger" (click)="toggleCanOpen()">
+              <span class="multi-select-value">{{ canSummary }}</span>
+              <span class="multi-select-caret" *ngIf="isCanOpen">&#9652;</span>
+              <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
+            </button>
+            <div class="multi-select-panel" *ngIf="isCanOpen">
+              <label class="multi-select-option" *ngFor="let frame of canFrameOptions">
+                <input type="checkbox" [checked]="isCanSelected(frame)" (change)="onCanToggle(frame, $any($event.target).checked)" />
+                <span class="option-label">{{ frame }}</span>
+              </label>
+            </div>
+          </div>
+          <small [class.visible]="f.canFrames.touched && f.canFrames.invalid">Select at least one CAN frame.</small>
+        </div>
+
+        <label class="field third row4">
+          <span>Number of Blocks (0 for all)</span>
+          <input type="number" formControlName="numberOfBlocks" step="1" min="0" />
+          <small [class.visible]="f.numberOfBlocks.touched && f.numberOfBlocks.invalid">Mandatory integer field.</small>
+        </label>
+
+        <label class="field third row4">
+          <span>Blocks Size (Bytes)</span>
+          <input type="number" formControlName="sizeOfBlocksBytes" step="1" min="0" />
+          <small [class.visible]="f.sizeOfBlocksBytes.touched && f.sizeOfBlocksBytes.invalid">Mandatory integer field.</small>
+        </label>
+
+        <label class="field third row4">
+          <span>Generation type</span>
+          <div class="switch-row">
+            <span class="switch-label">Over time</span>
+            <label class="switch-control">
+              <input type="checkbox" formControlName="generationTypeAllAtOnce" />
+              <span class="switch-slider"></span>
+            </label>
+            <span class="switch-label">All at once</span>
+          </div>
+        </label>
+
+        <label class="field half">
+          <span>S3 Bucket</span>
+          <input type="text" formControlName="s3Bucket" placeholder="Ex: my-trackster-bucket" />
+          <small [class.visible]="f.s3Bucket.touched && f.s3Bucket.invalid">Provide a valid bucket.</small>
+        </label>
+
+        <label class="field half">
+          <span>Engine URL</span>
+          <input type="text" formControlName="engineUrl" placeholder="Ex: https://engine.example.com/api" />
+          <small [class.visible]="f.engineUrl.touched && f.engineUrl.invalid">Provide a valid URL (http/https).</small>
+        </label>
+
+        <label class="field full">
+          <span>Payload (JSON)</span>
+          <textarea rows="10" formControlName="payload" readonly></textarea>
+          <small [class.visible]="f.payload.touched && f.payload.errors?.['jsonInvalid']">Payload invalido (JSON mal formatado).</small>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="form.invalid || isSubmitting">{{ isSubmitting ? 'Generating...' : 'Generate' }}</button>
+      </div>
+    </form>
+  </section>
+</main>
