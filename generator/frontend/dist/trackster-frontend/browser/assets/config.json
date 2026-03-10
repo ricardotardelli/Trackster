@@ -1,5 +1,5 @@
 ﻿{
-    "workQueueUrl":  "",
+    "workQueueUrl":  "https://sqs.us-east-1.amazonaws.com/366493038898/sqs-trackster-vehicles-creation",
     "dbcFiles":  [
                     "dbc_a",
                     "dbc_b",

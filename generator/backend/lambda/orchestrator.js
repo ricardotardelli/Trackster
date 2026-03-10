@@ -6,10 +6,11 @@
 //   Each vehicle = ONE SQS message (the worker generates ONE .bin per message).
 // ============================================================================
 
+const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
+
 const REGION = "us-east-1";
 const SQS_BATCH = 10;
 const MAX_VEHICLES = 150000;
-const SEND_TO_SQS = false;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -151,7 +152,7 @@ module.exports.handler = async (event, context) => {
     const s3Bucket = String(p.s3Bucket || "").trim();
     const workQueueUrl = resolveWorkQueueUrl(p);
 
-    if (SEND_TO_SQS && !workQueueUrl) {
+    if (!workQueueUrl) {
       return httpResp(400, { requestId, error: "workQueueUrl is required" });
     }
 
@@ -192,7 +193,9 @@ module.exports.handler = async (event, context) => {
       });
     }
 
-    console.log(`[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl || "mock"} send_to_sqs=${SEND_TO_SQS}`);
+    console.log(`[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl}`);
+
+    const sqs = new SQSClient({ region: REGION });
 
     const allEntries = vehicles.map((v, idx) => ({
       Id: `v-${idx}`,
@@ -223,17 +226,10 @@ module.exports.handler = async (event, context) => {
     let sentBatches = 0;
     for (let i = 0; i < allEntries.length; i += SQS_BATCH) {
       const batch = allEntries.slice(i, i + SQS_BATCH);
-      let resp = { Failed: [] };
-
-      if (SEND_TO_SQS) {
-        const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
-        const sqs = new SQSClient({ region: REGION });
-
-        resp = await sqs.send(new SendMessageBatchCommand({
-          QueueUrl: workQueueUrl,
-          Entries: batch
-        }));
-      }
+      const resp = await sqs.send(new SendMessageBatchCommand({
+        QueueUrl: workQueueUrl,
+        Entries: batch
+      }));
 
       sentBatches++;
 
