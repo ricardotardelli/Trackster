@@ -33390,12 +33390,30 @@ var AppComponent = class _AppComponent {
   }
   parseResponseBody(response) {
     return __async(this, null, function* () {
-      const contentType = response.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) {
-        return response.json();
-      }
+      const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
       const text = yield response.text();
-      return text || null;
+      if (!text) {
+        return null;
+      }
+      if (contentType.includes("application/json")) {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return {
+            rawBody: text,
+            parseError: "Response declared application/json but returned invalid JSON."
+          };
+        }
+      }
+      const trimmed = text.trim();
+      if (trimmed.startsWith("{") && trimmed.endsWith("}") || trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          return text;
+        }
+      }
+      return text;
     });
   }
   serializeHeaders(headers) {

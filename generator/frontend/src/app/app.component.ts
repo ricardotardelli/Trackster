@@ -376,13 +376,34 @@ export class AppComponent {
   }
 
   private async parseResponseBody(response: Response): Promise<unknown> {
-    const contentType = response.headers.get('content-type') ?? '';
-    if (contentType.includes('application/json')) {
-      return response.json();
+    const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
+    const text = await response.text();
+
+    if (!text) {
+      return null;
     }
 
-    const text = await response.text();
-    return text || null;
+    if (contentType.includes('application/json')) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return {
+          rawBody: text,
+          parseError: 'Response declared application/json but returned invalid JSON.'
+        };
+      }
+    }
+
+    const trimmed = text.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return text;
+      }
+    }
+
+    return text;
   }
 
   private serializeHeaders(headers: Headers): Record<string, string> {
