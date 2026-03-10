@@ -32902,25 +32902,25 @@ var ReactiveFormsModule = class _ReactiveFormsModule {
 
 // src/app/app.component.ts
 var _c0 = () => ({ standalone: true });
-function AppComponent_span_99_Template(rf, ctx) {
+function AppComponent_span_104_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 36);
     \u0275\u0275text(1, "\u25B4");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_span_100_Template(rf, ctx) {
+function AppComponent_span_105_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 36);
     \u0275\u0275text(1, "\u25BE");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_div_101_label_1_Template(rf, ctx) {
+function AppComponent_div_106_label_1_Template(rf, ctx) {
   if (rf & 1) {
     const _r1 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "label", 40)(1, "input", 41);
-    \u0275\u0275listener("change", function AppComponent_div_101_label_1_Template_input_change_1_listener($event) {
+    \u0275\u0275listener("change", function AppComponent_div_106_label_1_Template_input_change_1_listener($event) {
       const dbc_r2 = \u0275\u0275restoreView(_r1).$implicit;
       const ctx_r2 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r2.onDbcToggle(dbc_r2, $event.target.checked));
@@ -32939,17 +32939,17 @@ function AppComponent_div_101_label_1_Template(rf, ctx) {
     \u0275\u0275textInterpolate(dbc_r2);
   }
 }
-function AppComponent_div_101_div_2_Template(rf, ctx) {
+function AppComponent_div_106_div_2_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 43);
     \u0275\u0275text(1, "No DBC files configured.");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_div_101_Template(rf, ctx) {
+function AppComponent_div_106_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 37);
-    \u0275\u0275template(1, AppComponent_div_101_label_1_Template, 4, 2, "label", 38)(2, AppComponent_div_101_div_2_Template, 2, 0, "div", 39);
+    \u0275\u0275template(1, AppComponent_div_106_label_1_Template, 4, 2, "label", 38)(2, AppComponent_div_106_div_2_Template, 2, 0, "div", 39);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -32960,25 +32960,25 @@ function AppComponent_div_101_Template(rf, ctx) {
     \u0275\u0275property("ngIf", ctx_r2.dbcOptions.length === 0);
   }
 }
-function AppComponent_span_111_Template(rf, ctx) {
+function AppComponent_span_116_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 36);
     \u0275\u0275text(1, "\u25B4");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_span_112_Template(rf, ctx) {
+function AppComponent_span_117_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 36);
     \u0275\u0275text(1, "\u25BE");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_div_113_button_2_Template(rf, ctx) {
+function AppComponent_div_118_button_2_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "button", 46);
-    \u0275\u0275listener("click", function AppComponent_div_113_button_2_Template_button_click_0_listener() {
+    \u0275\u0275listener("click", function AppComponent_div_118_button_2_Template_button_click_0_listener() {
       const area_r6 = \u0275\u0275restoreView(_r5).$implicit;
       const ctx_r2 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r2.selectGpsArea(area_r6));
@@ -32992,25 +32992,25 @@ function AppComponent_div_113_button_2_Template(rf, ctx) {
     \u0275\u0275textInterpolate1(" ", area_r6, " ");
   }
 }
-function AppComponent_div_113_div_3_Template(rf, ctx) {
+function AppComponent_div_118_div_3_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 43);
     \u0275\u0275text(1, "No regions found.");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_div_113_Template(rf, ctx) {
+function AppComponent_div_118_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "div", 37)(1, "input", 44);
-    \u0275\u0275twoWayListener("ngModelChange", function AppComponent_div_113_Template_input_ngModelChange_1_listener($event) {
+    \u0275\u0275twoWayListener("ngModelChange", function AppComponent_div_118_Template_input_ngModelChange_1_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r2 = \u0275\u0275nextContext();
       \u0275\u0275twoWayBindingSet(ctx_r2.gpsFilter, $event) || (ctx_r2.gpsFilter = $event);
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275template(2, AppComponent_div_113_button_2_Template, 2, 1, "button", 45)(3, AppComponent_div_113_div_3_Template, 2, 0, "div", 39);
+    \u0275\u0275template(2, AppComponent_div_118_button_2_Template, 2, 1, "button", 45)(3, AppComponent_div_118_div_3_Template, 2, 0, "div", 39);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -33024,25 +33024,25 @@ function AppComponent_div_113_Template(rf, ctx) {
     \u0275\u0275property("ngIf", ctx_r2.filteredGpsAreas.length === 0);
   }
 }
-function AppComponent_span_123_Template(rf, ctx) {
+function AppComponent_span_128_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 36);
     \u0275\u0275text(1, "\u25B4");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_span_124_Template(rf, ctx) {
+function AppComponent_span_129_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "span", 36);
     \u0275\u0275text(1, "\u25BE");
     \u0275\u0275elementEnd();
   }
 }
-function AppComponent_div_125_label_1_Template(rf, ctx) {
+function AppComponent_div_130_label_1_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
     \u0275\u0275elementStart(0, "label", 40)(1, "input", 41);
-    \u0275\u0275listener("change", function AppComponent_div_125_label_1_Template_input_change_1_listener($event) {
+    \u0275\u0275listener("change", function AppComponent_div_130_label_1_Template_input_change_1_listener($event) {
       const frame_r8 = \u0275\u0275restoreView(_r7).$implicit;
       const ctx_r2 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r2.onCanToggle(frame_r8, $event.target.checked));
@@ -33061,10 +33061,10 @@ function AppComponent_div_125_label_1_Template(rf, ctx) {
     \u0275\u0275textInterpolate(frame_r8);
   }
 }
-function AppComponent_div_125_Template(rf, ctx) {
+function AppComponent_div_130_Template(rf, ctx) {
   if (rf & 1) {
     \u0275\u0275elementStart(0, "div", 37);
-    \u0275\u0275template(1, AppComponent_div_125_label_1_Template, 4, 2, "label", 38);
+    \u0275\u0275template(1, AppComponent_div_130_label_1_Template, 4, 2, "label", 38);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -33086,6 +33086,7 @@ var AppComponent = class _AppComponent {
     this.isDbcOpen = false;
     this.isSubmitting = false;
     this.formStatus = "pending";
+    this.generationTimestamp = "";
     this.suppressFormReset = false;
     this.form = this.fb.nonNullable.group({
       amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -33233,6 +33234,7 @@ var AppComponent = class _AppComponent {
         url: this.form.controls.engineUrl.value,
         body: envelope
       };
+      this.generationTimestamp = this.makeGenerationTimestamp();
       this.formStatus = "awaiting_response";
       this.isSubmitting = true;
       try {
@@ -33488,6 +33490,16 @@ var AppComponent = class _AppComponent {
     const minutes = String(now.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
+  makeGenerationTimestamp() {
+    const now = /* @__PURE__ */ new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+    return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+  }
   static {
     this.\u0275fac = function AppComponent_Factory(t) {
       return new (t || _AppComponent)(\u0275\u0275directiveInject(FormBuilder), \u0275\u0275directiveInject(ElementRef));
@@ -33500,7 +33512,7 @@ var AppComponent = class _AppComponent {
           return ctx.onDocumentClick($event);
         }, false, \u0275\u0275resolveDocument);
       }
-    }, standalone: true, features: [\u0275\u0275StandaloneFeature], decls: 172, vars: 92, consts: [[1, "page"], [1, "panel"], [3, "ngSubmit", "formGroup"], [1, "grid"], [1, "status-panel"], [1, "status-value"], [1, "status-value", "status-ok"], [1, "field", "third", "row1"], ["type", "number", "formControlName", "amountOfVehicles", "step", "1", "min", "0"], ["type", "text", "formControlName", "vinPrefix", "placeholder", "Ex: CARFWG"], ["type", "text", "formControlName", "vinSuffix", "placeholder", "Ex: ACHDF"], [1, "field", "third", "row2"], ["type", "datetime-local", "formControlName", "initialDateTime"], ["type", "number", "formControlName", "amountOfTime", "step", "0.1", "min", "0"], ["type", "number", "formControlName", "latencyTime", "step", "1", "min", "0"], [1, "field", "third", "row3"], [1, "multi-select"], ["type", "button", 1, "multi-select-trigger", 3, "click"], [1, "multi-select-value"], ["class", "multi-select-caret", 4, "ngIf"], ["class", "multi-select-panel", 4, "ngIf"], [1, "field", "third", "row4"], ["type", "number", "formControlName", "numberOfBlocks", "step", "1", "min", "0"], ["type", "number", "formControlName", "sizeOfBlocksBytes", "step", "1", "min", "0"], [1, "switch-row"], [1, "switch-label"], [1, "switch-control"], ["type", "checkbox", "formControlName", "generationTypeAllAtOnce"], [1, "switch-slider"], [1, "field", "half"], ["type", "text", "formControlName", "s3Bucket", "placeholder", "Ex: my-trackster-bucket"], ["type", "text", "formControlName", "engineUrl", "placeholder", "Ex: https://engine.example.com/api"], [1, "field", "full"], ["rows", "10", "formControlName", "payload", "readonly", ""], [1, "actions"], ["type", "submit", 3, "disabled"], [1, "multi-select-caret"], [1, "multi-select-panel"], ["class", "multi-select-option", 4, "ngFor", "ngForOf"], ["class", "single-select-empty", 4, "ngIf"], [1, "multi-select-option"], ["type", "checkbox", 3, "change", "checked"], [1, "option-label"], [1, "single-select-empty"], ["type", "text", "placeholder", "Type to filter regions...", 1, "single-select-filter", 3, "ngModelChange", "ngModel", "ngModelOptions"], ["type", "button", "class", "single-select-option", 3, "click", 4, "ngFor", "ngForOf"], ["type", "button", 1, "single-select-option", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
+    }, standalone: true, features: [\u0275\u0275StandaloneFeature], decls: 177, vars: 95, consts: [[1, "page"], [1, "panel"], [3, "ngSubmit", "formGroup"], [1, "grid"], [1, "status-panel"], [1, "status-value"], [1, "status-value", "status-ok"], [1, "field", "third", "row1"], ["type", "number", "formControlName", "amountOfVehicles", "step", "1", "min", "0"], ["type", "text", "formControlName", "vinPrefix", "placeholder", "Ex: CARFWG"], ["type", "text", "formControlName", "vinSuffix", "placeholder", "Ex: ACHDF"], [1, "field", "third", "row2"], ["type", "datetime-local", "formControlName", "initialDateTime"], ["type", "number", "formControlName", "amountOfTime", "step", "0.1", "min", "0"], ["type", "number", "formControlName", "latencyTime", "step", "1", "min", "0"], [1, "field", "third", "row3"], [1, "multi-select"], ["type", "button", 1, "multi-select-trigger", 3, "click"], [1, "multi-select-value"], ["class", "multi-select-caret", 4, "ngIf"], ["class", "multi-select-panel", 4, "ngIf"], [1, "field", "third", "row4"], ["type", "number", "formControlName", "numberOfBlocks", "step", "1", "min", "0"], ["type", "number", "formControlName", "sizeOfBlocksBytes", "step", "1", "min", "0"], [1, "switch-row"], [1, "switch-label"], [1, "switch-control"], ["type", "checkbox", "formControlName", "generationTypeAllAtOnce"], [1, "switch-slider"], [1, "field", "half"], ["type", "text", "formControlName", "s3Bucket", "placeholder", "Ex: my-trackster-bucket"], ["type", "text", "formControlName", "engineUrl", "placeholder", "Ex: https://engine.example.com/api"], [1, "field", "full"], ["rows", "10", "formControlName", "payload", "readonly", ""], [1, "actions"], ["type", "submit", 3, "disabled"], [1, "multi-select-caret"], [1, "multi-select-panel"], ["class", "multi-select-option", 4, "ngFor", "ngForOf"], ["class", "single-select-empty", 4, "ngIf"], [1, "multi-select-option"], ["type", "checkbox", 3, "change", "checked"], [1, "option-label"], [1, "single-select-empty"], ["type", "text", "placeholder", "Type to filter regions...", 1, "single-select-filter", 3, "ngModelChange", "ngModel", "ngModelOptions"], ["type", "button", "class", "single-select-option", 3, "click", 4, "ngFor", "ngForOf"], ["type", "button", 1, "single-select-option", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "main", 0)(1, "section", 1)(2, "h1");
         \u0275\u0275text(3, "Trackster - CAN Frames Generator");
@@ -33520,195 +33532,201 @@ var AppComponent = class _AppComponent {
         \u0275\u0275text(15);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(16, "p")(17, "strong");
-        \u0275\u0275text(18, "DBC:");
+        \u0275\u0275text(18, "Generation TS:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(19, "span", 5);
         \u0275\u0275text(20);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(21, "p")(22, "strong");
-        \u0275\u0275text(23, "CAN Frames:");
+        \u0275\u0275text(23, "DBC:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(24, "span", 5);
         \u0275\u0275text(25);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(26, "p")(27, "strong");
-        \u0275\u0275text(28, "GPS:");
+        \u0275\u0275text(28, "CAN Frames:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(29, "span", 5);
         \u0275\u0275text(30);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(31, "p")(32, "strong");
-        \u0275\u0275text(33, "VIN Prefix:");
+        \u0275\u0275text(33, "GPS:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(34, "span", 5);
         \u0275\u0275text(35);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(36, "p")(37, "strong");
-        \u0275\u0275text(38, "VIN Trailer:");
+        \u0275\u0275text(38, "VIN Prefix:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(39, "span", 5);
         \u0275\u0275text(40);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(41, "p")(42, "strong");
-        \u0275\u0275text(43, "S3 Bucket:");
+        \u0275\u0275text(43, "VIN Trailer:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(44, "span", 5);
         \u0275\u0275text(45);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(46, "p")(47, "strong");
-        \u0275\u0275text(48, "Engine URL:");
+        \u0275\u0275text(48, "S3 Bucket:");
         \u0275\u0275elementEnd();
         \u0275\u0275elementStart(49, "span", 5);
         \u0275\u0275text(50);
         \u0275\u0275elementEnd()();
         \u0275\u0275elementStart(51, "p")(52, "strong");
-        \u0275\u0275text(53, "Generation Type:");
+        \u0275\u0275text(53, "Engine URL:");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(54, "span", 6);
+        \u0275\u0275elementStart(54, "span", 5);
         \u0275\u0275text(55);
+        \u0275\u0275elementEnd()();
+        \u0275\u0275elementStart(56, "p")(57, "strong");
+        \u0275\u0275text(58, "Generation Type:");
+        \u0275\u0275elementEnd();
+        \u0275\u0275elementStart(59, "span", 6);
+        \u0275\u0275text(60);
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(56, "label", 7)(57, "span");
-        \u0275\u0275text(58, "Amount of Vehicles");
+        \u0275\u0275elementStart(61, "label", 7)(62, "span");
+        \u0275\u0275text(63, "Amount of Vehicles");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(59, "input", 8);
-        \u0275\u0275elementStart(60, "small");
-        \u0275\u0275text(61, "Informe um inteiro maior ou igual a 0.");
+        \u0275\u0275element(64, "input", 8);
+        \u0275\u0275elementStart(65, "small");
+        \u0275\u0275text(66, "Informe um inteiro maior ou igual a 0.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(62, "label", 7)(63, "span");
-        \u0275\u0275text(64, "VIN Prefix");
+        \u0275\u0275elementStart(67, "label", 7)(68, "span");
+        \u0275\u0275text(69, "VIN Prefix");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(65, "input", 9);
-        \u0275\u0275elementStart(66, "small");
-        \u0275\u0275text(67, "Mandatory field (exactly 6 characters).");
+        \u0275\u0275element(70, "input", 9);
+        \u0275\u0275elementStart(71, "small");
+        \u0275\u0275text(72, "Mandatory field (exactly 6 characters).");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(68, "label", 7)(69, "span");
-        \u0275\u0275text(70, "VIN Trailer");
+        \u0275\u0275elementStart(73, "label", 7)(74, "span");
+        \u0275\u0275text(75, "VIN Trailer");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(71, "input", 10);
-        \u0275\u0275elementStart(72, "small");
-        \u0275\u0275text(73, "Mandatory field (exactly 5 characters).");
+        \u0275\u0275element(76, "input", 10);
+        \u0275\u0275elementStart(77, "small");
+        \u0275\u0275text(78, "Mandatory field (exactly 5 characters).");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(74, "label", 11)(75, "span");
-        \u0275\u0275text(76, "Initial DateTime");
+        \u0275\u0275elementStart(79, "label", 11)(80, "span");
+        \u0275\u0275text(81, "Initial DateTime");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(77, "input", 12);
-        \u0275\u0275elementStart(78, "small");
-        \u0275\u0275text(79, "Mandatory date/time field.");
+        \u0275\u0275element(82, "input", 12);
+        \u0275\u0275elementStart(83, "small");
+        \u0275\u0275text(84, "Mandatory date/time field.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(80, "label", 11)(81, "span");
-        \u0275\u0275text(82, "Amount of Time (hours)");
+        \u0275\u0275elementStart(85, "label", 11)(86, "span");
+        \u0275\u0275text(87, "Amount of Time (hours)");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(83, "input", 13);
-        \u0275\u0275elementStart(84, "small");
-        \u0275\u0275text(85, "Informe um numero decimal valido.");
+        \u0275\u0275element(88, "input", 13);
+        \u0275\u0275elementStart(89, "small");
+        \u0275\u0275text(90, "Informe um numero decimal valido.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(86, "label", 11)(87, "span");
-        \u0275\u0275text(88, "Latency Time (seconds)");
+        \u0275\u0275elementStart(91, "label", 11)(92, "span");
+        \u0275\u0275text(93, "Latency Time (seconds)");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(89, "input", 14);
-        \u0275\u0275elementStart(90, "small");
-        \u0275\u0275text(91, "Mandatory integer field.");
+        \u0275\u0275element(94, "input", 14);
+        \u0275\u0275elementStart(95, "small");
+        \u0275\u0275text(96, "Mandatory integer field.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(92, "div", 15)(93, "span");
-        \u0275\u0275text(94, "DBC Files");
+        \u0275\u0275elementStart(97, "div", 15)(98, "span");
+        \u0275\u0275text(99, "DBC Files");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(95, "div", 16)(96, "button", 17);
-        \u0275\u0275listener("click", function AppComponent_Template_button_click_96_listener() {
+        \u0275\u0275elementStart(100, "div", 16)(101, "button", 17);
+        \u0275\u0275listener("click", function AppComponent_Template_button_click_101_listener() {
           return ctx.toggleDbcOpen();
         });
-        \u0275\u0275elementStart(97, "span", 18);
-        \u0275\u0275text(98);
+        \u0275\u0275elementStart(102, "span", 18);
+        \u0275\u0275text(103);
         \u0275\u0275elementEnd();
-        \u0275\u0275template(99, AppComponent_span_99_Template, 2, 0, "span", 19)(100, AppComponent_span_100_Template, 2, 0, "span", 19);
+        \u0275\u0275template(104, AppComponent_span_104_Template, 2, 0, "span", 19)(105, AppComponent_span_105_Template, 2, 0, "span", 19);
         \u0275\u0275elementEnd();
-        \u0275\u0275template(101, AppComponent_div_101_Template, 3, 2, "div", 20);
+        \u0275\u0275template(106, AppComponent_div_106_Template, 3, 2, "div", 20);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(102, "small");
-        \u0275\u0275text(103, "Select at least one DBC file.");
+        \u0275\u0275elementStart(107, "small");
+        \u0275\u0275text(108, "Select at least one DBC file.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(104, "div", 15)(105, "span");
-        \u0275\u0275text(106, "GPS Area");
+        \u0275\u0275elementStart(109, "div", 15)(110, "span");
+        \u0275\u0275text(111, "GPS Area");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(107, "div", 16)(108, "button", 17);
-        \u0275\u0275listener("click", function AppComponent_Template_button_click_108_listener() {
+        \u0275\u0275elementStart(112, "div", 16)(113, "button", 17);
+        \u0275\u0275listener("click", function AppComponent_Template_button_click_113_listener() {
           return ctx.toggleGpsOpen();
         });
-        \u0275\u0275elementStart(109, "span", 18);
-        \u0275\u0275text(110);
+        \u0275\u0275elementStart(114, "span", 18);
+        \u0275\u0275text(115);
         \u0275\u0275elementEnd();
-        \u0275\u0275template(111, AppComponent_span_111_Template, 2, 0, "span", 19)(112, AppComponent_span_112_Template, 2, 0, "span", 19);
+        \u0275\u0275template(116, AppComponent_span_116_Template, 2, 0, "span", 19)(117, AppComponent_span_117_Template, 2, 0, "span", 19);
         \u0275\u0275elementEnd();
-        \u0275\u0275template(113, AppComponent_div_113_Template, 4, 5, "div", 20);
+        \u0275\u0275template(118, AppComponent_div_118_Template, 4, 5, "div", 20);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(114, "small");
-        \u0275\u0275text(115, "Select a GPS area.");
+        \u0275\u0275elementStart(119, "small");
+        \u0275\u0275text(120, "Select a GPS area.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(116, "div", 15)(117, "span");
-        \u0275\u0275text(118, "CAN Frames");
+        \u0275\u0275elementStart(121, "div", 15)(122, "span");
+        \u0275\u0275text(123, "CAN Frames");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(119, "div", 16)(120, "button", 17);
-        \u0275\u0275listener("click", function AppComponent_Template_button_click_120_listener() {
+        \u0275\u0275elementStart(124, "div", 16)(125, "button", 17);
+        \u0275\u0275listener("click", function AppComponent_Template_button_click_125_listener() {
           return ctx.toggleCanOpen();
         });
-        \u0275\u0275elementStart(121, "span", 18);
-        \u0275\u0275text(122);
+        \u0275\u0275elementStart(126, "span", 18);
+        \u0275\u0275text(127);
         \u0275\u0275elementEnd();
-        \u0275\u0275template(123, AppComponent_span_123_Template, 2, 0, "span", 19)(124, AppComponent_span_124_Template, 2, 0, "span", 19);
+        \u0275\u0275template(128, AppComponent_span_128_Template, 2, 0, "span", 19)(129, AppComponent_span_129_Template, 2, 0, "span", 19);
         \u0275\u0275elementEnd();
-        \u0275\u0275template(125, AppComponent_div_125_Template, 2, 1, "div", 20);
+        \u0275\u0275template(130, AppComponent_div_130_Template, 2, 1, "div", 20);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(126, "small");
-        \u0275\u0275text(127, "Select at least one CAN frame.");
+        \u0275\u0275elementStart(131, "small");
+        \u0275\u0275text(132, "Select at least one CAN frame.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(128, "label", 21)(129, "span");
-        \u0275\u0275text(130, "Number of Blocks (0 for all)");
+        \u0275\u0275elementStart(133, "label", 21)(134, "span");
+        \u0275\u0275text(135, "Number of Blocks (0 for all)");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(131, "input", 22);
-        \u0275\u0275elementStart(132, "small");
-        \u0275\u0275text(133, "Mandatory integer field.");
+        \u0275\u0275element(136, "input", 22);
+        \u0275\u0275elementStart(137, "small");
+        \u0275\u0275text(138, "Mandatory integer field.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(134, "label", 21)(135, "span");
-        \u0275\u0275text(136, "Blocks Size (Bytes)");
+        \u0275\u0275elementStart(139, "label", 21)(140, "span");
+        \u0275\u0275text(141, "Blocks Size (Bytes)");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(137, "input", 23);
-        \u0275\u0275elementStart(138, "small");
-        \u0275\u0275text(139, "Mandatory integer field.");
+        \u0275\u0275element(142, "input", 23);
+        \u0275\u0275elementStart(143, "small");
+        \u0275\u0275text(144, "Mandatory integer field.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(140, "label", 21)(141, "span");
-        \u0275\u0275text(142, "Generation type");
+        \u0275\u0275elementStart(145, "label", 21)(146, "span");
+        \u0275\u0275text(147, "Generation type");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(143, "div", 24)(144, "span", 25);
-        \u0275\u0275text(145, "Over time");
+        \u0275\u0275elementStart(148, "div", 24)(149, "span", 25);
+        \u0275\u0275text(150, "Over time");
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(146, "label", 26);
-        \u0275\u0275element(147, "input", 27)(148, "span", 28);
+        \u0275\u0275elementStart(151, "label", 26);
+        \u0275\u0275element(152, "input", 27)(153, "span", 28);
         \u0275\u0275elementEnd();
-        \u0275\u0275elementStart(149, "span", 25);
-        \u0275\u0275text(150, "All at once");
+        \u0275\u0275elementStart(154, "span", 25);
+        \u0275\u0275text(155, "All at once");
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(151, "label", 29)(152, "span");
-        \u0275\u0275text(153, "S3 Bucket");
+        \u0275\u0275elementStart(156, "label", 29)(157, "span");
+        \u0275\u0275text(158, "S3 Bucket");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(154, "input", 30);
-        \u0275\u0275elementStart(155, "small");
-        \u0275\u0275text(156, "Provide a valid bucket.");
+        \u0275\u0275element(159, "input", 30);
+        \u0275\u0275elementStart(160, "small");
+        \u0275\u0275text(161, "Provide a valid bucket.");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(157, "label", 29)(158, "span");
-        \u0275\u0275text(159, "Engine URL");
+        \u0275\u0275elementStart(162, "label", 29)(163, "span");
+        \u0275\u0275text(164, "Engine URL");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(160, "input", 31);
-        \u0275\u0275elementStart(161, "small");
-        \u0275\u0275text(162, "Provide a valid URL (http/https).");
+        \u0275\u0275element(165, "input", 31);
+        \u0275\u0275elementStart(166, "small");
+        \u0275\u0275text(167, "Provide a valid URL (http/https).");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(163, "label", 32)(164, "span");
-        \u0275\u0275text(165, "Payload (JSON)");
+        \u0275\u0275elementStart(168, "label", 32)(169, "span");
+        \u0275\u0275text(170, "Payload (JSON)");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(166, "textarea", 33);
-        \u0275\u0275elementStart(167, "small");
-        \u0275\u0275text(168, "Payload invalido (JSON mal formatado).");
+        \u0275\u0275element(171, "textarea", 33);
+        \u0275\u0275elementStart(172, "small");
+        \u0275\u0275text(173, "Payload invalido (JSON mal formatado).");
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(169, "div", 34)(170, "button", 35);
-        \u0275\u0275text(171);
+        \u0275\u0275elementStart(174, "div", 34)(175, "button", 35);
+        \u0275\u0275text(176);
         \u0275\u0275elementEnd()()()()();
       }
       if (rf & 2) {
@@ -33718,6 +33736,10 @@ var AppComponent = class _AppComponent {
         \u0275\u0275classProp("status-ok", ctx.formStatus === "generated")("status-error", ctx.formStatus === "error");
         \u0275\u0275advance();
         \u0275\u0275textInterpolate1(" ", ctx.formStatusLabel, " ");
+        \u0275\u0275advance(4);
+        \u0275\u0275classProp("status-ok", !!ctx.generationTimestamp);
+        \u0275\u0275advance();
+        \u0275\u0275textInterpolate1(" ", ctx.generationTimestamp || "Not generated", " ");
         \u0275\u0275advance(4);
         \u0275\u0275classProp("status-ok", ctx.f.dbcFiles.valid)("status-error", !ctx.f.dbcFiles.valid);
         \u0275\u0275advance();

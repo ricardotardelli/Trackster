@@ -17,6 +17,12 @@
             </span>
           </p>
           <p>
+            <strong>Generation TS:</strong>
+            <span class="status-value" [class.status-ok]="!!generationTimestamp">
+              {{ generationTimestamp || 'Not generated' }}
+            </span>
+          </p>
+          <p>
             <strong>DBC:</strong>
             <span class="status-value" [class.status-ok]="f.dbcFiles.valid" [class.status-error]="!f.dbcFiles.valid">
               {{ f.dbcFiles.value.length }}/{{ dbcOptions.length }} selected
