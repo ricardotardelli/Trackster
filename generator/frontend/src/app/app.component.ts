@@ -211,7 +211,16 @@ export class AppComponent {
         body: JSON.stringify(request.body)
       });
 
-      const responseBody = await this.parseResponseBody(response);
+      let responseBody: unknown;
+      try {
+        responseBody = await this.parseResponseBody(response);
+      } catch (parseError: unknown) {
+        responseBody = {
+          rawBody: null,
+          parseError: this.describeFetchError(parseError)
+        };
+      }
+
       const result: Record<string, unknown> = {
         request,
         response: {
@@ -344,7 +353,8 @@ export class AppComponent {
       try {
         const response = await fetch(url, { cache: 'no-store' });
         if (response.ok) {
-          return await response.json() as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string };
+          const text = await response.text();
+          return JSON.parse(text) as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string };
         }
       } catch {
         // Try next candidate.

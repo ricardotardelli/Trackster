@@ -33241,7 +33241,15 @@ var AppComponent = class _AppComponent {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(request.body)
         });
-        const responseBody = yield this.parseResponseBody(response);
+        let responseBody;
+        try {
+          responseBody = yield this.parseResponseBody(response);
+        } catch (parseError) {
+          responseBody = {
+            rawBody: null,
+            parseError: this.describeFetchError(parseError)
+          };
+        }
         const result = {
           request,
           response: {
@@ -33361,7 +33369,8 @@ var AppComponent = class _AppComponent {
         try {
           const response = yield fetch(url, { cache: "no-store" });
           if (response.ok) {
-            return yield response.json();
+            const text = yield response.text();
+            return JSON.parse(text);
           }
         } catch {
         }
