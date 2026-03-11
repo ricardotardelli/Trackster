@@ -205,11 +205,11 @@
         </label>
 
         <label class="field full">
-          <span class="field-label-with-action">
-            <span>Payload (JSON)</span>
+          <span>Payload (JSON)</span>
+          <div class="payload-box">
             <button
               type="button"
-              class="copy-button"
+              class="copy-button copy-button-floating"
               (click)="copyPayload()"
               [disabled]="!f.payload.value"
               [attr.aria-label]="copyPayloadState === 'copied' ? 'Payload copied' : 'Copy payload'"
@@ -217,8 +217,15 @@
             >
               <span class="copy-icon" aria-hidden="true"></span>
             </button>
-          </span>
-          <textarea rows="10" formControlName="payload" readonly></textarea>
+            <span
+              class="copy-feedback"
+              [class.visible]="copyPayloadState !== 'idle'"
+              [class.error]="copyPayloadState === 'error'"
+            >
+              {{ copyPayloadState === 'copied' ? 'Copied' : 'Unable to copy' }}
+            </span>
+            <textarea rows="10" formControlName="payload" readonly></textarea>
+          </div>
           <small [class.visible]="f.payload.touched && f.payload.errors?.['jsonInvalid']">Payload invalido (JSON mal formatado).</small>
         </label>
       </div>
