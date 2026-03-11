@@ -12,7 +12,6 @@ const path = require("path");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const REGION = process.env.AWS_REGION || "us-east-1";
 const s3 = new S3Client({ region: REGION });
-const DIAG = "1";
 
 const BASE_DIR = __dirname;
 const DBC_DIR = path.join(BASE_DIR, "dbc");
@@ -378,13 +377,6 @@ function makeTimestampRelBytesMs(ms) {
 function loadSpec() {
   const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
 
-  if (!Array.isArray(cfg["s3-can-storage"]) || cfg["s3-can-storage"].length === 0) {
-    throw new Error("s3-can-storage missing or empty in config.json");
-  }
-
-  const bucketArn = cfg["s3-can-storage"][0];
-  const bucketName = bucketArn.slice("arn:aws:s3:::".length);
-
   const whitelist = new Set(
     (cfg.whitelist_can_ids || []).map(v =>
       typeof v === "string" ? parseInt(v, 16) : Number(v)
@@ -407,7 +399,7 @@ function loadSpec() {
     .filter(m => m.id !== 0x335)
     .sort((a, b) => a.id - b.id);
 
-  return { msgList, bucketName };
+  return { msgList };
 }
 
 function buildGenericHeader(numBlocks, epochMs) {
@@ -511,11 +503,7 @@ exports.handler = async (event) => {
     return;
   }
 
-  const { msgList, bucketName } = loadSpec();
-
-  const firstMsgBody = (() => {
-    try { return JSON.parse(event.Records[0].body); } catch { return {}; }
-  })();
+  const { msgList } = loadSpec();
 
   for (const rec of event.Records) {
     let msg;
@@ -550,6 +538,12 @@ exports.handler = async (event) => {
     const vin = String(msg.vin || "").trim();
     if (!vin) {
       console.log("Skipping record: missing vin");
+      continue;
+    }
+
+    const bucketName = String(msg.s3Bucket || "").trim();
+    if (!bucketName) {
+      console.log("Skipping record: missing s3Bucket");
       continue;
     }
 
