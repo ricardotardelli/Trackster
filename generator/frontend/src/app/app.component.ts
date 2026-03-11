@@ -25,6 +25,7 @@ export class AppComponent {
   isSubmitting = false;
   formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
+  copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
   private suppressFormReset = false;
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -188,6 +189,25 @@ export class AppComponent {
     } catch {
       control.markAsTouched();
     }
+  }
+
+  async copyPayload(): Promise<void> {
+    const payload = this.form.controls.payload.value;
+    if (!payload) {
+      this.copyPayloadState = 'error';
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      this.copyPayloadState = 'copied';
+    } catch {
+      this.copyPayloadState = 'error';
+    }
+
+    window.setTimeout(() => {
+      this.copyPayloadState = 'idle';
+    }, 1500);
   }
 
   async submit(): Promise<void> {

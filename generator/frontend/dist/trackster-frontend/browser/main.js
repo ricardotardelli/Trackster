@@ -32904,14 +32904,14 @@ var ReactiveFormsModule = class _ReactiveFormsModule {
 var _c0 = () => ({ standalone: true });
 function AppComponent_span_104_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 36);
+    \u0275\u0275elementStart(0, "span", 39);
     \u0275\u0275text(1, "\u25B4");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_span_105_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 36);
+    \u0275\u0275elementStart(0, "span", 39);
     \u0275\u0275text(1, "\u25BE");
     \u0275\u0275elementEnd();
   }
@@ -32919,14 +32919,14 @@ function AppComponent_span_105_Template(rf, ctx) {
 function AppComponent_div_106_label_1_Template(rf, ctx) {
   if (rf & 1) {
     const _r1 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "label", 40)(1, "input", 41);
+    \u0275\u0275elementStart(0, "label", 43)(1, "input", 44);
     \u0275\u0275listener("change", function AppComponent_div_106_label_1_Template_input_change_1_listener($event) {
       const dbc_r2 = \u0275\u0275restoreView(_r1).$implicit;
       const ctx_r2 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r2.onDbcToggle(dbc_r2, $event.target.checked));
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(2, "span", 42);
+    \u0275\u0275elementStart(2, "span", 45);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd()();
   }
@@ -32941,15 +32941,15 @@ function AppComponent_div_106_label_1_Template(rf, ctx) {
 }
 function AppComponent_div_106_div_2_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 43);
+    \u0275\u0275elementStart(0, "div", 46);
     \u0275\u0275text(1, "No DBC files configured.");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_div_106_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 37);
-    \u0275\u0275template(1, AppComponent_div_106_label_1_Template, 4, 2, "label", 38)(2, AppComponent_div_106_div_2_Template, 2, 0, "div", 39);
+    \u0275\u0275elementStart(0, "div", 40);
+    \u0275\u0275template(1, AppComponent_div_106_label_1_Template, 4, 2, "label", 41)(2, AppComponent_div_106_div_2_Template, 2, 0, "div", 42);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -32962,14 +32962,14 @@ function AppComponent_div_106_Template(rf, ctx) {
 }
 function AppComponent_span_116_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 36);
+    \u0275\u0275elementStart(0, "span", 39);
     \u0275\u0275text(1, "\u25B4");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_span_117_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 36);
+    \u0275\u0275elementStart(0, "span", 39);
     \u0275\u0275text(1, "\u25BE");
     \u0275\u0275elementEnd();
   }
@@ -32977,7 +32977,7 @@ function AppComponent_span_117_Template(rf, ctx) {
 function AppComponent_div_118_button_2_Template(rf, ctx) {
   if (rf & 1) {
     const _r5 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "button", 46);
+    \u0275\u0275elementStart(0, "button", 49);
     \u0275\u0275listener("click", function AppComponent_div_118_button_2_Template_button_click_0_listener() {
       const area_r6 = \u0275\u0275restoreView(_r5).$implicit;
       const ctx_r2 = \u0275\u0275nextContext(2);
@@ -32994,7 +32994,7 @@ function AppComponent_div_118_button_2_Template(rf, ctx) {
 }
 function AppComponent_div_118_div_3_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 43);
+    \u0275\u0275elementStart(0, "div", 46);
     \u0275\u0275text(1, "No regions found.");
     \u0275\u0275elementEnd();
   }
@@ -33002,7 +33002,7 @@ function AppComponent_div_118_div_3_Template(rf, ctx) {
 function AppComponent_div_118_Template(rf, ctx) {
   if (rf & 1) {
     const _r4 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "div", 37)(1, "input", 44);
+    \u0275\u0275elementStart(0, "div", 40)(1, "input", 47);
     \u0275\u0275twoWayListener("ngModelChange", function AppComponent_div_118_Template_input_ngModelChange_1_listener($event) {
       \u0275\u0275restoreView(_r4);
       const ctx_r2 = \u0275\u0275nextContext();
@@ -33010,7 +33010,7 @@ function AppComponent_div_118_Template(rf, ctx) {
       return \u0275\u0275resetView($event);
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275template(2, AppComponent_div_118_button_2_Template, 2, 1, "button", 45)(3, AppComponent_div_118_div_3_Template, 2, 0, "div", 39);
+    \u0275\u0275template(2, AppComponent_div_118_button_2_Template, 2, 1, "button", 48)(3, AppComponent_div_118_div_3_Template, 2, 0, "div", 42);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -33026,14 +33026,14 @@ function AppComponent_div_118_Template(rf, ctx) {
 }
 function AppComponent_span_128_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 36);
+    \u0275\u0275elementStart(0, "span", 39);
     \u0275\u0275text(1, "\u25B4");
     \u0275\u0275elementEnd();
   }
 }
 function AppComponent_span_129_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "span", 36);
+    \u0275\u0275elementStart(0, "span", 39);
     \u0275\u0275text(1, "\u25BE");
     \u0275\u0275elementEnd();
   }
@@ -33041,14 +33041,14 @@ function AppComponent_span_129_Template(rf, ctx) {
 function AppComponent_div_130_label_1_Template(rf, ctx) {
   if (rf & 1) {
     const _r7 = \u0275\u0275getCurrentView();
-    \u0275\u0275elementStart(0, "label", 40)(1, "input", 41);
+    \u0275\u0275elementStart(0, "label", 43)(1, "input", 44);
     \u0275\u0275listener("change", function AppComponent_div_130_label_1_Template_input_change_1_listener($event) {
       const frame_r8 = \u0275\u0275restoreView(_r7).$implicit;
       const ctx_r2 = \u0275\u0275nextContext(2);
       return \u0275\u0275resetView(ctx_r2.onCanToggle(frame_r8, $event.target.checked));
     });
     \u0275\u0275elementEnd();
-    \u0275\u0275elementStart(2, "span", 42);
+    \u0275\u0275elementStart(2, "span", 45);
     \u0275\u0275text(3);
     \u0275\u0275elementEnd()();
   }
@@ -33063,8 +33063,8 @@ function AppComponent_div_130_label_1_Template(rf, ctx) {
 }
 function AppComponent_div_130_Template(rf, ctx) {
   if (rf & 1) {
-    \u0275\u0275elementStart(0, "div", 37);
-    \u0275\u0275template(1, AppComponent_div_130_label_1_Template, 4, 2, "label", 38);
+    \u0275\u0275elementStart(0, "div", 40);
+    \u0275\u0275template(1, AppComponent_div_130_label_1_Template, 4, 2, "label", 41);
     \u0275\u0275elementEnd();
   }
   if (rf & 2) {
@@ -33087,6 +33087,7 @@ var AppComponent = class _AppComponent {
     this.isSubmitting = false;
     this.formStatus = "pending";
     this.generationTimestamp = "";
+    this.copyPayloadState = "idle";
     this.suppressFormReset = false;
     this.form = this.fb.nonNullable.group({
       amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -33221,6 +33222,24 @@ var AppComponent = class _AppComponent {
     } catch {
       control.markAsTouched();
     }
+  }
+  copyPayload() {
+    return __async(this, null, function* () {
+      const payload = this.form.controls.payload.value;
+      if (!payload) {
+        this.copyPayloadState = "error";
+        return;
+      }
+      try {
+        yield navigator.clipboard.writeText(payload);
+        this.copyPayloadState = "copied";
+      } catch {
+        this.copyPayloadState = "error";
+      }
+      window.setTimeout(() => {
+        this.copyPayloadState = "idle";
+      }, 1500);
+    });
   }
   submit() {
     return __async(this, null, function* () {
@@ -33512,7 +33531,7 @@ var AppComponent = class _AppComponent {
           return ctx.onDocumentClick($event);
         }, false, \u0275\u0275resolveDocument);
       }
-    }, standalone: true, features: [\u0275\u0275StandaloneFeature], decls: 177, vars: 95, consts: [[1, "page"], [1, "panel"], [3, "ngSubmit", "formGroup"], [1, "grid"], [1, "status-panel"], [1, "status-value"], [1, "status-value", "status-ok"], [1, "field", "third", "row1"], ["type", "number", "formControlName", "amountOfVehicles", "step", "1", "min", "0"], ["type", "text", "formControlName", "vinPrefix", "placeholder", "Ex: CARFWG"], ["type", "text", "formControlName", "vinSuffix", "placeholder", "Ex: ACHDF"], [1, "field", "third", "row2"], ["type", "datetime-local", "formControlName", "initialDateTime"], ["type", "number", "formControlName", "amountOfTime", "step", "0.1", "min", "0"], ["type", "number", "formControlName", "latencyTime", "step", "1", "min", "0"], [1, "field", "third", "row3"], [1, "multi-select"], ["type", "button", 1, "multi-select-trigger", 3, "click"], [1, "multi-select-value"], ["class", "multi-select-caret", 4, "ngIf"], ["class", "multi-select-panel", 4, "ngIf"], [1, "field", "third", "row4"], ["type", "number", "formControlName", "numberOfBlocks", "step", "1", "min", "0"], ["type", "number", "formControlName", "sizeOfBlocksBytes", "step", "1", "min", "0"], [1, "switch-row"], [1, "switch-label"], [1, "switch-control"], ["type", "checkbox", "formControlName", "generationTypeAllAtOnce"], [1, "switch-slider"], [1, "field", "half"], ["type", "text", "formControlName", "s3Bucket", "placeholder", "Ex: my-trackster-bucket"], ["type", "text", "formControlName", "engineUrl", "placeholder", "Ex: https://engine.example.com/api"], [1, "field", "full"], ["rows", "10", "formControlName", "payload", "readonly", ""], [1, "actions"], ["type", "submit", 3, "disabled"], [1, "multi-select-caret"], [1, "multi-select-panel"], ["class", "multi-select-option", 4, "ngFor", "ngForOf"], ["class", "single-select-empty", 4, "ngIf"], [1, "multi-select-option"], ["type", "checkbox", 3, "change", "checked"], [1, "option-label"], [1, "single-select-empty"], ["type", "text", "placeholder", "Type to filter regions...", 1, "single-select-filter", 3, "ngModelChange", "ngModel", "ngModelOptions"], ["type", "button", "class", "single-select-option", 3, "click", 4, "ngFor", "ngForOf"], ["type", "button", 1, "single-select-option", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
+    }, standalone: true, features: [\u0275\u0275StandaloneFeature], decls: 180, vars: 98, consts: [[1, "page"], [1, "panel"], [3, "ngSubmit", "formGroup"], [1, "grid"], [1, "status-panel"], [1, "status-value"], [1, "status-value", "status-ok"], [1, "field", "third", "row1"], ["type", "number", "formControlName", "amountOfVehicles", "step", "1", "min", "0"], ["type", "text", "formControlName", "vinPrefix", "placeholder", "Ex: CARFWG"], ["type", "text", "formControlName", "vinSuffix", "placeholder", "Ex: ACHDF"], [1, "field", "third", "row2"], ["type", "datetime-local", "formControlName", "initialDateTime"], ["type", "number", "formControlName", "amountOfTime", "step", "0.1", "min", "0"], ["type", "number", "formControlName", "latencyTime", "step", "1", "min", "0"], [1, "field", "third", "row3"], [1, "multi-select"], ["type", "button", 1, "multi-select-trigger", 3, "click"], [1, "multi-select-value"], ["class", "multi-select-caret", 4, "ngIf"], ["class", "multi-select-panel", 4, "ngIf"], [1, "field", "third", "row4"], ["type", "number", "formControlName", "numberOfBlocks", "step", "1", "min", "0"], ["type", "number", "formControlName", "sizeOfBlocksBytes", "step", "1", "min", "0"], [1, "switch-row"], [1, "switch-label"], [1, "switch-control"], ["type", "checkbox", "formControlName", "generationTypeAllAtOnce"], [1, "switch-slider"], [1, "field", "half"], ["type", "text", "formControlName", "s3Bucket", "placeholder", "Ex: my-trackster-bucket"], ["type", "text", "formControlName", "engineUrl", "placeholder", "Ex: https://engine.example.com/api"], [1, "field", "full"], [1, "field-label-with-action"], ["type", "button", 1, "copy-button", 3, "click", "disabled", "title"], ["aria-hidden", "true", 1, "copy-icon"], ["rows", "10", "formControlName", "payload", "readonly", ""], [1, "actions"], ["type", "submit", 3, "disabled"], [1, "multi-select-caret"], [1, "multi-select-panel"], ["class", "multi-select-option", 4, "ngFor", "ngForOf"], ["class", "single-select-empty", 4, "ngIf"], [1, "multi-select-option"], ["type", "checkbox", 3, "change", "checked"], [1, "option-label"], [1, "single-select-empty"], ["type", "text", "placeholder", "Type to filter regions...", 1, "single-select-filter", 3, "ngModelChange", "ngModel", "ngModelOptions"], ["type", "button", "class", "single-select-option", 3, "click", 4, "ngFor", "ngForOf"], ["type", "button", 1, "single-select-option", 3, "click"]], template: function AppComponent_Template(rf, ctx) {
       if (rf & 1) {
         \u0275\u0275elementStart(0, "main", 0)(1, "section", 1)(2, "h1");
         \u0275\u0275text(3, "Trackster - CAN Frames Generator");
@@ -33718,15 +33737,21 @@ var AppComponent = class _AppComponent {
         \u0275\u0275elementStart(166, "small");
         \u0275\u0275text(167, "Provide a valid URL (http/https).");
         \u0275\u0275elementEnd()();
-        \u0275\u0275elementStart(168, "label", 32)(169, "span");
-        \u0275\u0275text(170, "Payload (JSON)");
+        \u0275\u0275elementStart(168, "label", 32)(169, "span", 33)(170, "span");
+        \u0275\u0275text(171, "Payload (JSON)");
         \u0275\u0275elementEnd();
-        \u0275\u0275element(171, "textarea", 33);
-        \u0275\u0275elementStart(172, "small");
-        \u0275\u0275text(173, "Payload invalido (JSON mal formatado).");
+        \u0275\u0275elementStart(172, "button", 34);
+        \u0275\u0275listener("click", function AppComponent_Template_button_click_172_listener() {
+          return ctx.copyPayload();
+        });
+        \u0275\u0275element(173, "span", 35);
+        \u0275\u0275elementEnd()();
+        \u0275\u0275element(174, "textarea", 36);
+        \u0275\u0275elementStart(175, "small");
+        \u0275\u0275text(176, "Payload invalido (JSON mal formatado).");
         \u0275\u0275elementEnd()()();
-        \u0275\u0275elementStart(174, "div", 34)(175, "button", 35);
-        \u0275\u0275text(176);
+        \u0275\u0275elementStart(177, "div", 37)(178, "button", 38);
+        \u0275\u0275text(179);
         \u0275\u0275elementEnd()()()()();
       }
       if (rf & 2) {
@@ -33827,13 +33852,16 @@ var AppComponent = class _AppComponent {
         \u0275\u0275advance(6);
         \u0275\u0275classProp("visible", ctx.f.engineUrl.touched && ctx.f.engineUrl.invalid);
         \u0275\u0275advance(6);
+        \u0275\u0275property("disabled", !ctx.f.payload.value)("title", ctx.copyPayloadState === "copied" ? "Copied" : ctx.copyPayloadState === "error" ? "Unable to copy" : "Copy payload");
+        \u0275\u0275attribute("aria-label", ctx.copyPayloadState === "copied" ? "Payload copied" : "Copy payload");
+        \u0275\u0275advance(3);
         \u0275\u0275classProp("visible", ctx.f.payload.touched && (ctx.f.payload.errors == null ? null : ctx.f.payload.errors["jsonInvalid"]));
         \u0275\u0275advance(3);
         \u0275\u0275property("disabled", ctx.form.invalid || ctx.isSubmitting);
         \u0275\u0275advance();
         \u0275\u0275textInterpolate(ctx.isSubmitting ? "Generating..." : "Generate");
       }
-    }, dependencies: [CommonModule, NgForOf, NgIf, ReactiveFormsModule, \u0275NgNoValidate, DefaultValueAccessor, NumberValueAccessor, CheckboxControlValueAccessor, NgControlStatus, NgControlStatusGroup, MinValidator, FormGroupDirective, FormControlName, FormsModule, NgModel], styles: ['\n\n.page[_ngcontent-%COMP%] {\n  min-height: 100vh;\n  display: grid;\n  place-items: center;\n  padding: 28px;\n}\n.panel[_ngcontent-%COMP%] {\n  width: min(100%, 1180px);\n  background: rgba(255, 255, 255, 0.8);\n  border: 1px solid rgba(148, 163, 184, 0.32);\n  border-radius: 20px;\n  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.12);\n  -webkit-backdrop-filter: blur(10px);\n  backdrop-filter: blur(10px);\n  padding: 30px;\n}\nh1[_ngcontent-%COMP%] {\n  margin: 0 0 6px;\n  font-size: 1.8rem;\n  font-weight: 800;\n  letter-spacing: -0.02em;\n  color: #0b1f44;\n}\n.subtitle[_ngcontent-%COMP%] {\n  margin: 0 0 24px;\n  color: #475569;\n}\n.grid[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(12, minmax(0, 1fr));\n  grid-auto-flow: row dense;\n  gap: 16px;\n}\n.field[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 7px;\n  align-content: start;\n}\n.field.full[_ngcontent-%COMP%] {\n  grid-column: span 12;\n}\n.field.third[_ngcontent-%COMP%] {\n  grid-column: span 3;\n}\n.field.half[_ngcontent-%COMP%] {\n  grid-column: span 6;\n}\n.field.row1[_ngcontent-%COMP%] {\n  grid-row: 1;\n}\n.field.row2[_ngcontent-%COMP%] {\n  grid-row: 2;\n}\n.field.row3[_ngcontent-%COMP%] {\n  grid-row: 3;\n}\n.field.row4[_ngcontent-%COMP%] {\n  grid-row: 4;\n}\n.status-panel[_ngcontent-%COMP%] {\n  grid-column: span 3;\n  grid-row: 1 / span 4;\n  border: 1px solid rgba(14, 116, 144, 0.42);\n  border-radius: 14px;\n  background:\n    linear-gradient(\n      160deg,\n      rgba(186, 230, 253, 0.92) 0%,\n      rgba(224, 242, 254, 0.92) 100%);\n  padding: 14px;\n  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);\n}\n.status-panel[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  margin: 0 0 12px;\n  font-size: 1.05rem;\n  font-weight: 800;\n  color: #0c4a6e;\n}\n.status-panel[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 8px;\n  font-size: 0.92rem;\n  color: #1e293b;\n  display: flex;\n  align-items: baseline;\n  gap: 4px;\n  min-width: 0;\n}\n.status-panel[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%] {\n  color: #1e293b;\n  flex: 0 0 auto;\n  white-space: nowrap;\n}\n.status-value[_ngcontent-%COMP%] {\n  font-weight: 700;\n  flex: 1 1 auto;\n  min-width: 0;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.status-ok[_ngcontent-%COMP%] {\n  color: #15803d;\n}\n.status-error[_ngcontent-%COMP%] {\n  color: #b91c1c;\n}\nspan[_ngcontent-%COMP%] {\n  font-size: 0.88rem;\n  font-weight: 700;\n  color: #1e293b;\n}\ninput[_ngcontent-%COMP%], select[_ngcontent-%COMP%], textarea[_ngcontent-%COMP%] {\n  width: 100%;\n  border: 1px solid #bfdbfe;\n  border-radius: 12px;\n  padding: 11px 13px;\n  font: inherit;\n  color: #0f172a;\n  background:\n    linear-gradient(\n      180deg,\n      #ffffff 0%,\n      #f8fbff 100%);\n  transition:\n    border-color 0.16s ease,\n    box-shadow 0.16s ease,\n    transform 0.16s ease;\n}\n.multi-select[_ngcontent-%COMP%] {\n  position: relative;\n}\n.multi-select-trigger[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  width: 100%;\n  border: 1px solid #bfdbfe;\n  border-radius: 12px;\n  padding: 11px 13px;\n  font: inherit;\n  background:\n    linear-gradient(\n      180deg,\n      #ffffff 0%,\n      #f8fbff 100%);\n  color: #0f172a;\n  text-align: left;\n  cursor: pointer;\n  transition:\n    border-color 0.16s ease,\n    box-shadow 0.16s ease,\n    transform 0.16s ease;\n}\n.multi-select-value[_ngcontent-%COMP%] {\n  font-size: 0.92rem;\n  font-weight: 600;\n}\n.multi-select-caret[_ngcontent-%COMP%] {\n  font-size: 0.8rem;\n  color: #0369a1;\n}\n.multi-select-panel[_ngcontent-%COMP%] {\n  position: absolute;\n  top: calc(100% + 8px);\n  left: 0;\n  width: 100%;\n  max-height: 240px;\n  overflow: auto;\n  border: 1px solid #bfdbfe;\n  border-radius: 12px;\n  background: #ffffff;\n  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);\n  padding: 8px;\n  z-index: 20;\n}\n.multi-select-option[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: 16px 1fr;\n  align-items: center;\n  gap: 8px;\n  padding: 7px 6px;\n  border-radius: 8px;\n  cursor: pointer;\n}\n.multi-select-option[_ngcontent-%COMP%]:hover {\n  background: #f0f9ff;\n}\n.option-label[_ngcontent-%COMP%] {\n  font-size: 0.9rem;\n  font-weight: 500;\n  color: #0f172a;\n  white-space: nowrap;\n}\n.single-select-option[_ngcontent-%COMP%] {\n  width: 100%;\n  border: 0;\n  background: transparent;\n  color: #0f172a;\n  text-align: left;\n  padding: 8px 7px;\n  border-radius: 8px;\n  cursor: pointer;\n}\n.single-select-option[_ngcontent-%COMP%]:hover {\n  background: #f0f9ff;\n}\n.single-select-filter[_ngcontent-%COMP%] {\n  width: 100%;\n  border: 1px solid #bfdbfe;\n  border-radius: 8px;\n  padding: 8px 10px;\n  font: inherit;\n  margin-bottom: 8px;\n}\n.single-select-empty[_ngcontent-%COMP%] {\n  color: #64748b;\n  font-size: 0.88rem;\n  padding: 8px 6px;\n}\n.switch-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 18px;\n  width: 100%;\n  min-height: 46px;\n  padding: 0 2px;\n}\n.switch-label[_ngcontent-%COMP%] {\n  font-size: 0.88rem;\n  font-weight: 700;\n  color: #1e293b;\n  white-space: nowrap;\n}\n.switch-control[_ngcontent-%COMP%] {\n  position: relative;\n  display: inline-flex;\n  width: 52px;\n  height: 30px;\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%] {\n  position: absolute;\n  opacity: 0;\n  width: 0;\n  height: 0;\n}\n.switch-slider[_ngcontent-%COMP%] {\n  position: absolute;\n  inset: 0;\n  cursor: pointer;\n  border-radius: 999px;\n  background:\n    linear-gradient(\n      135deg,\n      #cbd5e1 0%,\n      #94a3b8 100%);\n  transition: background 0.22s ease, box-shadow 0.22s ease;\n}\n.switch-slider[_ngcontent-%COMP%]::before {\n  content: "";\n  position: absolute;\n  width: 24px;\n  height: 24px;\n  left: 3px;\n  top: 3px;\n  border-radius: 50%;\n  background: #ffffff;\n  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.26);\n  transition: transform 0.22s ease;\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%]:checked    + .switch-slider[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #0284c7 0%,\n      #0ea5e9 100%);\n  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%]:checked    + .switch-slider[_ngcontent-%COMP%]::before {\n  transform: translateX(22px);\n  animation: _ngcontent-%COMP%_switch-pop 0.22s ease;\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%]:focus    + .switch-slider[_ngcontent-%COMP%] {\n  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);\n}\n@keyframes _ngcontent-%COMP%_switch-pop {\n  0% {\n    transform: translateX(22px) scale(0.94);\n  }\n  60% {\n    transform: translateX(22px) scale(1.06);\n  }\n  100% {\n    transform: translateX(22px) scale(1);\n  }\n}\ntextarea[_ngcontent-%COMP%] {\n  resize: vertical;\n  min-height: 120px;\n  font-family:\n    "Consolas",\n    "Courier New",\n    monospace;\n}\ntextarea[readonly][_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      180deg,\n      #f8fbff 0%,\n      #eef6ff 100%);\n}\ninput[_ngcontent-%COMP%]:focus, select[_ngcontent-%COMP%]:focus, .multi-select-trigger[_ngcontent-%COMP%]:focus, textarea[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: #0ea5e9;\n  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);\n  transform: translateY(-1px);\n}\nsmall[_ngcontent-%COMP%] {\n  color: #be123c;\n  display: none;\n  font-size: 0.8rem;\n}\nsmall.visible[_ngcontent-%COMP%] {\n  display: block;\n}\n.actions[_ngcontent-%COMP%] {\n  margin-top: 22px;\n  display: flex;\n  justify-content: flex-end;\n}\n.actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%] {\n  border: 0;\n  background:\n    linear-gradient(\n      135deg,\n      #0284c7 0%,\n      #0ea5e9 100%);\n  color: #fff;\n  font-weight: 700;\n  border-radius: 12px;\n  padding: 11px 22px;\n  cursor: pointer;\n  box-shadow: 0 10px 22px rgba(14, 165, 233, 0.24);\n  transition: transform 0.16s ease, filter 0.16s ease;\n}\n.actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%]:hover {\n  filter: brightness(1.04);\n  transform: translateY(-1px);\n}\n.actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%]:disabled {\n  background:\n    linear-gradient(\n      135deg,\n      #94a3b8 0%,\n      #cbd5e1 100%);\n  box-shadow: none;\n  cursor: not-allowed;\n  opacity: 0.9;\n  transform: none;\n}\n@media (max-width: 992px) {\n  .panel[_ngcontent-%COMP%] {\n    padding: 22px;\n    border-radius: 16px;\n  }\n  .grid[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n  .status-panel[_ngcontent-%COMP%] {\n    grid-column: 1 / -1;\n    grid-row: auto;\n  }\n  .field.third[_ngcontent-%COMP%], .field.half[_ngcontent-%COMP%], .field.full[_ngcontent-%COMP%] {\n    grid-column: 1 / -1;\n    width: 100%;\n    min-width: 0;\n    grid-row: auto;\n  }\n}\n/*# sourceMappingURL=app.component.css.map */'] });
+    }, dependencies: [CommonModule, NgForOf, NgIf, ReactiveFormsModule, \u0275NgNoValidate, DefaultValueAccessor, NumberValueAccessor, CheckboxControlValueAccessor, NgControlStatus, NgControlStatusGroup, MinValidator, FormGroupDirective, FormControlName, FormsModule, NgModel], styles: ['\n\n.page[_ngcontent-%COMP%] {\n  min-height: 100vh;\n  display: grid;\n  place-items: center;\n  padding: 28px;\n}\n.panel[_ngcontent-%COMP%] {\n  width: min(100%, 1180px);\n  background: rgba(255, 255, 255, 0.8);\n  border: 1px solid rgba(148, 163, 184, 0.32);\n  border-radius: 20px;\n  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.12);\n  -webkit-backdrop-filter: blur(10px);\n  backdrop-filter: blur(10px);\n  padding: 30px;\n}\nh1[_ngcontent-%COMP%] {\n  margin: 0 0 6px;\n  font-size: 1.8rem;\n  font-weight: 800;\n  letter-spacing: -0.02em;\n  color: #0b1f44;\n}\n.subtitle[_ngcontent-%COMP%] {\n  margin: 0 0 24px;\n  color: #475569;\n}\n.grid[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: repeat(12, minmax(0, 1fr));\n  grid-auto-flow: row dense;\n  gap: 16px;\n}\n.field[_ngcontent-%COMP%] {\n  display: grid;\n  gap: 7px;\n  align-content: start;\n}\n.field.full[_ngcontent-%COMP%] {\n  grid-column: span 12;\n}\n.field.third[_ngcontent-%COMP%] {\n  grid-column: span 3;\n}\n.field.half[_ngcontent-%COMP%] {\n  grid-column: span 6;\n}\n.field.row1[_ngcontent-%COMP%] {\n  grid-row: 1;\n}\n.field.row2[_ngcontent-%COMP%] {\n  grid-row: 2;\n}\n.field.row3[_ngcontent-%COMP%] {\n  grid-row: 3;\n}\n.field.row4[_ngcontent-%COMP%] {\n  grid-row: 4;\n}\n.status-panel[_ngcontent-%COMP%] {\n  grid-column: span 3;\n  grid-row: 1 / span 4;\n  border: 1px solid rgba(14, 116, 144, 0.42);\n  border-radius: 14px;\n  background:\n    linear-gradient(\n      160deg,\n      rgba(186, 230, 253, 0.92) 0%,\n      rgba(224, 242, 254, 0.92) 100%);\n  padding: 14px;\n  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);\n}\n.status-panel[_ngcontent-%COMP%]   h2[_ngcontent-%COMP%] {\n  margin: 0 0 12px;\n  font-size: 1.05rem;\n  font-weight: 800;\n  color: #0c4a6e;\n}\n.status-panel[_ngcontent-%COMP%]   p[_ngcontent-%COMP%] {\n  margin: 0 0 8px;\n  font-size: 0.92rem;\n  color: #1e293b;\n  display: flex;\n  align-items: baseline;\n  gap: 4px;\n  min-width: 0;\n}\n.status-panel[_ngcontent-%COMP%]   strong[_ngcontent-%COMP%] {\n  color: #1e293b;\n  flex: 0 0 auto;\n  white-space: nowrap;\n}\n.status-value[_ngcontent-%COMP%] {\n  font-weight: 700;\n  flex: 1 1 auto;\n  min-width: 0;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.status-ok[_ngcontent-%COMP%] {\n  color: #15803d;\n}\n.status-error[_ngcontent-%COMP%] {\n  color: #b91c1c;\n}\nspan[_ngcontent-%COMP%] {\n  font-size: 0.88rem;\n  font-weight: 700;\n  color: #1e293b;\n}\n.field-label-with-action[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 10px;\n}\n.copy-button[_ngcontent-%COMP%] {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 34px;\n  height: 34px;\n  border: 1px solid #bfdbfe;\n  border-radius: 10px;\n  background:\n    linear-gradient(\n      180deg,\n      #ffffff 0%,\n      #f8fbff 100%);\n  cursor: pointer;\n  transition:\n    border-color 0.16s ease,\n    box-shadow 0.16s ease,\n    transform 0.16s ease;\n}\n.copy-button[_ngcontent-%COMP%]:hover:not(:disabled) {\n  border-color: #0ea5e9;\n  transform: translateY(-1px);\n}\n.copy-button[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: #0ea5e9;\n  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);\n}\n.copy-button[_ngcontent-%COMP%]:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.copy-icon[_ngcontent-%COMP%] {\n  position: relative;\n  width: 14px;\n  height: 14px;\n}\n.copy-icon[_ngcontent-%COMP%]::before, .copy-icon[_ngcontent-%COMP%]::after {\n  content: "";\n  position: absolute;\n  border: 1.6px solid #334155;\n  border-radius: 4px;\n  background: transparent;\n}\n.copy-icon[_ngcontent-%COMP%]::before {\n  width: 10px;\n  height: 10px;\n  top: 0;\n  left: 4px;\n}\n.copy-icon[_ngcontent-%COMP%]::after {\n  width: 10px;\n  height: 10px;\n  top: 4px;\n  left: 0;\n  background:\n    linear-gradient(\n      180deg,\n      #ffffff 0%,\n      #f8fbff 100%);\n}\ninput[_ngcontent-%COMP%], select[_ngcontent-%COMP%], textarea[_ngcontent-%COMP%] {\n  width: 100%;\n  border: 1px solid #bfdbfe;\n  border-radius: 12px;\n  padding: 11px 13px;\n  font: inherit;\n  color: #0f172a;\n  background:\n    linear-gradient(\n      180deg,\n      #ffffff 0%,\n      #f8fbff 100%);\n  transition:\n    border-color 0.16s ease,\n    box-shadow 0.16s ease,\n    transform 0.16s ease;\n}\n.multi-select[_ngcontent-%COMP%] {\n  position: relative;\n}\n.multi-select-trigger[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  width: 100%;\n  border: 1px solid #bfdbfe;\n  border-radius: 12px;\n  padding: 11px 13px;\n  font: inherit;\n  background:\n    linear-gradient(\n      180deg,\n      #ffffff 0%,\n      #f8fbff 100%);\n  color: #0f172a;\n  text-align: left;\n  cursor: pointer;\n  transition:\n    border-color 0.16s ease,\n    box-shadow 0.16s ease,\n    transform 0.16s ease;\n}\n.multi-select-value[_ngcontent-%COMP%] {\n  font-size: 0.92rem;\n  font-weight: 600;\n}\n.multi-select-caret[_ngcontent-%COMP%] {\n  font-size: 0.8rem;\n  color: #0369a1;\n}\n.multi-select-panel[_ngcontent-%COMP%] {\n  position: absolute;\n  top: calc(100% + 8px);\n  left: 0;\n  width: 100%;\n  max-height: 240px;\n  overflow: auto;\n  border: 1px solid #bfdbfe;\n  border-radius: 12px;\n  background: #ffffff;\n  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);\n  padding: 8px;\n  z-index: 20;\n}\n.multi-select-option[_ngcontent-%COMP%] {\n  display: grid;\n  grid-template-columns: 16px 1fr;\n  align-items: center;\n  gap: 8px;\n  padding: 7px 6px;\n  border-radius: 8px;\n  cursor: pointer;\n}\n.multi-select-option[_ngcontent-%COMP%]:hover {\n  background: #f0f9ff;\n}\n.option-label[_ngcontent-%COMP%] {\n  font-size: 0.9rem;\n  font-weight: 500;\n  color: #0f172a;\n  white-space: nowrap;\n}\n.single-select-option[_ngcontent-%COMP%] {\n  width: 100%;\n  border: 0;\n  background: transparent;\n  color: #0f172a;\n  text-align: left;\n  padding: 8px 7px;\n  border-radius: 8px;\n  cursor: pointer;\n}\n.single-select-option[_ngcontent-%COMP%]:hover {\n  background: #f0f9ff;\n}\n.single-select-filter[_ngcontent-%COMP%] {\n  width: 100%;\n  border: 1px solid #bfdbfe;\n  border-radius: 8px;\n  padding: 8px 10px;\n  font: inherit;\n  margin-bottom: 8px;\n}\n.single-select-empty[_ngcontent-%COMP%] {\n  color: #64748b;\n  font-size: 0.88rem;\n  padding: 8px 6px;\n}\n.switch-row[_ngcontent-%COMP%] {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 18px;\n  width: 100%;\n  min-height: 46px;\n  padding: 0 2px;\n}\n.switch-label[_ngcontent-%COMP%] {\n  font-size: 0.88rem;\n  font-weight: 700;\n  color: #1e293b;\n  white-space: nowrap;\n}\n.switch-control[_ngcontent-%COMP%] {\n  position: relative;\n  display: inline-flex;\n  width: 52px;\n  height: 30px;\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%] {\n  position: absolute;\n  opacity: 0;\n  width: 0;\n  height: 0;\n}\n.switch-slider[_ngcontent-%COMP%] {\n  position: absolute;\n  inset: 0;\n  cursor: pointer;\n  border-radius: 999px;\n  background:\n    linear-gradient(\n      135deg,\n      #cbd5e1 0%,\n      #94a3b8 100%);\n  transition: background 0.22s ease, box-shadow 0.22s ease;\n}\n.switch-slider[_ngcontent-%COMP%]::before {\n  content: "";\n  position: absolute;\n  width: 24px;\n  height: 24px;\n  left: 3px;\n  top: 3px;\n  border-radius: 50%;\n  background: #ffffff;\n  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.26);\n  transition: transform 0.22s ease;\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%]:checked    + .switch-slider[_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      135deg,\n      #0284c7 0%,\n      #0ea5e9 100%);\n  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%]:checked    + .switch-slider[_ngcontent-%COMP%]::before {\n  transform: translateX(22px);\n  animation: _ngcontent-%COMP%_switch-pop 0.22s ease;\n}\n.switch-control[_ngcontent-%COMP%]   input[_ngcontent-%COMP%]:focus    + .switch-slider[_ngcontent-%COMP%] {\n  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);\n}\n@keyframes _ngcontent-%COMP%_switch-pop {\n  0% {\n    transform: translateX(22px) scale(0.94);\n  }\n  60% {\n    transform: translateX(22px) scale(1.06);\n  }\n  100% {\n    transform: translateX(22px) scale(1);\n  }\n}\ntextarea[_ngcontent-%COMP%] {\n  resize: vertical;\n  min-height: 120px;\n  font-family:\n    "Consolas",\n    "Courier New",\n    monospace;\n}\ntextarea[readonly][_ngcontent-%COMP%] {\n  background:\n    linear-gradient(\n      180deg,\n      #f8fbff 0%,\n      #eef6ff 100%);\n}\ninput[_ngcontent-%COMP%]:focus, select[_ngcontent-%COMP%]:focus, .multi-select-trigger[_ngcontent-%COMP%]:focus, textarea[_ngcontent-%COMP%]:focus {\n  outline: none;\n  border-color: #0ea5e9;\n  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);\n  transform: translateY(-1px);\n}\nsmall[_ngcontent-%COMP%] {\n  color: #be123c;\n  display: none;\n  font-size: 0.8rem;\n}\nsmall.visible[_ngcontent-%COMP%] {\n  display: block;\n}\n.actions[_ngcontent-%COMP%] {\n  margin-top: 22px;\n  display: flex;\n  justify-content: flex-end;\n}\n.actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%] {\n  border: 0;\n  background:\n    linear-gradient(\n      135deg,\n      #0284c7 0%,\n      #0ea5e9 100%);\n  color: #fff;\n  font-weight: 700;\n  border-radius: 12px;\n  padding: 11px 22px;\n  cursor: pointer;\n  box-shadow: 0 10px 22px rgba(14, 165, 233, 0.24);\n  transition: transform 0.16s ease, filter 0.16s ease;\n}\n.actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%]:hover {\n  filter: brightness(1.04);\n  transform: translateY(-1px);\n}\n.actions[_ngcontent-%COMP%]   button[_ngcontent-%COMP%]:disabled {\n  background:\n    linear-gradient(\n      135deg,\n      #94a3b8 0%,\n      #cbd5e1 100%);\n  box-shadow: none;\n  cursor: not-allowed;\n  opacity: 0.9;\n  transform: none;\n}\n@media (max-width: 992px) {\n  .panel[_ngcontent-%COMP%] {\n    padding: 22px;\n    border-radius: 16px;\n  }\n  .grid[_ngcontent-%COMP%] {\n    grid-template-columns: 1fr;\n  }\n  .status-panel[_ngcontent-%COMP%] {\n    grid-column: 1 / -1;\n    grid-row: auto;\n  }\n  .field.third[_ngcontent-%COMP%], .field.half[_ngcontent-%COMP%], .field.full[_ngcontent-%COMP%] {\n    grid-column: 1 / -1;\n    width: 100%;\n    min-width: 0;\n    grid-row: auto;\n  }\n}\n/*# sourceMappingURL=app.component.css.map */'] });
   }
 };
 (() => {

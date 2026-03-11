@@ -125,6 +125,72 @@ span {
   color: #1e293b;
 }
 
+.field-label-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.copy-button:hover:not(:disabled) {
+  border-color: #0ea5e9;
+  transform: translateY(-1px);
+}
+
+.copy-button:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.copy-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copy-icon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+}
+
+.copy-icon::before,
+.copy-icon::after {
+  content: '';
+  position: absolute;
+  border: 1.6px solid #334155;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.copy-icon::before {
+  width: 10px;
+  height: 10px;
+  top: 0;
+  left: 4px;
+}
+
+.copy-icon::after {
+  width: 10px;
+  height: 10px;
+  top: 4px;
+  left: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
 input,
 select,
 textarea {
