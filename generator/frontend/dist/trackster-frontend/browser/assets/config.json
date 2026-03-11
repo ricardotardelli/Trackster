@@ -1,5 +1,7 @@
 ﻿{
     "workQueueUrl":  "https://sqs.us-east-1.amazonaws.com/366493038898/sqs-trackster-vehicles-creation",
+    "s3Default":     "s3-trackster-can-bucket",
+    "engineURL":     "https://7adkseqjq3p5bqnbvaf7htvauq0bzipg.lambda-url.us-east-1.on.aws/",
     "dbcFiles":  [
                     "dbc_a",
                     "dbc_b",

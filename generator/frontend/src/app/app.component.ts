@@ -348,11 +348,15 @@ export class AppComponent {
       this.canFrameOptions = Array.isArray(config.canFrames) && config.canFrames.length > 0 ? config.canFrames : defaultCanFrames;
       this.dbcOptions = Array.isArray(config.dbcFiles) && config.dbcFiles.length > 0 ? config.dbcFiles : defaultDbcFiles;
       this.form.controls.workQueueUrl.setValue(typeof config.workQueueUrl === 'string' ? config.workQueueUrl : '', { emitEvent: false });
+      this.form.controls.s3Bucket.setValue(typeof config.s3Default === 'string' && config.s3Default.trim() ? config.s3Default.trim() : '', { emitEvent: false });
+      this.form.controls.engineUrl.setValue(typeof config.engineURL === 'string' && config.engineURL.trim() ? config.engineURL.trim() : '', { emitEvent: false });
     } catch {
       this.gpsAreas = defaultGpsAreas;
       this.canFrameOptions = defaultCanFrames;
       this.dbcOptions = defaultDbcFiles;
       this.form.controls.workQueueUrl.setValue('', { emitEvent: false });
+      this.form.controls.s3Bucket.setValue('', { emitEvent: false });
+      this.form.controls.engineUrl.setValue('', { emitEvent: false });
     }
 
     this.suppressFormReset = true;
@@ -364,7 +368,7 @@ export class AppComponent {
     this.suppressFormReset = false;
   }
 
-  private async fetchRuntimeConfig(): Promise<{ gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string }> {
+  private async fetchRuntimeConfig(): Promise<{ gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string; s3Default?: string; engineURL?: string }> {
     const stamp = Date.now();
     const candidates = [
       `config.json?t=${stamp}`,
@@ -376,7 +380,7 @@ export class AppComponent {
         const response = await fetch(url, { cache: 'no-store' });
         if (response.ok) {
           const text = await response.text();
-          return JSON.parse(text) as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string };
+          return JSON.parse(text) as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string; s3Default?: string; engineURL?: string };
         }
       } catch {
         // Try next candidate.
