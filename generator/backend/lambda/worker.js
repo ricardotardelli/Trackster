@@ -402,6 +402,24 @@ function loadSpec() {
   return { msgList };
 }
 
+function resolveS3Bucket(payload) {
+  const raw = String(
+    payload?.s3Bucket ||
+    payload?.bucket ||
+    payload?.s3_bucket ||
+    ""
+  ).trim();
+
+  if (!raw) return "";
+
+  if (raw.startsWith("arn:aws:s3:::")) {
+    return raw.slice("arn:aws:s3:::".length);
+  }
+
+  return raw;
+
+}
+
 function buildGenericHeader(numBlocks, epochMs) {
   const h = Buffer.alloc(GENERIC_HEADER_SIZE, 0x00);
 
@@ -541,9 +559,9 @@ exports.handler = async (event) => {
       continue;
     }
 
-    const bucketName = String(msg.s3Bucket || "").trim();
+    const bucketName = resolveS3Bucket(msg);
     if (!bucketName) {
-      console.log("Skipping record: missing s3Bucket");
+      console.log("Skipping record: missing s3Bucket/bucket in payload");
       continue;
     }
 

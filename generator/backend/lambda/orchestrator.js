@@ -126,6 +126,15 @@ function resolveWorkQueueUrl(payload) {
   return String(payload?.workQueueUrl || "").trim();
 }
 
+function resolveS3Bucket(payload) {
+  return String(
+    payload?.s3Bucket ||
+    payload?.bucket ||
+    payload?.s3_bucket ||
+    ""
+  ).trim();
+}
+
 module.exports.handler = async (event, context) => {
   const requestId = context?.awsRequestId;
   const runId = makeRunIdUTC();
@@ -149,7 +158,7 @@ module.exports.handler = async (event, context) => {
     const vinSuffix = p.vinSuffix ?? p.vinSufix;
     const initialDateTime = String(p.initialDateTime || "").trim();
     const latencyTime = Math.max(1, parsePositiveInt(p.latencyTime));
-    const s3Bucket = String(p.s3Bucket || "").trim();
+    const s3Bucket = resolveS3Bucket(p);
     const workQueueUrl = resolveWorkQueueUrl(p);
 
     if (!workQueueUrl) {
