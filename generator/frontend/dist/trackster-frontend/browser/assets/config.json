@@ -3,12 +3,12 @@
     "s3Default":     "s3-trackster-can-bucket",
     "engineURL":     "https://7adkseqjq3p5bqnbvaf7htvauq0bzipg.lambda-url.us-east-1.on.aws/",
     "dbcFiles":  [
-                    "dbc_a",
-                    "dbc_b",
-                    "dbc_c",
-                    "dbc_d",
-                    "dbc_e",
-                    "dbc_f"
+                    "Bus_A",
+                    "Bus_B",
+                    "Bus_C",
+                    "Bus_D",
+                    "Bus_E",
+                    "Bus_F"
                  ],
     "gpsAreas":  [
                     "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",

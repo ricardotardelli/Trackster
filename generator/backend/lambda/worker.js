@@ -15,7 +15,6 @@ const s3 = new S3Client({ region: REGION });
 
 const BASE_DIR = __dirname;
 const DBC_DIR = path.join(BASE_DIR, "dbc");
-const CONFIG_PATH = path.join(BASE_DIR, "config.json");
 
 const GENERIC_HEADER_SIZE = 0x26;         // 38 bytes (keep as-is per your current working validator expectations)
 const NUM_CAN_BLOCKS_OFFSET = 0x23;       // 3 bytes (0x23..0x25)
@@ -28,6 +27,7 @@ const FD_PAYLOAD_SIZES = [
   0, 1, 2, 3, 4, 5, 6, 7, 8,
   12, 16, 20, 24, 32, 48, 64
 ];
+const specCache = new Map();
 
 async function putObjectNoOverwrite({ Bucket, Key, Body, ContentType }) {
   return s3.send(new PutObjectCommand({
@@ -374,22 +374,58 @@ function makeTimestampRelBytesMs(ms) {
   return b;
 }
 
-function loadSpec() {
-  const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+function normalizeDbcName(name) {
+  return String(name || "").trim().replace(/\.dbc$/i, "");
+}
 
-  const whitelist = new Set(
-    (cfg.whitelist_can_ids || []).map(v =>
-      typeof v === "string" ? parseInt(v, 16) : Number(v)
-    )
-  );
-  if (!whitelist.size) throw new Error("whitelist_can_ids empty");
+function resolveDbcPath(name) {
+  return path.join(DBC_DIR, `${normalizeDbcName(name)}.dbc`);
+}
 
-  const dbcNames = Object.keys(cfg.dbc_files || {});
-  if (!dbcNames.length) throw new Error("dbc_files empty");
+function resolveDbcFiles(payload) {
+  if (!Array.isArray(payload?.dbcFiles)) return [];
+
+  return Array.from(new Set(
+    payload.dbcFiles
+      .map(normalizeDbcName)
+      .filter(Boolean)
+  )).sort();
+}
+
+function normalizeCanId(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+
+  const text = String(value || "").trim();
+  if (!text) return Number.NaN;
+  if (/^0x/i.test(text)) return Number.parseInt(text, 16);
+  return Number.parseInt(text, 10);
+}
+
+function resolveCanWhitelist(payload) {
+  if (!Array.isArray(payload?.canFrames)) return new Set();
+
+  const canIds = payload.canFrames
+    .map(normalizeCanId)
+    .filter(Number.isFinite);
+
+  return new Set(canIds);
+}
+
+function loadSpec(selectedDbcFiles, whitelist) {
+  if (!whitelist.size) throw new Error("canFrames empty in message");
+
+  const dbcNames = selectedDbcFiles;
+  if (!dbcNames.length) throw new Error("dbcFiles empty in message");
+
+  const cacheKey = `${dbcNames.join("|")}::${Array.from(whitelist).sort((a, b) => a - b).join("|")}`;
+  const cached = specCache.get(cacheKey);
+  if (cached) return cached;
 
   let messages = {};
   for (const name of dbcNames) {
-    const fp = path.join(DBC_DIR, `${name}.dbc`);
+    const fp = resolveDbcPath(name);
     const dbcText = fs.readFileSync(fp, "utf8");
     Object.assign(messages, parseDbc(dbcText));
   }
@@ -399,7 +435,9 @@ function loadSpec() {
     .filter(m => m.id !== 0x335)
     .sort((a, b) => a.id - b.id);
 
-  return { msgList };
+  const spec = { msgList };
+  specCache.set(cacheKey, spec);
+  return spec;
 }
 
 function resolveS3Bucket(payload) {
@@ -521,8 +559,6 @@ exports.handler = async (event) => {
     return;
   }
 
-  const { msgList } = loadSpec();
-
   for (const rec of event.Records) {
     let msg;
     try {
@@ -559,11 +595,25 @@ exports.handler = async (event) => {
       continue;
     }
 
+    const dbcFiles = resolveDbcFiles(msg);
+    if (!dbcFiles.length) {
+      console.log("Skipping record: missing dbcFiles");
+      continue;
+    }
+
+    const whitelist = resolveCanWhitelist(msg);
+    if (!whitelist.size) {
+      console.log("Skipping record: missing canFrames");
+      continue;
+    }
+
     const bucketName = resolveS3Bucket(msg);
     if (!bucketName) {
       console.log("Skipping record: missing s3Bucket/bucket in payload");
       continue;
     }
+
+    const { msgList } = loadSpec(dbcFiles, whitelist);
 
     const seed = (epochMs ^ hashStringToU32(vin)) >>> 0;
     const bin = generateBin(msgList, cycles, seed, intervalSec, epochMs);
