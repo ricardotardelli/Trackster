@@ -1,0 +1,529 @@
+{
+  "header": {
+    "numBlocks": 1,
+    "epochMs": 1774050840000,
+    "blockDataSize": 3780,
+    "dbcValidation": {
+      "totalFrames": 99,
+      "validFrames": 99,
+      "invalidFrames": 0,
+      "errors": {
+        "unknownCanId": 0
+      },
+      "invalidIds": {}
+    }
+  },
+  "blocks": [
+    {
+      "blockNumber": 1,
+      "absTime": {
+        "sec": 0,
+        "min": 54,
+        "hour": 23,
+        "day": 20,
+        "month": 3,
+        "year": 2026
+      },
+      "relTimeMs": 0,
+      "gps": "77114820178be135",
+      "frameCount": 99,
+      "frames": [
+        {
+          "id": "0x3A",
+          "dlc": 8,
+          "payloadHex": "84090000fd000000"
+        },
+        {
+          "id": "0x75",
+          "dlc": 8,
+          "payloadHex": "8904000000000000"
+        },
+        {
+          "id": "0x86",
+          "dlc": 13,
+          "payloadHex": "2f390e0000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x108",
+          "dlc": 8,
+          "payloadHex": "b71a000000000000"
+        },
+        {
+          "id": "0x10B",
+          "dlc": 8,
+          "payloadHex": "090a0004f2051a00"
+        },
+        {
+          "id": "0x11F",
+          "dlc": 8,
+          "payloadHex": "0001698c1a0e2092"
+        },
+        {
+          "id": "0x124",
+          "dlc": 8,
+          "payloadHex": "4c0900633863fee8"
+        },
+        {
+          "id": "0x131",
+          "dlc": 8,
+          "payloadHex": "0000000000000000"
+        },
+        {
+          "id": "0x134",
+          "dlc": 8,
+          "payloadHex": "0000000000000000"
+        },
+        {
+          "id": "0x135",
+          "dlc": 8,
+          "payloadHex": "0000000000000000"
+        },
+        {
+          "id": "0x13C",
+          "dlc": 8,
+          "payloadHex": "b31227de8250c77f"
+        },
+        {
+          "id": "0x13F",
+          "dlc": 8,
+          "payloadHex": "1031c7b301000000"
+        },
+        {
+          "id": "0x159",
+          "dlc": 8,
+          "payloadHex": "00000012010d39ee"
+        },
+        {
+          "id": "0x1EE",
+          "dlc": 8,
+          "payloadHex": "080d0b6600000000"
+        },
+        {
+          "id": "0x1EF",
+          "dlc": 8,
+          "payloadHex": "cb0cd4bb92fd0b00"
+        },
+        {
+          "id": "0x21D",
+          "dlc": 13,
+          "payloadHex": "1ff76d4c64000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x21F",
+          "dlc": 13,
+          "payloadHex": "1927810000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x222",
+          "dlc": 8,
+          "payloadHex": "b8866d9e20000000"
+        },
+        {
+          "id": "0x22A",
+          "dlc": 8,
+          "payloadHex": "914ecf72ac158900"
+        },
+        {
+          "id": "0x296",
+          "dlc": 8,
+          "payloadHex": "9cf3f78dcd9500c4"
+        },
+        {
+          "id": "0x297",
+          "dlc": 8,
+          "payloadHex": "6e115089eb308239"
+        },
+        {
+          "id": "0x298",
+          "dlc": 8,
+          "payloadHex": "360e63c5561dc3b8"
+        },
+        {
+          "id": "0x299",
+          "dlc": 8,
+          "payloadHex": "cdb465e8c05d4311"
+        },
+        {
+          "id": "0x29C",
+          "dlc": 8,
+          "payloadHex": "1b98755b8cbf0196"
+        },
+        {
+          "id": "0x29D",
+          "dlc": 8,
+          "payloadHex": "3667f3854060c22e"
+        },
+        {
+          "id": "0x29E",
+          "dlc": 8,
+          "payloadHex": "03880324c7bac02a"
+        },
+        {
+          "id": "0x2A8",
+          "dlc": 8,
+          "payloadHex": "bf37b1f42d6080e5"
+        },
+        {
+          "id": "0x2A9",
+          "dlc": 8,
+          "payloadHex": "b92a54c17dcec2e0"
+        },
+        {
+          "id": "0x2AA",
+          "dlc": 8,
+          "payloadHex": "defcbd583d00c149"
+        },
+        {
+          "id": "0x2AB",
+          "dlc": 8,
+          "payloadHex": "a01e26ab3cc540f1"
+        },
+        {
+          "id": "0x2AD",
+          "dlc": 8,
+          "payloadHex": "93522ffdefb68217"
+        },
+        {
+          "id": "0x2AE",
+          "dlc": 8,
+          "payloadHex": "88a5349f4b794199"
+        },
+        {
+          "id": "0x2D3",
+          "dlc": 8,
+          "payloadHex": "c101570000000000"
+        },
+        {
+          "id": "0x317",
+          "dlc": 13,
+          "payloadHex": "753b6f00403d1bd763107103dc002b84c3330000000000000000000000000000"
+        },
+        {
+          "id": "0x319",
+          "dlc": 13,
+          "payloadHex": "39ea640000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x31E",
+          "dlc": 8,
+          "payloadHex": "0000000a131c9f5a"
+        },
+        {
+          "id": "0x31F",
+          "dlc": 8,
+          "payloadHex": "b906000000000000"
+        },
+        {
+          "id": "0x321",
+          "dlc": 8,
+          "payloadHex": "b33be812930666a7"
+        },
+        {
+          "id": "0x322",
+          "dlc": 8,
+          "payloadHex": "ddb86a3630f75e55"
+        },
+        {
+          "id": "0x324",
+          "dlc": 8,
+          "payloadHex": "a5bee8c73bfc15a0"
+        },
+        {
+          "id": "0x325",
+          "dlc": 8,
+          "payloadHex": "322a803f6c1c0000"
+        },
+        {
+          "id": "0x327",
+          "dlc": 8,
+          "payloadHex": "2867cb923bd91200"
+        },
+        {
+          "id": "0x328",
+          "dlc": 8,
+          "payloadHex": "710911f44f030300"
+        },
+        {
+          "id": "0x329",
+          "dlc": 8,
+          "payloadHex": "8732000000000000"
+        },
+        {
+          "id": "0x32B",
+          "dlc": 8,
+          "payloadHex": "984216ca43bd048b"
+        },
+        {
+          "id": "0x32C",
+          "dlc": 13,
+          "payloadHex": "7adca90000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x32D",
+          "dlc": 13,
+          "payloadHex": "dc18280000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x33B",
+          "dlc": 8,
+          "payloadHex": "f0490f030b000000"
+        },
+        {
+          "id": "0x341",
+          "dlc": 13,
+          "payloadHex": "652a870000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x349",
+          "dlc": 13,
+          "payloadHex": "b7bb320801000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x353",
+          "dlc": 8,
+          "payloadHex": "343df11b75f7284b"
+        },
+        {
+          "id": "0x354",
+          "dlc": 8,
+          "payloadHex": "445a709136611780"
+        },
+        {
+          "id": "0x35E",
+          "dlc": 13,
+          "payloadHex": "6fa81b0a1b000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x383",
+          "dlc": 8,
+          "payloadHex": "410c000000000000"
+        },
+        {
+          "id": "0x384",
+          "dlc": 8,
+          "payloadHex": "ad06000000000000"
+        },
+        {
+          "id": "0x386",
+          "dlc": 8,
+          "payloadHex": "df05000000000000"
+        },
+        {
+          "id": "0x3A9",
+          "dlc": 8,
+          "payloadHex": "3c41220600000000"
+        },
+        {
+          "id": "0x3B4",
+          "dlc": 8,
+          "payloadHex": "f701421700000000"
+        },
+        {
+          "id": "0x3B8",
+          "dlc": 8,
+          "payloadHex": "581a059809500100"
+        },
+        {
+          "id": "0x3BD",
+          "dlc": 8,
+          "payloadHex": "8b4e5c0903000000"
+        },
+        {
+          "id": "0x3C4",
+          "dlc": 8,
+          "payloadHex": "6fae14da6cb74b27"
+        },
+        {
+          "id": "0x3C5",
+          "dlc": 8,
+          "payloadHex": "e63bd9f52c4b3df8"
+        },
+        {
+          "id": "0x3C7",
+          "dlc": 8,
+          "payloadHex": "2f0a940003000048"
+        },
+        {
+          "id": "0x3D5",
+          "dlc": 8,
+          "payloadHex": "01efad3ba180ce16"
+        },
+        {
+          "id": "0x3D9",
+          "dlc": 8,
+          "payloadHex": "5217f8eb00000000"
+        },
+        {
+          "id": "0x3DD",
+          "dlc": 8,
+          "payloadHex": "c21d020000000000"
+        },
+        {
+          "id": "0x3E2",
+          "dlc": 8,
+          "payloadHex": "6453dc1700000000"
+        },
+        {
+          "id": "0x3ED",
+          "dlc": 8,
+          "payloadHex": "004a00000000000a"
+        },
+        {
+          "id": "0x444",
+          "dlc": 8,
+          "payloadHex": "01b4900000000000"
+        },
+        {
+          "id": "0x446",
+          "dlc": 8,
+          "payloadHex": "7a59131d00000000"
+        },
+        {
+          "id": "0x447",
+          "dlc": 8,
+          "payloadHex": "08353f0500000000"
+        },
+        {
+          "id": "0x449",
+          "dlc": 8,
+          "payloadHex": "eb6a7b0000000000"
+        },
+        {
+          "id": "0x44A",
+          "dlc": 13,
+          "payloadHex": "a755e80300000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x44C",
+          "dlc": 8,
+          "payloadHex": "49685e0000000000"
+        },
+        {
+          "id": "0x458",
+          "dlc": 8,
+          "payloadHex": "4df3bf6f3deb30b2"
+        },
+        {
+          "id": "0x459",
+          "dlc": 8,
+          "payloadHex": "5c50b82d8da9af90"
+        },
+        {
+          "id": "0x475",
+          "dlc": 13,
+          "payloadHex": "d1d452da50000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "id": "0x500",
+          "dlc": 8,
+          "payloadHex": "7400000000000000"
+        },
+        {
+          "id": "0x501",
+          "dlc": 8,
+          "payloadHex": "3b00000000000000"
+        },
+        {
+          "id": "0x502",
+          "dlc": 8,
+          "payloadHex": "3b10000000000000"
+        },
+        {
+          "id": "0x505",
+          "dlc": 8,
+          "payloadHex": "2010000000000000"
+        },
+        {
+          "id": "0x506",
+          "dlc": 8,
+          "payloadHex": "3210000000000000"
+        },
+        {
+          "id": "0x509",
+          "dlc": 8,
+          "payloadHex": "4810000000000000"
+        },
+        {
+          "id": "0x50A",
+          "dlc": 8,
+          "payloadHex": "9910000000000000"
+        },
+        {
+          "id": "0x50B",
+          "dlc": 8,
+          "payloadHex": "00a0000000000000"
+        },
+        {
+          "id": "0x50E",
+          "dlc": 8,
+          "payloadHex": "f810000000000000"
+        },
+        {
+          "id": "0x510",
+          "dlc": 8,
+          "payloadHex": "bb10000000000000"
+        },
+        {
+          "id": "0x511",
+          "dlc": 8,
+          "payloadHex": "5800000000000000"
+        },
+        {
+          "id": "0x512",
+          "dlc": 8,
+          "payloadHex": "3410000000000000"
+        },
+        {
+          "id": "0x513",
+          "dlc": 8,
+          "payloadHex": "010e000000000000"
+        },
+        {
+          "id": "0x515",
+          "dlc": 8,
+          "payloadHex": "5f00000000000000"
+        },
+        {
+          "id": "0x517",
+          "dlc": 8,
+          "payloadHex": "b500000000000000"
+        },
+        {
+          "id": "0x518",
+          "dlc": 8,
+          "payloadHex": "0500000000000000"
+        },
+        {
+          "id": "0x519",
+          "dlc": 8,
+          "payloadHex": "0910000000000000"
+        },
+        {
+          "id": "0x6A6",
+          "dlc": 8,
+          "payloadHex": "07e0d40527a9d525"
+        },
+        {
+          "id": "0x6E5",
+          "dlc": 8,
+          "payloadHex": "fd15000000400300"
+        },
+        {
+          "id": "0x6E7",
+          "dlc": 8,
+          "payloadHex": "fed43fec784c3fec"
+        },
+        {
+          "id": "0x6EC",
+          "dlc": 8,
+          "payloadHex": "008a00adf9e87a00"
+        },
+        {
+          "id": "0x6ED",
+          "dlc": 8,
+          "payloadHex": "01d450d724b8110b"
+        }
+      ]
+    }
+  ]
+}

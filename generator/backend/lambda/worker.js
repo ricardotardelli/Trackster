@@ -20,7 +20,6 @@ const GENERIC_HEADER_SIZE = 0x26;         // 38 bytes (keep as-is per your curre
 const NUM_CAN_BLOCKS_OFFSET = 0x23;       // 3 bytes (0x23..0x25)
 
 const BLOCK_HEADER_SIZE = 29;
-const BLOCK_DATA_SIZE = 0x1E00;
 const GPS_BYTES = Buffer.from("77114820178BE135", "hex");
 
 const FD_PAYLOAD_SIZES = [
@@ -458,7 +457,7 @@ function resolveS3Bucket(payload) {
 
 }
 
-function buildGenericHeader(numBlocks, epochMs) {
+function buildGenericHeader(numBlocks, epochMs, blockdatasize) {
   const h = Buffer.alloc(GENERIC_HEADER_SIZE, 0x00);
 
   h.writeUInt16BE(0x0001, 0x00);
@@ -470,7 +469,7 @@ function buildGenericHeader(numBlocks, epochMs) {
 
   h.writeUInt8(0x01, 0x0E);
 
-  const controlLen = numBlocks * (BLOCK_HEADER_SIZE + BLOCK_DATA_SIZE);
+  const controlLen = numBlocks * (BLOCK_HEADER_SIZE + blockdatasize);
   h.writeUInt32BE(controlLen >>> 0, 0x0F);
 
   h[NUM_CAN_BLOCKS_OFFSET + 0] = (numBlocks >> 16) & 0xff;
@@ -480,71 +479,69 @@ function buildGenericHeader(numBlocks, epochMs) {
   return h;
 }
 
-function generateBin(msgList, cycles, seed, intervalSec, epochMs) {
+function generateBin(msgList, cycles, seed, intervalSec, epochMs, blockdatasize, msg) {
   const rnd = makeRng(seed);
 
   const FRAMES_PER_BLOCK = 150;
   const blocksPerCycle = Math.ceil(msgList.length / FRAMES_PER_BLOCK);
-  const totalBlocks = cycles * blocksPerCycle;
+  const requestedBlocks = Number(msg?.numberOfBlocks || 0);
+  const totalBlocks = requestedBlocks > 0 ? requestedBlocks : (cycles * blocksPerCycle);
 
-  const genericHeader = buildGenericHeader(totalBlocks, epochMs);
+  const genericHeader = buildGenericHeader(totalBlocks, epochMs, blockdatasize);
   const blocks = [];
   const baseDate = new Date(epochMs);
 
   let blockNo = 1;
 
-  for (let i = 1; i <= cycles; i++) {
-    const simMs = (i - 1) * intervalSec * 1000;
+  for (let n = 0; n < totalBlocks; n++) {
+    const cycleIndex = Math.floor(n / blocksPerCycle);
+    const page = n % blocksPerCycle;
+
+    const simMs = cycleIndex * intervalSec * 1000;
     const simDate = new Date(baseDate.getTime() + simMs);
 
-    for (let page = 0; page < blocksPerCycle; page++) {
-      let used = 0;
-      const frames = [];
+    let used = 0;
+    const frames = [];
 
-      const start = page * FRAMES_PER_BLOCK;
-      const end = Math.min(start + FRAMES_PER_BLOCK, msgList.length);
+    const start = page * FRAMES_PER_BLOCK;
+    const end = Math.min(start + FRAMES_PER_BLOCK, msgList.length);
 
-      for (let k = start; k < end; k++) {
-        const m = msgList[k];
-        const payload = buildPayload(m, rnd);
+    for (let k = start; k < end; k++) {
+      const m = msgList[k];
+      const payload = buildPayload(m, rnd);
 
-        const frame = Buffer.alloc(8 + payload.length);
-        frame.writeUInt32BE(m.id >>> 0, 0);
+      const frame = Buffer.alloc(8 + payload.length);
+      frame.writeUInt32BE(m.id >>> 0, 0);
+      frame.writeUInt32BE(fdDlcFromSize(payload.length) >>> 0, 4);
+      payload.copy(frame, 8);
 
-        frame.writeUInt32BE(fdDlcFromSize(payload.length) >>> 0, 4);
-
-        payload.copy(frame, 8);
-
-        if (used + frame.length > BLOCK_DATA_SIZE) break;
-        frames.push(frame);
-        used += frame.length;
-      }
-
-      const block = Buffer.alloc(BLOCK_HEADER_SIZE + BLOCK_DATA_SIZE, 0x00);
-
-      block[0] = (blockNo >> 16) & 0xff;
-      block[1] = (blockNo >> 8) & 0xff;
-      block[2] = blockNo & 0xff;
-
-      makeTimestampAbsBytesFromDate(simDate).copy(block, 0x03);
-
-      makeTimestampRelBytesMs(simMs).copy(block, 0x0b);
-
-      GPS_BYTES.copy(block, 0x13);
-
-      block[0x1b] = (BLOCK_DATA_SIZE >> 8) & 0xff;
-      block[0x1c] = BLOCK_DATA_SIZE & 0xff;
-
-      let off = BLOCK_HEADER_SIZE;
-      for (const f of frames) {
-        f.copy(block, off);
-        off += f.length;
-        if (off >= block.length) break;
-      }
-
-      blocks.push(block);
-      blockNo++;
+      if (used + frame.length > blockdatasize) break;
+      frames.push(frame);
+      used += frame.length;
     }
+
+    const block = Buffer.alloc(BLOCK_HEADER_SIZE + blockdatasize, 0x00);
+
+    block[0] = (blockNo >> 16) & 0xff;
+    block[1] = (blockNo >> 8) & 0xff;
+    block[2] = blockNo & 0xff;
+
+    makeTimestampAbsBytesFromDate(simDate).copy(block, 0x03);
+    makeTimestampRelBytesMs(simMs).copy(block, 0x0b);
+    GPS_BYTES.copy(block, 0x13);
+
+    block[0x1b] = (blockdatasize >> 8) & 0xff;
+    block[0x1c] = blockdatasize & 0xff;
+
+    let off = BLOCK_HEADER_SIZE;
+    for (const f of frames) {
+      f.copy(block, off);
+      off += f.length;
+      if (off >= block.length) break;
+    }
+
+    blocks.push(block);
+    blockNo++;
   }
 
   return Buffer.concat([genericHeader, ...blocks]);
@@ -567,6 +564,8 @@ exports.handler = async (event) => {
       console.log("Skipping record: invalid JSON body");
       continue;
     }
+
+    const BLOCK_DATA_SIZE = Number(msg.blocksSize || 0x1E00);
 
     const epochMs  = Number(msg.epochMs || 0);
     const epochSec = Number(msg.epochSec || 0);
@@ -616,7 +615,7 @@ exports.handler = async (event) => {
     const { msgList } = loadSpec(dbcFiles, whitelist);
 
     const seed = (epochMs ^ hashStringToU32(vin)) >>> 0;
-    const bin = generateBin(msgList, cycles, seed, intervalSec, epochMs);
+    const bin = generateBin(msgList, cycles, seed, intervalSec, epochMs, BLOCK_DATA_SIZE, msg);
 
     let n = 1;
     while (true) {
