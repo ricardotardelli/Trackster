@@ -38,6 +38,19 @@ async function putObjectNoOverwrite({ Bucket, Key, Body, ContentType }) {
   }));
 }
 
+function getGpsBytesForBlock(gpsCoordinates, blockIndex) {
+  if (!Array.isArray(gpsCoordinates)) {
+    return GPS_BYTES;
+  }
+
+  const value = gpsCoordinates[blockIndex];
+  if (typeof value !== "string" || value.length !== 16) {
+    return GPS_BYTES;
+  }
+
+  return Buffer.from(value, "hex");
+}
+
 function isAlreadyExists(err) {
   return err?.$metadata?.httpStatusCode === 412 ||
          err?.name === "PreconditionFailed";
@@ -479,7 +492,7 @@ function buildGenericHeader(numBlocks, epochMs, blockdatasize) {
   return h;
 }
 
-function generateBin(msgList, cycles, seed, intervalSec, epochMs, blockdatasize, msg) {
+function generateBin(msgList, cycles, seed, intervalSec, epochMs, blockdatasize, msg, gpsCoordinates) {
   const rnd = makeRng(seed);
 
   const FRAMES_PER_BLOCK = 150;
@@ -528,7 +541,8 @@ function generateBin(msgList, cycles, seed, intervalSec, epochMs, blockdatasize,
 
     makeTimestampAbsBytesFromDate(simDate).copy(block, 0x03);
     makeTimestampRelBytesMs(simMs).copy(block, 0x0b);
-    GPS_BYTES.copy(block, 0x13);
+    const gpsBytes = getGpsBytesForBlock(gpsCoordinates, blockNo - 1);
+    gpsBytes.copy(block, 0x13);
 
     block[0x1b] = (blockdatasize >> 8) & 0xff;
     block[0x1c] = blockdatasize & 0xff;
@@ -615,7 +629,7 @@ exports.handler = async (event) => {
     const { msgList } = loadSpec(dbcFiles, whitelist);
 
     const seed = (epochMs ^ hashStringToU32(vin)) >>> 0;
-    const bin = generateBin(msgList, cycles, seed, intervalSec, epochMs, BLOCK_DATA_SIZE, msg);
+    const bin = generateBin(msgList, cycles, seed, intervalSec, epochMs, BLOCK_DATA_SIZE, msg, msg.gpsCoordinates);
 
     let n = 1;
     while (true) {

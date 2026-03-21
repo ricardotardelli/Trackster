@@ -152,6 +152,7 @@ module.exports.handler = async (event, context) => {
     const numberOfBlocks = Math.max(0, parsePositiveInt(p.numberOfBlocks));
     const blocksSize = Math.max(0, parsePositiveInt(p.blocksSize ?? p.blocks_size));
     const gpsArea = String(p.gpsArea || "").trim();
+    const gpsCoordinates = Array.isArray(p.gpsCoordinates) ? p.gpsCoordinates : ["77114820178BE133", "77114820178BE134", "77114820178BE135"];
     const canFrames = Array.isArray(p.canFrames) ? p.canFrames : [];
     const dbcFiles = Array.isArray(p.dbcFiles) ? p.dbcFiles : [];
     const vinPrefix = p.vinPrefix;
@@ -221,6 +222,7 @@ module.exports.handler = async (event, context) => {
         numberOfBlocks,
         blocksSize,
         gpsArea,
+        gpsCoordinates,
         canFrames,
         dbcFiles,
         vinPrefix,
