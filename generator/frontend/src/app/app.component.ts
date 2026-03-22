@@ -162,6 +162,16 @@ export class AppComponent {
     this.form.controls.canFrames.markAsTouched();
   }
 
+  selectAllCanFrames(): void {
+    this.form.controls.canFrames.setValue([...this.canFrameOptions]);
+    this.form.controls.canFrames.markAsTouched();
+  }
+
+  clearAllCanFrames(): void {
+    this.form.controls.canFrames.setValue([]);
+    this.form.controls.canFrames.markAsTouched();
+  }
+
   isDbcSelected(option: string): boolean {
     return this.form.controls.dbcFiles.value.includes(option);
   }

@@ -159,6 +159,10 @@
               <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
             </button>
             <div class="multi-select-panel" *ngIf="isCanOpen">
+              <div class="multi-select-actions">
+                <button type="button" class="small" (click)="selectAllCanFrames()" [disabled]="canFrameOptions.length === 0">Select All</button>
+                <button type="button" class="small" (click)="clearAllCanFrames()" [disabled]="f.canFrames.value.length === 0">Clear All</button>
+              </div>
               <label class="multi-select-option" *ngFor="let frame of canFrameOptions">
                 <input type="checkbox" [checked]="isCanSelected(frame)" (change)="onCanToggle(frame, $any($event.target).checked)" />
                 <span class="option-label">{{ frame }}</span>

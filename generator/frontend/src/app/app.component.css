@@ -291,6 +291,34 @@ textarea {
   background: #f0f9ff;
 }
 
+.multi-select-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.multi-select-actions .small {
+  border: 1px solid #cbd5e1;
+  background: #eef2ff;
+  color: #1e293b;
+  border-radius: 10px;
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.multi-select-actions .small:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.multi-select-actions .small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .option-label {
   font-size: 0.9rem;
   font-weight: 500;
