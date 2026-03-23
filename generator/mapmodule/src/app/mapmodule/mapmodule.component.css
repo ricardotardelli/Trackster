@@ -1,0 +1,89 @@
+:host ::ng-deep .leaflet-control-attribution {
+  display: none !important;
+}
+
+.route-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-group input {
+  padding: 10px;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.selection-mode {
+  font-size: 14px;
+}
+
+.map {
+  width: 100%;
+  height: 500px;
+  border: 1px solid #ccc;
+}
+
+.coordinates-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.coord-block,
+.output-panel {
+  border: 1px solid #ddd;
+  padding: 12px;
+  background: #fafafa;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.actions button {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid #cfe0ff;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+/* BOTÃO ATIVO */
+.actions button.active {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+.actions button.primary {
+  background: #1976d2;
+  color: #ffffff;
+  border-color: #1976d2;
+}
