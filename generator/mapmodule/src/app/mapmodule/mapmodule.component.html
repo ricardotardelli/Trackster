@@ -1,73 +1,61 @@
 <div class="route-picker-container">
-  <div class="toolbar">
-    <div class="field-group">
-      <label for="startFrom">Start from</label>
-      <input
-        id="startFrom"
-        name="startFrom"
-        type="text"
-        [(ngModel)]="startFrom"
-        placeholder="Select or type start point name"
-        (input)="testEvent('start input')"
-        (change)="testEvent('start change')"
-        (keyup.enter)="searchAddress(startFrom, 'start')"
-        (blur)="searchAddress(startFrom, 'start')"
-      />
+  <div class="controls-block">
+    <div class="toolbar">
+      <div class="field-group search-group">
+        <label for="locationSearch">Location</label>
 
-      <button type="button" (click)="searchAddress(startFrom, 'start')">
-        Search Start
-      </button>
+        <div class="search-row">
+          <input
+            id="locationSearch"
+            name="locationSearch"
+            type="text"
+            [(ngModel)]="locationSearch"
+            [placeholder]="getLocationPlaceholder()"
+            (keyup.enter)="searchSelectedAddress()"
+            (blur)="searchSelectedAddress()"
+          />
+
+          <button
+            type="button"
+            class="primary"
+            (click)="searchSelectedAddress()"
+            [disabled]="pointSelectionMode === 'waypoints'">
+            Search
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="field-group">
-      <label for="destination">Destination</label>
-      <input
-        id="destination"
-        type="text"
-        [(ngModel)]="destination"
-        placeholder="Select or type destination name"
-        (keydown.enter)="searchAddress(destination, 'destination')"
-        (blur)="searchAddress(destination, 'destination')"
-      />
-    </div>
-  </div>
-
-  <div class="actions">
     <div class="actions">
       <button
         type="button"
         (click)="setSelectionMode('start')"
         [class.active]="pointSelectionMode === 'start'">
-        Select Start on Map
+        Start Point
       </button>
 
       <button
         type="button"
         (click)="setSelectionMode('waypoints')"
         [class.active]="pointSelectionMode === 'waypoints'">
-        Define Waypoints
+        Waypoints
       </button>
 
       <button
         type="button"
         (click)="setSelectionMode('destination')"
         [class.active]="pointSelectionMode === 'destination'">
-        Select Destination on Map
+        Destination
       </button>
 
-</div>
+      <button type="button" (click)="swapPoints()" class="primary">
+        Swap
+      </button>
 
-    <button type="button" (click)="swapPoints()" class="primary">
-      Swap
-    </button>
-
-    <button type="button" (click)="clearAll()" class="primary">
-      Clear
-    </button>
-  </div>
-
-  <div class="selection-mode">
-    Current selection mode: <strong>{{ pointSelectionMode }}</strong>
+      <button type="button" (click)="clearAll()" class="primary">
+        Clear
+      </button>
+    </div>
   </div>
 
   <div
@@ -79,7 +67,7 @@
     (leafletClick)="onMapClick($event)">
   </div>
 
-  <div class="coordinates-panel">
+  <div class="coordinates-panel" style="display:none;">
     <div class="coord-block">
       <h3>Start</h3>
       <pre>{{ startPoint | json }}</pre>
