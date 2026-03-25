@@ -196,18 +196,6 @@
           </div>
         </label>
 
-        <label class="field half">
-          <span>S3 Bucket</span>
-          <input type="text" formControlName="s3Bucket" placeholder="Ex: s3-trackster-can-bucket" />
-          <small [class.visible]="f.s3Bucket.touched && f.s3Bucket.invalid">Provide a valid bucket.</small>
-        </label>
-
-        <label class="field half">
-          <span>Engine URL</span>
-          <input type="text" formControlName="engineUrl" placeholder="Ex: https://engine.example.com/api" />
-          <small [class.visible]="f.engineUrl.touched && f.engineUrl.invalid">Provide a valid URL (http/https).</small>
-        </label>
-
         <label class="field full">
           <span>Payload (JSON)</span>
           <div class="payload-box">
