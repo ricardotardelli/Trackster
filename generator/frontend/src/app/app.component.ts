@@ -536,4 +536,3 @@ export class AppComponent {
   }
 
 }
-

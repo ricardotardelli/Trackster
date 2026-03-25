@@ -240,16 +240,8 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  border: 1px solid #bfdbfe;
-  border-radius: 12px;
-  padding: 11px 13px;
-  font: inherit;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  color: #0f172a;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  position: relative;
+  padding-right: 40px; /* espaço para seta + ícone */
 }
 
 .multi-select-value {
