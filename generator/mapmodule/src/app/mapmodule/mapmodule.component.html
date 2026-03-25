@@ -18,8 +18,7 @@
           <button
             type="button"
             class="primary"
-            (click)="searchSelectedAddress()"
-            [disabled]="pointSelectionMode === 'waypoints'">
+            (click)="searchSelectedAddress()">
             Search
           </button>
         </div>
@@ -48,12 +47,12 @@
         Destination
       </button>
 
-      <button type="button" (click)="swapPoints()" class="primary">
-        Swap
-      </button>
-
       <button type="button" (click)="clearAll()" class="primary">
         Clear
+      </button>
+
+      <button type="button" (click)="save()" class="primary">
+        Save
       </button>
     </div>
   </div>
@@ -65,27 +64,5 @@
     [leafletLayers]="layers"
     (leafletMapReady)="onMapReady($event)"
     (leafletClick)="onMapClick($event)">
-  </div>
-
-  <div class="coordinates-panel" style="display:none;">
-    <div class="coord-block">
-      <h3>Start</h3>
-      <pre>{{ startPoint | json }}</pre>
-    </div>
-
-    <div class="coord-block">
-      <h3>Waypoints</h3>
-      <pre>{{ waypoints | json }}</pre>
-    </div>
-
-    <div class="coord-block">
-      <h3>Destination</h3>
-      <pre>{{ destinationPoint | json }}</pre>
-    </div>
-  </div>
-
-  <div class="output-panel">
-    <h3>Output JSON</h3>
-    <pre>{{ getOutput() }}</pre>
   </div>
 </div>

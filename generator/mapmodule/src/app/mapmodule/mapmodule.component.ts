@@ -1,4 +1,4 @@
-import { Component, OnInit, NgZone } from '@angular/core';
+import { Component, OnInit, NgZone, Input, OnChanges, SimpleChanges, Output, EventEmitter } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import * as L from 'leaflet';
 
@@ -15,7 +15,10 @@ interface GeoPoint {
   templateUrl: './mapmodule.component.html',
   styleUrls: ['./mapmodule.component.css']
 })
-export class MapmoduleComponent implements OnInit {
+export class MapmoduleComponent implements OnInit, OnChanges {
+  @Input() country: string = '';
+  @Output() saveRoute = new EventEmitter<string>();
+
   constructor(
     private ngZone: NgZone,
     private http: HttpClient
@@ -25,12 +28,19 @@ export class MapmoduleComponent implements OnInit {
   public startFrom = '';
   public destination = '';
   public waypoints: GeoPoint[] = [];
+  private defaultCountry: string = 'Portugal';
 
   public startPoint: GeoPoint | null = null;
   public destinationPoint: GeoPoint | null = null;
 
   public pointSelectionMode: PointSelectionMode = 'start';
 
+  public save(): void {
+    const output = this.getOutput();
+    console.log('Map output:', JSON.parse(output));
+    this.saveRoute.emit(output);
+  }
+  
   public options: L.MapOptions = {
     layers: [
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -44,7 +54,81 @@ export class MapmoduleComponent implements OnInit {
   public map: L.Map | null = null;
   public layers: L.Layer[] = [];
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.applyCountryToMap();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['country']) {
+      this.applyCountryToMap();
+    }
+  }
+
+  private logOutput(): void {
+    console.log('Map output:', JSON.parse(this.getOutput()));
+  }
+
+  private getCountryMapConfig(country: string): { center: L.LatLngExpression; zoom: number } {
+    const normalized = (country || '').trim().toLowerCase();
+
+    switch (normalized) {
+      case 'portugal':
+        return {
+          center: L.latLng(39.5, -8.0),
+          zoom: 6
+        };
+
+      case 'spain':
+        return {
+          center: L.latLng(40.2, -3.7),
+          zoom: 6
+        };
+
+      case 'france':
+        return {
+          center: L.latLng(46.2, 2.2),
+          zoom: 6
+        };
+
+      case 'brazil':
+        return {
+          center: L.latLng(-14.2, -51.9),
+          zoom: 4
+        };
+
+      case 'usa':
+      case 'united states':
+        return {
+          center: L.latLng(39.8, -98.6),
+          zoom: 4
+        };
+
+      default:
+        return {
+          center: L.latLng(39.5, -8.0),
+          zoom: 6
+        };
+    }
+  }
+
+  private applyCountryToMap(): void {
+    const effectiveCountry =
+      this.country && this.country.trim() !== ''
+        ? this.country
+        : this.defaultCountry;
+
+    const config = this.getCountryMapConfig(effectiveCountry);
+
+    this.options = {
+      ...this.options,
+      center: config.center,
+      zoom: config.zoom
+    };
+
+    if (this.map) {
+      this.map.setView(config.center, config.zoom);
+    }
+  }
 
   public getLocationPlaceholder(): string {
     if (this.pointSelectionMode === 'start') {
@@ -168,33 +252,34 @@ export class MapmoduleComponent implements OnInit {
     this.layers = [];
   }
 
-  public swapPoints(): void {
-    const oldStartFrom = this.startFrom;
-    const oldStartPoint = this.startPoint;
-
-    this.startFrom = this.destination;
-    this.startPoint = this.destinationPoint;
-
-    this.destination = oldStartFrom;
-    this.destinationPoint = oldStartPoint;
-
-    if (this.pointSelectionMode === 'start') {
-      this.locationSearch = this.startFrom;
-    } else if (this.pointSelectionMode === 'destination') {
-      this.locationSearch = this.destination;
-    } else {
-      this.locationSearch = '';
-    }
-
-    this.refreshLayers();
-  }
-
   public getOutput(): string {
+    const waypointsObject: Record<string, GeoPoint> = {};
+
+    this.waypoints.forEach((wp: GeoPoint, index: number) => {
+      waypointsObject[String(index + 1)] = {
+        lat: wp.lat,
+        lng: wp.lng,
+        label: wp.label
+      };
+    });
+
     return JSON.stringify(
       {
-        start: this.startPoint,
-        waypoints: this.waypoints,
+        start: this.startPoint
+          ? {
+              lat: this.startPoint.lat,
+              lng: this.startPoint.lng,
+              label: this.startPoint.label
+            }
+          : null,
+        waypoints: waypointsObject,
         destination: this.destinationPoint
+          ? {
+              lat: this.destinationPoint.lat,
+              lng: this.destinationPoint.lng,
+              label: this.destinationPoint.label
+            }
+          : null
       },
       null,
       2
@@ -318,5 +403,6 @@ export class MapmoduleComponent implements OnInit {
     }
 
     this.layers = newLayers;
+    this.logOutput();
   }
 }
