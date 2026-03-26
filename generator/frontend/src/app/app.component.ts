@@ -46,6 +46,18 @@ export class AppComponent {
     payload: ['', [this.jsonValidator]]
   });
 
+  isMapModalOpen = false;
+
+  openMap(event: MouseEvent): void {
+    event.stopPropagation();
+    this.isMapModalOpen = true;
+    this.isGpsOpen = false;
+  }
+
+  closeMapModal(): void {
+    this.isMapModalOpen = false;
+  }
+
   ngOnInit(): void {
     this.form.valueChanges.subscribe(() => {
       if (this.suppressFormReset) {

@@ -108,48 +108,18 @@
           <small [class.visible]="f.latencyTime.touched && f.latencyTime.invalid">Mandatory integer field.</small>
         </label>
 
-        <div class="field third row3">
-          <span>DBC Files</span>
-          <div class="multi-select" [class.open]="isDbcOpen">
-            <button type="button" class="multi-select-trigger" (click)="toggleDbcOpen()">
-              <span class="multi-select-value">{{ dbcSummary }}</span>
-              <span class="multi-select-caret" *ngIf="isDbcOpen">&#9652;</span>
-              <span class="multi-select-caret" *ngIf="!isDbcOpen">&#9662;</span>
-            </button>
-            <div class="multi-select-panel" *ngIf="isDbcOpen">
-              <label class="multi-select-option" *ngFor="let dbc of dbcOptions">
-                <input type="checkbox" [checked]="isDbcSelected(dbc)" (change)="onDbcToggle(dbc, $any($event.target).checked)" />
-                <span class="option-label">{{ dbc }}</span>
-              </label>
-              <div class="single-select-empty" *ngIf="dbcOptions.length === 0">No DBC files configured.</div>
-            </div>
-          </div>
-          <small [class.visible]="f.dbcFiles.touched && f.dbcFiles.invalid">Select at least one DBC file.</small>
-        </div>
-        <div class="field third row3">
-          <span>GPS Area</span>
-          <div class="multi-select" [class.open]="isGpsOpen">
-            <button type="button" class="multi-select-trigger" (click)="toggleGpsOpen()">
-              <span class="multi-select-value">{{ gpsSummary }}</span>
-              <span class="multi-select-caret" *ngIf="isGpsOpen">&#9652;</span>
-              <span class="multi-select-caret" *ngIf="!isGpsOpen">&#9662;</span>
-            </button>
-            <div class="multi-select-panel" *ngIf="isGpsOpen">
-              <input
-                type="text"
-                class="single-select-filter"
-                placeholder="Type to filter regions..."
-                [(ngModel)]="gpsFilter"
-                [ngModelOptions]="{ standalone: true }"
-              />
-              <button type="button" class="single-select-option" *ngFor="let area of filteredGpsAreas" (click)="selectGpsArea(area)">
-                {{ area }}
-              </button>
-              <div class="single-select-empty" *ngIf="filteredGpsAreas.length === 0">No regions found.</div>
-            </div>
-          </div>
-          <small [class.visible]="f.gpsArea.touched && f.gpsArea.invalid">Select a GPS area.</small>
-        </div>
+        <label class="field third row3">
+          <span>Number of Blocks (0 for all)</span>
+          <input type="number" formControlName="numberOfBlocks" step="1" min="0" />
+          <small [class.visible]="f.numberOfBlocks.touched && f.numberOfBlocks.invalid">Mandatory integer field.</small>
+        </label>
+
+        <label class="field third row3">
+          <span>Blocks Size (Bytes)</span>
+          <input type="number" formControlName="sizeOfBlocksBytes" step="1" min="0" />
+          <small [class.visible]="f.sizeOfBlocksBytes.touched && f.sizeOfBlocksBytes.invalid">Mandatory integer field.</small>
+        </label>
+
         <div class="field third row3">
           <span>CAN Frames</span>
           <div class="multi-select" [class.open]="isCanOpen">
@@ -172,19 +142,55 @@
           <small [class.visible]="f.canFrames.touched && f.canFrames.invalid">Select at least one CAN frame.</small>
         </div>
 
-        <label class="field third row4">
-          <span>Number of Blocks (0 for all)</span>
-          <input type="number" formControlName="numberOfBlocks" step="1" min="0" />
-          <small [class.visible]="f.numberOfBlocks.touched && f.numberOfBlocks.invalid">Mandatory integer field.</small>
-        </label>
+        <div class="field third row4">
+          <span>DBC Files</span>
+          <div class="multi-select" [class.open]="isDbcOpen">
+            <button type="button" class="multi-select-trigger" (click)="toggleDbcOpen()">
+              <span class="multi-select-value">{{ dbcSummary }}</span>
+              <span class="multi-select-caret" *ngIf="isDbcOpen">&#9652;</span>
+              <span class="multi-select-caret" *ngIf="!isDbcOpen">&#9662;</span>
+            </button>
+            <div class="multi-select-panel" *ngIf="isDbcOpen">
+              <label class="multi-select-option" *ngFor="let dbc of dbcOptions">
+                <input type="checkbox" [checked]="isDbcSelected(dbc)" (change)="onDbcToggle(dbc, $any($event.target).checked)" />
+                <span class="option-label">{{ dbc }}</span>
+              </label>
+              <div class="single-select-empty" *ngIf="dbcOptions.length === 0">No DBC files configured.</div>
+            </div>
+          </div>
+          <small [class.visible]="f.dbcFiles.touched && f.dbcFiles.invalid">Select at least one DBC file.</small>
+        </div>
+        <div class="field third row4 country-field">
+          <span>GPS Area</span>
+          <div class="multi-select" [class.open]="isGpsOpen">
+            <button type="button" class="multi-select-trigger" (click)="toggleGpsOpen()">
+              <span class="multi-select-value">{{ gpsSummary }}</span>
+              <span class="multi-select-caret gps-caret" *ngIf="isGpsOpen">&#9652;</span>
+              <span class="multi-select-caret gps-caret" *ngIf="!isGpsOpen">&#9662;</span>
+              <span class="map-icon gps-map-icon" (click)="openMap($event)" aria-label="Design tracking points">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#007bff">
+                  <path d="M20.5 3l-5.5 2-6-2L3.5 5v16l5.5-2 6 2 5.5-2V3zM9 5.5l6 2v11l-6-2v-11z"/>
+                </svg>
+              </span>
+            </button>
+            <div class="multi-select-panel" *ngIf="isGpsOpen">
+              <input
+                type="text"
+                class="single-select-filter"
+                placeholder="Type to filter regions..."
+                [(ngModel)]="gpsFilter"
+                [ngModelOptions]="{ standalone: true }"
+              />
+              <button type="button" class="single-select-option" *ngFor="let area of filteredGpsAreas" (click)="selectGpsArea(area)">
+                {{ area }}
+              </button>
+              <div class="single-select-empty" *ngIf="filteredGpsAreas.length === 0">No regions found.</div>
+            </div>
+          </div>
+          <small [class.visible]="f.gpsArea.touched && f.gpsArea.invalid">Select a GPS area.</small>
+        </div>
 
-        <label class="field third row4">
-          <span>Blocks Size (Bytes)</span>
-          <input type="number" formControlName="sizeOfBlocksBytes" step="1" min="0" />
-          <small [class.visible]="f.sizeOfBlocksBytes.touched && f.sizeOfBlocksBytes.invalid">Mandatory integer field.</small>
-        </label>
-
-        <label class="field third row4">
+        <label class="field third row4" style="display:none">
           <span>Generation type</span>
           <div class="switch-row">
             <span class="switch-label">Over time</span>
@@ -227,4 +233,19 @@
       </div>
     </form>
   </section>
+  <div class="map-modal-backdrop" *ngIf="isMapModalOpen" (click)="closeMapModal()">
+    <div class="map-modal" (click)="$event.stopPropagation()">
+      <div class="map-modal-header">
+        <h3>Design tracking points</h3>
+        <button type="button" class="map-modal-close" (click)="closeMapModal()">×</button>
+      </div>
+
+      <div class="map-modal-body">
+        <!-- colocar aqui depois o componente do mapmodule -->
+        <div class="map-modal-placeholder">
+          Map module goes here.
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
