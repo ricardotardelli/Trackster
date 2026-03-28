@@ -6,7 +6,12 @@ import { MapmoduleLibModule } from 'mapmodule-lib';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MapmoduleLibModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    FormsModule,
+    MapmoduleLibModule
+  ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
@@ -395,7 +400,6 @@ export class AppComponent {
   private async fetchRuntimeConfig(): Promise<{ gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string; s3Default?: string; engineURL?: string }> {
     const stamp = Date.now();
     const candidates = [
-      `config.json?t=${stamp}`,
       `assets/config.json?t=${stamp}`
     ];
 

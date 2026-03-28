@@ -241,10 +241,10 @@
       </div>
 
       <div class="map-modal-body">
-        <!-- colocar aqui depois o componente do mapmodule -->
-        <div class="map-modal-placeholder">
-          Map module goes here.
-        </div>
+        <app-mapmodule>
+          class="mapmodule-host"
+          [country]="f.gpsArea.value"
+        </app-mapmodule>
       </div>
     </div>
   </div>

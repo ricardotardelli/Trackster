@@ -1,40 +1,58 @@
 {
-  "hash": "c1b65955",
-  "configHash": "2e7868c7",
-  "lockfileHash": "c8af1e04",
-  "browserHash": "c2cb87cd",
+  "hash": "68120705",
+  "configHash": "92eb37ac",
+  "lockfileHash": "0b2078af",
+  "browserHash": "bdd85f93",
   "optimized": {
     "@angular/common": {
       "src": "../../../../../node_modules/@angular/common/fesm2022/common.mjs",
       "file": "@angular_common.js",
-      "fileHash": "d5e53ff4",
+      "fileHash": "7436467f",
       "needsInterop": false
     },
     "@angular/core": {
       "src": "../../../../../node_modules/@angular/core/fesm2022/core.mjs",
       "file": "@angular_core.js",
-      "fileHash": "8d365005",
+      "fileHash": "ccb65137",
       "needsInterop": false
     },
     "@angular/forms": {
       "src": "../../../../../node_modules/@angular/forms/fesm2022/forms.mjs",
       "file": "@angular_forms.js",
-      "fileHash": "b5757a06",
+      "fileHash": "c16abb5a",
       "needsInterop": false
     },
     "@angular/platform-browser": {
       "src": "../../../../../node_modules/@angular/platform-browser/fesm2022/platform-browser.mjs",
       "file": "@angular_platform-browser.js",
-      "fileHash": "7f068734",
+      "fileHash": "576c4899",
+      "needsInterop": false
+    },
+    "mapmodule-lib": {
+      "src": "../../../../../../mapmodule/dist/mapmodule-lib/fesm2022/mapmodule-lib.mjs",
+      "file": "mapmodule-lib.js",
+      "fileHash": "4a6c56b5",
+      "needsInterop": false
+    },
+    "@angular/common/http": {
+      "src": "../../../../../node_modules/@angular/common/fesm2022/http.mjs",
+      "file": "@angular_common_http.js",
+      "fileHash": "7127495e",
       "needsInterop": false
     }
   },
   "chunks": {
-    "chunk-PBLHRPPS": {
-      "file": "chunk-PBLHRPPS.js"
+    "chunk-CF2XNTDC": {
+      "file": "chunk-CF2XNTDC.js"
     },
-    "chunk-OF23TSPQ": {
-      "file": "chunk-OF23TSPQ.js"
+    "chunk-Q7SJ7Y7H": {
+      "file": "chunk-Q7SJ7Y7H.js"
+    },
+    "chunk-VAXOI7SM": {
+      "file": "chunk-VAXOI7SM.js"
+    },
+    "chunk-TXDUYLVM": {
+      "file": "chunk-TXDUYLVM.js"
     }
   }
 }
