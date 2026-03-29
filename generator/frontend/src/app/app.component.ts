@@ -1,7 +1,22 @@
 import { CommonModule } from '@angular/common';
-import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormBuilder,
+  FormsModule,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators
+} from '@angular/forms';
 import { MapmoduleComponent } from './mapmodule/mapmodule.component';
-import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
+import {
+  AfterViewChecked,
+  Component,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  ViewChild
+} from '@angular/core';
 
 @Component({
   selector: 'app-root',
@@ -15,14 +30,20 @@ import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-
-export class AppComponent {
+export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>
   ) {}
 
-  @ViewChild('mapModule') mapModule!: MapmoduleComponent;
+  @ViewChild('modalHeader', { static: false })
+  private modalHeader?: ElementRef<HTMLDivElement>;
+
+  @ViewChild('mapModal', { static: false })
+  private mapModal?: ElementRef<HTMLDivElement>;
+
+  @ViewChild('mapModule')
+  mapModule!: MapmoduleComponent;
 
   gpsAreas: string[] = [];
   canFrameOptions: string[] = [];
@@ -36,6 +57,16 @@ export class AppComponent {
   generationTimestamp = '';
   copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
   private suppressFormReset = false;
+
+  isMapModalOpen = false;
+
+  private dragInitialized = false;
+  private isDragging = false;
+  private dragOffsetX = 0;
+  private dragOffsetY = 0;
+  private boundMouseMove?: (event: MouseEvent) => void;
+  private boundMouseUp?: () => void;
+
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
     amountOfTime: [1, [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
@@ -55,22 +86,6 @@ export class AppComponent {
     payload: ['', [this.jsonValidator]]
   });
 
-  isMapModalOpen = false;
-
-  openMapModal(): void {
-    this.isMapModalOpen = true;
-  }
-
-  openMap(event: MouseEvent): void {
-    event.stopPropagation();
-    this.isMapModalOpen = true;
-    this.isGpsOpen = false;
-  }
-
-  closeMapModal(): void {
-    this.isMapModalOpen = false;
-  }
-
   ngOnInit(): void {
     this.form.valueChanges.subscribe(() => {
       if (this.suppressFormReset) {
@@ -83,6 +98,16 @@ export class AppComponent {
     });
 
     void this.loadConfig();
+  }
+
+  ngAfterViewChecked(): void {
+    if (this.isMapModalOpen) {
+      this.initializeModalDrag();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.removeDragListeners();
   }
 
   get f() {
@@ -139,6 +164,25 @@ export class AppComponent {
       return 'Error';
     }
     return 'Pending';
+  }
+
+  openMapModal(): void {
+    this.isMapModalOpen = true;
+  }
+
+  openMap(event: MouseEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.isMapModalOpen = true;
+    this.isGpsOpen = false;
+    this.dragInitialized = false;
+  }
+
+  closeMapModal(): void {
+    this.isMapModalOpen = false;
+    this.isDragging = false;
+    document.body.style.userSelect = '';
+    this.dragInitialized = false;
   }
 
   toggleCanOpen(): void {
@@ -332,6 +376,91 @@ export class AppComponent {
     }
   }
 
+  public onSaveRoute(routeJson: string): void {
+    this.f.payload.setValue(routeJson);
+    this.closeMapModal();
+  }
+
+  private initializeModalDrag(): void {
+    if (this.dragInitialized || !this.mapModal || !this.modalHeader) {
+      return;
+    }
+
+    const modal = this.mapModal.nativeElement;
+    const header = this.modalHeader.nativeElement;
+
+    header.style.cursor = 'move';
+    header.style.userSelect = 'none';
+
+    header.onmousedown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+
+      if (target?.closest('.map-modal-close')) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const rect = modal.getBoundingClientRect();
+      this.isDragging = true;
+      this.dragOffsetX = event.clientX - rect.left;
+      this.dragOffsetY = event.clientY - rect.top;
+
+      modal.style.position = 'fixed';
+      modal.style.left = `${rect.left}px`;
+      modal.style.top = `${rect.top}px`;
+      modal.style.transform = 'none';
+
+      document.body.style.userSelect = 'none';
+    };
+
+    this.boundMouseMove = (event: MouseEvent) => {
+      if (!this.isDragging) {
+        return;
+      }
+
+      const modalWidth = modal.offsetWidth;
+      const modalHeight = modal.offsetHeight;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let nextLeft = event.clientX - this.dragOffsetX;
+      let nextTop = event.clientY - this.dragOffsetY;
+
+      nextLeft = Math.max(0, Math.min(nextLeft, viewportWidth - modalWidth));
+      nextTop = Math.max(0, Math.min(nextTop, viewportHeight - modalHeight));
+
+      modal.style.left = `${nextLeft}px`;
+      modal.style.top = `${nextTop}px`;
+    };
+
+    this.boundMouseUp = () => {
+      this.isDragging = false;
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', this.boundMouseMove);
+    document.addEventListener('mouseup', this.boundMouseUp);
+
+    this.dragInitialized = true;
+  }
+
+  private removeDragListeners(): void {
+    if (this.boundMouseMove) {
+      document.removeEventListener('mousemove', this.boundMouseMove);
+      this.boundMouseMove = undefined;
+    }
+
+    if (this.boundMouseUp) {
+      document.removeEventListener('mouseup', this.boundMouseUp);
+      this.boundMouseUp = undefined;
+    }
+
+    if (this.modalHeader?.nativeElement) {
+      this.modalHeader.nativeElement.onmousedown = null;
+    }
+  }
+
   private jsonValidator(control: AbstractControl<string>): ValidationErrors | null {
     const value = control.value?.trim();
     if (!value) {
@@ -403,7 +532,14 @@ export class AppComponent {
     this.suppressFormReset = false;
   }
 
-  private async fetchRuntimeConfig(): Promise<{ gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string; s3Default?: string; engineURL?: string }> {
+  private async fetchRuntimeConfig(): Promise<{
+    gpsAreas?: string[];
+    canFrames?: string[];
+    dbcFiles?: string[];
+    workQueueUrl?: string;
+    s3Default?: string;
+    engineURL?: string;
+  }> {
     const stamp = Date.now();
     const candidates = [
       `assets/config.json?t=${stamp}`
@@ -414,7 +550,14 @@ export class AppComponent {
         const response = await fetch(url, { cache: 'no-store' });
         if (response.ok) {
           const text = await response.text();
-          return JSON.parse(text) as { gpsAreas?: string[]; canFrames?: string[]; dbcFiles?: string[]; workQueueUrl?: string; s3Default?: string; engineURL?: string };
+          return JSON.parse(text) as {
+            gpsAreas?: string[];
+            canFrames?: string[];
+            dbcFiles?: string[];
+            workQueueUrl?: string;
+            s3Default?: string;
+            engineURL?: string;
+          };
         }
       } catch {
         // Try next candidate.
@@ -558,5 +701,4 @@ export class AppComponent {
     const seconds = String(now.getSeconds()).padStart(2, '0');
     return `${year}${month}${day}T${hours}${minutes}${seconds}`;
   }
-
 }

@@ -565,19 +565,15 @@ small.visible {
 }
 
 .map-modal {
-  width: 75vw;
-  max-width: 1100px;
-  min-width: 760px;
+  width: 40vw;
   height: 50vh;
-  min-height: 560px;
-  max-height: 85vh;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  background: #fff;
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+
 
 .map-modal-header {
   height: 56px;
@@ -588,6 +584,8 @@ small.visible {
   border-bottom: 1px solid #e5e7eb;
   background: #ffffff;
   flex: 0 0 auto;
+  cursor: move;
+  user-select: none;
 }
 
 .map-modal-header h3 {
@@ -607,20 +605,19 @@ small.visible {
 
 .mapmodule-host {
   display: block;
+  flex: 1 1 auto;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto;
 }
 
 .map-modal-body {
   flex: 1 1 auto;
-  padding: 12px;
-  background: #ffffff;
-  overflow: hidden;
   min-height: 0;
   display: flex;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .gps-map-icon {

@@ -234,8 +234,8 @@
     </form>
   </section>
   <div class="map-modal-backdrop" *ngIf="isMapModalOpen" (click)="closeMapModal()">
-    <div class="map-modal" (click)="$event.stopPropagation()">
-      <div class="map-modal-header">
+    <div class="map-modal" #mapModal (click)="$event.stopPropagation()">
+      <div class="map-modal-header" #modalHeader>
         <h3>Design tracking points</h3>
         <button type="button" class="map-modal-close" (click)="closeMapModal()">×</button>
       </div>
@@ -243,7 +243,9 @@
       <div class="map-modal-body">
         <app-mapmodule
           class="mapmodule-host"
-          [visible]="isMapModalOpen">
+          [visible]="isMapModalOpen"
+          [country]="f.gpsArea.value"
+          (saveRoute)="onSaveRoute($event)">
         </app-mapmodule>
       </div>
     </div>
