@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener } from '@angular/core';
 import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
-import { MapmoduleLibModule } from 'mapmodule-lib';
+import { MapmoduleComponent } from './mapmodule/mapmodule.component';
+import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 
 @Component({
   selector: 'app-root',
@@ -10,7 +10,7 @@ import { MapmoduleLibModule } from 'mapmodule-lib';
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    MapmoduleLibModule
+    MapmoduleComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
@@ -21,6 +21,8 @@ export class AppComponent {
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>
   ) {}
+
+  @ViewChild('mapModule') mapModule!: MapmoduleComponent;
 
   gpsAreas: string[] = [];
   canFrameOptions: string[] = [];
@@ -54,6 +56,10 @@ export class AppComponent {
   });
 
   isMapModalOpen = false;
+
+  openMapModal(): void {
+    this.isMapModalOpen = true;
+  }
 
   openMap(event: MouseEvent): void {
     event.stopPropagation();

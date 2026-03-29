@@ -241,9 +241,9 @@
       </div>
 
       <div class="map-modal-body">
-        <app-mapmodule>
+        <app-mapmodule
           class="mapmodule-host"
-          [country]="f.gpsArea.value"
+          [visible]="isMapModalOpen">
         </app-mapmodule>
       </div>
     </div>
