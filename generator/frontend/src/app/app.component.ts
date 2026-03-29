@@ -1,22 +1,11 @@
 import { CommonModule } from '@angular/common';
-import {
-  AbstractControl,
-  FormBuilder,
-  FormsModule,
-  ReactiveFormsModule,
-  ValidationErrors,
-  Validators
-} from '@angular/forms';
+import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MapmoduleComponent } from './mapmodule/mapmodule.component';
-import {
-  AfterViewChecked,
-  Component,
-  ElementRef,
-  HostListener,
-  OnDestroy,
-  OnInit,
-  ViewChild
-} from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, HostListener,
+          OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { AuthService } from './auth/auth.service';
+
 
 @Component({
   selector: 'app-root',
@@ -25,15 +14,18 @@ import {
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    MapmoduleComponent
+    MapmoduleComponent,
+    RouterOutlet
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
+
 export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
-    private readonly elementRef: ElementRef<HTMLElement>
+    private readonly elementRef: ElementRef<HTMLElement>,
+    private readonly authService: AuthService
   ) {}
 
   @ViewChild('modalHeader', { static: false })
@@ -87,17 +79,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   });
 
   ngOnInit(): void {
-    this.form.valueChanges.subscribe(() => {
-      if (this.suppressFormReset) {
-        return;
-      }
-
-      this.formStatus = 'pending';
-      this.revalidateAllControls();
-      this.clearPayload();
-    });
-
-    void this.loadConfig();
+    void this.initializeApp();
   }
 
   ngAfterViewChecked(): void {
@@ -268,6 +250,31 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     } catch {
       control.markAsTouched();
     }
+  }
+
+  private async initializeApp(): Promise<void> {
+    const authenticated = await this.authService.isAuthenticated();
+
+    if (!authenticated) {
+      await this.authService.login();
+      return;
+    }
+
+    this.form.valueChanges.subscribe(() => {
+      if (this.suppressFormReset) {
+        return;
+      }
+
+      this.formStatus = 'pending';
+      this.revalidateAllControls();
+      this.clearPayload();
+    });
+
+    await this.loadConfig();
+  }
+
+  async logout(): Promise<void> {
+    await this.authService.logout();
   }
 
   async copyPayload(): Promise<void> {

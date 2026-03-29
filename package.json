@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@angular/router": "^21.2.6",
+    "aws-amplify": "^6.16.3"
+  }
+}
