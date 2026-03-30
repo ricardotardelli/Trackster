@@ -253,12 +253,19 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   private async initializeApp(): Promise<void> {
+    const redirectInProgress = sessionStorage.getItem('auth_redirect_in_progress') === 'true';
+
     const authenticated = await this.authService.isAuthenticated();
 
     if (!authenticated) {
-      await this.authService.login();
+      if (!redirectInProgress) {
+        sessionStorage.setItem('auth_redirect_in_progress', 'true');
+        await this.authService.login();
+      }
       return;
     }
+
+    sessionStorage.removeItem('auth_redirect_in_progress');
 
     this.form.valueChanges.subscribe(() => {
       if (this.suppressFormReset) {
@@ -274,6 +281,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   async logout(): Promise<void> {
+    sessionStorage.removeItem('auth_redirect_in_progress');
     await this.authService.logout();
   }
 

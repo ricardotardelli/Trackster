@@ -13,8 +13,9 @@ export class AuthService {
 
   async isAuthenticated(): Promise<boolean> {
     try {
+      const user = await getCurrentUser();
       const session = await fetchAuthSession();
-      return !!session.tokens?.idToken;
+      return !!user && !!session.tokens?.idToken;
     } catch {
       return false;
     }
