@@ -1,14 +1,8 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
-import { AppComponent } from './app/app.component';
 import { Amplify } from 'aws-amplify';
+import { AppComponent } from './app/app.component';
 import { cognitoConfig } from './app/auth/cognito.config';
-
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideHttpClient()
-  ]
-}).catch((err) => console.error(err));
 
 Amplify.configure({
   Auth: {
@@ -17,7 +11,7 @@ Amplify.configure({
       userPoolClientId: cognitoConfig.userPoolClientId,
       loginWith: {
         oauth: {
-          domain: cognitoConfig.domain.replace('https://', ''),
+          domain: cognitoConfig.domain,
           scopes: cognitoConfig.scopes,
           redirectSignIn: [cognitoConfig.redirectSignIn],
           redirectSignOut: [cognitoConfig.redirectSignOut],
@@ -27,4 +21,10 @@ Amplify.configure({
     }
   }
 });
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideHttpClient()
+  ]
+}).catch((err) => console.error(err));
 
