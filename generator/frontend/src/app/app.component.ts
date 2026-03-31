@@ -57,10 +57,12 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   isCanOpen = false;
   isDbcOpen = false;
   isSubmitting = false;
+  isConfigLoaded = false;
   formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
   copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
   private suppressFormReset = false;
+  private formValueChangesBound = false;
 
   isMapModalOpen = false;
 
@@ -70,7 +72,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private dragOffsetY = 0;
   private boundMouseMove?: (event: MouseEvent) => void;
   private boundMouseUp?: () => void;
-  private formChangeSubscriptionInitialized = false;
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -127,7 +128,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (selected.length === 0) {
       return 'Select CAN frames';
     }
-
     return `${selected.length} selected`;
   }
 
@@ -177,6 +177,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   toggleCanOpen(): void {
+    if (!this.isConfigLoaded) {
+      return;
+    }
+
     this.isCanOpen = !this.isCanOpen;
     if (this.isCanOpen) {
       this.isGpsOpen = false;
@@ -185,6 +189,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   toggleDbcOpen(): void {
+    if (!this.isConfigLoaded) {
+      return;
+    }
+
     this.isDbcOpen = !this.isDbcOpen;
     if (this.isDbcOpen) {
       this.isGpsOpen = false;
@@ -193,6 +201,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   toggleGpsOpen(): void {
+    if (!this.isConfigLoaded) {
+      return;
+    }
+
     this.isGpsOpen = !this.isGpsOpen;
     if (this.isGpsOpen) {
       this.gpsFilter = '';
@@ -262,6 +274,29 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   private async initializeApp(): Promise<void> {
+    this.bindFormValueChangesOnce();
+
+    try {
+      await this.loadConfig();
+      this.isConfigLoaded = true;
+    } catch (error: unknown) {
+      this.formStatus = 'error';
+      this.setPayloadValue(JSON.stringify({
+        error: {
+          category: 'config_load_error',
+          ...this.describeFetchError(error),
+          hints: [
+            'Check if src/assets/config.json is being published.',
+            'Open /assets/config.json directly in the browser and confirm it returns HTTP 200.',
+            'Check angular.json assets configuration.',
+            'Check that gpsAreas, canFrames and dbcFiles exist and are arrays.'
+          ]
+        }
+      }, null, 2));
+      this.form.controls.payload.markAsTouched();
+      return;
+    }
+
     const redirectInProgress = sessionStorage.getItem('auth_redirect_in_progress') === 'true';
     const authenticated = await this.authService.isAuthenticated();
 
@@ -274,30 +309,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
 
     sessionStorage.removeItem('auth_redirect_in_progress');
-    this.initializeFormValueChangeSubscription();
-
-    try {
-      await this.loadConfig();
-    } catch (error: unknown) {
-      this.formStatus = 'error';
-      this.setPayloadValue(JSON.stringify({
-        error: {
-          category: 'config_load_error',
-          ...this.describeFetchError(error),
-          hints: [
-            'Check if assets/config.json exists in the deployed application.',
-            'Check if angular.json includes src/assets in the assets section.',
-            'Check browser DevTools > Network and confirm config.json returns HTTP 200.',
-            'Check that gpsAreas, canFrames, dbcFiles, workQueueUrl, s3Default and engineURL exist in config.json.'
-          ]
-        }
-      }, null, 2));
-      this.form.controls.payload.markAsTouched();
-    }
   }
 
-  private initializeFormValueChangeSubscription(): void {
-    if (this.formChangeSubscriptionInitialized) {
+  private bindFormValueChangesOnce(): void {
+    if (this.formValueChangesBound) {
       return;
     }
 
@@ -311,7 +326,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.clearPayload();
     });
 
-    this.formChangeSubscriptionInitialized = true;
+    this.formValueChangesBound = true;
   }
 
   async logout(): Promise<void> {
@@ -566,12 +581,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       throw new Error('engineURL missing or empty in config.json');
     }
 
-    console.log('CONFIG LOADED', {
-      gpsAreas: config.gpsAreas.length,
-      canFrames: config.canFrames.length,
-      dbcFiles: config.dbcFiles.length
-    });
-
     this.suppressFormReset = true;
 
     this.gpsAreas = [...config.gpsAreas];
@@ -584,7 +593,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.form.controls.s3Bucket.setValue(config.s3Default.trim(), { emitEvent: false });
     this.form.controls.engineUrl.setValue(config.engineURL.trim(), { emitEvent: false });
 
-    this.form.controls.gpsArea.updateValueAndValidity({ emitEvent: false });
     this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
     this.form.controls.dbcFiles.updateValueAndValidity({ emitEvent: false });
     this.form.controls.workQueueUrl.updateValueAndValidity({ emitEvent: false });
@@ -605,13 +613,18 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }> {
     const stamp = Date.now();
     const candidates = [
-      `assets/config.json?t=${stamp}`,
-      `/assets/config.json?t=${stamp}`
+      '/assets/config.json',
+      'assets/config.json',
+      `/assets/config.json?t=${stamp}`,
+      `assets/config.json?t=${stamp}`
     ];
+
+    let lastStatus: number | null = null;
 
     for (const url of candidates) {
       try {
         const response = await fetch(url, { cache: 'no-store' });
+        lastStatus = response.status;
 
         if (!response.ok) {
           continue;
@@ -631,7 +644,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       }
     }
 
-    throw new Error('Unable to load runtime config from assets/config.json');
+    throw new Error(`Unable to load runtime config from assets/config.json. Last HTTP status: ${lastStatus ?? 'unknown'}`);
   }
 
   private buildEngineEnvelope() {
@@ -675,10 +688,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
 
     const trimmed = text.trim();
-    if (
-      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-      (trimmed.startsWith('[') && trimmed.endsWith(']'))
-    ) {
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
       try {
         return JSON.parse(trimmed);
       } catch {
