@@ -253,17 +253,26 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   private async initializeApp(): Promise<void> {
+    console.log('initializeApp started');
+
     const redirectInProgress = sessionStorage.getItem('auth_redirect_in_progress') === 'true';
+
+    console.log('redirectInProgress =', redirectInProgress);
 
     const authenticated = await this.authService.isAuthenticated();
 
+    console.log('authenticated =', authenticated);
+
     if (!authenticated) {
+      console.log('Not authenticated, returning before loadConfig');
       if (!redirectInProgress) {
         sessionStorage.setItem('auth_redirect_in_progress', 'true');
         await this.authService.login();
       }
       return;
     }
+
+    console.log('Authenticated, calling loadConfig');
 
     sessionStorage.removeItem('auth_redirect_in_progress');
 
