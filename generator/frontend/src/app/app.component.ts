@@ -79,8 +79,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   });
 
   ngOnInit(): void {
-    void this.initializeApp();
-  }
+  this.initializeDefaultOptions();
+  void this.initializeApp();
+}
 
   ngAfterViewChecked(): void {
     if (this.isMapModalOpen) {
@@ -250,6 +251,15 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     } catch {
       control.markAsTouched();
     }
+  }
+
+  private initializeDefaultOptions(): void {
+    this.gpsAreas = [];
+    this.canFrameOptions = this.buildCanFrameOptions();
+    this.dbcOptions = ['dbc_a', 'dbc_b', 'dbc_c', 'dbc_d', 'dbc_e', 'dbc_f'];
+
+    this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
+    this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
   }
 
   private async initializeApp(): Promise<void> {
