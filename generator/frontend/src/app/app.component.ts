@@ -1,11 +1,24 @@
 import { CommonModule } from '@angular/common';
-import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormBuilder,
+  FormsModule,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators
+} from '@angular/forms';
 import { MapmoduleComponent } from './mapmodule/mapmodule.component';
-import { AfterViewChecked, Component, ElementRef, HostListener,
-          OnDestroy, OnInit, ViewChild } from '@angular/core';
+import {
+  AfterViewChecked,
+  Component,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  ViewChild
+} from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
-
 
 @Component({
   selector: 'app-root',
@@ -20,7 +33,6 @@ import { AuthService } from './auth/auth.service';
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-
 export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
@@ -58,6 +70,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private dragOffsetY = 0;
   private boundMouseMove?: (event: MouseEvent) => void;
   private boundMouseUp?: () => void;
+  private formChangeSubscriptionInitialized = false;
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -66,8 +79,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     numberOfBlocks: [0, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
     sizeOfBlocksBytes: [7560, [Validators.required, Validators.pattern(/^\d+$/)]],
     gpsArea: ['', [Validators.required]],
-    canFrames: [[...this.canFrameOptions], [Validators.required]],
-    dbcFiles: [[...this.dbcOptions], [Validators.required]],
+    canFrames: [[] as string[], [Validators.required]],
+    dbcFiles: [[] as string[], [Validators.required]],
     vinPrefix: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
     initialDateTime: [this.getCurrentDateTimeLocal(), [Validators.required]],
     vinSuffix: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
@@ -79,9 +92,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   });
 
   ngOnInit(): void {
-  this.initializeDefaultOptions();
-  void this.initializeApp();
-}
+    void this.initializeApp();
+  }
 
   ngAfterViewChecked(): void {
     if (this.isMapModalOpen) {
@@ -114,10 +126,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     const selected = this.form.controls.canFrames.value;
     if (selected.length === 0) {
       return 'Select CAN frames';
-    }
-
-    if (selected.length === this.canFrameOptions.length) {
-      return `${selected.length} selected`;
     }
 
     return `${selected.length} selected`;
@@ -253,28 +261,11 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
-  private initializeDefaultOptions(): void {
-    this.gpsAreas = [];
-    this.canFrameOptions = this.buildCanFrameOptions();
-    this.dbcOptions = ['dbc_a', 'dbc_b', 'dbc_c', 'dbc_d', 'dbc_e', 'dbc_f'];
-
-    this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
-    this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
-  }
-
   private async initializeApp(): Promise<void> {
-    console.log('initializeApp started');
-
     const redirectInProgress = sessionStorage.getItem('auth_redirect_in_progress') === 'true';
-
-    console.log('redirectInProgress =', redirectInProgress);
-
     const authenticated = await this.authService.isAuthenticated();
 
-    console.log('authenticated =', authenticated);
-
     if (!authenticated) {
-      console.log('Not authenticated, returning before loadConfig');
       if (!redirectInProgress) {
         sessionStorage.setItem('auth_redirect_in_progress', 'true');
         await this.authService.login();
@@ -282,9 +273,33 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       return;
     }
 
-    console.log('Authenticated, calling loadConfig');
-
     sessionStorage.removeItem('auth_redirect_in_progress');
+    this.initializeFormValueChangeSubscription();
+
+    try {
+      await this.loadConfig();
+    } catch (error: unknown) {
+      this.formStatus = 'error';
+      this.setPayloadValue(JSON.stringify({
+        error: {
+          category: 'config_load_error',
+          ...this.describeFetchError(error),
+          hints: [
+            'Check if assets/config.json exists in the deployed application.',
+            'Check if angular.json includes src/assets in the assets section.',
+            'Check browser DevTools > Network and confirm config.json returns HTTP 200.',
+            'Check that gpsAreas, canFrames, dbcFiles, workQueueUrl, s3Default and engineURL exist in config.json.'
+          ]
+        }
+      }, null, 2));
+      this.form.controls.payload.markAsTouched();
+    }
+  }
+
+  private initializeFormValueChangeSubscription(): void {
+    if (this.formChangeSubscriptionInitialized) {
+      return;
+    }
 
     this.form.valueChanges.subscribe(() => {
       if (this.suppressFormReset) {
@@ -296,7 +311,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.clearPayload();
     });
 
-    await this.loadConfig();
+    this.formChangeSubscriptionInitialized = true;
   }
 
   async logout(): Promise<void> {
@@ -335,6 +350,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       url: this.form.controls.engineUrl.value,
       body: envelope
     };
+
     this.generationTimestamp = this.makeGenerationTimestamp();
     this.formStatus = 'awaiting_response';
     this.isSubmitting = true;
@@ -523,46 +539,59 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
-  private buildCanFrameOptions(): string[] {
-    const options: string[] = [];
-
-    for (let i = 0; i < 150; i++) {
-      const hex = i.toString(16).toUpperCase().padStart(3, '0');
-      options.push(`0x${hex}`);
-    }
-
-    return options;
-  }
-
   private async loadConfig(): Promise<void> {
-    const defaultGpsAreas: string[] = [];
-    const defaultCanFrames = this.buildCanFrameOptions();
-    const defaultDbcFiles = ['dbc_a', 'dbc_b', 'dbc_c', 'dbc_d', 'dbc_e', 'dbc_f'];
+    const config = await this.fetchRuntimeConfig();
 
-    try {
-      const config = await this.fetchRuntimeConfig();
-
-      this.gpsAreas = Array.isArray(config.gpsAreas) && config.gpsAreas.length > 0 ? config.gpsAreas : defaultGpsAreas;
-      this.canFrameOptions = Array.isArray(config.canFrames) && config.canFrames.length > 0 ? config.canFrames : defaultCanFrames;
-      this.dbcOptions = Array.isArray(config.dbcFiles) && config.dbcFiles.length > 0 ? config.dbcFiles : defaultDbcFiles;
-      this.form.controls.workQueueUrl.setValue(typeof config.workQueueUrl === 'string' ? config.workQueueUrl : '', { emitEvent: false });
-      this.form.controls.s3Bucket.setValue(typeof config.s3Default === 'string' && config.s3Default.trim() ? config.s3Default.trim() : '', { emitEvent: false });
-      this.form.controls.engineUrl.setValue(typeof config.engineURL === 'string' && config.engineURL.trim() ? config.engineURL.trim() : '', { emitEvent: false });
-    } catch {
-      this.gpsAreas = defaultGpsAreas;
-      this.canFrameOptions = defaultCanFrames;
-      this.dbcOptions = defaultDbcFiles;
-      this.form.controls.workQueueUrl.setValue('', { emitEvent: false });
-      this.form.controls.s3Bucket.setValue('', { emitEvent: false });
-      this.form.controls.engineUrl.setValue('', { emitEvent: false });
+    if (!Array.isArray(config.gpsAreas) || config.gpsAreas.length === 0) {
+      throw new Error('gpsAreas missing or empty in config.json');
     }
+
+    if (!Array.isArray(config.canFrames) || config.canFrames.length === 0) {
+      throw new Error('canFrames missing or empty in config.json');
+    }
+
+    if (!Array.isArray(config.dbcFiles) || config.dbcFiles.length === 0) {
+      throw new Error('dbcFiles missing or empty in config.json');
+    }
+
+    if (typeof config.workQueueUrl !== 'string' || !config.workQueueUrl.trim()) {
+      throw new Error('workQueueUrl missing or empty in config.json');
+    }
+
+    if (typeof config.s3Default !== 'string' || !config.s3Default.trim()) {
+      throw new Error('s3Default missing or empty in config.json');
+    }
+
+    if (typeof config.engineURL !== 'string' || !config.engineURL.trim()) {
+      throw new Error('engineURL missing or empty in config.json');
+    }
+
+    console.log('CONFIG LOADED', {
+      gpsAreas: config.gpsAreas.length,
+      canFrames: config.canFrames.length,
+      dbcFiles: config.dbcFiles.length
+    });
 
     this.suppressFormReset = true;
+
+    this.gpsAreas = [...config.gpsAreas];
+    this.canFrameOptions = [...config.canFrames];
+    this.dbcOptions = [...config.dbcFiles];
+
     this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
     this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
+    this.form.controls.workQueueUrl.setValue(config.workQueueUrl.trim(), { emitEvent: false });
+    this.form.controls.s3Bucket.setValue(config.s3Default.trim(), { emitEvent: false });
+    this.form.controls.engineUrl.setValue(config.engineURL.trim(), { emitEvent: false });
+
+    this.form.controls.gpsArea.updateValueAndValidity({ emitEvent: false });
     this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
     this.form.controls.dbcFiles.updateValueAndValidity({ emitEvent: false });
+    this.form.controls.workQueueUrl.updateValueAndValidity({ emitEvent: false });
+    this.form.controls.s3Bucket.updateValueAndValidity({ emitEvent: false });
+    this.form.controls.engineUrl.updateValueAndValidity({ emitEvent: false });
     this.form.updateValueAndValidity({ emitEvent: false });
+
     this.suppressFormReset = false;
   }
 
@@ -576,29 +605,33 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }> {
     const stamp = Date.now();
     const candidates = [
-      `assets/config.json?t=${stamp}`
+      `assets/config.json?t=${stamp}`,
+      `/assets/config.json?t=${stamp}`
     ];
 
     for (const url of candidates) {
       try {
         const response = await fetch(url, { cache: 'no-store' });
-        if (response.ok) {
-          const text = await response.text();
-          return JSON.parse(text) as {
-            gpsAreas?: string[];
-            canFrames?: string[];
-            dbcFiles?: string[];
-            workQueueUrl?: string;
-            s3Default?: string;
-            engineURL?: string;
-          };
+
+        if (!response.ok) {
+          continue;
         }
+
+        const text = await response.text();
+        return JSON.parse(text) as {
+          gpsAreas?: string[];
+          canFrames?: string[];
+          dbcFiles?: string[];
+          workQueueUrl?: string;
+          s3Default?: string;
+          engineURL?: string;
+        };
       } catch {
         // Try next candidate.
       }
     }
 
-    throw new Error('Unable to load runtime config');
+    throw new Error('Unable to load runtime config from assets/config.json');
   }
 
   private buildEngineEnvelope() {
@@ -642,7 +675,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
 
     const trimmed = text.trim();
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
       try {
         return JSON.parse(trimmed);
       } catch {
