@@ -52,20 +52,22 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   gpsAreas: string[] = [];
   canFrameOptions: string[] = [];
   dbcOptions: string[] = [];
+  selectedGpsCoordinates: string[] = [];
+
   isGpsOpen = false;
   gpsFilter = '';
   isCanOpen = false;
   isDbcOpen = false;
   isSubmitting = false;
   isConfigLoaded = false;
+  isMapModalOpen = false;
+
   formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
   copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
+
   private suppressFormReset = false;
   private formValueChangesBound = false;
-
-  isMapModalOpen = false;
-
   private dragInitialized = false;
   private isDragging = false;
   private dragOffsetX = 0;
@@ -128,6 +130,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (selected.length === 0) {
       return 'Select CAN frames';
     }
+
     return `${selected.length} selected`;
   }
 
@@ -284,13 +287,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.setPayloadValue(JSON.stringify({
         error: {
           category: 'config_load_error',
-          ...this.describeFetchError(error),
-          hints: [
-            'Check if src/assets/config.json is being published.',
-            'Open /assets/config.json directly in the browser and confirm it returns HTTP 200.',
-            'Check angular.json assets configuration.',
-            'Check that gpsAreas, canFrames and dbcFiles exist and are arrays.'
-          ]
+          ...this.describeFetchError(error)
         }
       }, null, 2));
       this.form.controls.payload.markAsTouched();
@@ -442,7 +439,27 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   public onSaveRoute(routeJson: string): void {
-    this.f.payload.setValue(routeJson);
+    this.selectedGpsCoordinates = [];
+
+    try {
+      const parsed = JSON.parse(routeJson) as Record<string, unknown>;
+      const gpsCoordinates = this.extractGpsCoordinatesFromRouteData(parsed);
+      const detectedGpsArea = this.extractGpsAreaFromRouteData(parsed);
+
+      if (gpsCoordinates.length > 0) {
+        this.selectedGpsCoordinates = gpsCoordinates;
+      }
+
+      if (detectedGpsArea) {
+        this.form.controls.gpsArea.setValue(detectedGpsArea);
+        this.form.controls.gpsArea.markAsTouched();
+      }
+
+      this.setPayloadValue(JSON.stringify(parsed, null, 2));
+    } catch {
+      this.setPayloadValue(routeJson);
+    }
+
     this.closeMapModal();
   }
 
@@ -657,6 +674,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       numberOfBlocks: Number(raw.numberOfBlocks),
       blocksSize: Number(raw.sizeOfBlocksBytes),
       gpsArea: raw.gpsArea,
+      gpsCoordinates: [...this.selectedGpsCoordinates],
       canFrames: raw.canFrames.map((frame) => frame.split(' - ')[0].trim()),
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
@@ -666,6 +684,49 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       s3Bucket: raw.s3Bucket.trim(),
       workQueueUrl: raw.workQueueUrl.trim()
     };
+  }
+
+  private extractGpsAreaFromRouteData(data: Record<string, unknown>): string | null {
+    const candidateKeys = ['gpsArea', 'country', 'region'];
+
+    for (const key of candidateKeys) {
+      const value = data[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return null;
+  }
+
+  private extractGpsCoordinatesFromRouteData(data: unknown): string[] {
+    const found = new Set<string>();
+
+    const visit = (value: unknown): void => {
+      if (typeof value === 'string') {
+        const normalized = value.trim().toUpperCase();
+        if (/^[0-9A-F]{16}$/.test(normalized)) {
+          found.add(normalized);
+        }
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          visit(item);
+        }
+        return;
+      }
+
+      if (value && typeof value === 'object') {
+        for (const nestedValue of Object.values(value as Record<string, unknown>)) {
+          visit(nestedValue);
+        }
+      }
+    };
+
+    visit(data);
+    return Array.from(found);
   }
 
   private async parseResponseBody(response: Response): Promise<unknown> {
