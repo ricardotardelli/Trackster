@@ -20,6 +20,18 @@ import {
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 
+interface RoutePoint {
+  lat: number;
+  lng: number;
+  label?: string;
+}
+
+interface RoutePayload {
+  start: RoutePoint | null;
+  waypoints: Record<string, RoutePoint>;
+  destination: RoutePoint | null;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -441,17 +453,14 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   public onSaveRoute(routeJson: string): void {
     try {
-      const parsed = JSON.parse(routeJson) as Record<string, unknown>;
+      const parsed = JSON.parse(routeJson) as RoutePayload;
 
-      this.selectedGpsCoordinates = this.extractGpsCoordinatesFromRouteData(parsed);
+      this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
 
-      const detectedGpsArea = this.extractGpsAreaFromRouteData(parsed);
-      if (detectedGpsArea) {
-        this.form.controls.gpsArea.setValue(detectedGpsArea);
-        this.form.controls.gpsArea.markAsTouched();
-      }
+      this.updatePayloadPreview();
     } catch {
       this.selectedGpsCoordinates = [];
+      this.updatePayloadPreview();
     }
 
     this.closeMapModal();
@@ -680,98 +689,64 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     };
   }
 
-  private extractGpsAreaFromRouteData(data: Record<string, unknown>): string | null {
-    const candidateKeys = ['gpsArea', 'country', 'region'];
+  private buildSequentialGpsHexCoordinates(route: RoutePayload): string[] {
+    const orderedPoints: RoutePoint[] = [];
 
-    for (const key of candidateKeys) {
-      const value = data[key];
-      if (typeof value === 'string' && value.trim()) {
-        return value.trim();
+    if (this.isValidRoutePoint(route.start)) {
+      orderedPoints.push(route.start);
+    }
+
+    const orderedWaypointKeys = Object.keys(route.waypoints ?? {}).sort((a, b) => Number(a) - Number(b));
+
+    for (const key of orderedWaypointKeys) {
+      const point = route.waypoints[key];
+      if (this.isValidRoutePoint(point)) {
+        orderedPoints.push(point);
       }
     }
 
-    return null;
+    if (this.isValidRoutePoint(route.destination)) {
+      orderedPoints.push(route.destination);
+    }
+
+    return orderedPoints.map((point) => this.encodeGpsPointToHex(point));
   }
 
-  private extractGpsCoordinatesFromRouteData(data: unknown): string[] {
-    const result = new Set<string>();
+  private isValidRoutePoint(value: unknown): value is RoutePoint {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
 
-    const addHexValue = (value: unknown): void => {
-      if (typeof value !== 'string') {
-        return;
-      }
+    const point = value as Record<string, unknown>;
 
-      const normalized = value.trim().toUpperCase();
-      if (/^[0-9A-F]{16}$/.test(normalized)) {
-        result.add(normalized);
-      }
-    };
+    return (
+      typeof point['lat'] === 'number' &&
+      Number.isFinite(point['lat']) &&
+      typeof point['lng'] === 'number' &&
+      Number.isFinite(point['lng'])
+    );
+  }
 
-    const extractFromNamedProperty = (obj: Record<string, unknown>, keys: string[]): void => {
-      for (const key of keys) {
-        if (key in obj) {
-          visit(obj[key]);
-        }
-      }
-    };
+  private encodeGpsPointToHex(point: RoutePoint): string {
+    const latScaled = Math.round(point.lat * 1_000_000);
+    const lngScaled = Math.round(point.lng * 1_000_000);
 
-    const visit = (value: unknown): void => {
-      if (value === null || value === undefined) {
-        return;
-      }
+    const buffer = new ArrayBuffer(8);
+    const view = new DataView(buffer);
 
-      if (typeof value === 'string') {
-        addHexValue(value);
-        return;
-      }
+    view.setInt32(0, latScaled, false);
+    view.setInt32(4, lngScaled, false);
 
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          visit(item);
-        }
-        return;
-      }
+    return Array.from(new Uint8Array(buffer))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase();
+  }
 
-      if (typeof value === 'object') {
-        const obj = value as Record<string, unknown>;
-
-        extractFromNamedProperty(obj, [
-          'gpsCoordinates',
-          'coordinates',
-          'trackingPoints',
-          'points',
-          'routePoints'
-        ]);
-
-        extractFromNamedProperty(obj, [
-          'hex',
-          'gpsHex',
-          'gpsCoordinate',
-          'coordinateHex',
-          'encodedGps',
-          'encodedCoordinate'
-        ]);
-
-        extractFromNamedProperty(obj, [
-          'start',
-          'waypoints',
-          'destination'
-        ]);
-
-        for (const nestedValue of Object.values(obj)) {
-          addHexValue(nestedValue);
-        }
-
-        for (const nestedValue of Object.values(obj)) {
-          if (typeof nestedValue === 'object') {
-            visit(nestedValue);
-          }
-        }
-      }
-    };
-
-    visit(data);
-    return Array.from(result);
+  private updatePayloadPreview(): void {
+    const envelope = this.buildEngineEnvelope();
+    this.setPayloadValue(JSON.stringify(envelope, null, 2));
+    this.form.controls.payload.markAsTouched();
   }
 
   private async parseResponseBody(response: Response): Promise<unknown> {
