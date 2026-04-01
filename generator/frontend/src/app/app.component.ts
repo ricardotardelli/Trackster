@@ -60,14 +60,14 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   isDbcOpen = false;
   isSubmitting = false;
   isConfigLoaded = false;
-  isMapModalOpen = false;
-
   formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
   copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
-
   private suppressFormReset = false;
   private formValueChangesBound = false;
+
+  isMapModalOpen = false;
+
   private dragInitialized = false;
   private isDragging = false;
   private dragOffsetX = 0;
@@ -130,7 +130,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (selected.length === 0) {
       return 'Select CAN frames';
     }
-
     return `${selected.length} selected`;
   }
 
@@ -368,6 +367,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.isSubmitting = true;
 
     try {
+      this.setPayloadValue(JSON.stringify(request.body, null, 2));
+
       const response = await fetch(request.url, {
         method: request.method,
         headers: { 'Content-Type': 'application/json' },
@@ -439,25 +440,18 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   public onSaveRoute(routeJson: string): void {
-    this.selectedGpsCoordinates = [];
-
     try {
       const parsed = JSON.parse(routeJson) as Record<string, unknown>;
-      const gpsCoordinates = this.extractGpsCoordinatesFromRouteData(parsed);
+
+      this.selectedGpsCoordinates = this.extractGpsCoordinatesFromRouteData(parsed);
+
       const detectedGpsArea = this.extractGpsAreaFromRouteData(parsed);
-
-      if (gpsCoordinates.length > 0) {
-        this.selectedGpsCoordinates = gpsCoordinates;
-      }
-
       if (detectedGpsArea) {
         this.form.controls.gpsArea.setValue(detectedGpsArea);
         this.form.controls.gpsArea.markAsTouched();
       }
-
-      this.setPayloadValue(JSON.stringify(parsed, null, 2));
     } catch {
-      this.setPayloadValue(routeJson);
+      this.selectedGpsCoordinates = [];
     }
 
     this.closeMapModal();
