@@ -694,14 +694,34 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   private extractGpsCoordinatesFromRouteData(data: unknown): string[] {
-    const found = new Set<string>();
+    const result = new Set<string>();
+
+    const addHexValue = (value: unknown): void => {
+      if (typeof value !== 'string') {
+        return;
+      }
+
+      const normalized = value.trim().toUpperCase();
+      if (/^[0-9A-F]{16}$/.test(normalized)) {
+        result.add(normalized);
+      }
+    };
+
+    const extractFromNamedProperty = (obj: Record<string, unknown>, keys: string[]): void => {
+      for (const key of keys) {
+        if (key in obj) {
+          visit(obj[key]);
+        }
+      }
+    };
 
     const visit = (value: unknown): void => {
+      if (value === null || value === undefined) {
+        return;
+      }
+
       if (typeof value === 'string') {
-        const normalized = value.trim().toUpperCase();
-        if (/^[0-9A-F]{16}$/.test(normalized)) {
-          found.add(normalized);
-        }
+        addHexValue(value);
         return;
       }
 
@@ -712,15 +732,46 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
         return;
       }
 
-      if (value && typeof value === 'object') {
-        for (const nestedValue of Object.values(value as Record<string, unknown>)) {
-          visit(nestedValue);
+      if (typeof value === 'object') {
+        const obj = value as Record<string, unknown>;
+
+        extractFromNamedProperty(obj, [
+          'gpsCoordinates',
+          'coordinates',
+          'trackingPoints',
+          'points',
+          'routePoints'
+        ]);
+
+        extractFromNamedProperty(obj, [
+          'hex',
+          'gpsHex',
+          'gpsCoordinate',
+          'coordinateHex',
+          'encodedGps',
+          'encodedCoordinate'
+        ]);
+
+        extractFromNamedProperty(obj, [
+          'start',
+          'waypoints',
+          'destination'
+        ]);
+
+        for (const nestedValue of Object.values(obj)) {
+          addHexValue(nestedValue);
+        }
+
+        for (const nestedValue of Object.values(obj)) {
+          if (typeof nestedValue === 'object') {
+            visit(nestedValue);
+          }
         }
       }
     };
 
     visit(data);
-    return Array.from(found);
+    return Array.from(result);
   }
 
   private async parseResponseBody(response: Response): Promise<unknown> {
