@@ -20,7 +20,7 @@ const GENERIC_HEADER_SIZE = 0x26;         // 38 bytes (keep as-is per your curre
 const NUM_CAN_BLOCKS_OFFSET = 0x23;       // 3 bytes (0x23..0x25)
 
 const BLOCK_HEADER_SIZE = 29;
-const GPS_BYTES = Buffer.from("77114820178BE135", "hex");
+const GPS_BYTES = Buffer.from("0000000000000000", "hex");
 
 const FD_PAYLOAD_SIZES = [
   0, 1, 2, 3, 4, 5, 6, 7, 8,
@@ -38,17 +38,62 @@ async function putObjectNoOverwrite({ Bucket, Key, Body, ContentType }) {
   }));
 }
 
-function getGpsBytesForBlock(gpsCoordinates, blockIndex) {
-  if (!Array.isArray(gpsCoordinates)) {
+function normalizeGpsHex(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (!/^[0-9A-F]{16}$/.test(normalized)) {
+    throw new Error(`Invalid GPS coordinate: "${value}"`);
+  }
+  return normalized;
+}
+
+function getGpsBytesForBlock(gpsCoordinates, blockIndex, totalBlocks) {
+  if (!Array.isArray(gpsCoordinates) || gpsCoordinates.length === 0) {
     return GPS_BYTES;
   }
 
-  const value = gpsCoordinates[blockIndex];
-  if (typeof value !== "string" || value.length !== 16) {
-    return GPS_BYTES;
+  const normalizedCoordinates = gpsCoordinates.map(normalizeGpsHex);
+  const coordCount = normalizedCoordinates.length;
+
+  if (totalBlocks <= 1) {
+    return Buffer.from(normalizedCoordinates[0], "hex");
   }
 
-  return Buffer.from(value, "hex");
+  if (coordCount === 1) {
+    return Buffer.from(normalizedCoordinates[0], "hex");
+  }
+
+  let selectedIndex = 0;
+
+  if (coordCount >= totalBlocks) {
+    if (blockIndex === 0) {
+      selectedIndex = 0;
+    } else if (blockIndex === totalBlocks - 1) {
+      selectedIndex = coordCount - 1;
+    } else {
+      selectedIndex = Math.round(
+        blockIndex * (coordCount - 1) / (totalBlocks - 1)
+      );
+    }
+  } else {
+    const base = Math.floor(totalBlocks / coordCount);
+    const rest = totalBlocks % coordCount;
+
+    let startBlock = 0;
+
+    for (let i = 0; i < coordCount; i++) {
+      const blocksForThisCoordinate = base + (i === coordCount - 1 ? rest : 0);
+      const endBlockExclusive = startBlock + blocksForThisCoordinate;
+
+      if (blockIndex >= startBlock && blockIndex < endBlockExclusive) {
+        selectedIndex = i;
+        break;
+      }
+
+      startBlock = endBlockExclusive;
+    }
+  }
+
+  return Buffer.from(normalizedCoordinates[selectedIndex], "hex");
 }
 
 function isAlreadyExists(err) {
@@ -541,7 +586,7 @@ function generateBin(msgList, cycles, seed, intervalSec, epochMs, blockdatasize,
 
     makeTimestampAbsBytesFromDate(simDate).copy(block, 0x03);
     makeTimestampRelBytesMs(simMs).copy(block, 0x0b);
-    const gpsBytes = getGpsBytesForBlock(gpsCoordinates, blockNo - 1);
+    const gpsBytes = getGpsBytesForBlock(gpsCoordinates, blockNo - 1, totalBlocks);
     gpsBytes.copy(block, 0x13);
 
     block[0x1b] = (blockdatasize >> 8) & 0xff;

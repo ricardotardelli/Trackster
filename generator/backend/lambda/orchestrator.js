@@ -3,7 +3,7 @@
 // ============================================================================
 // Purpose:
 //   Convert frontend payload into many SQS messages.
-//   Each vehicle = ONE SQS message (the worker generates ONE .bin per message).
+//   Each vehicle = ONE SQS message (the worker generates ONE .bin per message)
 // ============================================================================
 
 const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
@@ -152,7 +152,7 @@ module.exports.handler = async (event, context) => {
     const numberOfBlocks = Math.max(0, parsePositiveInt(p.numberOfBlocks));
     const blocksSize = Math.max(0, parsePositiveInt(p.blocksSize ?? p.blocks_size));
     const gpsArea = String(p.gpsArea || "").trim();
-    const gpsCoordinates = Array.isArray(p.gpsCoordinates) ? p.gpsCoordinates : ["77114820178BE133", "77114820178BE134", "77114820178BE135"];
+    const gpsCoordinates = Array.isArray(p.gpsCoordinates) ? p.gpsCoordinates : ["77114820178BE135"];
     const canFrames = Array.isArray(p.canFrames) ? p.canFrames : [];
     const dbcFiles = Array.isArray(p.dbcFiles) ? p.dbcFiles : [];
     const vinPrefix = p.vinPrefix;
