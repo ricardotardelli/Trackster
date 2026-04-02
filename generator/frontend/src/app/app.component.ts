@@ -173,12 +173,16 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   openMapModal(): void {
+    this.routeDataForMap = this.rebuildRoutePayloadFromHexCoordinates(this.selectedGpsCoordinates);
     this.isMapModalOpen = true;
   }
 
   openMap(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
+
+    this.routeDataForMap = this.rebuildRoutePayloadFromHexCoordinates(this.selectedGpsCoordinates);
+
     this.isMapModalOpen = true;
     this.isGpsOpen = false;
     this.dragInitialized = false;
@@ -287,6 +291,85 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       control.markAsTouched();
     }
   }
+
+  private decodeGpsHexToRoutePoint(hex: string): RoutePoint | null {
+    if (typeof hex !== 'string') {
+      return null;
+    }
+
+    const normalized = hex.trim().toUpperCase();
+
+    if (!/^[0-9A-F]{16}$/.test(normalized)) {
+      return null;
+    }
+
+    try {
+      const bytes = new Uint8Array(
+        normalized.match(/.{1,2}/g)!.map((value) => parseInt(value, 16))
+      );
+
+      const view = new DataView(bytes.buffer);
+
+      const latScaled = view.getInt32(0, false);
+      const lngScaled = view.getInt32(4, false);
+
+      const lat = latScaled / 1_000_000;
+      const lng = lngScaled / 1_000_000;
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+      }
+
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return null;
+      }
+
+      return {
+        lat,
+        lng,
+        label: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private rebuildRoutePayloadFromHexCoordinates(hexCoordinates: string[]): RoutePayload | null {
+    const decodedPoints = hexCoordinates
+      .map((hex) => this.decodeGpsHexToRoutePoint(hex))
+      .filter((point): point is RoutePoint => point !== null);
+
+    if (decodedPoints.length === 0) {
+      return null;
+    }
+
+    if (decodedPoints.length === 1) {
+      return {
+        start: decodedPoints[0],
+        waypoints: {},
+        destination: null
+      };
+    }
+
+    const start = decodedPoints[0];
+    const destination = decodedPoints[decodedPoints.length - 1];
+    const middlePoints = decodedPoints.slice(1, -1);
+
+    const waypoints: Record<string, RoutePoint> = {};
+
+    middlePoints.forEach((point, index) => {
+      waypoints[String(index + 1)] = point;
+    });
+
+    return {
+      start,
+      waypoints,
+      destination
+    };
+  }
+
+
+
 
   private async initializeApp(): Promise<void> {
     this.bindFormValueChangesOnce();
@@ -456,10 +539,12 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     try {
       const parsed = JSON.parse(routeJson) as RoutePayload;
 
+      this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
 
       this.updatePayloadPreview();
     } catch {
+      this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
       this.updatePayloadPreview();
     }
