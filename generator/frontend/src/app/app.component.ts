@@ -542,7 +542,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
 
-      this.updatePayloadPreview();
+      //this.updatePayloadPreview();
     } catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
