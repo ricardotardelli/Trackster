@@ -60,6 +60,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   @ViewChild('mapModule')
   mapModule!: MapmoduleComponent;
+  routeDataForMap: RoutePayload | null = null;
 
   gpsAreas: string[] = [];
   canFrameOptions: string[] = [];

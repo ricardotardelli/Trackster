@@ -242,9 +242,10 @@
 
       <div class="map-modal-body">
         <app-mapmodule
-          class="mapmodule-host"
+          #mapModule
+          [country]="form.controls.gpsArea.value"
           [visible]="isMapModalOpen"
-          [country]="f.gpsArea.value"
+          [routeData]="routeDataForMap"
           (saveRoute)="onSaveRoute($event)">
         </app-mapmodule>
       </div>

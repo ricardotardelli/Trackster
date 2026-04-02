@@ -25,6 +25,18 @@ interface GeoPoint {
   label?: string;
 }
 
+interface RoutePoint {
+  lat: number;
+  lng: number;
+  label?: string;
+}
+
+interface RoutePayload {
+  start: RoutePoint | null;
+  waypoints: Record<string, RoutePoint>;
+  destination: RoutePoint | null;
+}
+
 @Component({
   selector: 'app-mapmodule',
   standalone: true,
@@ -35,6 +47,8 @@ interface GeoPoint {
 export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   @Input() country: string = '';
   @Input() visible: boolean = true;
+  @Input() routeData: RoutePayload | null = null;
+
   @Output() saveRoute = new EventEmitter<string>();
 
   @ViewChild('mapContainer', { static: false })
@@ -45,7 +59,7 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
   private contextMenuHandler?: (event: MouseEvent) => void;
   private overlayGroup: L.LayerGroup | null = null;
 
-  private markerSequence = 0;
+  private readonly defaultCountry: string = 'Portugal';
 
   constructor(
     private readonly ngZone: NgZone,
@@ -56,7 +70,6 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
   public startFrom = '';
   public destination = '';
   public waypoints: GeoPoint[] = [];
-  private readonly defaultCountry: string = 'Portugal';
 
   public startPoint: GeoPoint | null = null;
   public destinationPoint: GeoPoint | null = null;
@@ -78,6 +91,7 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
 
   ngOnInit(): void {
     this.applyCountryToMap();
+    this.applyRouteDataFromInput();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -85,8 +99,21 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
       this.applyCountryToMap();
     }
 
+    if (changes['routeData']) {
+      this.applyRouteDataFromInput();
+
+      setTimeout(() => {
+        this.fitMapToRoute();
+      }, 0);
+    }
+
     if (changes['visible'] && this.visible) {
       this.initializeOrRefreshMap();
+
+      setTimeout(() => {
+        this.applyRouteDataFromInput();
+        this.fitMapToRoute();
+      }, 0);
     }
   }
 
@@ -95,6 +122,8 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
 
     setTimeout(() => {
       this.initializeOrRefreshMap();
+      this.applyRouteDataFromInput();
+      this.fitMapToRoute();
     }, 0);
   }
 
@@ -130,6 +159,185 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
     window.setTimeout(() => this.map?.invalidateSize(), 100);
     window.setTimeout(() => this.map?.invalidateSize(), 250);
     window.setTimeout(() => this.map?.invalidateSize(), 500);
+  }
+
+  public getLocationPlaceholder(): string {
+    if (this.pointSelectionMode === 'start') {
+      return 'Select or type start point name';
+    }
+
+    if (this.pointSelectionMode === 'destination') {
+      return 'Select or type destination name';
+    }
+
+    return 'Search and add waypoint';
+  }
+
+  public searchSelectedAddress(): void {
+    this.searchAddress(this.locationSearch, this.pointSelectionMode);
+  }
+
+  public searchAddress(query: string, target: PointSelectionMode): void {
+    const trimmedQuery = query ? query.trim() : '';
+
+    if (!trimmedQuery) {
+      return;
+    }
+
+    const params = new HttpParams()
+      .set('q', trimmedQuery)
+      .set('format', 'jsonv2')
+      .set('limit', '1');
+
+    this.http
+      .get<any[]>('https://nominatim.openstreetmap.org/search', { params })
+      .subscribe({
+        next: (results: any[]) => {
+          if (!results || results.length === 0) {
+            return;
+          }
+
+          const firstResult = results[0];
+          const resolvedName = firstResult.display_name || trimmedQuery;
+
+          const point: GeoPoint = {
+            lat: Number(firstResult.lat),
+            lng: Number(firstResult.lon),
+            label: resolvedName
+          };
+
+          if (target === 'start') {
+            this.startPoint = point;
+            this.startFrom = resolvedName;
+            this.locationSearch = resolvedName;
+          } else if (target === 'destination') {
+            this.destinationPoint = point;
+            this.destination = resolvedName;
+            this.locationSearch = resolvedName;
+          } else {
+            this.waypoints.push(point);
+            this.locationSearch = '';
+          }
+
+          this.refreshLayers();
+
+          if (this.map) {
+            this.map.setView([point.lat, point.lng], 13);
+            this.refreshMapSize();
+          }
+        },
+        error: (error: unknown) => {
+          console.error('Address search failed:', error);
+        }
+      });
+  }
+
+  public onMapClick(event: L.LeafletMouseEvent): void {
+    const lat = Number(event.latlng.lat.toFixed(6));
+    const lng = Number(event.latlng.lng.toFixed(6));
+
+    const point: GeoPoint = {
+      lat,
+      lng,
+      label: `${lat}, ${lng}`
+    };
+
+    if (this.pointSelectionMode === 'start') {
+      this.startPoint = point;
+      this.startFrom = point.label || '';
+      this.locationSearch = this.startFrom;
+    } else if (this.pointSelectionMode === 'destination') {
+      this.destinationPoint = point;
+      this.destination = point.label || '';
+      this.locationSearch = this.destination;
+    } else {
+      this.waypoints.push(point);
+      this.locationSearch = '';
+    }
+
+    this.refreshLayers();
+  }
+
+  public onMapRightClick(event: L.LeafletMouseEvent): void {
+    const clickedLat = Number(event.latlng.lat.toFixed(6));
+    const clickedLng = Number(event.latlng.lng.toFixed(6));
+
+    if (this.tryRemoveMarkerNear(clickedLat, clickedLng)) {
+      return;
+    }
+
+    if (this.pointSelectionMode === 'start' && this.startPoint) {
+      this.startPoint = null;
+      this.startFrom = '';
+      this.locationSearch = '';
+      this.refreshLayers();
+      return;
+    }
+
+    if (this.pointSelectionMode === 'destination' && this.destinationPoint) {
+      this.destinationPoint = null;
+      this.destination = '';
+      this.locationSearch = '';
+      this.refreshLayers();
+    }
+  }
+
+  public setSelectionMode(mode: PointSelectionMode): void {
+    this.pointSelectionMode = mode;
+
+    if (mode === 'start') {
+      this.locationSearch = this.startFrom;
+    } else if (mode === 'destination') {
+      this.locationSearch = this.destination;
+    } else {
+      this.locationSearch = '';
+    }
+  }
+
+  public clearAll(): void {
+    this.locationSearch = '';
+    this.startFrom = '';
+    this.destination = '';
+    this.startPoint = null;
+    this.destinationPoint = null;
+    this.waypoints = [];
+    this.layers = [];
+
+    this.refreshLayers();
+  }
+
+  public getOutput(): string {
+    const waypointsObject: Record<string, GeoPoint> = {};
+
+    this.waypoints.forEach((wp: GeoPoint, index: number) => {
+      waypointsObject[String(index + 1)] = {
+        lat: wp.lat,
+        lng: wp.lng,
+        label: wp.label
+      };
+    });
+
+    return JSON.stringify(
+      {
+        start: this.startPoint
+          ? {
+              lat: this.startPoint.lat,
+              lng: this.startPoint.lng,
+              label: this.startPoint.label
+            }
+          : null,
+        waypoints: waypointsObject,
+        destination: this.destinationPoint
+          ? {
+              lat: this.destinationPoint.lat,
+              lng: this.destinationPoint.lng,
+              label: this.destinationPoint.label
+            }
+          : null
+      },
+      null,
+      2
+    );
   }
 
   private initializeOrRefreshMap(): void {
@@ -790,10 +998,6 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
       });
     });
 
-    this.map.on('mousedown', () => {});
-    this.map.on('mouseup', () => {});
-    this.map.on('mouseover', () => {});
-
     this.map.on('contextmenu', (event: L.LeafletMouseEvent) => {
       L.DomEvent.stop(event.originalEvent);
 
@@ -819,125 +1023,110 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
     }, 0);
   }
 
-  public getLocationPlaceholder(): string {
-    if (this.pointSelectionMode === 'start') {
-      return 'Select or type start point name';
-    }
+  private applyRouteDataFromInput(): void {
+    const route = this.routeData;
 
-    if (this.pointSelectionMode === 'destination') {
-      return 'Select or type destination name';
-    }
-
-    return 'Search and add waypoint';
-  }
-
-  public searchSelectedAddress(): void {
-    this.searchAddress(this.locationSearch, this.pointSelectionMode);
-  }
-
-  public searchAddress(query: string, target: PointSelectionMode): void {
-    const trimmedQuery = query ? query.trim() : '';
-
-    if (!trimmedQuery) {
+    if (!route) {
+      this.startPoint = null;
+      this.destinationPoint = null;
+      this.startFrom = '';
+      this.destination = '';
+      this.waypoints = [];
+      this.locationSearch = '';
+      this.refreshLayers();
       return;
     }
 
-    const params = new HttpParams()
-      .set('q', trimmedQuery)
-      .set('format', 'jsonv2')
-      .set('limit', '1');
-
-    this.http
-      .get<any[]>('https://nominatim.openstreetmap.org/search', { params })
-      .subscribe({
-        next: (results: any[]) => {
-          if (!results || results.length === 0) {
-            return;
-          }
-
-          const firstResult = results[0];
-          const resolvedName = firstResult.display_name || trimmedQuery;
-
-          const point: GeoPoint = {
-            lat: Number(firstResult.lat),
-            lng: Number(firstResult.lon),
-            label: resolvedName
-          };
-
-          if (target === 'start') {
-            this.startPoint = point;
-            this.startFrom = resolvedName;
-            this.locationSearch = resolvedName;
-          } else if (target === 'destination') {
-            this.destinationPoint = point;
-            this.destination = resolvedName;
-            this.locationSearch = resolvedName;
-          } else {
-            this.waypoints.push(point);
-            this.locationSearch = '';
-          }
-
-          this.refreshLayers();
-
-          if (this.map) {
-            this.map.setView([point.lat, point.lng], 13);
-            this.refreshMapSize();
-          }
-        },
-        error: (error: unknown) => {
-          console.error('Address search failed:', error);
+    this.startPoint = this.isValidRoutePoint(route.start)
+      ? {
+          lat: route.start.lat,
+          lng: route.start.lng,
+          label: route.start.label
         }
-      });
-  }
+      : null;
 
-  public onMapClick(event: L.LeafletMouseEvent): void {
-    const lat = Number(event.latlng.lat.toFixed(6));
-    const lng = Number(event.latlng.lng.toFixed(6));
+    this.destinationPoint = this.isValidRoutePoint(route.destination)
+      ? {
+          lat: route.destination.lat,
+          lng: route.destination.lng,
+          label: route.destination.label
+        }
+      : null;
 
-    const point: GeoPoint = {
-      lat,
-      lng,
-      label: `${lat}, ${lng}`
-    };
+    this.startFrom = this.startPoint?.label ?? '';
+    this.destination = this.destinationPoint?.label ?? '';
+
+    const orderedWaypointKeys = Object.keys(route.waypoints ?? {}).sort(
+      (a, b) => Number(a) - Number(b)
+    );
+
+    this.waypoints = orderedWaypointKeys
+      .map((key) => route.waypoints[key])
+      .filter((point): point is RoutePoint => this.isValidRoutePoint(point))
+      .map((point) => ({
+        lat: point.lat,
+        lng: point.lng,
+        label: point.label
+      }));
 
     if (this.pointSelectionMode === 'start') {
-      this.startPoint = point;
-      this.startFrom = point.label || '';
       this.locationSearch = this.startFrom;
     } else if (this.pointSelectionMode === 'destination') {
-      this.destinationPoint = point;
-      this.destination = point.label || '';
       this.locationSearch = this.destination;
     } else {
-      this.waypoints.push(point);
       this.locationSearch = '';
     }
 
     this.refreshLayers();
   }
 
-  public onMapRightClick(event: L.LeafletMouseEvent): void {
-    const clickedLat = Number(event.latlng.lat.toFixed(6));
-    const clickedLng = Number(event.latlng.lng.toFixed(6));
+  private isValidRoutePoint(value: unknown): value is RoutePoint {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
 
-    if (this.tryRemoveMarkerNear(clickedLat, clickedLng)) {
+    const point = value as Record<string, unknown>;
+
+    return (
+      typeof point['lat'] === 'number' &&
+      Number.isFinite(point['lat']) &&
+      typeof point['lng'] === 'number' &&
+      Number.isFinite(point['lng'])
+    );
+  }
+
+  private fitMapToRoute(): void {
+    if (!this.map) {
       return;
     }
 
-    if (this.pointSelectionMode === 'start' && this.startPoint) {
-      this.startPoint = null;
-      this.startFrom = '';
-      this.locationSearch = '';
-      this.refreshLayers();
+    const points: L.LatLngExpression[] = [];
+
+    if (this.startPoint) {
+      points.push([this.startPoint.lat, this.startPoint.lng]);
+    }
+
+    for (const waypoint of this.waypoints) {
+      points.push([waypoint.lat, waypoint.lng]);
+    }
+
+    if (this.destinationPoint) {
+      points.push([this.destinationPoint.lat, this.destinationPoint.lng]);
+    }
+
+    if (points.length === 0) {
       return;
     }
 
-    if (this.pointSelectionMode === 'destination' && this.destinationPoint) {
-      this.destinationPoint = null;
-      this.destination = '';
-      this.locationSearch = '';
-      this.refreshLayers();
+    if (points.length === 1) {
+      this.map.setView(points[0], 13);
+      this.refreshMapSize();
+      return;
     }
+
+    const bounds = L.latLngBounds(points);
+    this.map.fitBounds(bounds, { padding: [30, 30] });
+    this.refreshMapSize();
   }
 
   private tryRemoveMarkerNear(lat: number, lng: number): boolean {
@@ -987,64 +1176,6 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
     return false;
   }
 
-  public setSelectionMode(mode: PointSelectionMode): void {
-    this.pointSelectionMode = mode;
-
-    if (mode === 'start') {
-      this.locationSearch = this.startFrom;
-    } else if (mode === 'destination') {
-      this.locationSearch = this.destination;
-    } else {
-      this.locationSearch = '';
-    }
-  }
-
-  public clearAll(): void {
-    this.locationSearch = '';
-    this.startFrom = '';
-    this.destination = '';
-    this.startPoint = null;
-    this.destinationPoint = null;
-    this.waypoints = [];
-    this.layers = [];
-
-    this.refreshLayers();
-  }
-
-  public getOutput(): string {
-    const waypointsObject: Record<string, GeoPoint> = {};
-
-    this.waypoints.forEach((wp: GeoPoint, index: number) => {
-      waypointsObject[String(index + 1)] = {
-        lat: wp.lat,
-        lng: wp.lng,
-        label: wp.label
-      };
-    });
-
-    return JSON.stringify(
-      {
-        start: this.startPoint
-          ? {
-              lat: this.startPoint.lat,
-              lng: this.startPoint.lng,
-              label: this.startPoint.label
-            }
-          : null,
-        waypoints: waypointsObject,
-        destination: this.destinationPoint
-          ? {
-              lat: this.destinationPoint.lat,
-              lng: this.destinationPoint.lng,
-              label: this.destinationPoint.label
-            }
-          : null
-      },
-      null,
-      2
-    );
-  }
-
   private getMarkerText(
     type: 'Start' | 'Waypoint' | 'Destination',
     point: GeoPoint,
@@ -1085,11 +1216,8 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
   private createMarker(
     point: GeoPoint,
     color: string,
-    tooltip: string,
-    debugName: string
+    tooltip: string
   ): L.Marker {
-    const markerId = ++this.markerSequence;
-
     const marker = L.marker([point.lat, point.lng], {
       icon: this.createColoredIcon(color),
       bubblingMouseEvents: false,
@@ -1100,16 +1228,6 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
     marker.bindTooltip(tooltip, {
       direction: 'top'
     });
-
-    marker.on('add', () => {});
-    marker.on('remove', () => {});
-    marker.on('mouseover', () => {});
-    marker.on('mouseout', () => {});
-    marker.on('mousedown', () => {});
-    marker.on('mouseup', () => {});
-    marker.on('click', () => {});
-    marker.on('tooltipopen', () => {});
-    marker.on('tooltipclose', () => {});
 
     return marker;
   }
@@ -1127,8 +1245,7 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
       const startMarker = this.createMarker(
         this.startPoint,
         '#2e7d32',
-        this.getMarkerText('Start', this.startPoint),
-        'START'
+        this.getMarkerText('Start', this.startPoint)
       );
 
       this.overlayGroup.addLayer(startMarker);
@@ -1139,8 +1256,7 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
       const waypointMarker = this.createMarker(
         wp,
         '#1976d2',
-        this.getMarkerText('Waypoint', wp, index),
-        `WAYPOINT[${index}]`
+        this.getMarkerText('Waypoint', wp, index)
       );
 
       waypointMarker.on('click', () => {
@@ -1158,8 +1274,7 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
       const destinationMarker = this.createMarker(
         this.destinationPoint,
         '#f9a825',
-        this.getMarkerText('Destination', this.destinationPoint),
-        'DESTINATION'
+        this.getMarkerText('Destination', this.destinationPoint)
       );
 
       this.overlayGroup.addLayer(destinationMarker);
