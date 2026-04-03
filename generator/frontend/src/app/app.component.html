@@ -4,14 +4,6 @@
   </div>
 </div>
 
-<div *ngIf="authReady && !isAuthenticated" class="auth-splash">
-  <div class="auth-card">
-    Authentication failed.
-    <br><br>
-    <button type="button" (click)="initializeLogin()">Try again</button>
-  </div>
-</div>
-
 <div *ngIf="authReady && isAuthenticated">
   <main class="page">
     <section class="panel">
