@@ -27,6 +27,12 @@ Amplify.configure({
 async function hasAuthenticatedSession(): Promise<boolean> {
   try {
     const session = await fetchAuthSession();
+
+    // REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE
+    console.log('ID TOKEN:', session.tokens?.idToken?.toString() ?? null);
+    console.log('ACCESS TOKEN:', session.tokens?.accessToken?.toString() ?? null);
+    // REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE
+
     return !!session.tokens?.idToken || !!session.tokens?.accessToken;
   } catch {
     return false;
