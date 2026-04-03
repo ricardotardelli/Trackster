@@ -52,6 +52,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     private readonly authService: AuthService
   ) {}
 
+  authReady = false;
+  isAuthenticated = false;
+
   @ViewChild('modalHeader', { static: false })
   private modalHeader?: ElementRef<HTMLDivElement>;
 
@@ -371,37 +374,44 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
 
 
-  private async initializeApp(): Promise<void> {
-    this.bindFormValueChangesOnce();
+    private async initializeApp(): Promise<void> {
+      this.bindFormValueChangesOnce();
 
-    try {
-      await this.loadConfig();
-      this.isConfigLoaded = true;
-    } catch (error: unknown) {
-      this.formStatus = 'error';
-      this.setPayloadValue(JSON.stringify({
-        error: {
-          category: 'config_load_error',
-          ...this.describeFetchError(error)
+      try {
+        const redirectInProgress = sessionStorage.getItem('auth_redirect_in_progress') === 'true';
+        const authenticated = await this.authService.isAuthenticated();
+
+        if (!authenticated) {
+          this.isAuthenticated = false;
+          this.authReady = false;
+
+          if (!redirectInProgress) {
+            sessionStorage.setItem('auth_redirect_in_progress', 'true');
+            await this.authService.login();
+          }
+
+          return;
         }
-      }, null, 2));
-      this.form.controls.payload.markAsTouched();
-      return;
-    }
 
-    const redirectInProgress = sessionStorage.getItem('auth_redirect_in_progress') === 'true';
-    const authenticated = await this.authService.isAuthenticated();
+        sessionStorage.removeItem('auth_redirect_in_progress');
+        this.isAuthenticated = true;
 
-    if (!authenticated) {
-      if (!redirectInProgress) {
-        sessionStorage.setItem('auth_redirect_in_progress', 'true');
-        await this.authService.login();
+        await this.loadConfig();
+        this.isConfigLoaded = true;
+
+        this.authReady = true;
+      } catch (error: unknown) {
+        this.formStatus = 'error';
+        this.setPayloadValue(JSON.stringify({
+          error: {
+            category: 'app_initialization_error',
+            ...this.describeFetchError(error)
+          }
+        }, null, 2));
+        this.form.controls.payload.markAsTouched();
+        this.authReady = true;
       }
-      return;
     }
-
-    sessionStorage.removeItem('auth_redirect_in_progress');
-  }
 
   private bindFormValueChangesOnce(): void {
     if (this.formValueChangesBound) {
@@ -542,7 +552,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
 
-      //this.updatePayloadPreview();
     } catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];

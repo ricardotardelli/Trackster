@@ -139,3 +139,15 @@
 :host ::ng-deep .leaflet-marker-icon.custom-map-marker .custom-map-marker-inner {
   cursor: pointer !important;
 }
+
+.auth-splash {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-splash p {
+  margin: 0;
+  font-size: 16px;
+}
