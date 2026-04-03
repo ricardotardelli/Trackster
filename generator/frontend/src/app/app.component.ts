@@ -375,20 +375,19 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.bindFormValueChangesOnce();
 
     try {
-      const authenticated = await this.authService.isAuthenticated();
-
-      if (!authenticated) {
-        this.isAuthenticated = false;
-        this.authReady = true;
-        return;
-      }
-
       this.isAuthenticated = true;
       await this.loadConfig();
       this.isConfigLoaded = true;
       this.authReady = true;
     } catch (error: unknown) {
       this.formStatus = 'error';
+      this.setPayloadValue(JSON.stringify({
+        error: {
+          category: 'app_initialization_error',
+          ...this.describeFetchError(error)
+        }
+      }, null, 2));
+      this.form.controls.payload.markAsTouched();
       this.authReady = true;
     }
   }
