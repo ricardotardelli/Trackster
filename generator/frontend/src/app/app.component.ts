@@ -1,3 +1,5 @@
+import { Hub } from 'aws-amplify/utils';
+import { getCurrentUser } from 'aws-amplify/auth';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -90,6 +92,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private dragOffsetY = 0;
   private boundMouseMove?: (event: MouseEvent) => void;
   private boundMouseUp?: () => void;
+  private authHubUnsubscribe?: () => void;
+  private authFlowInProgress = false;
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -111,6 +115,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.setupAuthListener();
     void this.initializeApp();
   }
 
@@ -122,6 +127,11 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   ngOnDestroy(): void {
     this.removeDragListeners();
+
+    if (this.authHubUnsubscribe) {
+      this.authHubUnsubscribe();
+      this.authHubUnsubscribe = undefined;
+    }
   }
 
   get f() {
@@ -295,6 +305,69 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
+  private isOAuthCallbackInProgress(): boolean {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('code') && params.has('state');
+  }
+
+  private async finalizeAuthenticatedState(): Promise<boolean> {
+    try {
+      await getCurrentUser();
+      this.isAuthenticated = true;
+      await this.loadConfig();
+      this.isConfigLoaded = true;
+      this.authReady = true;
+      sessionStorage.removeItem('auth_redirect_in_progress');
+      this.authFlowInProgress = false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private setupAuthListener(): void {
+    this.authHubUnsubscribe = Hub.listen('auth', async ({ payload }) => {
+      switch (payload.event) {
+        case 'signInWithRedirect':
+          try {
+            this.authFlowInProgress = false;
+            sessionStorage.removeItem('auth_redirect_in_progress');
+
+            this.isAuthenticated = true;
+            await this.loadConfig();
+            this.isConfigLoaded = true;
+            this.authReady = true;
+          } catch (error: unknown) {
+            this.formStatus = 'error';
+            this.setPayloadValue(JSON.stringify({
+              error: {
+                category: 'post_redirect_load_config_error',
+                ...this.describeFetchError(error)
+              }
+            }, null, 2));
+            this.form.controls.payload.markAsTouched();
+            this.authReady = true;
+          }
+          break;
+
+        case 'signInWithRedirect_failure':
+          this.authFlowInProgress = false;
+          sessionStorage.removeItem('auth_redirect_in_progress');
+          this.isAuthenticated = false;
+          this.formStatus = 'error';
+          this.setPayloadValue(JSON.stringify({
+            error: {
+              category: 'sign_in_with_redirect_failure',
+              details: payload.data ?? null
+            }
+          }, null, 2));
+          this.form.controls.payload.markAsTouched();
+          this.authReady = true;
+          break;
+      }
+    });
+  }
+
   private decodeGpsHexToRoutePoint(hex: string): RoutePoint | null {
     if (typeof hex !== 'string') {
       return null;
@@ -378,33 +451,55 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.bindFormValueChangesOnce();
 
     try {
-      const authenticated = await this.authService.isAuthenticated();
+      const redirectInProgress =
+        this.isOAuthCallbackInProgress() ||
+        sessionStorage.getItem('auth_redirect_in_progress') === 'true';
 
-      if (!authenticated) {
-        this.isAuthenticated = false;
+      if (redirectInProgress) {
+        this.authFlowInProgress = true;
 
-        try {
-          await this.authService.login();
-        } catch (error: unknown) {
-          this.formStatus = 'error';
-          this.setPayloadValue(JSON.stringify({
-            error: {
-              category: 'login_redirect_error',
-              ...this.describeFetchError(error)
-            }
-          }, null, 2));
-          this.form.controls.payload.markAsTouched();
-          this.authReady = true;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const authenticated = await this.finalizeAuthenticatedState();
+          if (authenticated) {
+            return;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 300));
         }
 
+        this.isAuthenticated = false;
+        this.formStatus = 'error';
+        this.setPayloadValue(JSON.stringify({
+          error: {
+            category: 'oauth_callback_timeout',
+            message: 'OAuth callback returned to the app, but the session was not established.'
+          }
+        }, null, 2));
+        this.form.controls.payload.markAsTouched();
+        this.authReady = true;
         return;
       }
 
-      this.isAuthenticated = true;
-      await this.loadConfig();
-      this.isConfigLoaded = true;
-      this.authReady = true;
+      const authenticated = await this.authService.isAuthenticated();
+
+      if (authenticated) {
+        this.isAuthenticated = true;
+        await this.loadConfig();
+        this.isConfigLoaded = true;
+        this.authReady = true;
+        return;
+      }
+
+      if (!this.authFlowInProgress) {
+        this.isAuthenticated = false;
+        this.authFlowInProgress = true;
+        sessionStorage.setItem('auth_redirect_in_progress', 'true');
+        await this.authService.login();
+        return;
+      }
     } catch (error: unknown) {
+      this.authFlowInProgress = false;
+      sessionStorage.removeItem('auth_redirect_in_progress');
       this.formStatus = 'error';
       this.setPayloadValue(JSON.stringify({
         error: {
@@ -431,7 +526,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.form.controls.payload.markAsTouched();
     }
   }
-  
+
   private bindFormValueChangesOnce(): void {
     if (this.formValueChangesBound) {
       return;
@@ -452,6 +547,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   async logout(): Promise<void> {
     sessionStorage.removeItem('auth_redirect_in_progress');
+    this.authFlowInProgress = false;
     await this.authService.logout();
   }
 

@@ -29,9 +29,7 @@ export class AuthService {
         return null;
       }
 
-      const payload = idToken.payload;
-      const username = payload['cognito:username'];
-
+      const username = idToken.payload['cognito:username'];
       return typeof username === 'string' ? username : null;
     } catch {
       return null;
