@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { fetchAuthSession, signInWithRedirect, signOut, getCurrentUser } from 'aws-amplify/auth';
+import { fetchAuthSession, signInWithRedirect, signOut } from 'aws-amplify/auth';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -13,9 +13,8 @@ export class AuthService {
 
   async isAuthenticated(): Promise<boolean> {
     try {
-      const user = await getCurrentUser();
       const session = await fetchAuthSession();
-      return !!user && !!session.tokens?.idToken;
+      return !!session.tokens?.idToken || !!session.tokens?.accessToken;
     } catch {
       return false;
     }
@@ -23,8 +22,17 @@ export class AuthService {
 
   async getUsername(): Promise<string | null> {
     try {
-      const user = await getCurrentUser();
-      return user.username;
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken;
+
+      if (!idToken) {
+        return null;
+      }
+
+      const payload = idToken.payload;
+      const username = payload['cognito:username'];
+
+      return typeof username === 'string' ? username : null;
     } catch {
       return null;
     }
