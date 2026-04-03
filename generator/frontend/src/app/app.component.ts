@@ -18,7 +18,6 @@ import {
   ViewChild
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { AuthService } from './auth/auth.service';
 
 interface RoutePoint {
   lat: number;
@@ -49,7 +48,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>,
-    private readonly authService: AuthService
   ) {}
 
   authReady = false;
@@ -408,10 +406,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     });
 
     this.formValueChangesBound = true;
-  }
-
-  async logout(): Promise<void> {
-    await this.authService.logout();
   }
 
   async copyPayload(): Promise<void> {
