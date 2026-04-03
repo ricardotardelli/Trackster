@@ -1,11 +1,8 @@
 import { Injectable } from '@angular/core';
-import { fetchAuthSession, signInWithRedirect, signOut } from 'aws-amplify/auth';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  async logout(): Promise<void> {
-    await signOut();
-  }
 
   async isAuthenticated(): Promise<boolean> {
     try {
@@ -16,19 +13,4 @@ export class AuthService {
     }
   }
 
-  async getUsername(): Promise<string | null> {
-    try {
-      const session = await fetchAuthSession();
-      const idToken = session.tokens?.idToken;
-
-      if (!idToken) {
-        return null;
-      }
-
-      const username = idToken.payload['cognito:username'];
-      return typeof username === 'string' ? username : null;
-    } catch {
-      return null;
-    }
-  }
 }
