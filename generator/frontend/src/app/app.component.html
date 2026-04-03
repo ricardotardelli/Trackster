@@ -1,5 +1,7 @@
 <div *ngIf="!authReady" class="auth-splash">
-  <p>Authenticating...</p>
+  <div class="auth-card">
+    Authenticating...
+  </div>
 </div>
 <div *ngIf="authReady && isAuthenticated">
   <main class="page">
