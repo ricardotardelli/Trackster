@@ -18,6 +18,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 
 interface RoutePoint {
   lat: number;
@@ -47,7 +48,7 @@ interface RoutePayload {
 export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
-    private readonly elementRef: ElementRef<HTMLElement>,
+    private readonly elementRef: ElementRef<HTMLElement>
   ) {}
 
   authReady = false;
@@ -61,6 +62,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   @ViewChild('mapModule')
   mapModule!: MapmoduleComponent;
+
   routeDataForMap: RoutePayload | null = null;
 
   gpsAreas: string[] = [];
@@ -373,11 +375,14 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.bindFormValueChangesOnce();
 
     try {
+      await this.ensureAuthenticatedSession();
       this.isAuthenticated = true;
+
       await this.loadConfig();
       this.isConfigLoaded = true;
       this.authReady = true;
     } catch (error: unknown) {
+      this.isAuthenticated = false;
       this.formStatus = 'error';
       this.setPayloadValue(JSON.stringify({
         error: {
@@ -388,6 +393,33 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.form.controls.payload.markAsTouched();
       this.authReady = true;
     }
+  }
+
+  private async ensureAuthenticatedSession(): Promise<void> {
+    await getCurrentUser();
+
+    const session = await fetchAuthSession();
+    const idToken = session.tokens?.idToken?.toString();
+
+    if (!idToken) {
+      throw new Error('Authenticated session does not contain an ID token.');
+    }
+  }
+
+  private async getAuthorizationToken(): Promise<string> {
+    const session = await fetchAuthSession();
+
+    const idToken = session.tokens?.idToken?.toString();
+    if (idToken) {
+      return idToken;
+    }
+
+    const accessToken = session.tokens?.accessToken?.toString();
+    if (accessToken) {
+      return accessToken;
+    }
+
+    throw new Error('Unable to retrieve Cognito token from current session.');
   }
 
   private bindFormValueChangesOnce(): void {
@@ -445,11 +477,16 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.isSubmitting = true;
 
     try {
+      const authorizationToken = await this.getAuthorizationToken();
+
       this.setPayloadValue(JSON.stringify(request.body, null, 2));
 
       const response = await fetch(request.url, {
         method: request.method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authorizationToken
+        },
         body: JSON.stringify(request.body)
       });
 
@@ -464,7 +501,13 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       }
 
       const result: Record<string, unknown> = {
-        request,
+        request: {
+          ...request,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: '[REDACTED]'
+          }
+        },
         response: {
           ok: response.ok,
           status: response.status,
@@ -496,7 +539,13 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.formStatus = 'error';
       const details = this.describeFetchError(error);
       this.setPayloadValue(JSON.stringify({
-        request,
+        request: {
+          ...request,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: '[REDACTED]'
+          }
+        },
         error: {
           category: 'network_or_runtime_error',
           httpErrorCode: null,
@@ -507,7 +556,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
           hints: [
             'Check if Engine URL is reachable from the browser.',
             'If it is a different domain, verify CORS configuration on the API.',
-            'Check browser DevTools > Network for blocked/preflight requests.'
+            'Check browser DevTools > Network for blocked/preflight requests.',
+            'Check if the Cognito session is still valid and contains a token.'
           ]
         }
       }, null, 2));
@@ -523,7 +573,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
-
     } catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
