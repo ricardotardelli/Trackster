@@ -5,7 +5,7 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { AppComponent } from './app/app.component';
 import { cognitoConfig } from './app/auth/cognito.config';
 
-const LOGIN_URL = '/login';
+const LOGIN_URL = 'https://us-east-1rzmuaolzz.auth.us-east-1.amazoncognito.com/login?client_id=7g4slp3sne6rsvtpiacglgjt8o&response_type=code&scope=openid+email&redirect_uri=https://www.trackster.pt/';
 
 Amplify.configure({
   Auth: {
