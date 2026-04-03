@@ -30,12 +30,10 @@ async function hasAuthenticatedSession(): Promise<boolean> {
   }
 }
 
-function showAuthError(message: string): void {
-  document.body.innerHTML = `
-    <div style="padding:24px;font-family:Arial,sans-serif;">
-      ${message}
-    </div>
-  `;
+async function loadTracksterApp(): Promise<void> {
+  await bootstrapApplication(AppComponent, {
+    providers: [provideHttpClient()]
+  });
 }
 
 async function start(): Promise<void> {
@@ -44,23 +42,24 @@ async function start(): Promise<void> {
   const hasOAuthError = url.searchParams.has('error');
 
   if (hasOAuthError) {
-    showAuthError('Authentication failed.');
+    document.body.innerHTML = `
+      <div style="padding:24px;font-family:Arial,sans-serif;">
+        Authentication failed.
+      </div>
+    `;
     return;
   }
 
   const authenticated = await hasAuthenticatedSession();
 
   if (authenticated) {
-    await bootstrapApplication(AppComponent, {
-      providers: [provideHttpClient()]
-    });
+    await loadTracksterApp();
     return;
   }
 
   if (hasOAuthCode) {
-    showAuthError(
-      'Authentication callback received, but this frontend is not processing the authorization code.'
-    );
+    window.history.replaceState({}, document.title, window.location.pathname);
+    await loadTracksterApp();
     return;
   }
 
@@ -69,5 +68,9 @@ async function start(): Promise<void> {
 
 void start().catch((error) => {
   console.error('Application startup failed.', error);
-  showAuthError('Application startup failed.');
+  document.body.innerHTML = `
+    <div style="padding:24px;font-family:Arial,sans-serif;">
+      Application startup failed.
+    </div>
+  `;
 });
