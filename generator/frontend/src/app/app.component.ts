@@ -378,9 +378,33 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.bindFormValueChangesOnce();
 
     try {
+      const params = new URLSearchParams(window.location.search);
+      const hasOAuthCallback =
+        params.has('code') ||
+        params.has('state') ||
+        params.has('error');
+
+      if (hasOAuthCallback) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
       const authenticated = await this.authService.isAuthenticated();
 
       if (!authenticated) {
+        if (hasOAuthCallback) {
+          this.isAuthenticated = false;
+          this.formStatus = 'error';
+          this.setPayloadValue(JSON.stringify({
+            error: {
+              category: 'oauth_callback_not_completed',
+              message: 'OAuth callback returned to the app, but the session was not established.'
+            }
+          }, null, 2));
+          this.form.controls.payload.markAsTouched();
+          this.authReady = true;
+          return;
+        }
+
         this.isAuthenticated = false;
         await this.authService.login();
         return;
@@ -390,8 +414,11 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       await this.loadConfig();
       this.isConfigLoaded = true;
-
       this.authReady = true;
+
+      if (hasOAuthCallback) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     } catch (error: unknown) {
       this.formStatus = 'error';
       this.setPayloadValue(JSON.stringify({
