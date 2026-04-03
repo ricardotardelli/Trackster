@@ -6,3 +6,4 @@ export const cognitoConfig = {
   redirectSignOut: 'https://www.trackster.pt/',
   scopes: ['openid', 'email']
 };
+

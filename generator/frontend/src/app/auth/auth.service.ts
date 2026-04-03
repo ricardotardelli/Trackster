@@ -3,10 +3,6 @@ import { fetchAuthSession, signInWithRedirect, signOut } from 'aws-amplify/auth'
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  async login(): Promise<void> {
-    await signInWithRedirect();
-  }
-
   async logout(): Promise<void> {
     await signOut();
   }
