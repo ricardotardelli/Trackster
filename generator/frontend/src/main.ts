@@ -1,22 +1,25 @@
+import 'aws-amplify/auth/enable-oauth-listener';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { Amplify } from 'aws-amplify';
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth';
 import { AppComponent } from './app/app.component';
 import { cognitoConfig } from './app/auth/cognito.config';
-
-const LOGIN_URL =
-  'https://us-east-1rzmuaolzz.auth.us-east-1.amazoncognito.com/login' +
-  '?client_id=7g4slp3sne6rsvtpiacglgjt8o' +
-  '&response_type=code' +
-  '&scope=openid+email' +
-  '&redirect_uri=https://www.trackster.pt/';
 
 Amplify.configure({
   Auth: {
     Cognito: {
       userPoolId: cognitoConfig.userPoolId,
-      userPoolClientId: cognitoConfig.userPoolClientId
+      userPoolClientId: cognitoConfig.userPoolClientId,
+      loginWith: {
+        oauth: {
+          domain: cognitoConfig.domain,
+          scopes: cognitoConfig.scopes,
+          redirectSignIn: [cognitoConfig.redirectSignIn],
+          redirectSignOut: [cognitoConfig.redirectSignOut],
+          responseType: 'code'
+        }
+      }
     }
   }
 });
@@ -30,47 +33,49 @@ async function hasAuthenticatedSession(): Promise<boolean> {
   }
 }
 
-async function loadTracksterApp(): Promise<void> {
+async function waitForSession(): Promise<boolean> {
+  for (let i = 0; i < 20; i++) {
+    if (await hasAuthenticatedSession()) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return false;
+}
+
+async function start(): Promise<void> {
+  const url = new URL(window.location.href);
+  const hasOAuthReturn =
+    url.searchParams.has('code') ||
+    url.searchParams.has('state') ||
+    url.searchParams.has('error');
+
+  if (hasOAuthReturn) {
+    const ok = await waitForSession();
+
+    if (!ok) {
+      document.body.innerHTML =
+        '<div style="padding:24px;font-family:Arial,sans-serif;">Authentication failed.</div>';
+      return;
+    }
+
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else {
+    const authenticated = await hasAuthenticatedSession();
+
+    if (!authenticated) {
+      await signInWithRedirect();
+      return;
+    }
+  }
+
   await bootstrapApplication(AppComponent, {
     providers: [provideHttpClient()]
   });
 }
 
-async function start(): Promise<void> {
-  const url = new URL(window.location.href);
-  const hasOAuthCode = url.searchParams.has('code');
-  const hasOAuthError = url.searchParams.has('error');
-
-  if (hasOAuthError) {
-    document.body.innerHTML = `
-      <div style="padding:24px;font-family:Arial,sans-serif;">
-        Authentication failed.
-      </div>
-    `;
-    return;
-  }
-
-  const authenticated = await hasAuthenticatedSession();
-
-  if (authenticated) {
-    await loadTracksterApp();
-    return;
-  }
-
-  if (hasOAuthCode) {
-    window.history.replaceState({}, document.title, window.location.pathname);
-    await loadTracksterApp();
-    return;
-  }
-
-  window.location.assign(LOGIN_URL);
-}
-
 void start().catch((error) => {
   console.error('Application startup failed.', error);
-  document.body.innerHTML = `
-    <div style="padding:24px;font-family:Arial,sans-serif;">
-      Application startup failed.
-    </div>
-  `;
+  document.body.innerHTML =
+    '<div style="padding:24px;font-family:Arial,sans-serif;">Application startup failed.</div>';
 });
