@@ -382,15 +382,27 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       if (!authenticated) {
         this.isAuthenticated = false;
-        await this.authService.login();
+
+        try {
+          await this.authService.login();
+        } catch (error: unknown) {
+          this.formStatus = 'error';
+          this.setPayloadValue(JSON.stringify({
+            error: {
+              category: 'login_redirect_error',
+              ...this.describeFetchError(error)
+            }
+          }, null, 2));
+          this.form.controls.payload.markAsTouched();
+          this.authReady = true;
+        }
+
         return;
       }
 
       this.isAuthenticated = true;
-
       await this.loadConfig();
       this.isConfigLoaded = true;
-
       this.authReady = true;
     } catch (error: unknown) {
       this.formStatus = 'error';
@@ -405,6 +417,21 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
+  async initializeLogin(): Promise<void> {
+    try {
+      await this.authService.login();
+    } catch (error: unknown) {
+      this.formStatus = 'error';
+      this.setPayloadValue(JSON.stringify({
+        error: {
+          category: 'login_redirect_error',
+          ...this.describeFetchError(error)
+        }
+      }, null, 2));
+      this.form.controls.payload.markAsTouched();
+    }
+  }
+  
   private bindFormValueChangesOnce(): void {
     if (this.formValueChangesBound) {
       return;
