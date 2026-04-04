@@ -2,9 +2,9 @@ import 'aws-amplify/auth/enable-oauth-listener';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { Amplify } from 'aws-amplify';
-import { fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth';
 import { AppComponent } from './app/app.component';
 import { cognitoConfig } from './app/auth/cognito.config';
+import { AuthService } from './app/auth/auth.service';
 
 Amplify.configure({
   Auth: {
@@ -24,56 +24,12 @@ Amplify.configure({
   }
 });
 
-async function hasAuthenticatedSession(): Promise<boolean> {
-  try {
-    const session = await fetchAuthSession();
-
-    // REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE
-    console.log('ID TOKEN:', session.tokens?.idToken?.toString() ?? null);
-    console.log('ACCESS TOKEN:', session.tokens?.accessToken?.toString() ?? null);
-    // REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE
-
-    return !!session.tokens?.idToken || !!session.tokens?.accessToken;
-  } catch {
-    return false;
-  }
-}
-
-async function waitForSession(): Promise<boolean> {
-  for (let i = 0; i < 20; i++) {
-    if (await hasAuthenticatedSession()) {
-      return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  return false;
-}
-
 async function start(): Promise<void> {
-  const url = new URL(window.location.href);
-  const hasOAuthReturn =
-    url.searchParams.has('code') ||
-    url.searchParams.has('state') ||
-    url.searchParams.has('error');
+  const authService = new AuthService();
 
-  if (hasOAuthReturn) {
-    const ok = await waitForSession();
+  const canStart = await authService.prepareApplicationStart();
 
-    if (!ok) {
-      document.body.innerHTML =
-        '<div style="padding:24px;font-family:Arial,sans-serif;">Authentication failed.</div>';
-      return;
-    }
-
-    window.history.replaceState({}, document.title, window.location.pathname);
-  } else {
-    const authenticated = await hasAuthenticatedSession();
-
-    if (!authenticated) {
-      await signInWithRedirect();
-      return;
-    }
-  }
+  if (!canStart) return;
 
   await bootstrapApplication(AppComponent, {
     providers: [provideHttpClient()]
