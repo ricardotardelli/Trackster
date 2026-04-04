@@ -1,11 +1,40 @@
+import { Amplify } from 'aws-amplify';
 import { fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth';
+import { cognitoConfig } from './cognito.config';
+
+let amplifyConfigured = false;
+
+export function configureAuth(): void {
+  if (amplifyConfigured) {
+    return;
+  }
+
+  Amplify.configure({
+    Auth: {
+      Cognito: {
+        userPoolId: cognitoConfig.userPoolId,
+        userPoolClientId: cognitoConfig.userPoolClientId,
+        loginWith: {
+          oauth: {
+            domain: cognitoConfig.domain,
+            scopes: cognitoConfig.scopes,
+            redirectSignIn: [cognitoConfig.redirectSignIn],
+            redirectSignOut: [cognitoConfig.redirectSignOut],
+            responseType: 'code'
+          }
+        }
+      }
+    }
+  });
+
+  amplifyConfigured = true;
+}
 
 export class AuthService {
   private async hasAuthenticatedSession(): Promise<boolean> {
     try {
       const session = await fetchAuthSession();
 
-      // Optional debug logs (remove in production)
       console.log('ID TOKEN:', session.tokens?.idToken?.toString() ?? null);
       console.log('ACCESS TOKEN:', session.tokens?.accessToken?.toString() ?? null);
 
@@ -39,10 +68,6 @@ export class AuthService {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  /**
-   * Main entry point used by main.ts
-   * Controls the entire auth flow before app bootstrap
-   */
   async prepareApplicationStart(): Promise<boolean> {
     if (this.isOAuthReturn()) {
       const ok = await this.waitForSession();
