@@ -585,7 +585,32 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
-      this.interpGpsCoords = [...this.selectedGpsCoordinates];
+
+      const raw = this.form.getRawValue();
+
+      const explicitBlocks = Number(this.form.controls.numberOfBlocks.value);
+      const latency = Number(this.form.controls.latencyTime.value);
+      const amountOfTime = Number(this.form.controls.amountOfTime.value);
+
+      const resolvedBlocks =
+        explicitBlocks > 0
+          ? explicitBlocks
+          : Math.floor((amountOfTime * 3600) / latency);
+
+      const speed = Number(this.form.controls.speed.value) || 80;
+
+      const unity =
+        this.form.controls.unity.value === 'Mi' ? 'Mi' : 'Km';
+
+      this.interpGpsCoords = interpolateGpsPerBlock(
+        this.selectedGpsCoordinates,
+        speed,
+        unity,
+        latency,
+        resolvedBlocks
+      );
+
+      this.updatePayloadPreview();
     } catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
