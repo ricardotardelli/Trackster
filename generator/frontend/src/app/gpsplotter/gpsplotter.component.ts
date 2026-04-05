@@ -39,14 +39,16 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
   private mapContainer?: ElementRef<HTMLDivElement>;
 
   private resizeObserver?: ResizeObserver;
-  private mapReady = false;
   private overlayGroup: L.LayerGroup | null = null;
+  private mapReady = false;
 
   public map: L.Map | null = null;
   public routeData: RoutePayload | null = null;
 
   ngAfterViewInit(): void {
+    console.log('GpsplotterComponent ngAfterViewInit');
     this.routeData = this.rebuildRoutePayloadFromHexCoordinates(this.hexCoordinates);
+    console.log('Gpsplotter routeData after view init:', this.routeData);
 
     if (this.visible) {
       this.initializeWhenReady();
@@ -56,6 +58,8 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['hexCoordinates']) {
       this.routeData = this.rebuildRoutePayloadFromHexCoordinates(this.hexCoordinates);
+      console.log('Gpsplotter hexCoordinates changed:', this.hexCoordinates?.length ?? 0);
+      console.log('Gpsplotter routeData rebuilt:', this.routeData);
 
       if (this.mapReady) {
         this.refreshLayers();
@@ -68,6 +72,7 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
 
     if (changes['visible'] && this.visible) {
+      console.log('Gpsplotter visible=true, initializing map');
       this.initializeWhenReady();
     }
   }
@@ -102,30 +107,44 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private initializeMap(): void {
     if (this.mapReady) {
+      console.log('Gpsplotter map already ready');
       this.refreshMapSize();
       return;
     }
 
     const container = this.mapContainer?.nativeElement;
     if (!container) {
+      console.error('Gpsplotter mapContainer not found');
       return;
     }
 
-    const config = this.getCountryMapConfig(this.country);
-
-    this.map = L.map(container, {
-      center: config.center,
-      zoom: config.zoom,
-      zoomControl: true,
-      layers: [
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
-        })
-      ]
+    console.log('Gpsplotter container size:', {
+      clientWidth: container.clientWidth,
+      clientHeight: container.clientHeight,
+      offsetWidth: container.offsetWidth,
+      offsetHeight: container.offsetHeight
     });
 
-    this.overlayGroup = L.layerGroup().addTo(this.map);
-    this.mapReady = true;
+    const config = this.getCountryMapConfig(this.country);
+
+    try {
+      this.map = L.map(container, {
+        center: config.center,
+        zoom: config.zoom,
+        zoomControl: true
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(this.map);
+
+      this.overlayGroup = L.layerGroup().addTo(this.map);
+      this.mapReady = true;
+
+      console.log('Gpsplotter map initialized successfully');
+    } catch (error) {
+      console.error('Gpsplotter failed to initialize map:', error);
+    }
   }
 
   private setupResizeObserver(): void {
@@ -153,6 +172,7 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     window.setTimeout(() => this.map?.invalidateSize(), 100);
     window.setTimeout(() => this.map?.invalidateSize(), 250);
     window.setTimeout(() => this.map?.invalidateSize(), 500);
+    window.setTimeout(() => this.map?.invalidateSize(), 1000);
   }
 
   private decodeGpsHexToRoutePoint(hex: string): RoutePoint | null {
@@ -201,6 +221,8 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     const decodedPoints = (hexCoordinates ?? [])
       .map((hex) => this.decodeGpsHexToRoutePoint(hex))
       .filter((point): point is RoutePoint => point !== null);
+
+    console.log('Gpsplotter decoded points:', decodedPoints.length);
 
     if (decodedPoints.length === 0) {
       return null;
@@ -315,12 +337,14 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private refreshLayers(): void {
     if (!this.overlayGroup) {
+      console.log('Gpsplotter refreshLayers skipped: overlayGroup not ready');
       return;
     }
 
     this.overlayGroup.clearLayers();
 
     if (!this.routeData) {
+      console.log('Gpsplotter refreshLayers skipped: routeData is null');
       return;
     }
 
@@ -371,6 +395,8 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (path.length >= 2) {
       this.overlayGroup.addLayer(L.polyline(path));
     }
+
+    console.log('Gpsplotter layers rendered. Path size:', path.length);
   }
 
   private fitMapToRoute(): void {
@@ -411,5 +437,7 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     this.map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
     this.refreshMapSize();
+
+    console.log('Gpsplotter fit bounds with points:', points.length);
   }
 }
