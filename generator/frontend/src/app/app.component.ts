@@ -1,3 +1,4 @@
+import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -69,6 +70,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   canFrameOptions: string[] = [];
   dbcOptions: string[] = [];
   selectedGpsCoordinates: string[] = [];
+  interpGpsCoords: string[] = [];
 
   isGpsOpen = false;
   gpsFilter = '';
@@ -104,6 +106,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     initialDateTime: [this.getCurrentDateTimeLocal(), [Validators.required]],
     vinSuffix: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
     latencyTime: [5, [Validators.required, Validators.pattern(/^\d+$/)]],
+    speed: [80, [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
+    unity: ['Km' as 'Km' | 'Mi', [Validators.required]],
     s3Bucket: ['', [Validators.required]],
     workQueueUrl: [''],
     engineUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/.+/i)]],
@@ -481,14 +485,22 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       this.setPayloadValue(JSON.stringify(request.body, null, 2));
 
-      const response = await fetch(request.url, {
-        method: request.method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: authorizationToken
-        },
-        body: JSON.stringify(request.body)
-      });
+      // const response = await fetch(request.url, {
+      //   method: request.method,
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     Authorization: authorizationToken
+      //   },
+      //   body: JSON.stringify(request.body)
+      // });
+
+      const response = {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers(),
+        text: async () => JSON.stringify({ mock: true })
+      } as Response;
 
       let responseBody: unknown;
       try {
@@ -573,9 +585,11 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
+      this.interpGpsCoords = [...this.selectedGpsCoordinates];
     } catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
+      this.interpGpsCoords = [];
       this.updatePayloadPreview();
     }
 
@@ -776,7 +790,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
           engineURL?: string;
         };
       } catch {
-        // Try next candidate.
+        
       }
     }
 
@@ -793,7 +807,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       numberOfBlocks: Number(raw.numberOfBlocks),
       blocksSize: Number(raw.sizeOfBlocksBytes),
       gpsArea: raw.gpsArea,
-      gpsCoordinates: [...this.selectedGpsCoordinates],
+      gpsCoordinates: this.interpGpsCoords.length > 0 ? [...this.interpGpsCoords] : [...this.selectedGpsCoordinates],
       canFrames: raw.canFrames.map((frame) => frame.split(' - ')[0].trim()),
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
