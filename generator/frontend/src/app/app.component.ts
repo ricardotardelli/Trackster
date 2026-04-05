@@ -1,4 +1,4 @@
-import { GpsplotterComponent } from './gpsplotter/gpsplotter.component';
+// import { GpsplotterComponent } from './gpsplotter/gpsplotter.component';
 import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
 import { CommonModule } from '@angular/common';
 import {
@@ -42,7 +42,7 @@ interface RoutePayload {
     ReactiveFormsModule,
     FormsModule,
     MapmoduleComponent,
-    GpsplotterComponent,
+    //GpsplotterComponent,
     RouterOutlet
   ],
   templateUrl: './app.component.html',
@@ -87,8 +87,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private formValueChangesBound = false;
 
   isMapModalOpen = false;
-  isGpsPlotterModalOpen = false;
-  gpsPlotterHexCoordinates: string[] = [];
+  //isGpsPlotterModalOpen = false;
+  //gpsPlotterHexCoordinates: string[] = [];
 
   private dragInitialized = false;
   private isDragging = false;
@@ -115,7 +115,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     s3Bucket: ['', [Validators.required]],
     workQueueUrl: [''],
     engineUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/.+/i)]],
-    payload: ['', [this.jsonValidator]]
+    payload: ['', [this.jsonValidator]],
+    driverProfile: ['']
   });
 
   ngOnInit(): void {
@@ -123,7 +124,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   ngAfterViewChecked(): void {
-    if (this.isMapModalOpen || this.isGpsPlotterModalOpen) {
+    // if (this.isMapModalOpen || this.isGpsPlotterModalOpen) {
+    //   this.initializeModalDrag();
+    // }
+    if (this.isMapModalOpen) {
       this.initializeModalDrag();
     }
   }
@@ -489,22 +493,22 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       this.setPayloadValue(JSON.stringify(request.body, null, 2));
 
-      // const response = await fetch(request.url, {
-      //   method: request.method,
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     Authorization: authorizationToken
-      //   },
-      //   body: JSON.stringify(request.body)
-      // });
+      const response = await fetch(request.url, {
+        method: request.method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authorizationToken
+        },
+        body: JSON.stringify(request.body)
+      });
 
-      const response = {
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers(),
-        text: async () => JSON.stringify({ mock: true })
-      } as Response;
+      // const response = {
+      //   ok: true,
+      //   status: 200,
+      //   statusText: 'OK',
+      //   headers: new Headers(),
+      //   text: async () => JSON.stringify({ mock: true })
+      // } as Response;
 
       let responseBody: unknown;
       try {
@@ -1021,23 +1025,23 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     return `${year}${month}${day}T${hours}${minutes}${seconds}`;
   }
 
-  openGpsPlotter(): void {
-    this.gpsPlotterHexCoordinates =
-      this.interpGpsCoords.length > 0
-        ? [...this.interpGpsCoords]
-        : [...this.selectedGpsCoordinates];
+  // openGpsPlotter(): void {
+  //   this.gpsPlotterHexCoordinates =
+  //     this.interpGpsCoords.length > 0
+  //       ? [...this.interpGpsCoords]
+  //       : [...this.selectedGpsCoordinates];
 
-    console.log('gpsPlotterHexCoordinates', this.gpsPlotterHexCoordinates);
+  //   console.log('gpsPlotterHexCoordinates', this.gpsPlotterHexCoordinates);
 
-    this.isGpsPlotterModalOpen = true;
-    this.isGpsOpen = false;
-    this.dragInitialized = false;
-  }
+  //   this.isGpsPlotterModalOpen = true;
+  //   this.isGpsOpen = false;
+  //   this.dragInitialized = false;
+  // }
 
-  closeGpsPlotterModal(): void {
-    this.isGpsPlotterModalOpen = false;
-    this.isDragging = false;
-    document.body.style.userSelect = '';
-    this.dragInitialized = false;
-  }
+  // closeGpsPlotterModal(): void {
+  //   this.isGpsPlotterModalOpen = false;
+  //   this.isDragging = false;
+  //   document.body.style.userSelect = '';
+  //   this.dragInitialized = false;
+  // }
 }

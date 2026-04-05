@@ -140,3 +140,53 @@
   cursor: pointer !important;
 }
 
+.grid {
+  display: grid;
+  grid-template-columns: 270px repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.status-panel {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+}
+
+.field.quarter {
+  min-width: 0;
+}
+
+.field.double {
+  grid-column: span 2;
+  min-width: 0;
+}
+
+.row1 {
+  grid-row: 1;
+}
+
+.row2 {
+  grid-row: 2;
+}
+
+.row3 {
+  grid-row: 3;
+}
+
+.row4 {
+  grid-row: 4;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.field,
+.multi-select,
+.multi-select-trigger,
+input,
+select,
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
