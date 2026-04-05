@@ -5,20 +5,30 @@ export function interpolateGpsPerBlock(
   latency: number,
   numberOfBlocks: number
 ): string[] {
-
   if (!hexInputCoord || hexInputCoord.length < 2) {
     throw new Error('At least 2 coordinates are required');
   }
 
-  const speedVal = unity === 'Mi' ? speed * 1.60934 : speed;
+  if (!Number.isFinite(speed) || speed <= 0) {
+    throw new Error('Speed must be greater than zero');
+  }
 
-  const distancePerBlockKm = speedVal * (latency / 3600);
+  if (!Number.isFinite(latency) || latency <= 0) {
+    throw new Error('Latency must be greater than zero');
+  }
+
+  if (!Number.isFinite(numberOfBlocks) || numberOfBlocks <= 0) {
+    throw new Error('Number of blocks must be greater than zero');
+  }
+
+  const speedKmH = unity === 'Mi' ? speed * 1.60934 : speed;
+  const distancePerBlockKm = speedKmH * (latency / 3600);
 
   const points = hexInputCoord.map(decodeHexGps);
 
   const segments: {
-    start: any;
-    end: any;
+    start: { lat: number; lng: number };
+    end: { lat: number; lng: number };
     distance: number;
     cumulativeStart: number;
     cumulativeEnd: number;
@@ -41,11 +51,9 @@ export function interpolateGpsPerBlock(
   }
 
   const totalDistance = cumulative;
-
   const result: string[] = [];
 
   for (let block = 0; block < numberOfBlocks; block++) {
-
     const targetDistance = block * distancePerBlockKm;
 
     if (targetDistance >= totalDistance) {
@@ -54,9 +62,10 @@ export function interpolateGpsPerBlock(
       continue;
     }
 
-    const segment = segments.find(s =>
-      targetDistance >= s.cumulativeStart &&
-      targetDistance <= s.cumulativeEnd
+    const segment = segments.find(
+      (s) =>
+        targetDistance >= s.cumulativeStart &&
+        targetDistance <= s.cumulativeEnd
     );
 
     if (!segment) {
@@ -66,7 +75,9 @@ export function interpolateGpsPerBlock(
     }
 
     const progress =
-      (targetDistance - segment.cumulativeStart) / segment.distance;
+      segment.distance === 0
+        ? 0
+        : (targetDistance - segment.cumulativeStart) / segment.distance;
 
     const lat =
       segment.start.lat +
@@ -94,14 +105,14 @@ function decodeHexGps(hex: string): { lat: number; lng: number } {
   const lngInt = signedInt32FromHex(lngHex);
 
   return {
-    lat: latInt / 1e7,
-    lng: lngInt / 1e7
+    lat: latInt / 1_000_000,
+    lng: lngInt / 1_000_000
   };
 }
 
 function encodeHexGps(lat: number, lng: number): string {
-  const latInt = Math.round(lat * 1e7);
-  const lngInt = Math.round(lng * 1e7);
+  const latInt = Math.round(lat * 1_000_000);
+  const lngInt = Math.round(lng * 1_000_000);
 
   const latHex = int32ToHex(latInt);
   const lngHex = int32ToHex(lngInt);
@@ -111,7 +122,7 @@ function encodeHexGps(lat: number, lng: number): string {
 
 function signedInt32FromHex(hex: string): number {
   const value = parseInt(hex, 16);
-  return value > 0x7FFFFFFF ? value - 0x100000000 : value;
+  return value > 0x7fffffff ? value - 0x100000000 : value;
 }
 
 function int32ToHex(value: number): string {
@@ -123,8 +134,7 @@ function haversine(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number }
 ): number {
-
-  const R = 6371; 
+  const R = 6371;
 
   const dLat = toRad(b.lat - a.lat);
   const dLng = toRad(b.lng - a.lng);
@@ -134,8 +144,9 @@ function haversine(
 
   const h =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) *
-    Math.sin(dLng / 2) ** 2;
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(dLng / 2) ** 2;
 
   return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }

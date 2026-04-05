@@ -609,9 +609,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
         latency,
         resolvedBlocks
       );
-
-      this.updatePayloadPreview();
-    } catch {
+    } 
+    catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
       this.interpGpsCoords = [];
