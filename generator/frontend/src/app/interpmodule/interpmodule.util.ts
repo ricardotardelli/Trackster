@@ -1,6 +1,6 @@
 export function interpolateGpsPerBlock(
   hexInputCoord: string[],
-  speed: number,
+  speed: 110,
   unity: 'Km' | 'Mi',
   latency: number,
   numberOfBlocks: number
