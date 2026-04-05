@@ -1,3 +1,4 @@
+import { GpsplotterComponent } from './gpsplotter/gpsplotter.component';
 import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
 import { CommonModule } from '@angular/common';
 import {
@@ -41,6 +42,7 @@ interface RoutePayload {
     ReactiveFormsModule,
     FormsModule,
     MapmoduleComponent,
+    GpsplotterComponent,
     RouterOutlet
   ],
   templateUrl: './app.component.html',
@@ -85,6 +87,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private formValueChangesBound = false;
 
   isMapModalOpen = false;
+  isGpsPlotterModalOpen = false;
+  gpsPlotterHexCoordinates: string[] = [];
 
   private dragInitialized = false;
   private isDragging = false;
@@ -119,7 +123,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   ngAfterViewChecked(): void {
-    if (this.isMapModalOpen) {
+    if (this.isMapModalOpen || this.isGpsPlotterModalOpen) {
       this.initializeModalDrag();
     }
   }
@@ -1015,5 +1019,23 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
     return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+  }
+
+  openGpsPlotter(): void {
+    this.gpsPlotterHexCoordinates =
+      this.interpGpsCoords.length > 0
+        ? [...this.interpGpsCoords]
+        : [...this.selectedGpsCoordinates];
+
+    this.isGpsPlotterModalOpen = true;
+    this.isGpsOpen = false;
+    this.dragInitialized = false;
+  }
+
+  closeGpsPlotterModal(): void {
+    this.isGpsPlotterModalOpen = false;
+    this.isDragging = false;
+    document.body.style.userSelect = '';
+    this.dragInitialized = false;
   }
 }

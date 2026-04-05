@@ -233,8 +233,13 @@
             <small [class.visible]="f.payload.touched && f.payload.errors?.['jsonInvalid']">Payload invalido (JSON mal formatado).</small>
           </label>
         </div>
-
         <div class="actions">
+          <button
+            type="button"
+            (click)="openGpsPlotter()"
+            [disabled]="(interpGpsCoords.length === 0 && selectedGpsCoordinates.length === 0) || isSubmitting">
+            Plot GPS
+          </button>
           <button type="submit" [disabled]="form.invalid || isSubmitting">{{ isSubmitting ? 'Generating...' : 'Generate' }}</button>
         </div>
       </form>
@@ -257,6 +262,25 @@
         </div>
       </div>
     </div>
+    <div class="map-modal-backdrop" *ngIf="isGpsPlotterModalOpen" (click)="closeGpsPlotterModal()">
+      <div class="map-modal" #mapModal (click)="$event.stopPropagation()">
+        <div class="map-modal-header" #modalHeader>
+          <h3>GPS Plotter</h3>
+          <button type="button" class="map-modal-close" (click)="closeGpsPlotterModal()">×</button>
+        </div>
+
+        <div class="map-modal-body">
+          <app-gpsplotter
+            [country]="form.controls.gpsArea.value"
+            [visible]="isGpsPlotterModalOpen"
+            [hexCoordinates]="gpsPlotterHexCoordinates">
+          </app-gpsplotter>
+        </div>
+      </div>
+    </div>
+
+
+
   </main>
 </div>
 
