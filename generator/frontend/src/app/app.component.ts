@@ -1027,6 +1027,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
         ? [...this.interpGpsCoords]
         : [...this.selectedGpsCoordinates];
 
+    console.log('gpsPlotterHexCoordinates', this.gpsPlotterHexCoordinates);
+
     this.isGpsPlotterModalOpen = true;
     this.isGpsOpen = false;
     this.dragInitialized = false;

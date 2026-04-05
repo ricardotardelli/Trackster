@@ -32,74 +32,49 @@ interface RoutePayload {
 })
 export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() country: string = '';
-  @Input() visible: boolean = true;
+  @Input() visible: boolean = false;
   @Input() hexCoordinates: string[] = [];
 
   @ViewChild('mapContainer', { static: false })
   private mapContainer?: ElementRef<HTMLDivElement>;
 
   private resizeObserver?: ResizeObserver;
-  private contextMenuHandler?: (event: MouseEvent) => void;
-  private overlayGroup: L.LayerGroup | null = null;
   private mapReady = false;
+  private overlayGroup: L.LayerGroup | null = null;
 
   public map: L.Map | null = null;
   public routeData: RoutePayload | null = null;
 
-  public options: L.MapOptions = {
-    layers: [
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      })
-    ],
-    zoom: 6,
-    center: L.latLng(39.5, -8.0)
-  };
-
   ngAfterViewInit(): void {
-    this.setupResizeObserver();
+    this.routeData = this.rebuildRoutePayloadFromHexCoordinates(this.hexCoordinates);
 
-    setTimeout(() => {
-      this.routeData = this.rebuildRoutePayloadFromHexCoordinates(this.hexCoordinates);
-      this.applyCountryToMap();
-      this.initializeOrRefreshMap();
-      this.refreshLayers();
-      this.fitMapToRoute();
-    }, 0);
+    if (this.visible) {
+      this.initializeWhenReady();
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['country']) {
-      this.applyCountryToMap();
-    }
-
     if (changes['hexCoordinates']) {
       this.routeData = this.rebuildRoutePayloadFromHexCoordinates(this.hexCoordinates);
 
-      setTimeout(() => {
+      if (this.mapReady) {
         this.refreshLayers();
         this.fitMapToRoute();
-      }, 0);
+      }
+    }
+
+    if (changes['country'] && this.mapReady) {
+      this.applyCountryToMap();
     }
 
     if (changes['visible'] && this.visible) {
-      this.initializeOrRefreshMap();
-
-      setTimeout(() => {
-        this.refreshLayers();
-        this.fitMapToRoute();
-      }, 0);
+      this.initializeWhenReady();
     }
   }
 
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.resizeObserver = undefined;
-
-    const container = this.mapContainer?.nativeElement;
-    if (container && this.contextMenuHandler) {
-      container.removeEventListener('contextmenu', this.contextMenuHandler);
-    }
 
     if (this.map) {
       this.map.off();
@@ -111,25 +86,46 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.mapReady = false;
   }
 
-  public refreshMapSize(): void {
-    if (!this.map) {
+  private initializeWhenReady(): void {
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.initializeMap();
+          this.setupResizeObserver();
+          this.refreshMapSize();
+          this.refreshLayers();
+          this.fitMapToRoute();
+        });
+      });
+    }, 0);
+  }
+
+  private initializeMap(): void {
+    if (this.mapReady) {
+      this.refreshMapSize();
       return;
     }
 
-    this.map.invalidateSize();
-    window.setTimeout(() => this.map?.invalidateSize(), 100);
-    window.setTimeout(() => this.map?.invalidateSize(), 250);
-    window.setTimeout(() => this.map?.invalidateSize(), 500);
-  }
+    const container = this.mapContainer?.nativeElement;
+    if (!container) {
+      return;
+    }
 
-  private initializeOrRefreshMap(): void {
-    setTimeout(() => {
-      if (!this.mapReady) {
-        this.initializeMap();
-      } else {
-        this.refreshMapSize();
-      }
-    }, 0);
+    const config = this.getCountryMapConfig(this.country);
+
+    this.map = L.map(container, {
+      center: config.center,
+      zoom: config.zoom,
+      zoomControl: true,
+      layers: [
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        })
+      ]
+    });
+
+    this.overlayGroup = L.layerGroup().addTo(this.map);
+    this.mapReady = true;
   }
 
   private setupResizeObserver(): void {
@@ -147,40 +143,16 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.resizeObserver.observe(container);
   }
 
-  private initializeMap(): void {
-    if (this.mapReady) {
-      this.refreshMapSize();
+  private refreshMapSize(): void {
+    if (!this.map) {
       return;
     }
 
-    const container = this.mapContainer?.nativeElement;
-    if (!container) {
-      return;
-    }
+    this.map.invalidateSize();
 
-    this.map = L.map(container, {
-      ...this.options,
-      zoomControl: true
-    });
-
-    this.overlayGroup = L.layerGroup().addTo(this.map);
-    this.mapReady = true;
-
-    this.contextMenuHandler = (event: MouseEvent) => {
-      event.preventDefault();
-    };
-
-    container.addEventListener('contextmenu', this.contextMenuHandler);
-
-    this.refreshLayers();
-    this.refreshMapSize();
-
-    window.setTimeout(() => {
-      if (this.map) {
-        this.map.setView(this.options.center as L.LatLngExpression, this.options.zoom as number);
-        this.refreshMapSize();
-      }
-    }, 0);
+    window.setTimeout(() => this.map?.invalidateSize(), 100);
+    window.setTimeout(() => this.map?.invalidateSize(), 250);
+    window.setTimeout(() => this.map?.invalidateSize(), 500);
   }
 
   private decodeGpsHexToRoutePoint(hex: string): RoutePoint | null {
@@ -281,18 +253,13 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private applyCountryToMap(): void {
-    const config = this.getCountryMapConfig(this.country);
-
-    this.options = {
-      ...this.options,
-      center: config.center,
-      zoom: config.zoom
-    };
-
-    if (this.map) {
-      this.map.setView(config.center, config.zoom);
-      this.refreshMapSize();
+    if (!this.map) {
+      return;
     }
+
+    const config = this.getCountryMapConfig(this.country);
+    this.map.setView(config.center, config.zoom);
+    this.refreshMapSize();
   }
 
   private getMarkerText(
@@ -315,7 +282,6 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
       className: 'custom-map-marker leaflet-marker-icon',
       html: `
         <div
-          class="custom-map-marker-inner"
           style="
             width: 18px;
             height: 18px;
@@ -332,15 +298,11 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     });
   }
 
-  private createMarker(
-    point: RoutePoint,
-    color: string,
-    tooltip: string
-  ): L.Marker {
+  private createMarker(point: RoutePoint, color: string, tooltip: string): L.Marker {
     const marker = L.marker([point.lat, point.lng], {
       icon: this.createColoredIcon(color),
-      bubblingMouseEvents: false,
       interactive: false,
+      bubblingMouseEvents: false,
       riseOnHover: true
     });
 
@@ -407,8 +369,7 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
 
     if (path.length >= 2) {
-      const polyline = L.polyline(path);
-      this.overlayGroup.addLayer(polyline);
+      this.overlayGroup.addLayer(L.polyline(path));
     }
   }
 
@@ -448,8 +409,7 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
       return;
     }
 
-    const bounds = L.latLngBounds(points);
-    this.map.fitBounds(bounds, { padding: [30, 30] });
+    this.map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
     this.refreshMapSize();
   }
 }
