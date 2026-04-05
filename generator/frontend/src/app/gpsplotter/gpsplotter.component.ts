@@ -289,7 +289,9 @@ export class GpsplotterComponent implements AfterViewInit, OnChanges, OnDestroy 
     point: RoutePoint,
     index?: number
   ): string {
-    const value = point.label ? point.label : `${point.lat}, ${point.lng}`;
+    const value = point.label
+      ? point.label
+      : `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
 
     if (type === 'Waypoint') {
       const numberText = index !== undefined ? String(index + 1) : '?';
