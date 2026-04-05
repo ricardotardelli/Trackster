@@ -269,8 +269,7 @@
                 (click)="copyPayload()"
                 [disabled]="!f.payload.value"
                 [attr.aria-label]="copyPayloadState === 'copied' ? 'Payload copied' : 'Copy payload'"
-                [title]="copyPayloadState === 'copied' ? 'Copied' : (copyPayloadState === 'error' ? 'Unable to copy' : 'Copy payload')"
-              >
+                [title]="copyPayloadState === 'copied' ? 'Copied' : (copyPayloadState === 'error' ? 'Unable to copy' : 'Copy payload')">
                 <span class="copy-icon" aria-hidden="true"></span>
               </button>
               <span
@@ -286,6 +285,17 @@
               Invalid payload (malformed JSON).
             </small>
           </label>
+        </div>
+        <div class="actions">
+          <!-- <button
+            type="button"
+            (click)="openGpsPlotter()"
+            [disabled]="(interpGpsCoords.length === 0 && selectedGpsCoordinates.length === 0) || isSubmitting">
+            Plot GPS
+          </button> -->
+          <button type="submit" [disabled]="form.invalid || isSubmitting">
+            {{ isSubmitting ? 'Generating...' : 'Generate' }}
+          </button>
         </div>
       </form>
     </section>
