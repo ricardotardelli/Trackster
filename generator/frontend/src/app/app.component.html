@@ -1,6 +1,69 @@
 <div *ngIf="authReady && isAuthenticated">
   <main class="page">
     <section class="panel">
+      <div class="panel-topbar">
+        <div class="panel-topbar-spacer"></div>
+
+        <div class="user-menu" #userMenuContainer>
+          <button
+            type="button"
+            class="user-menu-trigger"
+            (click)="toggleUserMenu($event)"
+            [attr.aria-expanded]="userMenuOpen"
+            aria-haspopup="menu"
+          >
+            <span class="user-avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="user-avatar-icon">
+                <path
+                  d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </span>
+
+            <span class="user-menu-name">{{ username }}</span>
+
+            <span class="user-menu-caret" aria-hidden="true">
+              <svg viewBox="0 0 20 20" class="user-caret-icon">
+                <path
+                  d="M5.25 7.5 10 12.25 14.75 7.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+          </button>
+
+          <div
+            class="user-menu-dropdown"
+            *ngIf="userMenuOpen"
+            role="menu"
+          >
+            <a
+              class="user-menu-item"
+              href=""
+              role="menuitem"
+              (click)="$event.preventDefault(); closeUserMenu()"
+            >
+              About
+            </a>
+
+            <button
+              type="button"
+              class="user-menu-item logout-item"
+              role="menuitem"
+              (click)="onLogout()"
+              [disabled]="isLoggingOut"
+            >
+              {{ isLoggingOut ? 'Logging out...' : 'Logout' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <h1>Trackster - CAN Frames Generator</h1>
       <br><br>
 

@@ -1,5 +1,6 @@
 import { Amplify } from 'aws-amplify';
-import { fetchAuthSession, signInWithRedirect } from 'aws-amplify/auth';
+import { Injectable } from '@angular/core';
+import { fetchAuthSession, signInWithRedirect, signOut, getCurrentUser } from 'aws-amplify/auth';
 import { cognitoConfig } from './cognito.config';
 
 let amplifyConfigured = false;
@@ -30,6 +31,7 @@ export function configureAuth(): void {
   amplifyConfigured = true;
 }
 
+@Injectable({ providedIn: 'root' })
 export class AuthService {
   private async hasAuthenticatedSession(): Promise<boolean> {
     try {
@@ -90,5 +92,30 @@ export class AuthService {
     }
 
     return true;
+  }
+
+  async logout(): Promise<void> {
+    await signOut({ global: true });
+  }
+
+  async getUsername(): Promise<string | null> {
+    try {
+      const user = await getCurrentUser();
+      return user.username;
+    } 
+    catch {
+      return null;
+    }
+  }
+  
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const user = await getCurrentUser();
+      const session = await fetchAuthSession();
+      return !!user && !!session.tokens?.idToken;
+    } 
+    catch {
+      return false;
+    }
   }
 }

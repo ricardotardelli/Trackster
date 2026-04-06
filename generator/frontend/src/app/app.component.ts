@@ -21,6 +21,7 @@ import {
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
+import { AuthService } from './auth/auth.service';
 
 interface RoutePoint {
   lat: number;
@@ -51,11 +52,16 @@ interface RoutePayload {
 export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
-    private readonly elementRef: ElementRef<HTMLElement>
+    private readonly elementRef: ElementRef<HTMLElement>,
+    private readonly authService: AuthService
   ) {}
 
   authReady = false;
   isAuthenticated = false;
+
+  username = 'User';
+  userMenuOpen = false;
+  isLoggingOut = false;
 
   @ViewChild('modalHeader', { static: false })
   private modalHeader?: ElementRef<HTMLDivElement>;
@@ -65,6 +71,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   @ViewChild('mapModule')
   mapModule!: MapmoduleComponent;
+
+  @ViewChild('userMenuContainer', { static: false })
+  private userMenuContainer?: ElementRef<HTMLElement>;
 
   routeDataForMap: RoutePayload | null = null;
 
@@ -219,6 +228,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (this.isCanOpen) {
       this.isGpsOpen = false;
       this.isDbcOpen = false;
+      this.isDriverProfileOpen = false;
+      this.isUnityOpen = false;
+      this.userMenuOpen = false;
     }
   }
 
@@ -231,6 +243,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (this.isDbcOpen) {
       this.isGpsOpen = false;
       this.isCanOpen = false;
+      this.isDriverProfileOpen = false;
+      this.isUnityOpen = false;
+      this.userMenuOpen = false;
     }
   }
 
@@ -244,6 +259,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.gpsFilter = '';
       this.isCanOpen = false;
       this.isDbcOpen = false;
+      this.isDriverProfileOpen = false;
+      this.isUnityOpen = false;
+      this.userMenuOpen = false;
     }
   }
 
@@ -304,6 +322,48 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       control.setValue(JSON.stringify(parsed, null, 2));
     } catch {
       control.markAsTouched();
+    }
+  }
+
+  toggleUserMenu(event?: MouseEvent): void {
+    event?.stopPropagation();
+
+    this.userMenuOpen = !this.userMenuOpen;
+
+    if (this.userMenuOpen) {
+      this.isGpsOpen = false;
+      this.isCanOpen = false;
+      this.isDbcOpen = false;
+      this.isDriverProfileOpen = false;
+      this.isUnityOpen = false;
+    }
+  }
+
+  closeUserMenu(): void {
+    this.userMenuOpen = false;
+  }
+
+  async onLogout(): Promise<void> {
+    if (this.isLoggingOut) {
+      return;
+    }
+
+    this.isLoggingOut = true;
+    this.userMenuOpen = false;
+
+    try {
+      await this.authService.logout();
+    } finally {
+      this.isLoggingOut = false;
+    }
+  }
+
+  private async loadUsername(): Promise<void> {
+    try {
+      const username = await this.authService.getUsername();
+      this.username = username?.trim() || 'User';
+    } catch {
+      this.username = 'User';
     }
   }
 
@@ -390,7 +450,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       await this.ensureAuthenticatedSession();
       this.isAuthenticated = true;
 
+      await this.loadUsername();
       await this.loadConfig();
+
       this.isConfigLoaded = true;
       this.authReady = true;
     } catch (error: unknown) {
@@ -594,8 +656,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.routeDataForMap = parsed;
       this.selectedGpsCoordinates = this.buildSequentialGpsHexCoordinates(parsed);
 
-      const raw = this.form.getRawValue();
-
       const explicitBlocks = Number(this.form.controls.numberOfBlocks.value);
       const latency = Number(this.form.controls.latencyTime.value);
       const amountOfTime = Number(this.form.controls.amountOfTime.value);
@@ -617,8 +677,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
         latency,
         resolvedBlocks
       );
-    } 
-    catch {
+    } catch {
       this.routeDataForMap = null;
       this.selectedGpsCoordinates = [];
       this.interpGpsCoords = [];
@@ -729,11 +788,21 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       return;
     }
 
+    if (this.userMenuOpen && this.userMenuContainer?.nativeElement.contains(target)) {
+      return;
+    }
+
     if (!this.elementRef.nativeElement.contains(target)) {
       this.isGpsOpen = false;
       this.isCanOpen = false;
       this.isDbcOpen = false;
+      this.isDriverProfileOpen = false;
+      this.isUnityOpen = false;
+      this.userMenuOpen = false;
+      return;
     }
+
+    this.userMenuOpen = false;
   }
 
   private async loadConfig(): Promise<void> {
@@ -822,7 +891,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
           engineURL?: string;
         };
       } catch {
-        
       }
     }
 
@@ -1065,6 +1133,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.isCanOpen = false;
     this.isDbcOpen = false;
     this.isGpsOpen = false;
+    this.userMenuOpen = false;
   }
 
   selectDriverProfile(value: string): void {
@@ -1079,6 +1148,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.isCanOpen = false;
     this.isDbcOpen = false;
     this.isGpsOpen = false;
+    this.userMenuOpen = false;
   }
 
   selectUnity(value: 'Km' | 'Mi'): void {
