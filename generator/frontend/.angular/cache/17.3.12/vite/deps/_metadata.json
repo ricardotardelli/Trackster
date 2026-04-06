@@ -1,0 +1,94 @@
+{
+  "hash": "be13f4be",
+  "configHash": "cd267e60",
+  "lockfileHash": "672e0f02",
+  "browserHash": "2fd6ea92",
+  "optimized": {
+    "@angular/common": {
+      "src": "../../../../../node_modules/@angular/common/fesm2022/common.mjs",
+      "file": "@angular_common.js",
+      "fileHash": "c4c52f18",
+      "needsInterop": false
+    },
+    "@angular/common/http": {
+      "src": "../../../../../node_modules/@angular/common/fesm2022/http.mjs",
+      "file": "@angular_common_http.js",
+      "fileHash": "281346c4",
+      "needsInterop": false
+    },
+    "@angular/core": {
+      "src": "../../../../../node_modules/@angular/core/fesm2022/core.mjs",
+      "file": "@angular_core.js",
+      "fileHash": "d8e3985c",
+      "needsInterop": false
+    },
+    "@angular/forms": {
+      "src": "../../../../../node_modules/@angular/forms/fesm2022/forms.mjs",
+      "file": "@angular_forms.js",
+      "fileHash": "8b88ca81",
+      "needsInterop": false
+    },
+    "@angular/platform-browser": {
+      "src": "../../../../../node_modules/@angular/platform-browser/fesm2022/platform-browser.mjs",
+      "file": "@angular_platform-browser.js",
+      "fileHash": "92d43d87",
+      "needsInterop": false
+    },
+    "@angular/router": {
+      "src": "../../../../../node_modules/@angular/router/fesm2022/router.mjs",
+      "file": "@angular_router.js",
+      "fileHash": "7b12fdb5",
+      "needsInterop": false
+    },
+    "aws-amplify": {
+      "src": "../../../../../node_modules/aws-amplify/dist/esm/index.mjs",
+      "file": "aws-amplify.js",
+      "fileHash": "80d28bb7",
+      "needsInterop": false
+    },
+    "aws-amplify/auth": {
+      "src": "../../../../../node_modules/aws-amplify/dist/esm/auth/index.mjs",
+      "file": "aws-amplify_auth.js",
+      "fileHash": "6fb61dbc",
+      "needsInterop": false
+    },
+    "aws-amplify/auth/enable-oauth-listener": {
+      "src": "../../../../../node_modules/aws-amplify/dist/esm/auth/enableOAuthListener.mjs",
+      "file": "aws-amplify_auth_enable-oauth-listener.js",
+      "fileHash": "592d569b",
+      "needsInterop": false
+    },
+    "leaflet": {
+      "src": "../../../../../node_modules/leaflet/dist/leaflet-src.js",
+      "file": "leaflet.js",
+      "fileHash": "9d499753",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-LQMHJM5G": {
+      "file": "chunk-LQMHJM5G.js"
+    },
+    "chunk-NQFTWJUP": {
+      "file": "chunk-NQFTWJUP.js"
+    },
+    "chunk-GDGSWVPQ": {
+      "file": "chunk-GDGSWVPQ.js"
+    },
+    "chunk-A3X3E2O7": {
+      "file": "chunk-A3X3E2O7.js"
+    },
+    "chunk-POQLK5GC": {
+      "file": "chunk-POQLK5GC.js"
+    },
+    "chunk-6SIHPBYX": {
+      "file": "chunk-6SIHPBYX.js"
+    },
+    "chunk-JMXAJD2I": {
+      "file": "chunk-JMXAJD2I.js"
+    },
+    "chunk-3OV72XIM": {
+      "file": "chunk-3OV72XIM.js"
+    }
+  }
+}

@@ -907,6 +907,12 @@ small.visible {
   text-align: left;
 }
 
+.user-menu-divider {
+  height: 1px;
+  margin: 6px 4px;
+  background: linear-gradient(90deg, rgba(191, 219, 254, 0) 0%, rgba(191, 219, 254, 0.95) 20%, rgba(191, 219, 254, 0.95) 80%, rgba(191, 219, 254, 0) 100%);
+}
+
 @media (max-width: 768px) {
   .panel-topbar {
     margin-bottom: 12px;

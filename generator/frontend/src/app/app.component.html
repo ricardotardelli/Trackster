@@ -42,22 +42,13 @@
             *ngIf="userMenuOpen"
             role="menu"
           >
-            <a
-              class="user-menu-item"
-              href=""
-              role="menuitem"
-              (click)="$event.preventDefault(); closeUserMenu()"
-            >
+            <a class="user-menu-item" href="" role="menuitem" (click)="$event.preventDefault(); closeUserMenu()" >
               About
             </a>
+            
+            <div class="user-menu-divider"></div>
 
-            <button
-              type="button"
-              class="user-menu-item logout-item"
-              role="menuitem"
-              (click)="onLogout()"
-              [disabled]="isLoggingOut"
-            >
+            <button type="button" class="user-menu-item logout-item" role="menuitem" (click)="onLogout()" [disabled]="isLoggingOut" >
               {{ isLoggingOut ? 'Logging out...' : 'Logout' }}
             </button>
           </div>

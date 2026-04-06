@@ -20,8 +20,8 @@ import {
   ViewChild
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 import { AuthService } from './auth/auth.service';
+import { environment } from '../environments/environment';
 
 interface RoutePoint {
   lat: number;
@@ -43,7 +43,7 @@ interface RoutePayload {
     ReactiveFormsModule,
     FormsModule,
     MapmoduleComponent,
-    //GpsplotterComponent,
+    // GpsplotterComponent,
     RouterOutlet
   ],
   templateUrl: './app.component.html',
@@ -96,8 +96,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private formValueChangesBound = false;
 
   isMapModalOpen = false;
-  //isGpsPlotterModalOpen = false;
-  //gpsPlotterHexCoordinates: string[] = [];
+  // isGpsPlotterModalOpen = false;
+  // gpsPlotterHexCoordinates: string[] = [];
 
   private dragInitialized = false;
   private isDragging = false;
@@ -128,14 +128,14 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     driverProfile: ['']
   });
 
+  isDriverProfileOpen = false;
+  isUnityOpen = false;
+
   ngOnInit(): void {
     void this.initializeApp();
   }
 
   ngAfterViewChecked(): void {
-    // if (this.isMapModalOpen || this.isGpsPlotterModalOpen) {
-    //   this.initializeModalDrag();
-    // }
     if (this.isMapModalOpen) {
       this.initializeModalDrag();
     }
@@ -143,6 +143,14 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   ngOnDestroy(): void {
     this.removeDragListeners();
+  }
+
+  private isAuthDisabled(): boolean {
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    return environment.disableAuth && isLocalhost;
   }
 
   get f() {
@@ -167,6 +175,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     if (selected.length === 0) {
       return 'Select CAN frames';
     }
+
     return `${selected.length} selected`;
   }
 
@@ -194,6 +203,14 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       return 'Error';
     }
     return 'Pending';
+  }
+
+  get driverProfileSummary(): string {
+    return this.form.controls.driverProfile.value || 'Select a value';
+  }
+
+  get unitySummary(): string {
+    return this.form.controls.unity.value || 'Km';
   }
 
   openMapModal(): void {
@@ -265,11 +282,41 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
+  toggleDriverProfileOpen(): void {
+    this.isDriverProfileOpen = !this.isDriverProfileOpen;
+    this.isUnityOpen = false;
+    this.isCanOpen = false;
+    this.isDbcOpen = false;
+    this.isGpsOpen = false;
+    this.userMenuOpen = false;
+  }
+
+  toggleUnityOpen(): void {
+    this.isUnityOpen = !this.isUnityOpen;
+    this.isDriverProfileOpen = false;
+    this.isCanOpen = false;
+    this.isDbcOpen = false;
+    this.isGpsOpen = false;
+    this.userMenuOpen = false;
+  }
+
   selectGpsArea(area: string): void {
     this.form.controls.gpsArea.setValue(area);
     this.form.controls.gpsArea.markAsTouched();
     this.gpsFilter = '';
     this.isGpsOpen = false;
+  }
+
+  selectDriverProfile(value: string): void {
+    this.form.patchValue({ driverProfile: value });
+    this.form.controls.driverProfile.markAsTouched();
+    this.isDriverProfileOpen = false;
+  }
+
+  selectUnity(value: 'Km' | 'Mi'): void {
+    this.form.patchValue({ unity: value });
+    this.form.controls.unity.markAsTouched();
+    this.isUnityOpen = false;
   }
 
   isCanSelected(option: string): boolean {
@@ -447,10 +494,15 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.bindFormValueChangesOnce();
 
     try {
-      await this.ensureAuthenticatedSession();
-      this.isAuthenticated = true;
+      if (this.isAuthDisabled()) {
+        this.isAuthenticated = true;
+        this.username = 'local-dev';
+      } else {
+        await this.ensureAuthenticatedSession();
+        this.isAuthenticated = true;
+        await this.loadUsername();
+      }
 
-      await this.loadUsername();
       await this.loadConfig();
 
       this.isConfigLoaded = true;
@@ -470,25 +522,24 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   private async ensureAuthenticatedSession(): Promise<void> {
-    await getCurrentUser();
+    const authenticated = await this.authService.isAuthenticated();
 
-    const session = await fetchAuthSession();
-    const idToken = session.tokens?.idToken?.toString();
-
-    if (!idToken) {
-      throw new Error('Authenticated session does not contain an ID token.');
+    if (!authenticated) {
+      throw new Error('Authenticated session is not available.');
     }
   }
 
-  private async getAuthorizationToken(): Promise<string> {
-    const session = await fetchAuthSession();
+  private async getAuthorizationToken(): Promise<string | null> {
+    if (this.isAuthDisabled()) {
+      return null;
+    }
 
-    const idToken = session.tokens?.idToken?.toString();
+    const idToken = await this.authService.getIdToken();
     if (idToken) {
       return idToken;
     }
 
-    const accessToken = session.tokens?.accessToken?.toString();
+    const accessToken = await this.authService.getAccessToken();
     if (accessToken) {
       return accessToken;
     }
@@ -551,6 +602,33 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.isSubmitting = true;
 
     try {
+      if (this.isAuthDisabled()) {
+        const localResult = {
+          request: {
+            ...request,
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: '[LOCAL_MODE_DISABLED]'
+            }
+          },
+          response: {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: {
+              localMode: true,
+              message: 'Request was not sent because authentication is disabled in local mode.',
+              generatedAt: new Date().toISOString()
+            }
+          }
+        };
+
+        this.formStatus = 'generated';
+        this.setPayloadValue(JSON.stringify(localResult, null, 2));
+        return;
+      }
+
       const authorizationToken = await this.getAuthorizationToken();
 
       this.setPayloadValue(JSON.stringify(request.body, null, 2));
@@ -559,18 +637,10 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
         method: request.method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: authorizationToken
+          Authorization: authorizationToken ?? ''
         },
         body: JSON.stringify(request.body)
       });
-
-      // const response = {
-      //   ok: true,
-      //   status: 200,
-      //   statusText: 'OK',
-      //   headers: new Headers(),
-      //   text: async () => JSON.stringify({ mock: true })
-      // } as Response;
 
       let responseBody: unknown;
       try {
@@ -1115,45 +1185,4 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   //   document.body.style.userSelect = '';
   //   this.dragInitialized = false;
   // }
-
-  isDriverProfileOpen = false;
-  isUnityOpen = false;
-
-  get driverProfileSummary(): string {
-    return this.form.controls.driverProfile.value || 'Select a value';
-  }
-
-  get unitySummary(): string {
-    return this.form.controls.unity.value || 'Km';
-  }
-
-  toggleDriverProfileOpen(): void {
-    this.isDriverProfileOpen = !this.isDriverProfileOpen;
-    this.isUnityOpen = false;
-    this.isCanOpen = false;
-    this.isDbcOpen = false;
-    this.isGpsOpen = false;
-    this.userMenuOpen = false;
-  }
-
-  selectDriverProfile(value: string): void {
-    this.form.patchValue({ driverProfile: value });
-    this.form.controls.driverProfile.markAsTouched();
-    this.isDriverProfileOpen = false;
-  }
-
-  toggleUnityOpen(): void {
-    this.isUnityOpen = !this.isUnityOpen;
-    this.isDriverProfileOpen = false;
-    this.isCanOpen = false;
-    this.isDbcOpen = false;
-    this.isGpsOpen = false;
-    this.userMenuOpen = false;
-  }
-
-  selectUnity(value: 'Km' | 'Mi'): void {
-    this.form.patchValue({ unity: value });
-    this.form.controls.unity.markAsTouched();
-    this.isUnityOpen = false;
-  }
 }

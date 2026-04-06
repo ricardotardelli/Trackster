@@ -3,15 +3,24 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { AppComponent } from './app/app.component';
 import { AuthService, configureAuth } from './app/auth/auth.service';
+import { environment } from './environments/environment';
 
 async function start(): Promise<void> {
-  configureAuth();
+  const isLocalhost =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
 
-  const authService = new AuthService();
-  const canStart = await authService.prepareApplicationStart();
+  const shouldDisableAuth = environment.disableAuth && isLocalhost;
 
-  if (!canStart) {
-    return;
+  if (!shouldDisableAuth) {
+    configureAuth();
+
+    const authService = new AuthService();
+    const canStart = await authService.prepareApplicationStart();
+
+    if (!canStart) {
+      return;
+    }
   }
 
   await bootstrapApplication(AppComponent, {

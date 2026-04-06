@@ -29,12 +29,29 @@
           "configurations": {
             "production": {
               "optimization": true,
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.prod.ts"
+                }
+              ]
             },
             "development": {
               "optimization": false,
               "sourceMap": true,
               "extractLicenses": false
+            },
+            "local": {
+              "optimization": false,
+              "sourceMap": true,
+              "extractLicenses": false,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.local.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "development"
@@ -47,6 +64,9 @@
             },
             "development": {
               "buildTarget": "trackster-frontend:build:development"
+            },
+            "local": {
+              "buildTarget": "trackster-frontend:build:local"
             }
           },
           "defaultConfiguration": "development"

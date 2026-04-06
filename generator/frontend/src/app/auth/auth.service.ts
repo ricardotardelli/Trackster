@@ -1,12 +1,29 @@
 import { Amplify } from 'aws-amplify';
 import { Injectable } from '@angular/core';
-import { fetchAuthSession, signInWithRedirect, signOut, getCurrentUser } from 'aws-amplify/auth';
+import {
+  fetchAuthSession,
+  signInWithRedirect,
+  signOut,
+  getCurrentUser
+} from 'aws-amplify/auth';
 import { cognitoConfig } from './cognito.config';
+import { environment } from '../../environments/environment';
 
 let amplifyConfigured = false;
 
+function isLocalhost(): boolean {
+  return (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  );
+}
+
+function isAuthDisabled(): boolean {
+  return environment.disableAuth && isLocalhost();
+}
+
 export function configureAuth(): void {
-  if (amplifyConfigured) {
+  if (amplifyConfigured || isAuthDisabled()) {
     return;
   }
 
@@ -33,7 +50,15 @@ export function configureAuth(): void {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private authDisabled(): boolean {
+    return isAuthDisabled();
+  }
+
   private async hasAuthenticatedSession(): Promise<boolean> {
+    if (this.authDisabled()) {
+      return true;
+    }
+
     try {
       const session = await fetchAuthSession();
 
@@ -47,16 +72,26 @@ export class AuthService {
   }
 
   private async waitForSession(): Promise<boolean> {
+    if (this.authDisabled()) {
+      return true;
+    }
+
     for (let i = 0; i < 20; i++) {
       if (await this.hasAuthenticatedSession()) {
         return true;
       }
+
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
+
     return false;
   }
 
   private isOAuthReturn(): boolean {
+    if (this.authDisabled()) {
+      return false;
+    }
+
     const url = new URL(window.location.href);
 
     return (
@@ -71,6 +106,10 @@ export class AuthService {
   }
 
   async prepareApplicationStart(): Promise<boolean> {
+    if (this.authDisabled()) {
+      return true;
+    }
+
     if (this.isOAuthReturn()) {
       const ok = await this.waitForSession();
 
@@ -95,27 +134,63 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    if (this.authDisabled()) {
+      return;
+    }
+
     await signOut({ global: true });
   }
 
   async getUsername(): Promise<string | null> {
+    if (this.authDisabled()) {
+      return 'local-dev';
+    }
+
     try {
       const user = await getCurrentUser();
       return user.username;
-    } 
-    catch {
+    } catch {
       return null;
     }
   }
-  
+
   async isAuthenticated(): Promise<boolean> {
+    if (this.authDisabled()) {
+      return true;
+    }
+
     try {
       const user = await getCurrentUser();
       const session = await fetchAuthSession();
       return !!user && !!session.tokens?.idToken;
-    } 
-    catch {
+    } catch {
       return false;
+    }
+  }
+
+  async getIdToken(): Promise<string | null> {
+    if (this.authDisabled()) {
+      return null;
+    }
+
+    try {
+      const session = await fetchAuthSession();
+      return session.tokens?.idToken?.toString() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getAccessToken(): Promise<string | null> {
+    if (this.authDisabled()) {
+      return null;
+    }
+
+    try {
+      const session = await fetchAuthSession();
+      return session.tokens?.accessToken?.toString() ?? null;
+    } catch {
+      return null;
     }
   }
 }
