@@ -31,6 +31,14 @@ function normalizeVinSuffix(raw) {
   return String(raw || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, VIN_SUFFIX_LENGTH);
 }
 
+function normalizeUnity(raw) {
+  return String(raw || "").trim().toUpperCase() === "MI" ? "Mi" : "Km";
+}
+
+function normalizeDriverProfile(raw) {
+  return String(raw || "").trim();
+}
+
 function padSeq(n) {
   return String(n).padStart(VIN_SEQ_LENGTH, "0");
 }
@@ -42,6 +50,7 @@ function makeVin(prefix, suffix, seq) {
 function makeRunIdUTC() {
   const d = new Date();
   const p2 = (n) => String(n).padStart(2, "0");
+  const p3 = (n) => String(n).padStart(3, "0");
 
   const year = d.getUTCFullYear();
   const month = p2(d.getUTCMonth() + 1);
@@ -49,7 +58,7 @@ function makeRunIdUTC() {
   const hour = p2(d.getUTCHours());
   const min = p2(d.getUTCMinutes());
   const sec = p2(d.getUTCSeconds());
-  const ms = p2(Math.floor(d.getUTCMilliseconds()));
+  const ms = p3(d.getUTCMilliseconds());
 
   return `${year}${month}${day}T${hour}${min}${sec}${ms}`;
 }
@@ -159,6 +168,9 @@ module.exports.handler = async (event, context) => {
     const vinSuffix = p.vinSuffix ?? p.vinSufix;
     const initialDateTime = String(p.initialDateTime || "").trim();
     const latencyTime = Math.max(1, parsePositiveInt(p.latencyTime));
+    const speed = parsePositiveNumber(p.speed);
+    const unity = normalizeUnity(p.unity);
+    const driverProfile = normalizeDriverProfile(p.driverProfile);
     const s3Bucket = resolveS3Bucket(p);
     const workQueueUrl = resolveWorkQueueUrl(p);
 
@@ -182,6 +194,10 @@ module.exports.handler = async (event, context) => {
       return httpResp(400, { requestId, error: "initialDateTime is required" });
     }
 
+    if (!speed) {
+      return httpResp(400, { requestId, error: "speed is required" });
+    }
+
     const epochMs = Date.parse(initialDateTime);
     if (!Number.isFinite(epochMs)) {
       return httpResp(400, { requestId, error: "initialDateTime is invalid" });
@@ -203,7 +219,9 @@ module.exports.handler = async (event, context) => {
       });
     }
 
-    console.log(`[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl}`);
+    console.log(
+      `[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl} speed=${speed} unity=${unity} driverProfile=${driverProfile || "EMPTY"}`
+    );
 
     const sqs = new SQSClient({ region: REGION });
 
@@ -229,6 +247,9 @@ module.exports.handler = async (event, context) => {
         vinSuffix,
         initialDateTime,
         latencyTime,
+        speed,
+        unity,
+        driverProfile,
         s3Bucket,
         runId
       })
@@ -275,6 +296,9 @@ module.exports.handler = async (event, context) => {
       vinSuffix,
       initialDateTime,
       latencyTime,
+      speed,
+      unity,
+      driverProfile,
       s3Bucket,
       epochSec,
       runId

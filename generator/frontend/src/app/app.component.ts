@@ -846,6 +846,9 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       vinSuffix: raw.vinSuffix,
       initialDateTime: raw.initialDateTime,
       latencyTime: Number(raw.latencyTime),
+      speed: Number(raw.speed),
+      unity: raw.unity === 'Mi' ? 'Mi' : 'Km',
+      driverProfile: String(raw.driverProfile || '').trim(),
       s3Bucket: raw.s3Bucket.trim(),
       workQueueUrl: raw.workQueueUrl.trim()
     };
