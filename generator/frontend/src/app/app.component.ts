@@ -1044,4 +1044,43 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   //   document.body.style.userSelect = '';
   //   this.dragInitialized = false;
   // }
+
+  isDriverProfileOpen = false;
+  isUnityOpen = false;
+
+  get driverProfileSummary(): string {
+    return this.form.controls.driverProfile.value || 'Select a value';
+  }
+
+  get unitySummary(): string {
+    return this.form.controls.unity.value || 'Km';
+  }
+
+  toggleDriverProfileOpen(): void {
+    this.isDriverProfileOpen = !this.isDriverProfileOpen;
+    this.isUnityOpen = false;
+    this.isCanOpen = false;
+    this.isDbcOpen = false;
+    this.isGpsOpen = false;
+  }
+
+  selectDriverProfile(value: string): void {
+    this.form.patchValue({ driverProfile: value });
+    this.form.controls.driverProfile.markAsTouched();
+    this.isDriverProfileOpen = false;
+  }
+
+  toggleUnityOpen(): void {
+    this.isUnityOpen = !this.isUnityOpen;
+    this.isDriverProfileOpen = false;
+    this.isCanOpen = false;
+    this.isDbcOpen = false;
+    this.isGpsOpen = false;
+  }
+
+  selectUnity(value: 'Km' | 'Mi'): void {
+    this.form.patchValue({ unity: value });
+    this.form.controls.unity.markAsTouched();
+    this.isUnityOpen = false;
+  }
 }

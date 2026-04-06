@@ -98,15 +98,27 @@
             </small>
           </label>
 
-          <label class="field quarter row1">
+          <div class="field quarter row1">
             <span>Driver Profile</span>
-            <select formControlName="driverProfile">
-              <option value="">Select a value</option>
-            </select>
+            <div class="multi-select" [class.open]="isDriverProfileOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleDriverProfileOpen()">
+                <span class="multi-select-value">{{ driverProfileSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isDriverProfileOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isDriverProfileOpen">&#9662;</span>
+              </button>
+              <div class="multi-select-panel" *ngIf="isDriverProfileOpen">
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('')">
+                  Select a value
+                </button>
+              </div>
+            </div>
             <small [class.visible]="f.driverProfile.touched && f.driverProfile.invalid">
               Select a driver profile.
             </small>
-          </label>
+          </div>
 
           <label class="field quarter row2">
             <span>Initial DateTime</span>
@@ -184,16 +196,33 @@
             </small>
           </div>
 
-          <label class="field quarter row3">
+          <div class="field quarter row3">
             <span>Unity</span>
-            <select formControlName="unity">
-              <option value="Km">Km</option>
-              <option value="Mi">Mi</option>
-            </select>
+            <div class="multi-select" [class.open]="isUnityOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleUnityOpen()">
+                <span class="multi-select-value">{{ unitySummary }}</span>
+                <span class="multi-select-caret" *ngIf="isUnityOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isUnityOpen">&#9662;</span>
+              </button>
+              <div class="multi-select-panel" *ngIf="isUnityOpen">
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectUnity('Km')">
+                  Km
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectUnity('Mi')">
+                  Mi
+                </button>
+              </div>
+            </div>
             <small [class.visible]="f.unity.touched && f.unity.invalid">
               Select a unit.
             </small>
-          </label>
+          </div>
 
           <div class="field quarter row4">
             <span>DBC Files</span>
@@ -286,6 +315,7 @@
             </small>
           </label>
         </div>
+
         <div class="actions">
           <!-- <button
             type="button"
@@ -299,6 +329,7 @@
         </div>
       </form>
     </section>
+
     <div class="map-modal-backdrop" *ngIf="isMapModalOpen" (click)="closeMapModal()">
       <div class="map-modal" #mapModal (click)="$event.stopPropagation()">
         <div class="map-modal-header" #modalHeader>
@@ -317,6 +348,7 @@
         </div>
       </div>
     </div>
+
     <!-- <div class="map-modal-backdrop" *ngIf="isGpsPlotterModalOpen" (click)="closeGpsPlotterModal()">
       <div class="map-modal" #mapModal (click)="$event.stopPropagation()">
         <div class="map-modal-header" #modalHeader>
@@ -334,4 +366,4 @@
       </div>
     </div> -->
   </main>
-</div>  
+</div>
