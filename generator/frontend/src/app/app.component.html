@@ -145,7 +145,7 @@
           </label>
 
           <label class="field quarter row1">
-            <span>VIN Trailer</span>
+            <span>VIN Suffix</span>
             <input type="text" formControlName="vinSuffix" placeholder="Ex: ACHDF" />
             <small [class.visible]="f.vinSuffix.touched && f.vinSuffix.invalid">
               Mandatory field (exactly 5 characters).
@@ -164,8 +164,50 @@
                 <button
                   type="button"
                   class="single-select-option"
-                  (click)="selectDriverProfile('')">
-                  Select a value
+                  (click)="selectDriverProfile('Normal')">
+                  Normal
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('Eco')">
+                  Eco
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('Sport')">
+                  Sport
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('Aggressive')">
+                  Aggressive
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('Urban')">
+                  Urban
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('Highway')">
+                  Highway
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('OffRoad')">
+                  OffRoad
+                </button>
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectDriverProfile('Delivery')">
+                  Delivery
                 </button>
               </div>
             </div>
@@ -183,7 +225,7 @@
           </label>
 
           <label class="field quarter row2">
-            <span>Amount of Time (hours)</span>
+            <span>Duration (hours)</span>
             <input type="number" formControlName="amountOfTime" step="0.1" min="0" />
             <small [class.visible]="f.amountOfTime.touched && f.amountOfTime.invalid">
               Enter a valid decimal number.
@@ -198,16 +240,53 @@
             </small>
           </label>
 
-          <label class="field quarter row2">
-            <span>Speed</span>
-            <input type="number" formControlName="speed" step="0.1" min="0" />
-            <small [class.visible]="f.speed.touched && f.speed.invalid">
-              Enter a valid speed.
+          <div class="field quarter row2">
+            <span>Simulation Mode</span>
+            <div class="multi-select" [class.open]="isSimulationModeOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleSimulationModeOpen()">
+                <span class="multi-select-value">{{ simulationModeSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isSimulationModeOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isSimulationModeOpen">&#9662;</span>
+              </button>
+
+              <div class="multi-select-panel" *ngIf="isSimulationModeOpen">
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectSimulationMode('Blocks')">
+                  Blocks
+                </button>
+
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectSimulationMode('Speed')">
+                  Speed
+                </button>
+
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectSimulationMode('Time')">
+                  Time
+                </button>
+
+                <button
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectSimulationMode('Distance')">
+                  Distance
+                </button>
+              </div>
+            </div>
+
+            <small [class.visible]="f.simulationMode.touched && f.simulationMode.invalid">
+              Select a simulation mode.
             </small>
-          </label>
+          </div>
 
           <label class="field quarter row3">
-            <span>Number of Blocks (0 for all)</span>
+            <span>Block Count (0 = auto)</span>
             <input type="number" formControlName="numberOfBlocks" step="1" min="0" />
             <small [class.visible]="f.numberOfBlocks.touched && f.numberOfBlocks.invalid">
               Mandatory integer field.
@@ -215,43 +294,23 @@
           </label>
 
           <label class="field quarter row3">
-            <span>Blocks Size (Bytes)</span>
+            <span>Block Size (Bytes)</span>
             <input type="number" formControlName="sizeOfBlocksBytes" step="1" min="0" />
             <small [class.visible]="f.sizeOfBlocksBytes.touched && f.sizeOfBlocksBytes.invalid">
               Mandatory integer field.
             </small>
           </label>
 
-          <div class="field quarter row3">
-            <span>CAN Frames</span>
-            <div class="multi-select" [class.open]="isCanOpen">
-              <button type="button" class="multi-select-trigger" (click)="toggleCanOpen()">
-                <span class="multi-select-value">{{ canSummary }}</span>
-                <span class="multi-select-caret" *ngIf="isCanOpen">&#9652;</span>
-                <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
-              </button>
-              <div class="multi-select-panel" *ngIf="isCanOpen">
-                <div class="multi-select-actions">
-                  <button type="button" class="small" (click)="selectAllCanFrames()" [disabled]="canFrameOptions.length === 0">
-                    Select All
-                  </button>
-                  <button type="button" class="small" (click)="clearAllCanFrames()" [disabled]="f.canFrames.value.length === 0">
-                    Clear All
-                  </button>
-                </div>
-                <label class="multi-select-option" *ngFor="let frame of canFrameOptions">
-                  <input type="checkbox" [checked]="isCanSelected(frame)" (change)="onCanToggle(frame, $any($event.target).checked)" />
-                  <span class="option-label">{{ frame }}</span>
-                </label>
-              </div>
-            </div>
-            <small [class.visible]="f.canFrames.touched && f.canFrames.invalid">
-              Select at least one CAN frame.
+          <label class="field quarter row3">
+            <span>Speed</span>
+            <input type="number" formControlName="speed" step="0.1" min="0" />
+            <small [class.visible]="f.speed.touched && f.speed.invalid">
+              Enter a valid speed.
             </small>
-          </div>
+          </label>
 
           <div class="field quarter row3">
-            <span>Unity</span>
+            <span>Distance Unit</span>
             <div class="multi-select" [class.open]="isUnityOpen">
               <button type="button" class="multi-select-trigger" (click)="toggleUnityOpen()">
                 <span class="multi-select-value">{{ unitySummary }}</span>
@@ -296,6 +355,34 @@
             </div>
             <small [class.visible]="f.dbcFiles.touched && f.dbcFiles.invalid">
               Select at least one DBC file.
+            </small>
+          </div>
+
+          <div class="field quarter row4">
+            <span>CAN Frames</span>
+            <div class="multi-select" [class.open]="isCanOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleCanOpen()">
+                <span class="multi-select-value">{{ canSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isCanOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
+              </button>
+              <div class="multi-select-panel" *ngIf="isCanOpen">
+                <div class="multi-select-actions">
+                  <button type="button" class="small" (click)="selectAllCanFrames()" [disabled]="canFrameOptions.length === 0">
+                    Select All
+                  </button>
+                  <button type="button" class="small" (click)="clearAllCanFrames()" [disabled]="f.canFrames.value.length === 0">
+                    Clear All
+                  </button>
+                </div>
+                <label class="multi-select-option" *ngFor="let frame of canFrameOptions">
+                  <input type="checkbox" [checked]="isCanSelected(frame)" (change)="onCanToggle(frame, $any($event.target).checked)" />
+                  <span class="option-label">{{ frame }}</span>
+                </label>
+              </div>
+            </div>
+            <small [class.visible]="f.canFrames.touched && f.canFrames.invalid">
+              Select at least one CAN frame.
             </small>
           </div>
 

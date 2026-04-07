@@ -1,4 +1,3 @@
-// import { GpsplotterComponent } from './gpsplotter/gpsplotter.component';
 import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
 import { CommonModule } from '@angular/common';
 import {
@@ -96,8 +95,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   private formValueChangesBound = false;
 
   isMapModalOpen = false;
-  // isGpsPlotterModalOpen = false;
-  // gpsPlotterHexCoordinates: string[] = [];
 
   private dragInitialized = false;
   private isDragging = false;
@@ -120,6 +117,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     vinSuffix: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
     latencyTime: [5, [Validators.required, Validators.pattern(/^\d+$/)]],
     speed: [80, [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
+    simulationMode: ['Blocks', Validators.required],
     unity: ['Km' as 'Km' | 'Mi', [Validators.required]],
     s3Bucket: ['', [Validators.required]],
     workQueueUrl: [''],
@@ -130,6 +128,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   isDriverProfileOpen = false;
   isUnityOpen = false;
+  isSimulationModeOpen = false;
 
   ngOnInit(): void {
     void this.initializeApp();
@@ -206,7 +205,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   get driverProfileSummary(): string {
-    return this.form.controls.driverProfile.value || 'Select a value';
+    return this.form.controls.driverProfile.value || "Normal";
   }
 
   get unitySummary(): string {
@@ -234,6 +233,19 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.isDragging = false;
     document.body.style.userSelect = '';
     this.dragInitialized = false;
+  }
+
+  toggleSimulationModeOpen() {
+    this.isSimulationModeOpen = !this.isSimulationModeOpen;
+  }
+
+  selectSimulationMode(mode: string) {
+    this.form.controls['simulationMode'].setValue(mode);
+    this.isSimulationModeOpen = false;
+  }
+
+  get simulationModeSummary(): string {
+    return this.form.controls['simulationMode'].value || 'Select';
   }
 
   toggleCanOpen(): void {
@@ -1165,24 +1177,4 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     const seconds = String(now.getSeconds()).padStart(2, '0');
     return `${year}${month}${day}T${hours}${minutes}${seconds}`;
   }
-
-  // openGpsPlotter(): void {
-  //   this.gpsPlotterHexCoordinates =
-  //     this.interpGpsCoords.length > 0
-  //       ? [...this.interpGpsCoords]
-  //       : [...this.selectedGpsCoordinates];
-
-  //   console.log('gpsPlotterHexCoordinates', this.gpsPlotterHexCoordinates);
-
-  //   this.isGpsPlotterModalOpen = true;
-  //   this.isGpsOpen = false;
-  //   this.dragInitialized = false;
-  // }
-
-  // closeGpsPlotterModal(): void {
-  //   this.isGpsPlotterModalOpen = false;
-  //   this.isDragging = false;
-  //   document.body.style.userSelect = '';
-  //   this.dragInitialized = false;
-  // }
 }
