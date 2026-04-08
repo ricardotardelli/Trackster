@@ -1,0 +1,66 @@
+<div class="page-shell">
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" routerLink="/">
+        <div class="brand-mark">T</div>
+        <div class="brand-copy">
+          <span class="brand-name">Trackster</span>
+          <span class="brand-tagline">CAN simulation platform</span>
+        </div>
+      </a>
+
+      <nav class="main-nav" aria-label="Primary">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
+        <a routerLink="/platform" routerLinkActive="active">Platform</a>
+        <a routerLink="/use-cases" routerLinkActive="active">Use Cases</a>
+        <a routerLink="/about" routerLinkActive="active">About</a>
+        <a routerLink="/contact" routerLinkActive="active">Contact</a>
+      </nav>
+
+      <div class="header-actions">
+        <a class="cta-primary" [href]="studioUrl">Open Studio</a>
+      </div>
+    </div>
+  </header>
+
+  <router-outlet></router-outlet>
+
+  <footer class="site-footer">
+    <div class="container footer-grid surface-card">
+      <div class="footer-brand">
+        <div class="brand-mark footer-mark">T</div>
+        <div>
+          <h3>Trackster</h3>
+          <p>
+            Structured CAN simulation for modern validation, integration, and synthetic fleet testing.
+          </p>
+        </div>
+      </div>
+
+      <div class="footer-column">
+        <h4>Platform</h4>
+        <a routerLink="/platform">Overview</a>
+        <a routerLink="/use-cases">Use Cases</a>
+        <a [href]="studioUrl">Open Studio</a>
+      </div>
+
+      <div class="footer-column">
+        <h4>Company</h4>
+        <a routerLink="/about">About</a>
+        <a routerLink="/contact">Contact</a>
+        <a routerLink="/privacy">Privacy</a>
+      </div>
+
+      <div class="footer-column">
+        <h4>Contact</h4>
+        <a [href]="'mailto:' + contactEmail">{{ contactEmail }}</a>
+        <a [href]="studioUrl">studio.trackster.pt</a>
+      </div>
+    </div>
+
+    <div class="container footer-bottom">
+      <span>© 2026 Trackster. All rights reserved.</span>
+      <span>Built for clear, controlled, high-fidelity simulation workflows.</span>
+    </div>
+  </footer>
+</div>
