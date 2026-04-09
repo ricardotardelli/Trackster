@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, inject } from '@angular/core';
+import { FormsModule, NgForm } from '@angular/forms';
+import { ContactService } from '../services/contact.service';
 
 @Component({
   standalone: true,
@@ -11,17 +12,17 @@ import { FormsModule } from '@angular/forms';
           <p class="section-kicker">Contact</p>
           <h1 class="section-title">Get in touch about Trackster</h1>
           <p class="section-text">
-            Use the form below to prepare a message. The button opens your email client with the fields already populated.
+            Use the form below to contact the Trackster team directly from this page.
           </p>
 
           <div class="surface-card contact-info">
             <h3>Direct contact</h3>
-            <a class="inline-link" [href]="'mailto:' + emailAddress">{{ emailAddress }}</a>
+            <p>All inquiries are handled directly through this form.</p>
             <p>Production workspace: <a class="inline-link" href="https://studio.trackster.pt">studio.trackster.pt</a></p>
           </div>
         </div>
 
-        <form class="surface-card contact-form" (ngSubmit)="openEmail()" #contactForm="ngForm">
+        <form class="surface-card contact-form" (ngSubmit)="submitContact(contactForm)" #contactForm="ngForm">
           <div class="field">
             <label for="name">Name</label>
             <input
@@ -31,6 +32,7 @@ import { FormsModule } from '@angular/forms';
               type="text"
               required
               placeholder="Your name"
+              [disabled]="sending"
             >
           </div>
 
@@ -42,6 +44,7 @@ import { FormsModule } from '@angular/forms';
               [(ngModel)]="company"
               type="text"
               placeholder="Company name"
+              [disabled]="sending"
             >
           </div>
 
@@ -53,7 +56,9 @@ import { FormsModule } from '@angular/forms';
               [(ngModel)]="email"
               type="email"
               required
+              email
               placeholder="you@company.com"
+              [disabled]="sending"
             >
           </div>
 
@@ -66,12 +71,16 @@ import { FormsModule } from '@angular/forms';
               rows="7"
               required
               placeholder="Tell us about your use case"
+              [disabled]="sending"
             ></textarea>
           </div>
 
-          <button class="cta-primary submit-button" type="submit" [disabled]="!contactForm.form.valid">
-            Send Message
+          <button class="cta-primary submit-button" type="submit" [disabled]="!contactForm.form.valid || sending">
+            {{ sending ? 'Sending...' : 'Send Message' }}
           </button>
+
+          <p class="form-success" *ngIf="successMessage">{{ successMessage }}</p>
+          <p class="form-error" *ngIf="errorMessage">{{ errorMessage }}</p>
         </form>
       </div>
     </section>
@@ -115,6 +124,18 @@ import { FormsModule } from '@angular/forms';
       transform: none;
     }
 
+    .form-success {
+      margin: 4px 0 0;
+      color: #166534;
+      font-weight: 600;
+    }
+
+    .form-error {
+      margin: 4px 0 0;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
     @media (max-width: 900px) {
       .contact-layout {
         grid-template-columns: 1fr;
@@ -123,6 +144,8 @@ import { FormsModule } from '@angular/forms';
   `]
 })
 export class ContactPageComponent {
+  private readonly contactService = inject(ContactService);
+
   public readonly emailAddress = 'contact@trackster.pt';
 
   public name = '';
@@ -130,19 +153,44 @@ export class ContactPageComponent {
   public email = '';
   public message = '';
 
-  public openEmail(): void {
-    const subject = encodeURIComponent(`Trackster inquiry from ${this.name || 'website visitor'}`);
-    const body = encodeURIComponent(
-      [
-        `Name: ${this.name}`,
-        `Company: ${this.company || 'Not provided'}`,
-        `Email: ${this.email}`,
-        '',
-        'Message:',
-        this.message
-      ].join('\n')
-    );
+  public sending = false;
+  public successMessage = '';
+  public errorMessage = '';
 
-    window.location.href = `mailto:${this.emailAddress}?subject=${subject}&body=${body}`;
+  public submitContact(contactForm: NgForm): void {
+    if (contactForm.invalid || this.sending) {
+      contactForm.form.markAllAsTouched();
+      return;
+    }
+
+    this.sending = true;
+    this.successMessage = '';
+    this.errorMessage = '';
+
+    this.contactService.sendContact({
+      name: this.name.trim(),
+      company: this.company.trim(),
+      email: this.email.trim(),
+      message: this.message.trim()
+    }).subscribe({
+      next: () => {
+        this.sending = false;
+        this.successMessage = 'Message sent successfully.';
+        this.errorMessage = '';
+        this.name = '';
+        this.company = '';
+        this.email = '';
+        this.message = '';
+        contactForm.resetForm();
+      },
+      error: (error) => {
+        this.sending = false;
+        this.successMessage = '';
+        this.errorMessage =
+          error?.error?.error ||
+          error?.error?.message ||
+          'Failed to send message.';
+      }
+    });
   }
 }
