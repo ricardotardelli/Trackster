@@ -1,40 +1,55 @@
 {
-  "hash": "ae7d3f8f",
-  "configHash": "428316c1",
-  "lockfileHash": "692ef4ec",
-  "browserHash": "a82bb19d",
+  "hash": "673152ae",
+  "configHash": "9b8ffb9b",
+  "lockfileHash": "73d8a921",
+  "browserHash": "384b4e64",
   "optimized": {
+    "@angular/common": {
+      "src": "../../../../../node_modules/@angular/common/fesm2022/common.mjs",
+      "file": "@angular_common.js",
+      "fileHash": "ca6fa239",
+      "needsInterop": false
+    },
+    "@angular/common/http": {
+      "src": "../../../../../node_modules/@angular/common/fesm2022/http.mjs",
+      "file": "@angular_common_http.js",
+      "fileHash": "37c6da42",
+      "needsInterop": false
+    },
     "@angular/core": {
       "src": "../../../../../node_modules/@angular/core/fesm2022/core.mjs",
       "file": "@angular_core.js",
-      "fileHash": "ec0a3173",
+      "fileHash": "fb9dfcaf",
       "needsInterop": false
     },
     "@angular/forms": {
       "src": "../../../../../node_modules/@angular/forms/fesm2022/forms.mjs",
       "file": "@angular_forms.js",
-      "fileHash": "38256a11",
+      "fileHash": "36dcab5f",
       "needsInterop": false
     },
     "@angular/platform-browser": {
       "src": "../../../../../node_modules/@angular/platform-browser/fesm2022/platform-browser.mjs",
       "file": "@angular_platform-browser.js",
-      "fileHash": "f605dbb7",
+      "fileHash": "9f48ad46",
       "needsInterop": false
     },
     "@angular/router": {
       "src": "../../../../../node_modules/@angular/router/fesm2022/router.mjs",
       "file": "@angular_router.js",
-      "fileHash": "65c74bdc",
+      "fileHash": "f3cf1e25",
       "needsInterop": false
     }
   },
   "chunks": {
-    "chunk-IKS3X7DU": {
-      "file": "chunk-IKS3X7DU.js"
+    "chunk-YSPTTWBN": {
+      "file": "chunk-YSPTTWBN.js"
     },
-    "chunk-36R7ME4L": {
-      "file": "chunk-36R7ME4L.js"
+    "chunk-H4XFGP3N": {
+      "file": "chunk-H4XFGP3N.js"
+    },
+    "chunk-ZQGI3ZYG": {
+      "file": "chunk-ZQGI3ZYG.js"
     },
     "chunk-6DT2DWOU": {
       "file": "chunk-6DT2DWOU.js"

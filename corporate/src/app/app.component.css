@@ -6,7 +6,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  padding: 18px 0;
+  padding: 20px 0;
   backdrop-filter: blur(10px);
   background: rgba(239, 247, 255, 0.72);
   border-bottom: 1px solid rgba(191, 219, 254, 0.65);
@@ -22,21 +22,19 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .brand-mark {
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #ffffff, #dbeafe);
-  border: 1px solid #bfdbfe;
-  color: #0b1f44;
-  font-weight: 800;
-  font-size: 1.2rem;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  display: block;
+  width: auto;
+  height: 40px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.brand-logo-image {
+  filter: drop-shadow(0 8px 18px rgba(15, 23, 42, 0.08));
 }
 
 .brand-copy {
@@ -98,8 +96,8 @@
 }
 
 .footer-mark {
-  width: 42px;
-  height: 42px;
+  height: 34px;
+  width: auto;
 }
 
 .footer-brand h3,
