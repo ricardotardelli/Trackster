@@ -1,10 +1,11 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 import { ContactService } from '../services/contact.service';
 
 @Component({
   standalone: true,
-  imports: [FormsModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <section class="section">
       <div class="container contact-layout">
@@ -18,7 +19,12 @@ import { ContactService } from '../services/contact.service';
           <div class="surface-card contact-info">
             <h3>Direct contact</h3>
             <p>All inquiries are handled directly through this form.</p>
-            <p>Production workspace: <a class="inline-link" href="https://studio.trackster.pt">studio.trackster.pt</a></p>
+            <p>
+              Production workspace:
+              <a class="inline-link" href="https://studio.trackster.pt">
+                studio.trackster.pt
+              </a>
+            </p>
           </div>
         </div>
 
@@ -31,6 +37,7 @@ import { ContactService } from '../services/contact.service';
               [(ngModel)]="name"
               type="text"
               required
+              maxlength="120"
               placeholder="Your name"
               [disabled]="sending"
             >
@@ -43,6 +50,7 @@ import { ContactService } from '../services/contact.service';
               name="company"
               [(ngModel)]="company"
               type="text"
+              maxlength="200"
               placeholder="Company name"
               [disabled]="sending"
             >
@@ -57,6 +65,7 @@ import { ContactService } from '../services/contact.service';
               type="email"
               required
               email
+              maxlength="200"
               placeholder="you@company.com"
               [disabled]="sending"
             >
@@ -70,17 +79,29 @@ import { ContactService } from '../services/contact.service';
               [(ngModel)]="message"
               rows="7"
               required
+              maxlength="3000"
               placeholder="Tell us about your use case"
               [disabled]="sending"
             ></textarea>
           </div>
 
+          <input
+            class="honeypot"
+            type="text"
+            name="website"
+            [(ngModel)]="website"
+            tabindex="-1"
+            autocomplete="off"
+          >
+
           <button class="cta-primary submit-button" type="submit" [disabled]="!contactForm.form.valid || sending">
             {{ sending ? 'Sending...' : 'Send Message' }}
           </button>
 
-          <p class="form-success" *ngIf="successMessage">{{ successMessage }}</p>
-          <p class="form-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+          <div class="form-status" *ngIf="successMessage || errorMessage">
+            <p class="form-success" *ngIf="successMessage">{{ successMessage }}</p>
+            <p class="form-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+          </div>
         </form>
       </div>
     </section>
@@ -124,6 +145,10 @@ import { ContactService } from '../services/contact.service';
       transform: none;
     }
 
+    .form-status {
+      min-height: 24px;
+    }
+
     .form-success {
       margin: 4px 0 0;
       color: #166534;
@@ -136,6 +161,15 @@ import { ContactService } from '../services/contact.service';
       font-weight: 600;
     }
 
+    .honeypot {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
     @media (max-width: 900px) {
       .contact-layout {
         grid-template-columns: 1fr;
@@ -146,12 +180,11 @@ import { ContactService } from '../services/contact.service';
 export class ContactPageComponent {
   private readonly contactService = inject(ContactService);
 
-  public readonly emailAddress = 'contact@trackster.pt';
-
   public name = '';
   public company = '';
   public email = '';
   public message = '';
+  public website = '';
 
   public sending = false;
   public successMessage = '';
@@ -171,16 +204,19 @@ export class ContactPageComponent {
       name: this.name.trim(),
       company: this.company.trim(),
       email: this.email.trim(),
-      message: this.message.trim()
+      message: this.message.trim(),
+      website: this.website.trim()
     }).subscribe({
-      next: () => {
+      next: (response: any) => {
         this.sending = false;
-        this.successMessage = 'Message sent successfully.';
+        this.successMessage =
+          response?.message || 'Your message has been sent successfully.';
         this.errorMessage = '';
         this.name = '';
         this.company = '';
         this.email = '';
         this.message = '';
+        this.website = '';
         contactForm.resetForm();
       },
       error: (error) => {

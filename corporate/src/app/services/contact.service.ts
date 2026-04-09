@@ -7,6 +7,7 @@ export interface ContactPayload {
   company?: string;
   email: string;
   message: string;
+  website?: string
 }
 
 @Injectable({
