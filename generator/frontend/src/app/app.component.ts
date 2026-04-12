@@ -34,6 +34,38 @@ interface RoutePayload {
   destination: RoutePoint | null;
 }
 
+type WorkspaceModule = 'generator' | 'decoder' | 'dbc-manager';
+type DistanceUnit = 'Km' | 'Mi';
+type SimulationModeValue = 'Time Window' | 'Adaptive Blocks' | 'Velocity Target' | 'Distance Target';
+type DriverProfileValue =
+  | 'Balanced'
+  | 'Efficiency'
+  | 'Dynamic'
+  | 'Performance'
+  | 'City Cycle'
+  | 'Cruise'
+  | 'Terrain'
+  | 'Fleet';
+
+interface WorkspaceTab {
+  id: WorkspaceModule;
+  label: string;
+  shortLabel: string;
+  description: string;
+}
+
+interface DriverProfileOption {
+  value: DriverProfileValue;
+  label: string;
+  description: string;
+}
+
+interface SimulationModeOption {
+  value: SimulationModeValue;
+  label: string;
+  description: string;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -42,7 +74,6 @@ interface RoutePayload {
     ReactiveFormsModule,
     FormsModule,
     MapmoduleComponent,
-    // GpsplotterComponent,
     RouterOutlet
   ],
   templateUrl: './app.component.html',
@@ -61,6 +92,105 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   username = 'User';
   userMenuOpen = false;
   isLoggingOut = false;
+
+  activeModule: WorkspaceModule = 'generator';
+
+  isPayloadModalOpen = false;
+
+  openPayloadModal(): void {
+    this.isPayloadModalOpen = true;
+  }
+
+  closePayloadModal(): void {
+    this.isPayloadModalOpen = false;
+  }
+
+  readonly workspaceTabs: readonly WorkspaceTab[] = [
+    {
+      id: 'generator',
+      label: 'Simulation Studio',
+      shortLabel: 'Studio',
+      description: 'Build and generate CAN simulation packages.'
+    },
+    {
+      id: 'decoder',
+      label: 'Signal Decoder',
+      shortLabel: 'Decoder',
+      description: 'Inspect frames, decode payloads, and validate signals.'
+    },
+    {
+      id: 'dbc-manager',
+      label: 'DBC Vault',
+      shortLabel: 'Vault',
+      description: 'Organize, validate, and prepare DBC assets.'
+    }
+  ];
+
+  readonly driverProfileOptions: readonly DriverProfileOption[] = [
+    {
+      value: 'Balanced',
+      label: 'Balanced',
+      description: 'General-purpose driving behavior.'
+    },
+    {
+      value: 'Efficiency',
+      label: 'Efficiency',
+      description: 'Lower energy and smoother transitions.'
+    },
+    {
+      value: 'Dynamic',
+      label: 'Dynamic',
+      description: 'Sharper response with more variation.'
+    },
+    {
+      value: 'Performance',
+      label: 'Performance',
+      description: 'Higher intensity and aggressive pacing.'
+    },
+    {
+      value: 'City Cycle',
+      label: 'City Cycle',
+      description: 'Urban stop-and-go behavior.'
+    },
+    {
+      value: 'Cruise',
+      label: 'Cruise',
+      description: 'Stable highway-oriented behavior.'
+    },
+    {
+      value: 'Terrain',
+      label: 'Terrain',
+      description: 'Irregular path and off-grid emphasis.'
+    },
+    {
+      value: 'Fleet',
+      label: 'Fleet',
+      description: 'Commercial and delivery-style behavior.'
+    }
+  ];
+
+  readonly simulationModeOptions: readonly SimulationModeOption[] = [
+    {
+      value: 'Time Window',
+      label: 'Time Window',
+      description: 'Resolve output from duration.'
+    },
+    {
+      value: 'Adaptive Blocks',
+      label: 'Adaptive Blocks',
+      description: 'Resolve output by block count.'
+    },
+    {
+      value: 'Velocity Target',
+      label: 'Velocity Target',
+      description: 'Resolve output from speed.'
+    },
+    {
+      value: 'Distance Target',
+      label: 'Distance Target',
+      description: 'Resolve output from route distance.'
+    }
+  ];
 
   @ViewChild('modalHeader', { static: false })
   private modalHeader?: ElementRef<HTMLDivElement>;
@@ -117,13 +247,13 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     vinSuffix: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(5)]],
     latencyTime: [5, [Validators.required, Validators.pattern(/^\d+$/)]],
     speed: [80, [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
-    simulationMode: ['Blocks', Validators.required],
-    unity: ['Km' as 'Km' | 'Mi', [Validators.required]],
+    simulationMode: ['Time Window' as SimulationModeValue, Validators.required],
+    unity: ['Km' as DistanceUnit, [Validators.required]],
     s3Bucket: ['', [Validators.required]],
     workQueueUrl: [''],
     engineUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/.+/i)]],
     payload: ['', [this.jsonValidator]],
-    driverProfile: ['']
+    driverProfile: ['Balanced' as DriverProfileValue, Validators.required]
   });
 
   isDriverProfileOpen = false;
@@ -154,6 +284,40 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   get f() {
     return this.form.controls;
+  }
+
+  get isGeneratorModule(): boolean {
+    return this.activeModule === 'generator';
+  }
+
+  get isDecoderModule(): boolean {
+    return this.activeModule === 'decoder';
+  }
+
+  get isDbcManagerModule(): boolean {
+    return this.activeModule === 'dbc-manager';
+  }
+
+  get activeWorkspaceTab(): WorkspaceTab {
+    return this.workspaceTabs.find((tab) => tab.id === this.activeModule) ?? this.workspaceTabs[0];
+  }
+
+  get activeWorkspaceTitle(): string {
+    return this.activeWorkspaceTab.label;
+  }
+
+  get activeWorkspaceDescription(): string {
+    return this.activeWorkspaceTab.description;
+  }
+
+  setActiveModule(module: WorkspaceModule): void {
+    if (this.activeModule === module) {
+      return;
+    }
+
+    this.activeModule = module;
+    this.closeAllDropdowns();
+    this.closeUserMenu();
   }
 
   get gpsSummary(): string {
@@ -205,11 +369,33 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   get driverProfileSummary(): string {
-    return this.form.controls.driverProfile.value || "Normal";
+    return this.form.controls.driverProfile.value || 'Balanced';
   }
 
   get unitySummary(): string {
     return this.form.controls.unity.value || 'Km';
+  }
+
+  get simulationModeSummary(): string {
+    return this.form.controls.simulationMode.value || 'Time Window';
+  }
+
+  get generationTypeSummary(): string {
+    return this.f.generationTypeAllAtOnce.value ? 'Burst Generation' : 'Progressive Flow';
+  }
+
+  get selectedDriverProfileDescription(): string {
+    return (
+      this.driverProfileOptions.find((option) => option.value === this.form.controls.driverProfile.value)
+        ?.description ?? ''
+    );
+  }
+
+  get selectedSimulationModeDescription(): string {
+    return (
+      this.simulationModeOptions.find((option) => option.value === this.form.controls.simulationMode.value)
+        ?.description ?? ''
+    );
   }
 
   openMapModal(): void {
@@ -235,17 +421,23 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.dragInitialized = false;
   }
 
-  toggleSimulationModeOpen() {
+  toggleSimulationModeOpen(): void {
     this.isSimulationModeOpen = !this.isSimulationModeOpen;
+    if (this.isSimulationModeOpen) {
+      this.isDriverProfileOpen = false;
+      this.isUnityOpen = false;
+      this.isCanOpen = false;
+      this.isDbcOpen = false;
+      this.isGpsOpen = false;
+      this.userMenuOpen = false;
+    }
   }
 
-  selectSimulationMode(mode: string) {
-    this.form.controls['simulationMode'].setValue(mode);
+  selectSimulationMode(mode: SimulationModeValue): void {
+    this.form.controls.simulationMode.setValue(mode);
+    this.form.controls.simulationMode.markAsTouched();
     this.isSimulationModeOpen = false;
-  }
-
-  get simulationModeSummary(): string {
-    return this.form.controls['simulationMode'].value || 'Select';
+    this.updatePayloadPreview();
   }
 
   toggleCanOpen(): void {
@@ -255,11 +447,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
     this.isCanOpen = !this.isCanOpen;
     if (this.isCanOpen) {
-      this.isGpsOpen = false;
-      this.isDbcOpen = false;
-      this.isDriverProfileOpen = false;
-      this.isUnityOpen = false;
-      this.userMenuOpen = false;
+      this.closeAllDropdowns();
+      this.isCanOpen = true;
     }
   }
 
@@ -270,11 +459,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
     this.isDbcOpen = !this.isDbcOpen;
     if (this.isDbcOpen) {
-      this.isGpsOpen = false;
-      this.isCanOpen = false;
-      this.isDriverProfileOpen = false;
-      this.isUnityOpen = false;
-      this.userMenuOpen = false;
+      this.closeAllDropdowns();
+      this.isDbcOpen = true;
     }
   }
 
@@ -285,31 +471,26 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
     this.isGpsOpen = !this.isGpsOpen;
     if (this.isGpsOpen) {
+      this.closeAllDropdowns();
       this.gpsFilter = '';
-      this.isCanOpen = false;
-      this.isDbcOpen = false;
-      this.isDriverProfileOpen = false;
-      this.isUnityOpen = false;
-      this.userMenuOpen = false;
+      this.isGpsOpen = true;
     }
   }
 
   toggleDriverProfileOpen(): void {
     this.isDriverProfileOpen = !this.isDriverProfileOpen;
-    this.isUnityOpen = false;
-    this.isCanOpen = false;
-    this.isDbcOpen = false;
-    this.isGpsOpen = false;
-    this.userMenuOpen = false;
+    if (this.isDriverProfileOpen) {
+      this.closeAllDropdowns();
+      this.isDriverProfileOpen = true;
+    }
   }
 
   toggleUnityOpen(): void {
     this.isUnityOpen = !this.isUnityOpen;
-    this.isDriverProfileOpen = false;
-    this.isCanOpen = false;
-    this.isDbcOpen = false;
-    this.isGpsOpen = false;
-    this.userMenuOpen = false;
+    if (this.isUnityOpen) {
+      this.closeAllDropdowns();
+      this.isUnityOpen = true;
+    }
   }
 
   selectGpsArea(area: string): void {
@@ -317,18 +498,21 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.form.controls.gpsArea.markAsTouched();
     this.gpsFilter = '';
     this.isGpsOpen = false;
+    this.updatePayloadPreview();
   }
 
-  selectDriverProfile(value: string): void {
-    this.form.patchValue({ driverProfile: value });
+  selectDriverProfile(value: DriverProfileValue): void {
+    this.form.controls.driverProfile.setValue(value);
     this.form.controls.driverProfile.markAsTouched();
     this.isDriverProfileOpen = false;
+    this.updatePayloadPreview();
   }
 
-  selectUnity(value: 'Km' | 'Mi'): void {
-    this.form.patchValue({ unity: value });
+  selectUnity(value: DistanceUnit): void {
+    this.form.controls.unity.setValue(value);
     this.form.controls.unity.markAsTouched();
     this.isUnityOpen = false;
+    this.updatePayloadPreview();
   }
 
   isCanSelected(option: string): boolean {
@@ -343,16 +527,19 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
     this.form.controls.canFrames.setValue(next);
     this.form.controls.canFrames.markAsTouched();
+    this.updatePayloadPreview();
   }
 
   selectAllCanFrames(): void {
     this.form.controls.canFrames.setValue([...this.canFrameOptions]);
     this.form.controls.canFrames.markAsTouched();
+    this.updatePayloadPreview();
   }
 
   clearAllCanFrames(): void {
     this.form.controls.canFrames.setValue([]);
     this.form.controls.canFrames.markAsTouched();
+    this.updatePayloadPreview();
   }
 
   isDbcSelected(option: string): boolean {
@@ -367,6 +554,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
     this.form.controls.dbcFiles.setValue(next);
     this.form.controls.dbcFiles.markAsTouched();
+    this.updatePayloadPreview();
   }
 
   formatJsonField(field: 'payload'): void {
@@ -390,11 +578,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.userMenuOpen = !this.userMenuOpen;
 
     if (this.userMenuOpen) {
-      this.isGpsOpen = false;
-      this.isCanOpen = false;
-      this.isDbcOpen = false;
-      this.isDriverProfileOpen = false;
-      this.isUnityOpen = false;
+      this.closeAllDropdowns();
+      this.userMenuOpen = true;
     }
   }
 
@@ -519,6 +704,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
       this.isConfigLoaded = true;
       this.authReady = true;
+      this.updatePayloadPreview();
     } catch (error: unknown) {
       this.isAuthenticated = false;
       this.formStatus = 'error';
@@ -748,9 +934,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
           : Math.floor((amountOfTime * 3600) / latency);
 
       const speed = Number(this.form.controls.speed.value) || 80;
-
-      const unity =
-        this.form.controls.unity.value === 'Mi' ? 'Mi' : 'Km';
+      const unity = this.form.controls.unity.value === 'Mi' ? 'Mi' : 'Km';
 
       this.interpGpsCoords = interpolateGpsPerBlock(
         this.selectedGpsCoordinates,
@@ -766,6 +950,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       this.updatePayloadPreview();
     }
 
+    this.updatePayloadPreview();
     this.closeMapModal();
   }
 
@@ -875,16 +1060,21 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
 
     if (!this.elementRef.nativeElement.contains(target)) {
-      this.isGpsOpen = false;
-      this.isCanOpen = false;
-      this.isDbcOpen = false;
-      this.isDriverProfileOpen = false;
-      this.isUnityOpen = false;
+      this.closeAllDropdowns();
       this.userMenuOpen = false;
       return;
     }
 
     this.userMenuOpen = false;
+  }
+
+  private closeAllDropdowns(): void {
+    this.isGpsOpen = false;
+    this.isCanOpen = false;
+    this.isDbcOpen = false;
+    this.isDriverProfileOpen = false;
+    this.isUnityOpen = false;
+    this.isSimulationModeOpen = false;
   }
 
   private async loadConfig(): Promise<void> {
@@ -998,6 +1188,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       latencyTime: Number(raw.latencyTime),
       speed: Number(raw.speed),
       unity: raw.unity === 'Mi' ? 'Mi' : 'Km',
+      simulationMode: raw.simulationMode,
       driverProfile: String(raw.driverProfile || '').trim(),
       s3Bucket: raw.s3Bucket.trim(),
       workQueueUrl: raw.workQueueUrl.trim()
