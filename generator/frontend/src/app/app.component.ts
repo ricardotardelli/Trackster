@@ -119,7 +119,7 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
       restoreFocus: true,
       width: '980px',
       maxWidth: '92vw',
-      maxHeight: '86vh'
+      maxHeight: '56vh'
     });
   }
 

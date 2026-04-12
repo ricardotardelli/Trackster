@@ -14,25 +14,24 @@
 
   <div class="payload-dialog-content">
     <div class="payload-surface">
-      <div class="payload-surface-actions">
+        <div class="payload-pre-wrapper">
         <button
-          type="button"
-          class="payload-copy-icon"
-          (click)="copyPayload()"
-          [disabled]="!payload"
-          aria-label="Copy payload"
-          title="Copy payload"
+            type="button"
+            class="payload-copy-icon"
+            (click)="copyPayload()"
+            [disabled]="!payload"
+            aria-label="Copy payload"
+            title="Copy payload"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
-              d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"
-              fill="currentColor"
+                d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"
+                fill="currentColor"
             />
-          </svg>
+            </svg>
         </button>
-      </div>
 
-      <pre class="payload-dialog-pre">{{ payload || 'No payload available.' }}</pre>
+        <pre class="payload-dialog-pre">{{ payload || 'No payload available.' }}</pre>
+        </div>
     </div>
-  </div>
 </div>
