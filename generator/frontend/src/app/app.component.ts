@@ -1,3 +1,6 @@
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { PayloadComponent } from './payloadmodule/payload.component';
+import { MatTabsModule } from '@angular/material/tabs';
 import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
 import { CommonModule } from '@angular/common';
 import {
@@ -74,7 +77,10 @@ interface SimulationModeOption {
     ReactiveFormsModule,
     FormsModule,
     MapmoduleComponent,
-    RouterOutlet
+    RouterOutlet,
+    MatTabsModule,
+    MatDialogModule, 
+    PayloadComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
@@ -83,7 +89,8 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   constructor(
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private dialog: MatDialog
   ) {}
 
   authReady = false;
@@ -97,12 +104,29 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   isPayloadModalOpen = false;
 
-  openPayloadModal(): void {
-    this.isPayloadModalOpen = true;
-  }
-
   closePayloadModal(): void {
     this.isPayloadModalOpen = false;
+  }
+
+  openPayloadModal(): void {
+    this.dialog.open(PayloadComponent, {
+      data: {
+        payload: this.form.get('payload')?.value || ''
+      },
+      panelClass: 'trackster-payload-dialog',
+      backdropClass: 'trackster-dialog-backdrop',
+      autoFocus: false,
+      restoreFocus: true,
+      width: '980px',
+      maxWidth: '92vw',
+      maxHeight: '86vh'
+    });
+  }
+
+  selectedTabIndex = 0;
+
+  onTabChange(index: number): void {
+    this.selectedTabIndex = index;
   }
 
   readonly workspaceTabs: readonly WorkspaceTab[] = [

@@ -4,6 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { AppComponent } from './app/app.component';
 import { AuthService, configureAuth } from './app/auth/auth.service';
 import { environment } from './environments/environment';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 
 async function start(): Promise<void> {
   const isLocalhost =
@@ -24,7 +25,7 @@ async function start(): Promise<void> {
   }
 
   await bootstrapApplication(AppComponent, {
-    providers: [provideHttpClient()]
+    providers: [provideHttpClient(), provideAnimationsAsync('noop'), provideAnimationsAsync(), provideAnimationsAsync()]
   });
 }
 

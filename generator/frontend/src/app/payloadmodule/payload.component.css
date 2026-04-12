@@ -1,0 +1,124 @@
+:host {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.payload-dialog-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 540px;
+  max-height: 86vh;
+  background: #ffffff;
+}
+
+.payload-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  background: #ffffff;
+}
+
+.payload-dialog-header h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0b1f44;
+}
+
+.payload-dialog-close {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  border-radius: 10px;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.payload-dialog-close:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.payload-dialog-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 22px 24px 24px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.payload-surface {
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  border-radius: 18px;
+  background: #fbfdff;
+  overflow: hidden;
+}
+
+.payload-surface-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 12px 0 12px;
+  background: #fbfdff;
+}
+
+.payload-dialog-pre {
+  margin: 0;
+  padding: 10px 20px 18px;
+  color: #0f172a;
+  background: #fbfdff;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.58;
+  box-sizing: border-box;
+}
+
+.payload-copy-icon {
+  all: unset; /* limpa COMPLETAMENTE qualquer estilo herdado */
+
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+  color: #0b86cf;
+  cursor: pointer;
+
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.payload-copy-icon:hover:not(:disabled) {
+  background: rgba(14, 165, 233, 0.12);
+  transform: translateY(-1px);
+}
+
+.payload-copy-icon:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.payload-copy-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.payload-copy-icon svg {
+  width: 16px;
+  height: 16px;
+}

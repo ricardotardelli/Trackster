@@ -23,3 +23,24 @@ body {
     radial-gradient(circle at 85% 18%, rgba(14, 165, 233, 0.14), transparent 38%),
     linear-gradient(155deg, var(--bg-start) 0%, var(--bg-mid) 45%, var(--bg-end) 100%);
 }
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.trackster-dialog-panel .mat-mdc-dialog-container {
+  padding: 0 !important;
+}
+
+.trackster-dialog-panel .mdc-dialog__surface {
+  padding: 0 !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22) !important;
+}
+
+.trackster-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.34) !important;
+  backdrop-filter: blur(5px);
+}
