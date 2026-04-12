@@ -1,62 +1,76 @@
-<div class="route-picker-container">
-  <div class="controls-block">
-    <div class="toolbar">
-      <div class="field-group search-group">
-        <label for="locationSearch">Location</label>
+<app-dialogshell
+  title="Design tracking points"
+  subtitle="Define start, waypoint, and destination positions directly on the map."
+  (closeClicked)="closeDialog()"
+>
+  <div class="route-picker-container">
+    <div class="controls-card">
+      <div class="toolbar">
+        <div class="field-group search-group">
+          <label for="locationSearch">Location</label>
 
-        <div class="search-row">
-          <input
-            id="locationSearch"
-            name="locationSearch"
-            type="text"
-            [(ngModel)]="locationSearch"
-            [placeholder]="getLocationPlaceholder()"
-            (keyup.enter)="searchSelectedAddress()"
-          />
+          <div class="search-row">
+            <input
+              id="locationSearch"
+              name="locationSearch"
+              type="text"
+              [(ngModel)]="locationSearch"
+              [placeholder]="getLocationPlaceholder()"
+              (keyup.enter)="searchSelectedAddress()"
+            />
 
-          <button
-            type="button"
-            class="primary"
-            (click)="searchSelectedAddress()">
-            Search
-          </button>
+            <button
+              type="button"
+              class="primary"
+              (click)="searchSelectedAddress()">
+              Search
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div class="actions map-actions">
+        <button
+          type="button"
+          (click)="setSelectionMode('start')"
+          [class.active]="pointSelectionMode === 'start'">
+          Start Point
+        </button>
+
+        <button
+          type="button"
+          (click)="setSelectionMode('waypoints')"
+          [class.active]="pointSelectionMode === 'waypoints'">
+          Waypoints
+        </button>
+
+        <button
+          type="button"
+          (click)="setSelectionMode('destination')"
+          [class.active]="pointSelectionMode === 'destination'">
+          Destination
+        </button>
+
+        <div class="actions-spacer"></div>
+
+        <button type="button" (click)="clearAll()">
+          Clear
+        </button>
+
+        <button type="button" (click)="save()" class="primary">
+          Save
+        </button>
       </div>
     </div>
 
-    <div class="actions">
-      <button
-        type="button"
-        (click)="setSelectionMode('start')"
-        [class.active]="pointSelectionMode === 'start'">
-        Start Point
-      </button>
-
-      <button
-        type="button"
-        (click)="setSelectionMode('waypoints')"
-        [class.active]="pointSelectionMode === 'waypoints'">
-        Waypoints
-      </button>
-
-      <button
-        type="button"
-        (click)="setSelectionMode('destination')"
-        [class.active]="pointSelectionMode === 'destination'">
-        Destination
-      </button>
-
-      <button type="button" (click)="clearAll()" class="primary">
-        Clear
-      </button>
-
-      <button type="button" (click)="save()" class="primary">
-        Save
-      </button>
+    <div class="map-card">
+      <div class="map">
+        <div
+          #mapContainer
+          class="leaflet-host"
+          [class.waypoint-mode]="pointSelectionMode === 'waypoints'">
+        </div>
+      </div>
     </div>
   </div>
-
-  <div class="map">
-    <div #mapContainer class="leaflet-host" [class.waypoint-mode]="pointSelectionMode === 'waypoints'"></div>
-  </div>
-</div>
+</app-dialogshell>

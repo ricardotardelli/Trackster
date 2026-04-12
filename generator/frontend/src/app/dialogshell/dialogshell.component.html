@@ -1,0 +1,25 @@
+<div class="dialog-shell">
+  <div class="dialog-shell__header">
+    <div class="dialog-shell__titles">
+      <h2 class="dialog-shell__title">{{ title }}</h2>
+      <p *ngIf="subtitle" class="dialog-shell__subtitle">{{ subtitle }}</p>
+    </div>
+
+    <button
+      mat-icon-button
+      type="button"
+      class="dialog-shell__close"
+      aria-label="Close dialog"
+      (click)="closeClicked.emit()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-shell__body" [ngClass]="contentClass">
+    <ng-content></ng-content>
+  </div>
+
+  <div *ngIf="showFooter" class="dialog-shell__footer">
+    <ng-content select="[dialog-actions]"></ng-content>
+  </div>
+</div>

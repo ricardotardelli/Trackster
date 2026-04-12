@@ -1,33 +1,42 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { DialogshellComponent } from '../dialogshell/dialogshell.component';
+
+interface PayloadDialogData {
+  payloadText: string;
+}
 
 @Component({
-  selector: 'app-payload-preview',
+  selector: 'app-payloadmodule',
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    MatButtonModule,
+    MatIconModule,
+    DialogshellComponent
+  ],
   templateUrl: './payload.component.html',
   styleUrls: ['./payload.component.css']
 })
 export class PayloadComponent {
-  payload: string = '';
+  payloadText: string = '';
 
   constructor(
     private dialogRef: MatDialogRef<PayloadComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: any
+    @Inject(MAT_DIALOG_DATA) private data: PayloadDialogData
   ) {
-    this.payload = data.payload || '';
+    this.payloadText = data?.payloadText ?? '';
   }
 
-  public close(): void {
+  closeDialog(): void {
     this.dialogRef.close();
   }
 
-  public copyPayload(): void {
-    if (!this.payload) return;
-
-    navigator.clipboard.writeText(this.payload).catch(() => {
-      // silent
-    });
+  copyPayload(): void {
+    navigator.clipboard.writeText(this.payloadText || '');
   }
 }

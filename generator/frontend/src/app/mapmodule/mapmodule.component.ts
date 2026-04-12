@@ -1,3 +1,6 @@
+import { DialogshellComponent } from '../dialogshell/dialogshell.component';
+import { Inject, Optional } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import {
   AfterViewInit,
   Component,
@@ -37,10 +40,20 @@ interface RoutePayload {
   destination: RoutePoint | null;
 }
 
+interface MapDialogData {
+  country: string;
+  routeData: RoutePayload | null;
+}
+
 @Component({
   selector: 'app-mapmodule',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule, 
+    FormsModule,
+    MatDialogModule,
+    DialogshellComponent
+  ],
   templateUrl: './mapmodule.component.html',
   styleUrls: ['./mapmodule.component.css']
 })
@@ -63,7 +76,9 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
 
   constructor(
     private readonly ngZone: NgZone,
-    private readonly http: HttpClient
+    private readonly http: HttpClient,
+    @Optional() private readonly dialogRef?: MatDialogRef<MapmoduleComponent>,
+    @Optional() @Inject(MAT_DIALOG_DATA) private readonly dialogData?: MapDialogData
   ) {}
 
   public locationSearch = '';
@@ -90,6 +105,16 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
   public layers: L.Layer[] = [];
 
   ngOnInit(): void {
+    if (this.dialogData) {
+      if (this.dialogData.country) {
+        this.country = this.dialogData.country;
+      }
+
+      if (this.dialogData.routeData) {
+        this.routeData = this.dialogData.routeData;
+      }
+    }
+
     this.applyCountryToMap();
     this.applyRouteDataFromInput();
   }
@@ -146,8 +171,31 @@ export class MapmoduleComponent implements OnInit, OnChanges, AfterViewInit, OnD
     this.mapReady = false;
   }
 
-  public save(): void {
-    this.saveRoute.emit(this.getOutput());
+  save(): void {
+    const payload = {
+      start: this.startPoint,
+      waypoints: this.waypoints,
+      destination: this.destinationPoint
+    };
+
+    const routeJson = JSON.stringify(payload);
+
+    if (this.dialogRef) {
+      this.dialogRef.close(routeJson);
+      return;
+    }
+
+    this.saveRoute.emit(routeJson);
+  }
+
+  get isDialogMode(): boolean {
+    return !!this.dialogRef;
+  }
+
+  closeDialog(): void {
+    if (this.dialogRef) {
+      this.dialogRef.close();
+    }
   }
 
   public refreshMapSize(): void {

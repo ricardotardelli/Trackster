@@ -1,0 +1,73 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.dialog-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.dialog-shell__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  flex: 0 0 auto;
+}
+
+.dialog-shell__titles {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dialog-shell__title {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0b1f44;
+}
+
+.dialog-shell__subtitle {
+  margin: 8px 0 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: #52627a;
+}
+
+.dialog-shell__close {
+  flex: 0 0 auto;
+  margin: -6px -8px 0 0;
+}
+
+.dialog-shell__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  padding: 20px 24px 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-shell__footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}

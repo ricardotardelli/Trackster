@@ -1,4 +1,5 @@
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { ComponentType } from '@angular/cdk/portal';
 import { PayloadComponent } from './payloadmodule/payload.component';
 import { MatTabsModule } from '@angular/material/tabs';
 import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
@@ -13,7 +14,6 @@ import {
 } from '@angular/forms';
 import { MapmoduleComponent } from './mapmodule/mapmodule.component';
 import {
-  AfterViewChecked,
   Component,
   ElementRef,
   HostListener,
@@ -85,7 +85,7 @@ interface SimulationModeOption {
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
+export class AppComponent implements OnInit {
   constructor(
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>,
@@ -109,19 +109,38 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   openPayloadModal(): void {
-    this.dialog.open(PayloadComponent, {
+    this.openTracksterDialog(PayloadComponent, {
       data: {
-        payload: this.form.get('payload')?.value || ''
-      },
-      panelClass: 'trackster-payload-dialog',
-      backdropClass: 'trackster-dialog-backdrop',
-      autoFocus: false,
-      restoreFocus: true,
-      width: '980px',
-      maxWidth: '92vw',
-      maxHeight: '56vh'
+        payloadText: this.form.controls.payload.value || ''
+      }
     });
   }
+
+  private openTracksterDialog<T>(
+    component: ComponentType<T>,
+    options?: {
+      data?: unknown;
+      width?: string;
+      height?: string;
+      maxWidth?: string;
+      maxHeight?: string;
+      panelClass?: string;
+      backdropClass?: string;
+    }
+  ): MatDialogRef<T> {
+    return this.dialog.open(component, {
+      data: options?.data,
+      width: options?.width ?? '1040px',
+      height: options?.height ?? '82vh',
+      maxWidth: options?.maxWidth ?? '95vw',
+      maxHeight: options?.maxHeight ?? '90vh',
+      panelClass: options?.panelClass ?? 'trackster-dialog',
+      backdropClass: options?.backdropClass ?? 'trackster-dialog-backdrop',
+      autoFocus: false,
+      restoreFocus: true
+    });
+  }
+
 
   selectedTabIndex = 0;
 
@@ -216,15 +235,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   ];
 
-  @ViewChild('modalHeader', { static: false })
-  private modalHeader?: ElementRef<HTMLDivElement>;
-
-  @ViewChild('mapModal', { static: false })
-  private mapModal?: ElementRef<HTMLDivElement>;
-
-  @ViewChild('mapModule')
-  mapModule!: MapmoduleComponent;
-
   @ViewChild('userMenuContainer', { static: false })
   private userMenuContainer?: ElementRef<HTMLElement>;
 
@@ -247,15 +257,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
   copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
   private suppressFormReset = false;
   private formValueChangesBound = false;
-
-  isMapModalOpen = false;
-
-  private dragInitialized = false;
-  private isDragging = false;
-  private dragOffsetX = 0;
-  private dragOffsetY = 0;
-  private boundMouseMove?: (event: MouseEvent) => void;
-  private boundMouseUp?: () => void;
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -286,16 +287,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
 
   ngOnInit(): void {
     void this.initializeApp();
-  }
-
-  ngAfterViewChecked(): void {
-    if (this.isMapModalOpen) {
-      this.initializeModalDrag();
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.removeDragListeners();
   }
 
   private isAuthDisabled(): boolean {
@@ -422,27 +413,48 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     );
   }
 
-  openMapModal(): void {
-    this.routeDataForMap = this.rebuildRoutePayloadFromHexCoordinates(this.selectedGpsCoordinates);
-    this.isMapModalOpen = true;
+  openMapDialog(): void {
+    this.dialog.open(MapmoduleComponent, {
+      width: '1120px',
+      maxWidth: '95vw',
+      height: '84vh',
+      maxHeight: '90vh',
+      panelClass: 'trackster-dialog'
+    });
+  }
+
+  openPayloadDialog(): void {
+    this.dialog.open(PayloadComponent, {
+      width: '1040px',
+      maxWidth: '95vw',
+      height: '82vh',
+      maxHeight: '90vh',
+      panelClass: 'trackster-dialog'
+    });
   }
 
   openMap(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
 
-    this.routeDataForMap = this.rebuildRoutePayloadFromHexCoordinates(this.selectedGpsCoordinates);
+    const routeData = this.rebuildRoutePayloadFromHexCoordinates(this.selectedGpsCoordinates);
 
-    this.isMapModalOpen = true;
     this.isGpsOpen = false;
-    this.dragInitialized = false;
-  }
 
-  closeMapModal(): void {
-    this.isMapModalOpen = false;
-    this.isDragging = false;
-    document.body.style.userSelect = '';
-    this.dragInitialized = false;
+    const dialogRef = this.openTracksterDialog(MapmoduleComponent, {
+      data: {
+        country: this.form.controls.gpsArea.value,
+        routeData
+      },
+      width: '1100px',
+      height: '86vh'
+    });
+
+    dialogRef.afterClosed().subscribe((routeJson?: string) => {
+      if (routeJson) {
+        this.onSaveRoute(routeJson);
+      }
+    });
   }
 
   toggleSimulationModeOpen(): void {
@@ -975,87 +987,6 @@ export class AppComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
 
     this.updatePayloadPreview();
-    this.closeMapModal();
-  }
-
-  private initializeModalDrag(): void {
-    if (this.dragInitialized || !this.mapModal || !this.modalHeader) {
-      return;
-    }
-
-    const modal = this.mapModal.nativeElement;
-    const header = this.modalHeader.nativeElement;
-
-    header.style.cursor = 'move';
-    header.style.userSelect = 'none';
-
-    header.onmousedown = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-
-      if (target?.closest('.map-modal-close')) {
-        return;
-      }
-
-      event.preventDefault();
-
-      const rect = modal.getBoundingClientRect();
-      this.isDragging = true;
-      this.dragOffsetX = event.clientX - rect.left;
-      this.dragOffsetY = event.clientY - rect.top;
-
-      modal.style.position = 'fixed';
-      modal.style.left = `${rect.left}px`;
-      modal.style.top = `${rect.top}px`;
-      modal.style.transform = 'none';
-
-      document.body.style.userSelect = 'none';
-    };
-
-    this.boundMouseMove = (event: MouseEvent) => {
-      if (!this.isDragging) {
-        return;
-      }
-
-      const modalWidth = modal.offsetWidth;
-      const modalHeight = modal.offsetHeight;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      let nextLeft = event.clientX - this.dragOffsetX;
-      let nextTop = event.clientY - this.dragOffsetY;
-
-      nextLeft = Math.max(0, Math.min(nextLeft, viewportWidth - modalWidth));
-      nextTop = Math.max(0, Math.min(nextTop, viewportHeight - modalHeight));
-
-      modal.style.left = `${nextLeft}px`;
-      modal.style.top = `${nextTop}px`;
-    };
-
-    this.boundMouseUp = () => {
-      this.isDragging = false;
-      document.body.style.userSelect = '';
-    };
-
-    document.addEventListener('mousemove', this.boundMouseMove);
-    document.addEventListener('mouseup', this.boundMouseUp);
-
-    this.dragInitialized = true;
-  }
-
-  private removeDragListeners(): void {
-    if (this.boundMouseMove) {
-      document.removeEventListener('mousemove', this.boundMouseMove);
-      this.boundMouseMove = undefined;
-    }
-
-    if (this.boundMouseUp) {
-      document.removeEventListener('mouseup', this.boundMouseUp);
-      this.boundMouseUp = undefined;
-    }
-
-    if (this.modalHeader?.nativeElement) {
-      this.modalHeader.nativeElement.onmousedown = null;
-    }
   }
 
   private jsonValidator(control: AbstractControl<string>): ValidationErrors | null {

@@ -1,37 +1,21 @@
-<div class="payload-dialog-shell">
-  <div class="payload-dialog-header">
-    <h2>Payload Preview</h2>
+<app-dialogshell
+  title="Payload Preview"
+  [showFooter]="false"
+  (closeClicked)="closeDialog()">
 
+  <div class="payload-pre-wrapper">
     <button
       type="button"
-      class="payload-dialog-close"
-      (click)="close()"
-      aria-label="Close payload preview"
-    >
-      ×
+      class="copy-button"
+      (click)="copyPayload()"
+      matTooltip="Copy payload"
+      aria-label="Copy payload" 
+      title="Copy payload">
+      <mat-icon>content_copy</mat-icon>
     </button>
-  </div>
 
-  <div class="payload-dialog-content">
-    <div class="payload-surface">
-        <div class="payload-pre-wrapper">
-        <button
-            type="button"
-            class="payload-copy-icon"
-            (click)="copyPayload()"
-            [disabled]="!payload"
-            aria-label="Copy payload"
-            title="Copy payload"
-        >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-                d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"
-                fill="currentColor"
-            />
-            </svg>
-        </button>
-
-        <pre class="payload-dialog-pre">{{ payload || 'No payload available.' }}</pre>
-        </div>
+    <div class="payload-scroll-area">
+      <pre>{{ payloadText || 'No payload to show' }}</pre>
     </div>
-</div>
+  </div>
+</app-dialogshell>

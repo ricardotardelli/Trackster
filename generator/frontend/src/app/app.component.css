@@ -32,28 +32,105 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
+}
+
+.panel-header-main h1 {
+  margin: 0 0 6px 0;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  color: #0f2348;
+}
+
+.panel-header-main .subtitle {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  color: #5b6b81;
 }
 
 .panel-header-main {
   min-width: 0;
   flex: 1 1 auto;
+  padding-top: 2px;
 }
 
-h1 {
-  margin: 0 0 4px;
-  font-size: 2rem;
+.brand-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-brand {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.panel-brand-logo {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+.header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.header-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.header-title h1 {
+  margin: 0;
+  font-size: 1.65rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  line-height: 1.06;
+  line-height: 1;
   color: #0f2348;
 }
 
-.subtitle {
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.45;
+.header-block .subtitle {
+  margin: 8px 0 0 42px;
+  font-size: 0.98rem;
+  line-height: 1.35;
   color: #5b6b81;
+}
+
+.logo {
+  height: 18px;
+  width: auto;
+  display: block;
+  position: relative;
+  top: -2px;
+}
+
+.brand-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.title-block {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.title-block h1 {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: #0f2348;
 }
 
 .workspace-shell {
@@ -716,86 +793,6 @@ button.payload-inline-toggle:focus-visible {
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
 }
 
-.map-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.map-modal-backdrop {
-  z-index: 2000;
-  background: rgba(0, 0, 0, 0.45);
-}
-
-.payload-modal {
-  display: flex;
-  flex-direction: column;
-  width: min(920px, 92vw);
-  max-height: 82vh;
-  overflow: hidden;
-  border: 1px solid rgba(191, 219, 254, 0.95);
-  border-radius: 20px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.2);
-}
-
-.map-modal-close {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: 28px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.map-modal {
-  display: flex;
-  flex-direction: column;
-  width: 40vw;
-  height: 50vh;
-  overflow: hidden;
-  border-radius: 20px;
-  background: #fff;
-}
-
-.map-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 auto;
-  height: 56px;
-  padding: 0 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
-  cursor: move;
-  user-select: none;
-}
-
-.map-modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.map-modal-body {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
-.mapmodule-host {
-  display: block;
-  flex: 1 1 auto;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
 .map-icon,
 .gps-map-icon {
   position: absolute;
@@ -1032,7 +1029,6 @@ button.payload-inline-toggle:focus-visible {
   min-height: 190px;
 }
 
-/* Angular Material tabs */
 .trackster-tabs ::ng-deep .mat-mdc-tab-header {
   margin-bottom: 6px;
 }
@@ -1160,6 +1156,18 @@ button.payload-inline-toggle:focus-visible {
     align-items: stretch;
   }
 
+  .header-title {
+    gap: 12px;
+  }
+
+  .logo {
+    height: 30px;
+  }
+
+  .title-block h1 {
+    font-size: 1.65rem;
+  }
+
   .user-menu {
     justify-content: flex-start;
   }
@@ -1169,3 +1177,34 @@ button.payload-inline-toggle:focus-visible {
   }
 }
 
+::ng-deep .trackster-map-dialog .mat-mdc-dialog-container {
+  padding: 0 !important;
+}
+
+::ng-deep .trackster-map-dialog .mat-mdc-dialog-surface {
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(191, 219, 254, 0.95) !important;
+  border-radius: 24px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%) !important;
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.2),
+    0 8px 20px rgba(15, 23, 42, 0.08) !important;
+}
+
+::ng-deep .trackster-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.42) !important;
+  backdrop-filter: blur(4px);
+}
+
+::ng-deep .mat-mdc-tab-body-wrapper {
+  overflow: visible !important;
+}
+
+::ng-deep .mat-mdc-tab-body {
+  overflow: visible !important;
+}
+
+::ng-deep .mat-mdc-tab-body-content {
+  overflow: visible !important;
+}

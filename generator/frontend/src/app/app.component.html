@@ -1,10 +1,18 @@
 <div *ngIf="authReady && isAuthenticated">
   <main class="page">
     <section class="panel">
+      <div class="panel-brand">
+        <img src="../assets/img/Trackster-LogoTransp.png" alt="Trackster" class="panel-brand-logo" />
+        <span class="brand-name">Trackster</span>
+      </div>
       <div class="panel-header">
         <div class="panel-header-main">
-          <h1>Trackster - Simulation Studio</h1>
-          <p class="subtitle">{{ activeWorkspaceDescription }}</p>
+          <div class="brand-row">
+            <div class="brand-copy">
+              <h1>Simulation Studio</h1>
+              <p class="subtitle">{{ activeWorkspaceDescription }}</p>
+            </div>
+          </div>
         </div>
 
         <div class="user-menu" #userMenuContainer>
@@ -72,7 +80,7 @@
       <div class="workspace-shell">
         <mat-tab-group class="trackster-tabs" 
             [selectedIndex]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)" 
-            animationDuration="450ms" mat-stretch-tabs="false" mat-align-tabs="start" >
+            animationDuration="0ms" mat-stretch-tabs="false" mat-align-tabs="start" >
           <mat-tab label="Simulation Generator">
             <ng-template matTabContent>
               <form class="workspace-view workspace-view-form" [formGroup]="form" (ngSubmit)="submit()" >
@@ -449,7 +457,7 @@
             </ng-template>
           </mat-tab>
           <!-- DBC MANAGER -->
-          <mat-tab label="DBC Vault">
+          <mat-tab label="DBC Workspace">
             <ng-template matTabContent>
               <div class="workspace-view">
                 <div class="module-stage-shell">
@@ -459,7 +467,7 @@
 
                       <p>
                         <strong>Workspace:</strong>
-                        <span class="status-value status-ok">DBC Vault</span>
+                        <span class="status-value status-ok">DBC Workspace</span>
                       </p>
 
                       <p>
@@ -515,7 +523,7 @@
 
                     <section class="workspace-body">
                       <div class="workspace-body-header">
-                        <h2>DBC Vault</h2>
+                        <h2>DBC Workspace</h2>
                         <p>
                           Organize DBC files, validate structure, and prepare signal catalogs for simulation
                           and decoding.
@@ -659,25 +667,5 @@
         </mat-tab-group>
       </div>
     </section>
-
-    <div class="map-modal-backdrop" *ngIf="isMapModalOpen" (click)="closeMapModal()">
-      <div class="map-modal" #mapModal (click)="$event.stopPropagation()">
-        <div class="map-modal-header" #modalHeader>
-          <h3>Design tracking points</h3>
-          <button type="button" class="map-modal-close" (click)="closeMapModal()">×</button>
-        </div>
-
-        <div class="map-modal-body">
-          <app-mapmodule
-            #mapModule
-            [country]="form.controls.gpsArea.value"
-            [visible]="isMapModalOpen"
-            [routeData]="routeDataForMap"
-            (saveRoute)="onSaveRoute($event)"
-          >
-          </app-mapmodule>
-        </div>
-      </div>
-    </div>
   </main>
 </div>
