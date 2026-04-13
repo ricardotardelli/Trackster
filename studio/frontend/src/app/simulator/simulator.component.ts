@@ -1,9 +1,3 @@
-import { SimulatorComponent } from './simulator/simulator.component';
-import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { ComponentType } from '@angular/cdk/portal';
-import { PayloadComponent } from './payloadmodule/payload.component';
-import { MatTabsModule } from '@angular/material/tabs';
-import { interpolateGpsPerBlock } from './interpmodule/interpmodule.util';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl,
@@ -13,18 +7,20 @@ import {
   ValidationErrors,
   Validators
 } from '@angular/forms';
-import { MapmoduleComponent } from './mapmodule/mapmodule.component';
 import {
   Component,
   ElementRef,
   HostListener,
-  OnDestroy,
-  OnInit,
-  ViewChild
+  OnInit
 } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { AuthService } from './auth/auth.service';
-import { environment } from '../environments/environment';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { ComponentType } from '@angular/cdk/portal';
+
+import { AuthService } from '../auth/auth.service';
+import { environment } from '../../environments/environment';
+import { PayloadComponent } from '../payloadmodule/payload.component';
+import { MapmoduleComponent } from '../mapmodule/mapmodule.component';
+import { interpolateGpsPerBlock } from '../interpmodule/interpmodule.util';
 
 interface RoutePoint {
   lat: number;
@@ -38,9 +34,14 @@ interface RoutePayload {
   destination: RoutePoint | null;
 }
 
-type WorkspaceModule = 'generator' | 'decoder' | 'dbc-manager';
 type DistanceUnit = 'Km' | 'Mi';
-type SimulationModeValue = 'Time Window' | 'Adaptive Blocks' | 'Velocity Target' | 'Distance Target';
+
+type SimulationModeValue =
+  | 'Time Window'
+  | 'Adaptive Blocks'
+  | 'Velocity Target'
+  | 'Distance Target';
+
 type DriverProfileValue =
   | 'Balanced'
   | 'Efficiency'
@@ -50,13 +51,6 @@ type DriverProfileValue =
   | 'Cruise'
   | 'Terrain'
   | 'Fleet';
-
-interface WorkspaceTab {
-  id: WorkspaceModule;
-  label: string;
-  shortLabel: string;
-  description: string;
-}
 
 interface DriverProfileOption {
   value: DriverProfileValue;
@@ -71,105 +65,23 @@ interface SimulationModeOption {
 }
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-simulator',
   standalone: true,
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    FormsModule,
-    MapmoduleComponent,
-    RouterOutlet,
-    MatTabsModule,
-    MatDialogModule, 
-    PayloadComponent,
-    SimulatorComponent
+    FormsModule
   ],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  templateUrl: './simulator.component.html',
+  styleUrl: './simulator.component.css'
 })
-export class AppComponent implements OnInit {
+export class SimulatorComponent implements OnInit {
   constructor(
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>,
     private readonly authService: AuthService,
-    private dialog: MatDialog
+    private readonly dialog: MatDialog
   ) {}
-
-  authReady = false;
-  isAuthenticated = false;
-
-  username = 'User';
-  userMenuOpen = false;
-  isLoggingOut = false;
-
-  activeModule: WorkspaceModule = 'generator';
-
-  isPayloadModalOpen = false;
-
-  closePayloadModal(): void {
-    this.isPayloadModalOpen = false;
-  }
-
-  openPayloadModal(): void {
-    this.openTracksterDialog(PayloadComponent, {
-      data: {
-        payloadText: this.form.controls.payload.value || ''
-      }
-    });
-  }
-
-  private openTracksterDialog<T>(
-    component: ComponentType<T>,
-    options?: {
-      data?: unknown;
-      width?: string;
-      height?: string;
-      maxWidth?: string;
-      maxHeight?: string;
-      panelClass?: string;
-      backdropClass?: string;
-    }
-  ): MatDialogRef<T> {
-    return this.dialog.open(component, {
-      data: options?.data,
-      width: options?.width ?? '1040px',
-      height: options?.height ?? '82vh',
-      maxWidth: options?.maxWidth ?? '95vw',
-      maxHeight: options?.maxHeight ?? '90vh',
-      panelClass: options?.panelClass ?? 'trackster-dialog',
-      backdropClass: options?.backdropClass ?? 'trackster-dialog-backdrop',
-      autoFocus: false,
-      restoreFocus: true
-    });
-  }
-
-
-  selectedTabIndex = 0;
-
-  onTabChange(index: number): void {
-    this.selectedTabIndex = index;
-  }
-
-  readonly workspaceTabs: readonly WorkspaceTab[] = [
-    {
-      id: 'generator',
-      label: 'Simulation Studio',
-      shortLabel: 'Studio',
-      description: 'Build and generate CAN simulation packages.'
-    },
-    {
-      id: 'decoder',
-      label: 'Signal Decoder',
-      shortLabel: 'Decoder',
-      description: 'Inspect frames, decode payloads, and validate signals.'
-    },
-    {
-      id: 'dbc-manager',
-      label: 'DBC Vault',
-      shortLabel: 'Vault',
-      description: 'Organize, validate, and prepare DBC assets.'
-    }
-  ];
 
   readonly driverProfileOptions: readonly DriverProfileOption[] = [
     {
@@ -237,26 +149,27 @@ export class AppComponent implements OnInit {
     }
   ];
 
-  @ViewChild('userMenuContainer', { static: false })
-  private userMenuContainer?: ElementRef<HTMLElement>;
-
-  routeDataForMap: RoutePayload | null = null;
-
   gpsAreas: string[] = [];
   canFrameOptions: string[] = [];
   dbcOptions: string[] = [];
   selectedGpsCoordinates: string[] = [];
   interpGpsCoords: string[] = [];
+  routeDataForMap: RoutePayload | null = null;
 
   isGpsOpen = false;
   gpsFilter = '';
   isCanOpen = false;
   isDbcOpen = false;
+  isDriverProfileOpen = false;
+  isUnityOpen = false;
+  isSimulationModeOpen = false;
+
   isSubmitting = false;
   isConfigLoaded = false;
+
   formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
-  copyPayloadState: 'idle' | 'copied' | 'error' = 'idle';
+
   private suppressFormReset = false;
   private formValueChangesBound = false;
 
@@ -283,58 +196,12 @@ export class AppComponent implements OnInit {
     driverProfile: ['Balanced' as DriverProfileValue, Validators.required]
   });
 
-  isDriverProfileOpen = false;
-  isUnityOpen = false;
-  isSimulationModeOpen = false;
-
   ngOnInit(): void {
-    void this.initializeApp();
-  }
-
-  private isAuthDisabled(): boolean {
-    const isLocalhost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
-
-    return environment.disableAuth && isLocalhost;
+    void this.initializeComponent();
   }
 
   get f() {
     return this.form.controls;
-  }
-
-  get isGeneratorModule(): boolean {
-    return this.activeModule === 'generator';
-  }
-
-  get isDecoderModule(): boolean {
-    return this.activeModule === 'decoder';
-  }
-
-  get isDbcManagerModule(): boolean {
-    return this.activeModule === 'dbc-manager';
-  }
-
-  get activeWorkspaceTab(): WorkspaceTab {
-    return this.workspaceTabs.find((tab) => tab.id === this.activeModule) ?? this.workspaceTabs[0];
-  }
-
-  get activeWorkspaceTitle(): string {
-    return this.activeWorkspaceTab.label;
-  }
-
-  get activeWorkspaceDescription(): string {
-    return this.activeWorkspaceTab.description;
-  }
-
-  setActiveModule(module: WorkspaceModule): void {
-    if (this.activeModule === module) {
-      return;
-    }
-
-    this.activeModule = module;
-    this.closeAllDropdowns();
-    this.closeUserMenu();
   }
 
   get gpsSummary(): string {
@@ -403,35 +270,25 @@ export class AppComponent implements OnInit {
 
   get selectedDriverProfileDescription(): string {
     return (
-      this.driverProfileOptions.find((option) => option.value === this.form.controls.driverProfile.value)
-        ?.description ?? ''
+      this.driverProfileOptions.find(
+        (option) => option.value === this.form.controls.driverProfile.value
+      )?.description ?? ''
     );
   }
 
   get selectedSimulationModeDescription(): string {
     return (
-      this.simulationModeOptions.find((option) => option.value === this.form.controls.simulationMode.value)
-        ?.description ?? ''
+      this.simulationModeOptions.find(
+        (option) => option.value === this.form.controls.simulationMode.value
+      )?.description ?? ''
     );
   }
 
-  openMapDialog(): void {
-    this.dialog.open(MapmoduleComponent, {
-      width: '1120px',
-      maxWidth: '95vw',
-      height: '84vh',
-      maxHeight: '90vh',
-      panelClass: 'trackster-dialog'
-    });
-  }
-
-  openPayloadDialog(): void {
-    this.dialog.open(PayloadComponent, {
-      width: '1040px',
-      maxWidth: '95vw',
-      height: '82vh',
-      maxHeight: '90vh',
-      panelClass: 'trackster-dialog'
+  openPayloadModal(): void {
+    this.openTracksterDialog(PayloadComponent, {
+      data: {
+        payloadText: this.form.controls.payload.value || ''
+      }
     });
   }
 
@@ -462,12 +319,8 @@ export class AppComponent implements OnInit {
   toggleSimulationModeOpen(): void {
     this.isSimulationModeOpen = !this.isSimulationModeOpen;
     if (this.isSimulationModeOpen) {
-      this.isDriverProfileOpen = false;
-      this.isUnityOpen = false;
-      this.isCanOpen = false;
-      this.isDbcOpen = false;
-      this.isGpsOpen = false;
-      this.userMenuOpen = false;
+      this.closeAllDropdowns();
+      this.isSimulationModeOpen = true;
     }
   }
 
@@ -610,216 +463,6 @@ export class AppComponent implements OnInit {
     }
   }
 
-  toggleUserMenu(event?: MouseEvent): void {
-    event?.stopPropagation();
-
-    this.userMenuOpen = !this.userMenuOpen;
-
-    if (this.userMenuOpen) {
-      this.closeAllDropdowns();
-      this.userMenuOpen = true;
-    }
-  }
-
-  closeUserMenu(): void {
-    this.userMenuOpen = false;
-  }
-
-  async onLogout(): Promise<void> {
-    if (this.isLoggingOut) {
-      return;
-    }
-
-    this.isLoggingOut = true;
-    this.userMenuOpen = false;
-
-    try {
-      await this.authService.logout();
-    } finally {
-      this.isLoggingOut = false;
-    }
-  }
-
-  private async loadUsername(): Promise<void> {
-    try {
-      const username = await this.authService.getUsername();
-      this.username = username?.trim() || 'User';
-    } catch {
-      this.username = 'User';
-    }
-  }
-
-  private decodeGpsHexToRoutePoint(hex: string): RoutePoint | null {
-    if (typeof hex !== 'string') {
-      return null;
-    }
-
-    const normalized = hex.trim().toUpperCase();
-
-    if (!/^[0-9A-F]{16}$/.test(normalized)) {
-      return null;
-    }
-
-    try {
-      const bytes = new Uint8Array(
-        normalized.match(/.{1,2}/g)!.map((value) => parseInt(value, 16))
-      );
-
-      const view = new DataView(bytes.buffer);
-
-      const latScaled = view.getInt32(0, false);
-      const lngScaled = view.getInt32(4, false);
-
-      const lat = latScaled / 1_000_000;
-      const lng = lngScaled / 1_000_000;
-
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return null;
-      }
-
-      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        return null;
-      }
-
-      return {
-        lat,
-        lng,
-        label: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private rebuildRoutePayloadFromHexCoordinates(hexCoordinates: string[]): RoutePayload | null {
-    const decodedPoints = hexCoordinates
-      .map((hex) => this.decodeGpsHexToRoutePoint(hex))
-      .filter((point): point is RoutePoint => point !== null);
-
-    if (decodedPoints.length === 0) {
-      return null;
-    }
-
-    if (decodedPoints.length === 1) {
-      return {
-        start: decodedPoints[0],
-        waypoints: {},
-        destination: null
-      };
-    }
-
-    const start = decodedPoints[0];
-    const destination = decodedPoints[decodedPoints.length - 1];
-    const middlePoints = decodedPoints.slice(1, -1);
-
-    const waypoints: Record<string, RoutePoint> = {};
-
-    middlePoints.forEach((point, index) => {
-      waypoints[String(index + 1)] = point;
-    });
-
-    return {
-      start,
-      waypoints,
-      destination
-    };
-  }
-
-  private async initializeApp(): Promise<void> {
-    this.bindFormValueChangesOnce();
-
-    try {
-      if (this.isAuthDisabled()) {
-        this.isAuthenticated = true;
-        this.username = 'local-dev';
-      } else {
-        await this.ensureAuthenticatedSession();
-        this.isAuthenticated = true;
-        await this.loadUsername();
-      }
-
-      await this.loadConfig();
-
-      this.isConfigLoaded = true;
-      this.authReady = true;
-      this.updatePayloadPreview();
-    } catch (error: unknown) {
-      this.isAuthenticated = false;
-      this.formStatus = 'error';
-      this.setPayloadValue(JSON.stringify({
-        error: {
-          category: 'app_initialization_error',
-          ...this.describeFetchError(error)
-        }
-      }, null, 2));
-      this.form.controls.payload.markAsTouched();
-      this.authReady = true;
-    }
-  }
-
-  private async ensureAuthenticatedSession(): Promise<void> {
-    const authenticated = await this.authService.isAuthenticated();
-
-    if (!authenticated) {
-      throw new Error('Authenticated session is not available.');
-    }
-  }
-
-  private async getAuthorizationToken(): Promise<string | null> {
-    if (this.isAuthDisabled()) {
-      return null;
-    }
-
-    const idToken = await this.authService.getIdToken();
-    if (idToken) {
-      return idToken;
-    }
-
-    const accessToken = await this.authService.getAccessToken();
-    if (accessToken) {
-      return accessToken;
-    }
-
-    throw new Error('Unable to retrieve Cognito token from current session.');
-  }
-
-  private bindFormValueChangesOnce(): void {
-    if (this.formValueChangesBound) {
-      return;
-    }
-
-    this.form.valueChanges.subscribe(() => {
-      if (this.suppressFormReset) {
-        return;
-      }
-
-      this.formStatus = 'pending';
-      this.revalidateAllControls();
-      this.clearPayload();
-    });
-
-    this.formValueChangesBound = true;
-  }
-
-  async copyPayload(): Promise<void> {
-    const payload = this.form.controls.payload.value;
-    if (!payload) {
-      this.copyPayloadState = 'error';
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(payload);
-      this.copyPayloadState = 'copied';
-    } catch {
-      this.copyPayloadState = 'error';
-    }
-
-    window.setTimeout(() => {
-      this.copyPayloadState = 'idle';
-    }, 1500);
-  }
-
   async submit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -955,7 +598,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  public onSaveRoute(routeJson: string): void {
+  onSaveRoute(routeJson: string): void {
     try {
       const parsed = JSON.parse(routeJson) as RoutePayload;
 
@@ -991,20 +634,6 @@ export class AppComponent implements OnInit {
     this.updatePayloadPreview();
   }
 
-  private jsonValidator(control: AbstractControl<string>): ValidationErrors | null {
-    const value = control.value?.trim();
-    if (!value) {
-      return null;
-    }
-
-    try {
-      JSON.parse(value);
-      return null;
-    } catch {
-      return { jsonInvalid: true };
-    }
-  }
-
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as Node | null;
@@ -1012,17 +641,72 @@ export class AppComponent implements OnInit {
       return;
     }
 
-    if (this.userMenuOpen && this.userMenuContainer?.nativeElement.contains(target)) {
-      return;
-    }
-
     if (!this.elementRef.nativeElement.contains(target)) {
       this.closeAllDropdowns();
-      this.userMenuOpen = false;
+    }
+  }
+
+  private async initializeComponent(): Promise<void> {
+    this.bindFormValueChangesOnce();
+
+    try {
+      await this.loadConfig();
+      this.isConfigLoaded = true;
+      this.updatePayloadPreview();
+    } catch (error: unknown) {
+      this.formStatus = 'error';
+      this.setPayloadValue(JSON.stringify({
+        error: {
+          category: 'simulator_initialization_error',
+          ...this.describeFetchError(error)
+        }
+      }, null, 2));
+      this.form.controls.payload.markAsTouched();
+    }
+  }
+
+  private isAuthDisabled(): boolean {
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    return environment.disableAuth && isLocalhost;
+  }
+
+  private async getAuthorizationToken(): Promise<string | null> {
+    if (this.isAuthDisabled()) {
+      return null;
+    }
+
+    const idToken = await this.authService.getIdToken();
+    if (idToken) {
+      return idToken;
+    }
+
+    const accessToken = await this.authService.getAccessToken();
+    if (accessToken) {
+      return accessToken;
+    }
+
+    throw new Error('Unable to retrieve Cognito token from current session.');
+  }
+
+  private bindFormValueChangesOnce(): void {
+    if (this.formValueChangesBound) {
       return;
     }
 
-    this.userMenuOpen = false;
+    this.form.valueChanges.subscribe(() => {
+      if (this.suppressFormReset) {
+        return;
+      }
+
+      this.formStatus = 'pending';
+      this.revalidateAllControls();
+      this.clearPayload();
+    });
+
+    this.formValueChangesBound = true;
   }
 
   private closeAllDropdowns(): void {
@@ -1123,7 +807,9 @@ export class AppComponent implements OnInit {
       }
     }
 
-    throw new Error(`Unable to load runtime config from assets/config.json. Last HTTP status: ${lastStatus ?? 'unknown'}`);
+    throw new Error(
+      `Unable to load runtime config from assets/config.json. Last HTTP status: ${lastStatus ?? 'unknown'}`
+    );
   }
 
   private buildEngineEnvelope() {
@@ -1136,7 +822,9 @@ export class AppComponent implements OnInit {
       numberOfBlocks: Number(raw.numberOfBlocks),
       blocksSize: Number(raw.sizeOfBlocksBytes),
       gpsArea: raw.gpsArea,
-      gpsCoordinates: this.interpGpsCoords.length > 0 ? [...this.interpGpsCoords] : [...this.selectedGpsCoordinates],
+      gpsCoordinates: this.interpGpsCoords.length > 0
+        ? [...this.interpGpsCoords]
+        : [...this.selectedGpsCoordinates],
       canFrames: raw.canFrames.map((frame) => frame.split(' - ')[0].trim()),
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
@@ -1152,6 +840,12 @@ export class AppComponent implements OnInit {
     };
   }
 
+  private updatePayloadPreview(): void {
+    const envelope = this.buildEngineEnvelope();
+    this.setPayloadValue(JSON.stringify(envelope, null, 2));
+    this.form.controls.payload.markAsTouched();
+  }
+
   private buildSequentialGpsHexCoordinates(route: RoutePayload): string[] {
     const orderedPoints: RoutePoint[] = [];
 
@@ -1159,7 +853,9 @@ export class AppComponent implements OnInit {
       orderedPoints.push(route.start);
     }
 
-    const orderedWaypointKeys = Object.keys(route.waypoints ?? {}).sort((a, b) => Number(a) - Number(b));
+    const orderedWaypointKeys = Object.keys(route.waypoints ?? {}).sort(
+      (a, b) => Number(a) - Number(b)
+    );
 
     for (const key of orderedWaypointKeys) {
       const point = route.waypoints[key];
@@ -1206,10 +902,94 @@ export class AppComponent implements OnInit {
       .toUpperCase();
   }
 
-  private updatePayloadPreview(): void {
-    const envelope = this.buildEngineEnvelope();
-    this.setPayloadValue(JSON.stringify(envelope, null, 2));
-    this.form.controls.payload.markAsTouched();
+  private decodeGpsHexToRoutePoint(hex: string): RoutePoint | null {
+    if (typeof hex !== 'string') {
+      return null;
+    }
+
+    const normalized = hex.trim().toUpperCase();
+
+    if (!/^[0-9A-F]{16}$/.test(normalized)) {
+      return null;
+    }
+
+    try {
+      const bytes = new Uint8Array(
+        normalized.match(/.{1,2}/g)!.map((value) => parseInt(value, 16))
+      );
+
+      const view = new DataView(bytes.buffer);
+
+      const latScaled = view.getInt32(0, false);
+      const lngScaled = view.getInt32(4, false);
+
+      const lat = latScaled / 1_000_000;
+      const lng = lngScaled / 1_000_000;
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+      }
+
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return null;
+      }
+
+      return {
+        lat,
+        lng,
+        label: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private rebuildRoutePayloadFromHexCoordinates(hexCoordinates: string[]): RoutePayload | null {
+    const decodedPoints = hexCoordinates
+      .map((hex) => this.decodeGpsHexToRoutePoint(hex))
+      .filter((point): point is RoutePoint => point !== null);
+
+    if (decodedPoints.length === 0) {
+      return null;
+    }
+
+    if (decodedPoints.length === 1) {
+      return {
+        start: decodedPoints[0],
+        waypoints: {},
+        destination: null
+      };
+    }
+
+    const start = decodedPoints[0];
+    const destination = decodedPoints[decodedPoints.length - 1];
+    const middlePoints = decodedPoints.slice(1, -1);
+
+    const waypoints: Record<string, RoutePoint> = {};
+
+    middlePoints.forEach((point, index) => {
+      waypoints[String(index + 1)] = point;
+    });
+
+    return {
+      start,
+      waypoints,
+      destination
+    };
+  }
+
+  private jsonValidator(control: AbstractControl<string>): ValidationErrors | null {
+    const value = control.value?.trim();
+    if (!value) {
+      return null;
+    }
+
+    try {
+      JSON.parse(value);
+      return null;
+    } catch {
+      return { jsonInvalid: true };
+    }
   }
 
   private async parseResponseBody(response: Response): Promise<unknown> {
@@ -1232,7 +1012,10 @@ export class AppComponent implements OnInit {
     }
 
     const trimmed = text.trim();
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
       try {
         return JSON.parse(trimmed);
       } catch {
@@ -1307,11 +1090,13 @@ export class AppComponent implements OnInit {
   private getCurrentDateTimeLocal(): string {
     const now = new Date();
     now.setSeconds(0, 0);
+
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
+
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
@@ -1323,6 +1108,32 @@ export class AppComponent implements OnInit {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
+
     return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+  }
+
+  private openTracksterDialog<T>(
+    component: ComponentType<T>,
+    options?: {
+      data?: unknown;
+      width?: string;
+      height?: string;
+      maxWidth?: string;
+      maxHeight?: string;
+      panelClass?: string;
+      backdropClass?: string;
+    }
+  ): MatDialogRef<T> {
+    return this.dialog.open(component, {
+      data: options?.data,
+      width: options?.width ?? '1040px',
+      height: options?.height ?? '82vh',
+      maxWidth: options?.maxWidth ?? '95vw',
+      maxHeight: options?.maxHeight ?? '90vh',
+      panelClass: options?.panelClass ?? 'trackster-dialog',
+      backdropClass: options?.backdropClass ?? 'trackster-dialog-backdrop',
+      autoFocus: false,
+      restoreFocus: true
+    });
   }
 }

@@ -8,7 +8,7 @@ import {
   ScrollingModule,
   TemplatePortal,
   ViewportRuler
-} from "./chunk-MAO4WGWM.js";
+} from "./chunk-HB22SNZY.js";
 import {
   animate,
   animateChild,
@@ -37,7 +37,7 @@ import {
   coerceNumberProperty,
   hasModifierKey,
   supportsScrollBehavior
-} from "./chunk-PIEPJMSE.js";
+} from "./chunk-SAKPCYPD.js";
 import {
   DOCUMENT,
   Location
