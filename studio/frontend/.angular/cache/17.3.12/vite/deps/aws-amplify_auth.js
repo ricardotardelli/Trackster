@@ -34,7 +34,7 @@ import {
   updateUserAttribute,
   updateUserAttributes,
   verifyTOTPSetup
-} from "./chunk-RVDDAAK6.js";
+} from "./chunk-RUP4D5PD.js";
 import {
   Amplify,
   AuthAction,
@@ -52,8 +52,8 @@ import {
   getAuthUserAgentValue,
   getCurrentUser,
   getRegionFromUserPoolId
-} from "./chunk-GY5TF3G7.js";
-import "./chunk-FGJUURVA.js";
+} from "./chunk-N67RFWKV.js";
+import "./chunk-NI6KYH2A.js";
 import {
   __async,
   __spreadValues

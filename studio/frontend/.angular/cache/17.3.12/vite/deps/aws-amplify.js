@@ -1,15 +1,15 @@
 import {
   CognitoAWSCredentialsAndIdentityIdProvider,
   DefaultIdentityIdStore
-} from "./chunk-RVDDAAK6.js";
+} from "./chunk-RUP4D5PD.js";
 import {
   Amplify,
   CookieStorage,
   cognitoUserPoolsTokenProvider,
   defaultStorage,
   parseAmplifyConfig
-} from "./chunk-GY5TF3G7.js";
-import "./chunk-FGJUURVA.js";
+} from "./chunk-N67RFWKV.js";
+import "./chunk-NI6KYH2A.js";
 import {
   __spreadProps,
   __spreadValues
