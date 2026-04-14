@@ -4,11 +4,7 @@
         <aside class="workspace-sidebar status-panel">
             <h2>Session Status</h2>
             <p>
-            <strong>Workspace:</strong>
-            <span class="status-value status-ok">Simulation Studio</span>
-            </p>
-            <p>
-            <strong>Form:</strong>
+            <strong>Generation:</strong>
             <span class="status-value" [class.status-ok]="formStatus === 'generated'" [class.status-error]="formStatus === 'error'" >
                 {{ formStatusLabel }}
             </span>

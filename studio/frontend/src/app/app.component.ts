@@ -1,13 +1,9 @@
 import { SimulatorComponent } from './simulator/simulator.component';
+import { DbcworkspaceComponent } from './dbcworkspace/dbcworkspace.component';
+import { DecoderComponent } from './decoder/decoder.component';
 import { MatTabsModule } from '@angular/material/tabs';
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  ElementRef,
-  HostListener,
-  OnInit,
-  ViewChild
-} from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 
@@ -27,7 +23,9 @@ interface WorkspaceTab {
     CommonModule,
     RouterOutlet,
     MatTabsModule,
-    SimulatorComponent
+    SimulatorComponent,
+    DbcworkspaceComponent,
+    DecoderComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'

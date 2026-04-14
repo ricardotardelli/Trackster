@@ -4,11 +4,8 @@ import {
   ComponentPortal,
   DomPortalOutlet,
   PortalModule,
-  ScrollDispatcher,
-  ScrollingModule,
-  TemplatePortal,
-  ViewportRuler
-} from "./chunk-HB22SNZY.js";
+  TemplatePortal
+} from "./chunk-BUWAMGSX.js";
 import {
   animate,
   animateChild,
@@ -19,6 +16,11 @@ import {
   transition,
   trigger
 } from "./chunk-HEWOFX77.js";
+import {
+  ScrollDispatcher,
+  ScrollingModule,
+  ViewportRuler
+} from "./chunk-EKXN5RA6.js";
 import {
   A11yModule,
   BidiModule,
@@ -37,7 +39,7 @@ import {
   coerceNumberProperty,
   hasModifierKey,
   supportsScrollBehavior
-} from "./chunk-SAKPCYPD.js";
+} from "./chunk-RIWOKXMU.js";
 import {
   DOCUMENT,
   Location

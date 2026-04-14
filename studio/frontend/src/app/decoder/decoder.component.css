@@ -1,0 +1,227 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.decoder-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.decoder-stage-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 508px;
+  height: 100%;
+}
+
+.decoder-grid {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.decoder-sidebar,
+.decoder-body {
+  min-width: 0;
+}
+
+.decoder-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+}
+
+.decoder-body-header {
+  padding: 2px 2px 0;
+}
+
+.decoder-body-header h2 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: #102349;
+}
+
+.decoder-body-header p {
+  margin: 0;
+  max-width: 920px;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #5a6b82;
+}
+
+.decoder-body-content {
+  min-height: 0;
+  margin-top: auto;
+}
+
+.decoder-status-panel {
+  align-self: start;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 18px 16px 14px;
+  border: 1px solid rgba(14, 116, 144, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(240, 249, 255, 0.92) 0%,
+    rgba(232, 245, 255, 0.88) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 10px 24px rgba(14, 116, 144, 0.06);
+}
+
+.decoder-status-panel h2 {
+  margin: 0 0 14px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #0f3b67;
+}
+
+.decoder-status-panel p {
+  margin: 0 0 9px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: #1e293b;
+}
+
+.decoder-status-panel strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: #1e293b;
+}
+
+.decoder-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+  align-content: start;
+}
+
+.decoder-card {
+  min-height: 150px;
+  padding: 20px;
+  box-sizing: border-box;
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.decoder-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(147, 197, 253, 0.95);
+  box-shadow:
+    0 16px 32px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.decoder-card h3 {
+  margin: 0 0 10px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #0b1f44;
+}
+
+.decoder-card p {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.decoder-card-wide {
+  grid-column: 1 / -1;
+  min-height: 190px;
+}
+
+.decoder-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 32px;
+}
+
+.decoder-actions button {
+  min-height: 40px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    0 12px 28px rgba(14, 165, 233, 0.22),
+    0 4px 10px rgba(14, 165, 233, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+
+.decoder-actions button:hover:not(:disabled) {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 32px rgba(14, 165, 233, 0.24),
+    0 6px 14px rgba(14, 165, 233, 0.1);
+}
+
+.decoder-actions button:disabled {
+  background: linear-gradient(135deg, #c6d2e3 0%, #d8e1ec 100%);
+  color: rgba(255, 255, 255, 0.82);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 992px) {
+  .decoder-stage-shell,
+  .decoder-view,
+  .decoder-status-panel {
+    min-height: auto;
+  }
+
+  .decoder-grid,
+  .decoder-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .decoder-sidebar,
+  .decoder-body {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .decoder-card-wide {
+    grid-column: auto;
+    min-height: 150px;
+  }
+}
+
+.actions-placeholder {
+  visibility: hidden;
+}

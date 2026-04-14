@@ -1,0 +1,158 @@
+<div class="workspace-view">
+  <div class="module-stage-shell">
+    <div class="workspace-grid">
+      <aside class="workspace-sidebar status-panel">
+        <h2>Session Status</h2>
+
+        <p>
+          <strong>State:</strong>
+          <span class="status-value status-ok">Ready to simulation</span>
+        </p>
+
+        <p>
+          <strong>Valid DBC's:</strong>
+          <span class="status-value">999</span>
+        </p>
+
+        <p>
+          <strong>Pending DBC's:</strong>
+          <span class="status-value">999</span>
+        </p>
+
+        <p>
+          <strong>Rejected DBC's:</strong>
+          <span class="status-value">999</span>
+        </p>
+
+        <p>
+          <strong>Messages:</strong>
+          <span class="status-value">999999</span>
+        </p>
+
+        <p>
+          <strong>Signals:</strong>
+          <span class="status-value">999999</span>
+        </p>
+
+        <p>
+          <strong>Last Upload:</strong>
+          <span class="status-value">2026-04-14 00:00</span>
+        </p>
+      </aside>
+
+      <section class="workspace-body">
+        <div class="workspace-body-header">
+          <h2>DBC Workspace</h2>
+          <p>
+            Organize DBC files, validate structure, and prepare signal catalogs for simulation
+            and decoding.
+          </p>
+        </div>
+
+        <div class="workspace-body-content">
+          <div class="module-card-grid">
+
+            <!-- INTAKE -->
+            <section class="module-card intake-card">
+              <div class="card-header-row">
+                <h3>Intake</h3>
+
+                <div class="card-header-actions">
+                  <button type="button" class="intake-button primary">Upload</button>
+                  <button type="button" class="intake-button secondary">Validate</button>
+                </div>
+              </div>
+
+              <div class="table-shell">
+                <table mat-table [dataSource]="originalFiles" class="file-table">
+
+                  <ng-container matColumnDef="name">
+                    <td mat-cell *matCellDef="let file">
+                      <span class="table-name">{{ file.name }}</span>
+                    </td>
+                  </ng-container>
+
+                  <ng-container matColumnDef="size">
+                    <td mat-cell *matCellDef="let file">
+                      <span class="table-meta">{{ formatFileSize(file.sizeBytes) }}</span>
+                    </td>
+                  </ng-container>
+
+                  <ng-container matColumnDef="lastModified">
+                    <td mat-cell *matCellDef="let file">
+                      <span class="table-meta">{{ file.lastModified }}</span>
+                    </td>
+                  </ng-container>
+
+                  <tr
+                    mat-row
+                    *matRowDef="let row; columns: intakeDisplayedColumns"
+                    class="file-table-row"
+                    [class.row-selected]="isOriginalSelected(row)"
+                    tabindex="0"
+                    (click)="selectOriginalFile(row)"
+                    (keydown.enter)="selectOriginalFile(row)"
+                  ></tr>
+
+                </table>
+              </div>
+            </section>
+
+            <!-- VALIDATED -->
+            <section class="module-card validated-card">
+              <div class="card-header-row">
+                <h3>Validated Files</h3>
+              </div>
+
+              <div class="table-shell">
+                <table mat-table [dataSource]="validatedFiles" class="file-table">
+
+                  <ng-container matColumnDef="name">
+                    <td mat-cell *matCellDef="let file">
+                      <span class="table-name">{{ file.name }}</span>
+                    </td>
+                  </ng-container>
+
+                  <ng-container matColumnDef="state">
+                    <td mat-cell *matCellDef="let file">
+                      <span class="table-meta">{{ file.state }}</span>
+                    </td>
+                  </ng-container>
+
+                  <ng-container matColumnDef="lastModified">
+                    <td mat-cell *matCellDef="let file">
+                      <span class="table-meta">{{ file.lastModified }}</span>
+                    </td>
+                  </ng-container>
+
+                  <tr
+                    mat-row
+                    *matRowDef="let row; columns: validatedDisplayedColumns"
+                    class="file-table-row"
+                    [class.row-selected]="isValidatedSelected(row)"
+                    tabindex="0"
+                    (click)="selectValidatedFile(row)"
+                    (keydown.enter)="selectValidatedFile(row)"
+                  ></tr>
+
+                </table>
+              </div>
+            </section>
+
+            <!-- CATALOG -->
+            <section class="module-card module-card-wide catalog-card">
+              <h3>Catalog</h3>
+
+              <div class="catalog-body">
+                <p>
+                  This area can later expose searchable signals, English normalization, and reusable compatibility reports.
+                </p>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
