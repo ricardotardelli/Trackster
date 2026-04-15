@@ -56,22 +56,47 @@
                 <h3>Intake</h3>
 
                 <div class="card-header-actions">
-                  <button type="button" class="intake-button primary" (click)="fileInput.click()" >
+                  <button type="button" class="intake-button primary" (click)="fileInput.click()">
                     Upload
                   </button>
-                  <input #fileInput type="file" accept=".dbc" multiple hidden (change)="onNativeFilesSelected($event)" />
 
-                  <button type="button" class="intake-button primary" [disabled]="!hasPendingSelection()" (click)="validateSelectedFiles()" >
+                  <input
+                    #fileInput
+                    type="file"
+                    accept=".dbc"
+                    multiple
+                    hidden
+                    (change)="onNativeFilesSelected($event)"
+                  />
+
+                  <button
+                    type="button"
+                    class="intake-button primary"
+                    [disabled]="!hasPendingSelection()"
+                    (click)="validateSelectedFiles()"
+                  >
                     Validate Selected
                   </button>
 
-                  <button type="button" class="intake-button danger" [disabled]="!hasAnySelection()" (click)="removeSelectedFiles()" >
+                  <button
+                    type="button"
+                    class="intake-button danger"
+                    [disabled]="!hasAnySelection()"
+                    (click)="removeSelectedFiles()"
+                  >
                     Remove Selected
                   </button>
                 </div>
               </div>
+
               <div class="table-shell">
-                <table mat-table [dataSource]="originalFilesDataSource" matSort #intakeSort="matSort" class="file-table" >
+                <table
+                  mat-table
+                  [dataSource]="originalFilesDataSource"
+                  matSort
+                  #intakeSort="matSort"
+                  class="file-table"
+                >
                   <ng-container matColumnDef="select">
                     <th mat-header-cell *matHeaderCellDef class="select-column">
                       <mat-checkbox
@@ -138,14 +163,159 @@
               </div>
             </section>
 
-            <section class="module-card validated-card placeholder-card">
+            <section class="module-card validated-card details-card">
               <div class="card-header-row">
-                <h3>Validated Files</h3>
+                <h3>Validation Report</h3>
               </div>
 
-              <div class="placeholder-body">
-                <p>This panel is a placeholder for now.</p>
+              <div class="details-body" *ngIf="selectedOriginalFile && selectedValidationPreview; else noSelectionState">
+                <div class="details-file-header">
+                  <div class="details-file-meta">
+                    <div class="details-file-title-row">
+                      <h4>{{ selectedOriginalFile.name }}</h4>
+                      <span class="status-badge" [ngClass]="'status-' + selectedOriginalFile.status">
+                        {{ selectedOriginalFile.status }}
+                      </span>
+                    </div>
+
+                    <div class="details-file-subline">
+                      <span>{{ formatFileSize(selectedOriginalFile.sizeBytes) }}</span>
+                      <span>•</span>
+                      <span>{{ selectedOriginalFile.lastModified }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="details-summary-grid">
+                  <div class="summary-box">
+                    <span class="summary-label">Messages</span>
+                    <strong>{{ selectedValidationPreview.summary.messages }}</strong>
+                  </div>
+
+                  <div class="summary-box">
+                    <span class="summary-label">Signals</span>
+                    <strong>{{ selectedValidationPreview.summary.signals }}</strong>
+                  </div>
+
+                  <div class="summary-box">
+                    <span class="summary-label">Warnings</span>
+                    <strong>{{ selectedValidationPreview.summary.warnings }}</strong>
+                  </div>
+
+                  <div class="summary-box">
+                    <span class="summary-label">Errors</span>
+                    <strong>{{ selectedValidationPreview.summary.errors }}</strong>
+                  </div>
+                </div>
+
+                <section class="details-section">
+                  <div class="section-header">
+                    <h4>Validation Log</h4>
+                  </div>
+
+                  <div class="log-list">
+                    <div
+                      class="log-item"
+                      *ngFor="let entry of selectedValidationPreview.logEntries"
+                      [ngClass]="'log-' + entry.level"
+                    >
+                      <div class="log-item-top">
+                        <span class="log-level">{{ entry.level }}</span>
+                        <span class="log-code">{{ entry.code }}</span>
+                      </div>
+
+                      <div class="log-message">{{ entry.message }}</div>
+
+                      <div class="log-context" *ngIf="entry.context">
+                        {{ entry.context }}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section
+                  class="details-section"
+                  *ngIf="selectedOriginalFile.status === 'validated' && selectedValidationPreview.messages.length > 0"
+                >
+                  <div class="section-header">
+                    <h4>Parsed Messages and Signals</h4>
+                  </div>
+
+                  <div class="message-list">
+                    <div class="message-card" *ngFor="let message of selectedValidationPreview.messages">
+                      <div class="message-card-header">
+                        <div class="message-title-block">
+                          <h5>{{ message.name }}</h5>
+                          <span class="message-id">ID {{ message.id }}</span>
+                        </div>
+
+                        <div class="message-meta-block">
+                          <span>DLC {{ message.dlc }}</span>
+                          <span>{{ message.transmitter }}</span>
+                        </div>
+                      </div>
+
+                      <div class="signal-table-shell">
+                        <table class="signal-table">
+                          <thead>
+                            <tr>
+                              <th>Signal</th>
+                              <th>Start Bit</th>
+                              <th>Length</th>
+                              <th>Endianess</th>
+                              <th>Signed</th>
+                              <th>Factor</th>
+                              <th>Offset</th>
+                              <th>Min</th>
+                              <th>Max</th>
+                              <th>Unit</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let signal of message.signals">
+                              <td>{{ signal.name }}</td>
+                              <td>{{ signal.startBit }}</td>
+                              <td>{{ signal.length }}</td>
+                              <td>{{ signal.endianness }}</td>
+                              <td>{{ signal.signed ? 'yes' : 'no' }}</td>
+                              <td>{{ signal.factor }}</td>
+                              <td>{{ signal.offset }}</td>
+                              <td>{{ signal.min }}</td>
+                              <td>{{ signal.max }}</td>
+                              <td>{{ signal.unit || '-' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section
+                  class="details-section details-note-block"
+                  *ngIf="selectedOriginalFile.status !== 'validated'"
+                >
+                  <div class="section-header">
+                    <h4>Signal Catalog</h4>
+                  </div>
+
+                  <div class="details-note">
+                    <p *ngIf="selectedOriginalFile.status === 'pending'">
+                      Signal details are not available yet because this file has not been validated.
+                    </p>
+
+                    <p *ngIf="selectedOriginalFile.status === 'rejected'">
+                      Signal extraction is not available because the file failed validation.
+                    </p>
+                  </div>
+                </section>
               </div>
+
+              <ng-template #noSelectionState>
+                <div class="placeholder-body">
+                  <p>Select a file from Intake to inspect validation details.</p>
+                </div>
+              </ng-template>
             </section>
           </div>
         </div>

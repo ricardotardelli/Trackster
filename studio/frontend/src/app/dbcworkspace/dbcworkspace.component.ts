@@ -6,12 +6,54 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { NgxDropzoneModule } from 'ngx-dropzone';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
+type ValidationLogLevel = 'info' | 'warning' | 'error';
 
 interface OriginalDbcFile {
   name: string;
   sizeBytes: number;
   lastModified: string;
   status: OriginalDbcStatus;
+}
+
+interface ValidationLogEntry {
+  level: ValidationLogLevel;
+  code: string;
+  message: string;
+  context?: string;
+}
+
+interface ValidationSignalPreview {
+  name: string;
+  startBit: number;
+  length: number;
+  endianness: 'little_endian' | 'big_endian';
+  signed: boolean;
+  factor: number;
+  offset: number;
+  min: number;
+  max: number;
+  unit?: string;
+}
+
+interface ValidationMessagePreview {
+  id: string;
+  name: string;
+  dlc: number;
+  transmitter: string;
+  signals: ValidationSignalPreview[];
+}
+
+interface ValidationPreviewSummary {
+  messages: number;
+  signals: number;
+  warnings: number;
+  errors: number;
+}
+
+interface ValidationPreview {
+  summary: ValidationPreviewSummary;
+  logEntries: ValidationLogEntry[];
+  messages: ValidationMessagePreview[];
 }
 
 @Component({
@@ -34,6 +76,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   isUploading = false;
 
   selectedOriginalFileName: string | null = 'Powertrain.dbc';
+  selectedOriginalFile: OriginalDbcFile | null = null;
+  selectedValidationPreview: ValidationPreview | null = null;
 
   readonly intakeDisplayedColumns: string[] = [
     'select',
@@ -86,6 +130,15 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
   ngOnInit(): void {
     this.originalFilesDataSource.data = this.originalFiles;
+
+    const initialSelected =
+      this.originalFiles.find((file) => file.name === this.selectedOriginalFileName) ??
+      this.originalFiles[0] ??
+      null;
+
+    if (initialSelected) {
+      this.selectOriginalFile(initialSelected);
+    }
   }
 
   ngAfterViewInit(): void {
@@ -153,7 +206,12 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       this.originalFiles = [...uploadedEntries, ...this.originalFiles];
       this.originalFilesDataSource.data = this.originalFiles;
       this.selectedFiles = [];
-      this.selectedOriginalFileName = uploadedEntries[0]?.name ?? this.selectedOriginalFileName;
+
+      const newSelected = uploadedEntries[0] ?? null;
+
+      if (newSelected) {
+        this.selectOriginalFile(newSelected);
+      }
     } finally {
       this.isUploading = false;
     }
@@ -172,6 +230,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       return;
     }
 
+    const selectedNameBeforeUpdate = this.selectedOriginalFileName;
+
     this.originalFiles = this.originalFiles.map((file) => {
       if (
         this.checkedOriginalFileNames.has(file.name) &&
@@ -189,6 +249,16 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     this.checkedOriginalFileNames.clear();
     this.originalFilesDataSource.data = this.originalFiles;
+
+    if (selectedNameBeforeUpdate) {
+      const updatedSelected = this.originalFiles.find(
+        (file) => file.name === selectedNameBeforeUpdate
+      );
+
+      if (updatedSelected) {
+        this.selectOriginalFile(updatedSelected);
+      }
+    }
   }
 
   removeSelectedFiles(): void {
@@ -204,12 +274,22 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       this.selectedOriginalFileName &&
       !remaining.some((file) => file.name === this.selectedOriginalFileName)
     ) {
-      this.selectedOriginalFileName = remaining[0]?.name ?? null;
+      const nextSelected = remaining[0] ?? null;
+
+      if (nextSelected) {
+        this.selectOriginalFile(nextSelected);
+      } else {
+        this.selectedOriginalFileName = null;
+        this.selectedOriginalFile = null;
+        this.selectedValidationPreview = null;
+      }
     }
   }
 
   selectOriginalFile(file: OriginalDbcFile): void {
     this.selectedOriginalFileName = file.name;
+    this.selectedOriginalFile = file;
+    this.selectedValidationPreview = this.buildFakeValidationPreview(file);
   }
 
   isOriginalSelected(file: OriginalDbcFile): boolean {
@@ -267,8 +347,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     return checkedCount > 0 && checkedCount < this.originalFiles.length;
   }
 
-  hasAnySelection(): boolean {
-    return this.checkedOriginalFileNames.size > 0;
+  hasAnySelection(): number {
+    return this.checkedOriginalFileNames.size;
   }
 
   hasPendingFiles(): boolean {
@@ -320,6 +400,244 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
 
     input.value = '';
+  }
+
+  private buildFakeValidationPreview(file: OriginalDbcFile): ValidationPreview {
+    if (file.status === 'validated') {
+      return this.buildValidatedPreview(file);
+    }
+
+    if (file.status === 'rejected') {
+      return this.buildRejectedPreview(file);
+    }
+
+    return this.buildPendingPreview(file);
+  }
+
+  private buildValidatedPreview(file: OriginalDbcFile): ValidationPreview {
+    const messages: ValidationMessagePreview[] = [
+      {
+        id: '0x120',
+        name: 'VehicleSpeedStatus',
+        dlc: 8,
+        transmitter: 'VCU',
+        signals: [
+          {
+            name: 'VehicleSpeed',
+            startBit: 0,
+            length: 16,
+            endianness: 'little_endian',
+            signed: false,
+            factor: 0.01,
+            offset: 0,
+            min: 0,
+            max: 250,
+            unit: 'km/h'
+          },
+          {
+            name: 'WheelBasedSpeed',
+            startBit: 16,
+            length: 16,
+            endianness: 'little_endian',
+            signed: false,
+            factor: 0.01,
+            offset: 0,
+            min: 0,
+            max: 250,
+            unit: 'km/h'
+          },
+          {
+            name: 'SpeedValidity',
+            startBit: 32,
+            length: 2,
+            endianness: 'little_endian',
+            signed: false,
+            factor: 1,
+            offset: 0,
+            min: 0,
+            max: 3
+          }
+        ]
+      },
+      {
+        id: '0x221',
+        name: 'EngineData',
+        dlc: 8,
+        transmitter: 'ECM',
+        signals: [
+          {
+            name: 'EngineRpm',
+            startBit: 0,
+            length: 16,
+            endianness: 'little_endian',
+            signed: false,
+            factor: 0.25,
+            offset: 0,
+            min: 0,
+            max: 8000,
+            unit: 'rpm'
+          },
+          {
+            name: 'ThrottlePosition',
+            startBit: 16,
+            length: 8,
+            endianness: 'little_endian',
+            signed: false,
+            factor: 0.4,
+            offset: 0,
+            min: 0,
+            max: 100,
+            unit: '%'
+          },
+          {
+            name: 'EngineCoolantTemp',
+            startBit: 24,
+            length: 8,
+            endianness: 'little_endian',
+            signed: true,
+            factor: 1,
+            offset: -40,
+            min: -40,
+            max: 215,
+            unit: '°C'
+          }
+        ]
+      },
+      {
+        id: '0x305',
+        name: 'GpsPose',
+        dlc: 8,
+        transmitter: 'TCU',
+        signals: [
+          {
+            name: 'LatitudeRaw',
+            startBit: 0,
+            length: 32,
+            endianness: 'big_endian',
+            signed: true,
+            factor: 0.000001,
+            offset: 0,
+            min: -90,
+            max: 90,
+            unit: 'deg'
+          },
+          {
+            name: 'LongitudeRaw',
+            startBit: 32,
+            length: 32,
+            endianness: 'big_endian',
+            signed: true,
+            factor: 0.000001,
+            offset: 0,
+            min: -180,
+            max: 180,
+            unit: 'deg'
+          }
+        ]
+      }
+    ];
+
+    const totalSignals = messages.reduce((sum, message) => sum + message.signals.length, 0);
+
+    return {
+      summary: {
+        messages: messages.length,
+        signals: totalSignals,
+        warnings: 1,
+        errors: 0
+      },
+      logEntries: [
+        {
+          level: 'info',
+          code: 'DBC-001',
+          message: 'File loaded successfully.',
+          context: file.name
+        },
+        {
+          level: 'info',
+          code: 'DBC-010',
+          message: 'Message definitions parsed without structural errors.',
+          context: '3 messages detected'
+        },
+        {
+          level: 'warning',
+          code: 'DBC-021',
+          message: 'One signal does not define an explicit unit.',
+          context: 'VehicleSpeedStatus.SpeedValidity'
+        },
+        {
+          level: 'info',
+          code: 'DBC-099',
+          message: 'Validation completed successfully.',
+          context: 'File is ready for simulation catalog usage'
+        }
+      ],
+      messages
+    };
+  }
+
+  private buildPendingPreview(file: OriginalDbcFile): ValidationPreview {
+    return {
+      summary: {
+        messages: 0,
+        signals: 0,
+        warnings: 0,
+        errors: 0
+      },
+      logEntries: [
+        {
+          level: 'info',
+          code: 'DBC-000',
+          message: 'File uploaded and queued for validation.',
+          context: file.name
+        },
+        {
+          level: 'info',
+          code: 'DBC-002',
+          message: 'Awaiting validation execution.',
+          context: 'No parser output available yet'
+        }
+      ],
+      messages: []
+    };
+  }
+
+  private buildRejectedPreview(file: OriginalDbcFile): ValidationPreview {
+    return {
+      summary: {
+        messages: 1,
+        signals: 0,
+        warnings: 1,
+        errors: 2
+      },
+      logEntries: [
+        {
+          level: 'info',
+          code: 'DBC-001',
+          message: 'File loaded successfully.',
+          context: file.name
+        },
+        {
+          level: 'warning',
+          code: 'DBC-014',
+          message: 'Message declaration found with incomplete metadata.',
+          context: 'Message BrakeStatus'
+        },
+        {
+          level: 'error',
+          code: 'DBC-031',
+          message: 'Signal bit range exceeds message payload length.',
+          context: 'BrakeStatus.BrakePressure'
+        },
+        {
+          level: 'error',
+          code: 'DBC-041',
+          message: 'Validation failed due to structural inconsistency.',
+          context: 'Signal extraction aborted'
+        }
+      ],
+      messages: []
+    };
   }
 
   private getCurrentTimestamp(): string {
