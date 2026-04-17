@@ -27,16 +27,87 @@ body {
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
-.trackster-dialog .mat-mdc-dialog-container {
-  padding: 0 !important;
-}
-
-.trackster-dialog .mat-mdc-dialog-surface {
+.trackster-dialog .mat-mdc-dialog-surface,
+.trackster-dialog .mdc-dialog__surface {
   padding: 0 !important;
   overflow: hidden !important;
   border-radius: 24px !important;
-  background: rgba(255, 255, 255, 0.96) !important;
-  box-shadow:
-    0 24px 60px rgba(15, 23, 42, 0.18),
-    0 12px 28px rgba(15, 23, 42, 0.12) !important;
+  background: transparent !important;
+}
+
+.trackster-dialog .mat-mdc-dialog-content {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-height: none !important;
+}
+
+.trackster-dialog .mat-mdc-dialog-actions {
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+.trackster-close.mat-mdc-icon-button {
+  color: #334155;
+}
+
+.trackster-close.mat-mdc-icon-button:hover {
+  background-color: #dbeafe !important;
+  color: #0f172a;
+}
+
+.trackster-close .mdc-icon-button__ripple,
+.trackster-close .mat-mdc-button-persistent-ripple {
+  background: transparent !important;
+  opacity: 0 !important;
+}
+
+.trackster-close {
+  --mdc-icon-button-state-layer-color: transparent;
+  --mat-mdc-button-persistent-ripple-color: transparent;
+}
+
+/* =========================
+   TRACKSTER BUTTON SYSTEM
+   ========================= */
+
+.trackster-button {
+  min-width: 110px;
+  height: 40px;
+  padding: 0 18px;
+
+  border-radius: 12px;
+  border: 1px solid transparent;
+
+  font-size: 0.9rem;
+  font-weight: 600;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* PRIMARY */
+.trackster-button--primary {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+.trackster-button--primary:hover {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+/* SECONDARY */
+.trackster-button--secondary {
+  background: #ffffff;
+  color: #334155;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.trackster-button--secondary:hover {
+  background: #f1f5f9;
 }

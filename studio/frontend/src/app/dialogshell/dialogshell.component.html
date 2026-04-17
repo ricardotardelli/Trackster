@@ -4,19 +4,19 @@
       <h2 class="dialog-shell__title">{{ title }}</h2>
       <p *ngIf="subtitle" class="dialog-shell__subtitle">{{ subtitle }}</p>
     </div>
-
-    <button
-      mat-icon-button
-      type="button"
-      class="dialog-shell__close"
-      aria-label="Close dialog"
-      (click)="closeClicked.emit()">
+    <button type="button" class="dialog-shell__close" (click)="onClose()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
 
-  <div class="dialog-shell__body" [ngClass]="contentClass">
-    <ng-content></ng-content>
+  <div class="dialog-shell__body">
+    <div class="dialog-shell__content-frame" [ngClass]="contentClass">
+      <div class="dialog-shell__scroll-boundary">
+        <div class="dialog-shell__scroll-region">
+          <ng-content></ng-content>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div *ngIf="showFooter" class="dialog-shell__footer">

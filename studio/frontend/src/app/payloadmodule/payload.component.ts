@@ -3,7 +3,7 @@ import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { DialogshellComponent } from '../dialogshell/dialogshell.component';
+import { DialogShellComponent } from '../dialogshell/dialogshell.component';
 
 interface PayloadDialogData {
   payloadText: string;
@@ -17,7 +17,7 @@ interface PayloadDialogData {
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    DialogshellComponent
+    DialogShellComponent
   ],
   templateUrl: './payload.component.html',
   styleUrls: ['./payload.component.css']
@@ -30,10 +30,6 @@ export class PayloadComponent {
     @Inject(MAT_DIALOG_DATA) private data: PayloadDialogData
   ) {
     this.payloadText = data?.payloadText ?? '';
-  }
-
-  closeDialog(): void {
-    this.dialogRef.close();
   }
 
   copyPayload(): void {

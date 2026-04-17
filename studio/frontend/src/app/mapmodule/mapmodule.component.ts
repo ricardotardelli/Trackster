@@ -1,4 +1,4 @@
-import { DialogshellComponent } from '../dialogshell/dialogshell.component';
+import { DialogShellComponent } from '../dialogshell/dialogshell.component';
 import { Inject, Optional } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import {
@@ -52,7 +52,7 @@ interface MapDialogData {
     CommonModule, 
     FormsModule,
     MatDialogModule,
-    DialogshellComponent
+    DialogShellComponent
   ],
   templateUrl: './mapmodule.component.html',
   styleUrls: ['./mapmodule.component.css']

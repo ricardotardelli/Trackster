@@ -1,0 +1,43 @@
+<div class="dbc-editor-root">
+  <!-- HEADER -->
+  <div class="dbc-editor-header">
+    <div class="dbc-editor-titles">
+      <h2 class="dbc-editor-title">{{ data.title }}</h2>
+      <p class="dbc-editor-subtitle">{{ data.subtitle }}</p>
+    </div>
+
+    <button
+      type="button"
+      class="dbc-editor-close"
+      (click)="cancel()">
+      ✕
+    </button>
+  </div>
+
+  <!-- BODY -->
+  <div class="dbc-editor-body">
+    <ngx-monaco-editor
+      [(ngModel)]="dbcText"
+      [options]="editorOptions"
+      [editorStyle]="{ width: '100%', height: '100%' }"
+      (editorInitialized)="onEditorInit($event)">
+    </ngx-monaco-editor>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="dbc-editor-footer">
+    <button
+      type="button"
+      class="trackster-button trackster-button--secondary"
+      (click)="cancel()">
+      Cancel
+    </button>
+
+    <button
+      type="button"
+      class="trackster-button trackster-button--primary"
+      (click)="save()">
+      Save
+    </button>
+  </div>
+</div>

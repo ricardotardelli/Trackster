@@ -2,72 +2,116 @@
   display: block;
   width: 100%;
   height: 100%;
-  min-width: 0;
-  min-height: 0;
-  box-sizing: border-box;
+  /* Garante que o componente ocupe todo o espaço do container do Material */
+  position: relative;
 }
 
 .dialog-shell {
   display: flex;
   flex-direction: column;
+  
   width: 100%;
   height: 100%;
-  min-height: 0;
   background: #ffffff;
+  
+  /* RAIO GRANDE: Agora com 40px para bater com o padrão do sistema */
+  border-radius: 40px !important; 
+  
+  /* O segredo para o Material não cortar o seu raio: */
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
 }
 
+/* HEADER */
 .dialog-shell__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  padding: 32px 32px 10px; /* Aumentado para não sufocar na curva de 40px */
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   flex: 0 0 auto;
-}
-
-.dialog-shell__titles {
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .dialog-shell__title {
   margin: 0;
-  font-size: 1.75rem;
-  line-height: 1.2;
+  font-size: 1.15rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
   color: #0b1f44;
 }
 
-.dialog-shell__subtitle {
-  margin: 8px 0 0;
-  font-size: 0.98rem;
-  line-height: 1.5;
-  color: #52627a;
-}
-
+/* BOTÃO FECHAR (Igual ao seu original) */
 .dialog-shell__close {
   flex: 0 0 auto;
-  margin: -6px -8px 0 0;
+  margin: -2px 0 0;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
+.dialog-shell__close:hover {
+  background: #dbeafe;
+}
+
+/* BODY */
 .dialog-shell__body {
   flex: 1 1 auto;
   min-height: 0;
-  min-width: 0;
-  padding: 20px 24px 24px;
-  overflow: hidden;
+  padding: 0 32px 32px; /* Aumentado para 32px nas laterais */
   display: flex;
   flex-direction: column;
+  background: #ffffff;
 }
 
+.dialog-shell__content-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  overflow: hidden;
+}
+
+/* SCROLL (O que a gente já tinha acertado) */
+.dialog-shell__scroll-boundary {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 20px 8px 20px 0; 
+  overflow: hidden;
+}
+
+.dialog-shell__scroll-region {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 16px 0 24px;
+}
+
+.dialog-shell__scroll-region::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dialog-shell__scroll-region::-webkit-scrollbar-thumb {
+  background-color: #93c5fd;
+  border-radius: 10px;
+}
+
+/* FOOTER */
 .dialog-shell__footer {
   flex: 0 0 auto;
   display: flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px 20px;
-  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  padding: 16px 32px 32px;
+  border-top: 1px solid rgba(203, 213, 225, 0.35);
 }

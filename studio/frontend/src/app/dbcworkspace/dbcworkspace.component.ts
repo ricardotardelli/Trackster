@@ -1,9 +1,11 @@
+import { DbcEditorComponent } from '../dbceditor/dbceditor.component';
+import { MatDialog } from '@angular/material/dialog';
+import { DialogShellComponent } from '../dialogshell/dialogshell.component';
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { NgxDropzoneModule } from 'ngx-dropzone';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
 type ValidationLogLevel = 'info' | 'warning' | 'error';
@@ -61,16 +63,19 @@ interface ValidationPreview {
   standalone: true,
   imports: [
     CommonModule,
-    NgxDropzoneModule,
     MatTableModule,
     MatSortModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    DialogShellComponent,
+    DbcEditorComponent
   ],
   templateUrl: './dbcworkspace.component.html',
   styleUrls: ['./dbcworkspace.component.css']
 })
 export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   @ViewChild('intakeSort') intakeSort!: MatSort;
+
+  constructor(private dialog: MatDialog) {}
 
   selectedFiles: File[] = [];
   isUploading = false;
@@ -654,4 +659,29 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   private toSortableTimestamp(value: string): number {
     return new Date(value.replace(' ', 'T')).getTime();
   }
+
+  openDbcEditor(file: OriginalDbcFile): void {
+    const dialogRef = this.dialog.open(DbcEditorComponent, {
+      width: '1500px',
+      height: '820px',
+      panelClass: 'trackster-dialog',
+      autoFocus: false,
+      restoreFocus: false,
+      data: {
+        file,
+        title: 'DBC Editor',
+        subtitle: file.name,
+        content: ''
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result?: { saved: boolean; content: string }) => {
+      if (!result?.saved) {
+        return;
+      }
+
+      console.log('Updated DBC content:', result.content);
+    });
+  }
+
 }

@@ -20,7 +20,12 @@
             ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              "src/assets"
+              "src/assets",
+              {
+                "glob": "**/*",
+                "input": "node_modules/monaco-editor/min/vs",
+                "output": "vs"
+              }
             ],
             "styles": [
               "src/custom-theme.scss",
