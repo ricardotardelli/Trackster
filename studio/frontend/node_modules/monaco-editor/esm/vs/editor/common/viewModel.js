@@ -1,11 +1,11 @@
-import { equals } from '../../base/common/arrays.js';
-import { isBasicASCII, containsRTL } from '../../base/common/strings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class Viewport {
+import * as arrays from '../../base/common/arrays.js';
+import * as strings from '../../base/common/strings.js';
+import { Range } from './core/range.js';
+export class Viewport {
     constructor(top, left, width, height) {
         this._viewportBrand = undefined;
         this.top = top | 0;
@@ -14,13 +14,13 @@ class Viewport {
         this.height = height | 0;
     }
 }
-class MinimapLinesRenderingData {
+export class MinimapLinesRenderingData {
     constructor(tabSize, data) {
         this.tabSize = tabSize;
         this.data = data;
     }
 }
-class ViewLineData {
+export class ViewLineData {
     constructor(content, continuesWithWrappedLine, minColumn, maxColumn, startVisibleColumn, tokens, inlineDecorations) {
         this._viewLineDataBrand = undefined;
         this.content = content;
@@ -32,8 +32,8 @@ class ViewLineData {
         this.inlineDecorations = inlineDecorations;
     }
 }
-class ViewLineRenderingData {
-    constructor(minColumn, maxColumn, content, continuesWithWrappedLine, mightContainRTL, mightContainNonBasicASCII, tokens, inlineDecorations, tabSize, startVisibleColumn, textDirection, hasVariableFonts) {
+export class ViewLineRenderingData {
+    constructor(minColumn, maxColumn, content, continuesWithWrappedLine, mightContainRTL, mightContainNonBasicASCII, tokens, inlineDecorations, tabSize, startVisibleColumn) {
         this.minColumn = minColumn;
         this.maxColumn = maxColumn;
         this.content = content;
@@ -44,23 +44,46 @@ class ViewLineRenderingData {
         this.inlineDecorations = inlineDecorations;
         this.tabSize = tabSize;
         this.startVisibleColumn = startVisibleColumn;
-        this.textDirection = textDirection;
-        this.hasVariableFonts = hasVariableFonts;
     }
     static isBasicASCII(lineContent, mightContainNonBasicASCII) {
         if (mightContainNonBasicASCII) {
-            return isBasicASCII(lineContent);
+            return strings.isBasicASCII(lineContent);
         }
         return true;
     }
     static containsRTL(lineContent, isBasicASCII, mightContainRTL) {
         if (!isBasicASCII && mightContainRTL) {
-            return containsRTL(lineContent);
+            return strings.containsRTL(lineContent);
         }
         return false;
     }
 }
-class OverviewRulerDecorationsGroup {
+export class InlineDecoration {
+    constructor(range, inlineClassName, type) {
+        this.range = range;
+        this.inlineClassName = inlineClassName;
+        this.type = type;
+    }
+}
+export class SingleLineInlineDecoration {
+    constructor(startOffset, endOffset, inlineClassName, inlineClassNameAffectsLetterSpacing) {
+        this.startOffset = startOffset;
+        this.endOffset = endOffset;
+        this.inlineClassName = inlineClassName;
+        this.inlineClassNameAffectsLetterSpacing = inlineClassNameAffectsLetterSpacing;
+    }
+    toInlineDecoration(lineNumber) {
+        return new InlineDecoration(new Range(lineNumber, this.startOffset + 1, lineNumber, this.endOffset + 1), this.inlineClassName, this.inlineClassNameAffectsLetterSpacing ? 3 /* InlineDecorationType.RegularAffectingLetterSpacing */ : 0 /* InlineDecorationType.Regular */);
+    }
+}
+export class ViewModelDecoration {
+    constructor(range, options) {
+        this._viewModelDecorationBrand = undefined;
+        this.range = range;
+        this.options = options;
+    }
+}
+export class OverviewRulerDecorationsGroup {
     constructor(color, zIndex, 
     /**
      * Decorations are encoded in a number array using the following scheme:
@@ -88,11 +111,9 @@ class OverviewRulerDecorationsGroup {
     static equals(a, b) {
         return (a.color === b.color
             && a.zIndex === b.zIndex
-            && equals(a.data, b.data));
+            && arrays.equals(a.data, b.data));
     }
     static equalsArr(a, b) {
-        return equals(a, b, OverviewRulerDecorationsGroup.equals);
+        return arrays.equals(a, b, OverviewRulerDecorationsGroup.equals);
     }
 }
-
-export { MinimapLinesRenderingData, OverviewRulerDecorationsGroup, ViewLineData, ViewLineRenderingData, Viewport };

@@ -1,39 +1,38 @@
-import { ResourceTextEdit } from '../../../browser/services/bulkEditService.js';
-import { SnippetParser } from '../../snippet/browser/snippetParser.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { ResourceTextEdit } from '../../../browser/services/bulkEditService.js';
+import { SnippetParser } from '../../snippet/browser/snippetParser.js';
 /**
  * Given a {@link DropOrPasteEdit} and set of ranges, creates a {@link WorkspaceEdit} that applies the insert text from
  * the {@link DropOrPasteEdit} at each range plus any additional edits.
  */
-function createCombinedWorkspaceEdit(uri, ranges, edit) {
+export function createCombinedWorkspaceEdit(uri, ranges, edit) {
+    var _a, _b, _c, _d;
     // If the edit insert text is empty, skip applying at each range
     if (typeof edit.insertText === 'string' ? edit.insertText === '' : edit.insertText.snippet === '') {
         return {
-            edits: edit.additionalEdit?.edits ?? []
+            edits: (_b = (_a = edit.additionalEdit) === null || _a === void 0 ? void 0 : _a.edits) !== null && _b !== void 0 ? _b : []
         };
     }
     return {
         edits: [
             ...ranges.map(range => new ResourceTextEdit(uri, { range, text: typeof edit.insertText === 'string' ? SnippetParser.escape(edit.insertText) + '$0' : edit.insertText.snippet, insertAsSnippet: true })),
-            ...(edit.additionalEdit?.edits ?? [])
+            ...((_d = (_c = edit.additionalEdit) === null || _c === void 0 ? void 0 : _c.edits) !== null && _d !== void 0 ? _d : [])
         ]
     };
 }
-function sortEditsByYieldTo(edits) {
+export function sortEditsByYieldTo(edits) {
+    var _a;
     function yieldsTo(yTo, other) {
-        if ('mimeType' in yTo) {
-            return yTo.mimeType === other.handledMimeType;
-        }
-        return !!other.kind && yTo.kind.contains(other.kind);
+        return ('providerId' in yTo && yTo.providerId === other.providerId)
+            || ('mimeType' in yTo && yTo.mimeType === other.handledMimeType);
     }
     // Build list of nodes each node yields to
     const yieldsToMap = new Map();
     for (const edit of edits) {
-        for (const yTo of edit.yieldTo ?? []) {
+        for (const yTo of (_a = edit.yieldTo) !== null && _a !== void 0 ? _a : []) {
             for (const other of edits) {
                 if (other === edit) {
                     continue;
@@ -61,7 +60,7 @@ function sortEditsByYieldTo(edits) {
         }
         const node = nodes[0];
         if (tempStack.includes(node)) {
-            console.warn('Yield to cycle detected', node);
+            console.warn(`Yield to cycle detected for ${node.providerId}`);
             return nodes;
         }
         if (visited.has(node)) {
@@ -79,5 +78,3 @@ function sortEditsByYieldTo(edits) {
     }
     return visit(Array.from(edits));
 }
-
-export { createCombinedWorkspaceEdit, sortEditsByYieldTo };

@@ -1,17 +1,16 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { findLast } from '../../../base/common/arraysFind.js';
-import { firstNonWhitespaceIndex } from '../../../base/common/strings.js';
+import * as strings from '../../../base/common/strings.js';
 import { CursorColumns } from '../core/cursorColumns.js';
 import { Range } from '../core/range.js';
 import { TextModelPart } from './textModelPart.js';
 import { computeIndentLevel } from './utils.js';
 import { HorizontalGuidesState, IndentGuide, IndentGuideHorizontalLine } from '../textModelGuides.js';
 import { BugIndicatingError } from '../../../base/common/errors.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class GuidesTextModelPart extends TextModelPart {
+export class GuidesTextModelPart extends TextModelPart {
     constructor(textModel, languageConfigurationService) {
         super();
         this.textModel = textModel;
@@ -206,6 +205,7 @@ class GuidesTextModelPart extends TextModelPart {
         return { startLineNumber, endLineNumber, indent };
     }
     getLinesBracketGuides(startLineNumber, endLineNumber, activePosition, options) {
+        var _a;
         const result = [];
         for (let lineNumber = startLineNumber; lineNumber <= endLineNumber; lineNumber++) {
             result.push([]);
@@ -220,7 +220,7 @@ class GuidesTextModelPart extends TextModelPart {
                 // We don't need to query the brackets again if the cursor is in the viewport
                 ? bracketPairs
                 : this.textModel.bracketPairs.getBracketPairsInRange(Range.fromPositions(activePosition)).toArray()).filter((bp) => Range.strictContainsPosition(bp.range, activePosition));
-            activeBracketPairRange = findLast(bracketsContainingActivePosition, (i) => includeSingleLinePairs)?.range;
+            activeBracketPairRange = (_a = findLast(bracketsContainingActivePosition, (i) => includeSingleLinePairs || i.range.startLineNumber !== i.range.endLineNumber)) === null || _a === void 0 ? void 0 : _a.range;
         }
         const independentColorPoolPerBracketType = this.textModel.getOptions().bracketPairColorizationOptions.independentColorPoolPerBracketType;
         const colorProvider = new BracketPairGuidesClassNames();
@@ -266,7 +266,7 @@ class GuidesTextModelPart extends TextModelPart {
             const end = pair.closingBracketRange.getStartPosition();
             const horizontalGuides = options.horizontalGuides === HorizontalGuidesState.Enabled || (options.horizontalGuides === HorizontalGuidesState.EnabledForActive && isActive);
             if (pair.range.startLineNumber === pair.range.endLineNumber) {
-                if (horizontalGuides) {
+                if (includeSingleLinePairs && horizontalGuides) {
                     result[pair.range.startLineNumber - startLineNumber].push(new IndentGuide(-1, pair.openingBracketRange.getEndPosition().column, className, new IndentGuideHorizontalLine(false, end.column), -1, -1));
                 }
                 continue;
@@ -275,7 +275,7 @@ class GuidesTextModelPart extends TextModelPart {
             const startVisibleColumn = this.getVisibleColumnFromPosition(pair.openingBracketRange.getStartPosition());
             const guideVisibleColumn = Math.min(startVisibleColumn, endVisibleColumn, pair.minVisibleColumnIndentation + 1);
             let renderHorizontalEndLineAtTheBottom = false;
-            const firstNonWsIndex = firstNonWhitespaceIndex(this.textModel.getLineContent(pair.closingBracketRange.startLineNumber));
+            const firstNonWsIndex = strings.firstNonWhitespaceIndex(this.textModel.getLineContent(pair.closingBracketRange.startLineNumber));
             const hasTextBeforeClosingBracket = firstNonWsIndex < pair.closingBracketRange.startColumn - 1;
             if (hasTextBeforeClosingBracket) {
                 renderHorizontalEndLineAtTheBottom = true;
@@ -388,7 +388,7 @@ class GuidesTextModelPart extends TextModelPart {
         }
     }
 }
-class BracketPairGuidesClassNames {
+export class BracketPairGuidesClassNames {
     constructor() {
         this.activeClassName = 'indent-active';
     }
@@ -401,5 +401,3 @@ class BracketPairGuidesClassNames {
         return `bracket-indent-guide lvl-${level % 30}`;
     }
 }
-
-export { BracketPairGuidesClassNames, GuidesTextModelPart };

@@ -1,24 +1,24 @@
-import './currentLineHighlight.css';
-import { DynamicViewOverlay } from '../../view/dynamicViewOverlay.js';
-import { editorLineHighlight, editorLineHighlightBorder } from '../../../common/core/editorColorRegistry.js';
-import { equals } from '../../../../base/common/arrays.js';
-import { registerThemingParticipant } from '../../../../platform/theme/common/themeService.js';
-import { Selection } from '../../../common/core/selection.js';
-import { isHighContrast } from '../../../../platform/theme/common/theme.js';
-import { Position } from '../../../common/core/position.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class AbstractLineHighlightOverlay extends DynamicViewOverlay {
+import './currentLineHighlight.css';
+import { DynamicViewOverlay } from '../../view/dynamicViewOverlay.js';
+import { editorLineHighlight, editorLineHighlightBorder } from '../../../common/core/editorColorRegistry.js';
+import * as arrays from '../../../../base/common/arrays.js';
+import { registerThemingParticipant } from '../../../../platform/theme/common/themeService.js';
+import { Selection } from '../../../common/core/selection.js';
+import { isHighContrast } from '../../../../platform/theme/common/theme.js';
+import { Position } from '../../../common/core/position.js';
+export class AbstractLineHighlightOverlay extends DynamicViewOverlay {
     constructor(context) {
         super();
         this._context = context;
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
-        this._renderLineHighlight = options.get(110 /* EditorOption.renderLineHighlight */);
-        this._renderLineHighlightOnlyWhenFocus = options.get(111 /* EditorOption.renderLineHighlightOnlyWhenFocus */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
+        this._lineHeight = options.get(67 /* EditorOption.lineHeight */);
+        this._renderLineHighlight = options.get(96 /* EditorOption.renderLineHighlight */);
+        this._renderLineHighlightOnlyWhenFocus = options.get(97 /* EditorOption.renderLineHighlightOnlyWhenFocus */);
         this._wordWrap = layoutInfo.isViewportWrapping;
         this._contentLeft = layoutInfo.contentLeft;
         this._contentWidth = layoutInfo.contentWidth;
@@ -41,7 +41,7 @@ class AbstractLineHighlightOverlay extends DynamicViewOverlay {
         }
         const cursorsLineNumbers = Array.from(lineNumbers);
         cursorsLineNumbers.sort((a, b) => a - b);
-        if (!equals(this._cursorLineNumbers, cursorsLineNumbers)) {
+        if (!arrays.equals(this._cursorLineNumbers, cursorsLineNumbers)) {
             this._cursorLineNumbers = cursorsLineNumbers;
             hasChanged = true;
         }
@@ -58,9 +58,10 @@ class AbstractLineHighlightOverlay extends DynamicViewOverlay {
     }
     onConfigurationChanged(e) {
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
-        this._renderLineHighlight = options.get(110 /* EditorOption.renderLineHighlight */);
-        this._renderLineHighlightOnlyWhenFocus = options.get(111 /* EditorOption.renderLineHighlightOnlyWhenFocus */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
+        this._lineHeight = options.get(67 /* EditorOption.lineHeight */);
+        this._renderLineHighlight = options.get(96 /* EditorOption.renderLineHighlight */);
+        this._renderLineHighlightOnlyWhenFocus = options.get(97 /* EditorOption.renderLineHighlightOnlyWhenFocus */);
         this._wordWrap = layoutInfo.isViewportWrapping;
         this._contentLeft = layoutInfo.contentLeft;
         this._contentWidth = layoutInfo.contentWidth;
@@ -153,13 +154,10 @@ class AbstractLineHighlightOverlay extends DynamicViewOverlay {
             && (!this._renderLineHighlightOnlyWhenFocus || this._focused));
     }
 }
-/**
- * Emphasizes the current line by drawing a border around it.
- */
-class CurrentLineHighlightOverlay extends AbstractLineHighlightOverlay {
+export class CurrentLineHighlightOverlay extends AbstractLineHighlightOverlay {
     _renderOne(ctx, exact) {
         const className = 'current-line' + (this._shouldRenderInMargin() ? ' current-line-both' : '') + (exact ? ' current-line-exact' : '');
-        return `<div class="${className}" style="width:${Math.max(ctx.scrollWidth, this._contentWidth)}px;"></div>`;
+        return `<div class="${className}" style="width:${Math.max(ctx.scrollWidth, this._contentWidth)}px; height:${this._lineHeight}px;"></div>`;
     }
     _shouldRenderThis() {
         return this._shouldRenderInContent();
@@ -168,13 +166,10 @@ class CurrentLineHighlightOverlay extends AbstractLineHighlightOverlay {
         return this._shouldRenderInMargin();
     }
 }
-/**
- * Emphasizes the current line margin/gutter by drawing a border around it.
- */
-class CurrentLineMarginHighlightOverlay extends AbstractLineHighlightOverlay {
+export class CurrentLineMarginHighlightOverlay extends AbstractLineHighlightOverlay {
     _renderOne(ctx, exact) {
         const className = 'current-line' + (this._shouldRenderInMargin() ? ' current-line-margin' : '') + (this._shouldRenderOther() ? ' current-line-margin-both' : '') + (this._shouldRenderInMargin() && exact ? ' current-line-exact-margin' : '');
-        return `<div class="${className}" style="width:${this._contentLeft}px"></div>`;
+        return `<div class="${className}" style="width:${this._contentLeft}px; height:${this._lineHeight}px;"></div>`;
     }
     _shouldRenderThis() {
         return true;
@@ -201,5 +196,3 @@ registerThemingParticipant((theme, collector) => {
         }
     }
 });
-
-export { AbstractLineHighlightOverlay, CurrentLineHighlightOverlay, CurrentLineMarginHighlightOverlay };

@@ -6,15 +6,30 @@ import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { HttpClient } from '@angular/common/http';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
 type ValidationLogLevel = 'info' | 'warning' | 'error';
+
+interface DbcFolderFile {
+  name: string;
+  sizeBytes: number;
+  lastModified: string;
+  status: OriginalDbcStatus;
+  content?: string;
+}
+
+interface DbcFolderResponse {
+  folderName: string;
+  files: DbcFolderFile[];
+}
 
 interface OriginalDbcFile {
   name: string;
   sizeBytes: number;
   lastModified: string;
   status: OriginalDbcStatus;
+  content?: string;
 }
 
 interface ValidationLogEntry {
@@ -75,14 +90,19 @@ interface ValidationPreview {
 export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   @ViewChild('intakeSort') intakeSort!: MatSort;
 
-  constructor(private dialog: MatDialog) {}
+  constructor(
+    private readonly dialog: MatDialog,
+    private readonly http: HttpClient
+  ) {}
 
   selectedFiles: File[] = [];
   isUploading = false;
 
-  selectedOriginalFileName: string | null = 'Powertrain.dbc';
+  selectedOriginalFileName: string | null = null;
   selectedOriginalFile: OriginalDbcFile | null = null;
   selectedValidationPreview: ValidationPreview | null = null;
+
+  folderName = '';
 
   readonly intakeDisplayedColumns: string[] = [
     'select',
@@ -92,58 +112,14 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     'lastModified'
   ];
 
-  originalFiles: OriginalDbcFile[] = [
-    { name: 'Engine_Control.dbc', status: 'validated', sizeBytes: 854200, lastModified: '2026-04-14 09:15' },
-    { name: 'Battery_Management.dbc', status: 'pending', sizeBytes: 432100, lastModified: '2026-04-14 08:30' },
-    { name: 'Transmission_v2.dbc', status: 'validated', sizeBytes: 981300, lastModified: '2026-04-14 00:00' },
-    { name: 'Body_Control.dbc', status: 'validated', sizeBytes: 568500, lastModified: '2026-04-13 18:42' },
-    { name: 'Powertrain_Main.dbc', status: 'pending', sizeBytes: 742900, lastModified: '2026-04-13 10:15' },
-    { name: 'ADAS_Core_Module.dbc', status: 'pending', sizeBytes: 431000, lastModified: '2026-04-13 09:20' },
-    { name: 'Gateway_Central.dbc', status: 'rejected', sizeBytes: 312300, lastModified: '2026-04-12 22:11' },
-    { name: 'Braking_System.dbc', status: 'validated', sizeBytes: 125400, lastModified: '2026-04-12 20:05' },
-    { name: 'Climate_Control.dbc', status: 'pending', sizeBytes: 234800, lastModified: '2026-04-12 15:30' },
-    { name: 'Infotainment_Bus.dbc', status: 'validated', sizeBytes: 1054200, lastModified: '2026-04-12 11:00' },
-    { name: 'Sensors_Array_A.dbc', status: 'pending', sizeBytes: 154000, lastModified: '2026-04-11 19:45' },
-    { name: 'Sensors_Array_B.dbc', status: 'rejected', sizeBytes: 148000, lastModified: '2026-04-11 19:50' },
-    { name: 'Lighting_Exterior.dbc', status: 'validated', sizeBytes: 89000, lastModified: '2026-04-11 14:20' },
-    { name: 'Steering_Angle.dbc', status: 'pending', sizeBytes: 67000, lastModified: '2026-04-11 10:10' },
-    { name: 'Chassis_CAN_v1.dbc', status: 'validated', sizeBytes: 882000, lastModified: '2026-04-10 23:55' },
-    { name: 'Safety_Systems.dbc', status: 'validated', sizeBytes: 345000, lastModified: '2026-04-10 17:30' },
-    { name: 'Inverters_Rear.dbc', status: 'pending', sizeBytes: 512000, lastModified: '2026-04-10 12:40' },
-    { name: 'HVAC_Compressor.dbc', status: 'rejected', sizeBytes: 122000, lastModified: '2026-04-09 16:15' },
-    { name: 'Airbag_Controller.dbc', status: 'validated', sizeBytes: 78000, lastModified: '2026-04-09 14:05' },
-    { name: 'Telematics_Unit.dbc', status: 'pending', sizeBytes: 940000, lastModified: '2026-04-09 09:30' },
-    { name: 'Drivetrain_Diagnostics.dbc', status: 'validated', sizeBytes: 654000, lastModified: '2026-04-08 21:10' },
-    { name: 'Tire_Pressure_TPMS.dbc', status: 'pending', sizeBytes: 45000, lastModified: '2026-04-08 18:45' },
-    { name: 'Wheel_Speeds.dbc', status: 'validated', sizeBytes: 112000, lastModified: '2026-04-08 14:20' },
-    { name: 'Mirror_Controls.dbc', status: 'rejected', sizeBytes: 33000, lastModified: '2026-04-07 13:00' },
-    { name: 'Door_Lock_States.dbc', status: 'validated', sizeBytes: 56000, lastModified: '2026-04-07 11:30' },
-    { name: 'Window_Regulator.dbc', status: 'pending', sizeBytes: 89000, lastModified: '2026-04-07 08:20' },
-    { name: 'Seat_Adjustment.dbc', status: 'validated', sizeBytes: 128000, lastModified: '2026-04-06 17:55' },
-    { name: 'Parking_Assist.dbc', status: 'pending', sizeBytes: 672000, lastModified: '2026-04-06 14:10' },
-    { name: 'Ultrasonic_Sensors.dbc', status: 'validated', sizeBytes: 341000, lastModified: '2026-04-06 10:05' },
-    { name: 'Front_Camera_Bus.dbc', status: 'rejected', sizeBytes: 1205000, lastModified: '2026-04-05 22:40' },
-    { name: 'Radar_Long_Range.dbc', status: 'validated', sizeBytes: 884000, lastModified: '2026-04-05 19:15' },
-    { name: 'Instrument_Cluster.dbc', status: 'pending', sizeBytes: 542000, lastModified: '2026-04-05 15:30' },
-    { name: 'Fuel_System.dbc', status: 'validated', sizeBytes: 212000, lastModified: '2026-04-05 09:45' },
-    { name: 'Exhaust_Monitoring.dbc', status: 'pending', sizeBytes: 135000, lastModified: '2026-04-04 18:20' },
-    { name: 'Generic_IO_Module.dbc', status: 'rejected', sizeBytes: 44000, lastModified: '2026-04-04 14:10' }
-  ];
+  originalFiles: OriginalDbcFile[] = [];
 
   originalFilesDataSource = new MatTableDataSource<OriginalDbcFile>([]);
   checkedOriginalFileNames = new Set<string>();
 
   ngOnInit(): void {
     this.originalFilesDataSource.data = this.originalFiles;
-
-    const initialSelected =
-      this.originalFiles.find((file) => file.name === this.selectedOriginalFileName) ??
-      this.originalFiles[0] ??
-      null;
-
-    if (initialSelected) {
-      this.selectOriginalFile(initialSelected);
-    }
+    this.loadDbcFolderCatalog();
   }
 
   ngAfterViewInit(): void {
@@ -201,12 +177,15 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     try {
       const now = this.getCurrentTimestamp();
 
-      const uploadedEntries: OriginalDbcFile[] = this.selectedFiles.map((file) => ({
-        name: file.name,
-        sizeBytes: file.size,
-        lastModified: now,
-        status: 'rejected'
-      }));
+      const uploadedEntries: OriginalDbcFile[] = await Promise.all(
+        this.selectedFiles.map(async (file) => ({
+          name: file.name,
+          sizeBytes: file.size,
+          lastModified: now,
+          status: 'rejected' as OriginalDbcStatus,
+          content: await file.text()
+        }))
+      );
 
       this.originalFiles = [...uploadedEntries, ...this.originalFiles];
       this.originalFilesDataSource.data = this.originalFiles;
@@ -405,6 +384,66 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
 
     input.value = '';
+  }
+
+  loadDbcFolderCatalog(): void {
+    this.getDbcFolderCatalog().subscribe({
+      next: (response) => {
+        const mappedFiles = response.files.map((file) => this.mapFolderFileToOriginalFile(file));
+
+        this.folderName = response.folderName;
+        this.originalFiles = mappedFiles;
+        this.originalFilesDataSource.data = mappedFiles;
+        this.checkedOriginalFileNames.clear();
+
+        const selectedByName =
+          (this.selectedOriginalFileName &&
+            mappedFiles.find((file) => file.name === this.selectedOriginalFileName)) ||
+          null;
+
+        const nextSelected = selectedByName ?? mappedFiles[0] ?? null;
+
+        if (nextSelected) {
+          this.selectOriginalFile(nextSelected);
+        } else {
+          this.selectedOriginalFileName = null;
+          this.selectedOriginalFile = null;
+          this.selectedValidationPreview = null;
+        }
+      },
+      error: (error) => {
+        console.error('Failed to load DBC folder catalog.', error);
+        this.folderName = '';
+        this.originalFiles = [];
+        this.originalFilesDataSource.data = [];
+        this.checkedOriginalFileNames.clear();
+        this.selectedOriginalFileName = null;
+        this.selectedOriginalFile = null;
+        this.selectedValidationPreview = null;
+      }
+    });
+  }
+
+  private getDbcFolderCatalog() {
+    return this.http.get<DbcFolderResponse>('assets/mock/dbc-folder.json');
+  }
+
+  private mapFolderFileToOriginalFile(file: DbcFolderFile): OriginalDbcFile {
+    return {
+      name: file.name,
+      sizeBytes: file.sizeBytes,
+      lastModified: file.lastModified,
+      status: file.status,
+      content: file.content
+    };
+  }
+
+  private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
+    if (typeof file.content === 'string') {
+      return file.content;
+    }
+
+    return '';
   }
 
   private buildFakeValidationPreview(file: OriginalDbcFile): ValidationPreview {
@@ -660,7 +699,9 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     return new Date(value.replace(' ', 'T')).getTime();
   }
 
-  openDbcEditor(file: OriginalDbcFile): void {
+  async openDbcEditor(file: OriginalDbcFile): Promise<void> {
+    const content = await this.resolveDbcContent(file);
+
     const dialogRef = this.dialog.open(DbcEditorComponent, {
       width: '1500px',
       height: '820px',
@@ -671,7 +712,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         file,
         title: 'DBC Editor',
         subtitle: file.name,
-        content: ''
+        content
       }
     });
 
@@ -680,8 +721,28 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         return;
       }
 
+      this.originalFiles = this.originalFiles.map((currentFile) => {
+        if (currentFile.name !== file.name) {
+          return currentFile;
+        }
+
+        return {
+          ...currentFile,
+          content: result.content,
+          lastModified: this.getCurrentTimestamp()
+        };
+      });
+
+      this.originalFilesDataSource.data = this.originalFiles;
+
+      const updatedSelected =
+        this.originalFiles.find((currentFile) => currentFile.name === file.name) ?? null;
+
+      if (updatedSelected) {
+        this.selectOriginalFile(updatedSelected);
+      }
+
       console.log('Updated DBC content:', result.content);
     });
   }
-
 }

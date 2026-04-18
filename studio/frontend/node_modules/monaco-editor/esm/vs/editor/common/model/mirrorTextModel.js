@@ -1,12 +1,11 @@
-import { splitLines } from '../../../base/common/strings.js';
-import { Position } from '../core/position.js';
-import { PrefixSumComputer } from './prefixSumComputer.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class MirrorTextModel {
+import { splitLines } from '../../../base/common/strings.js';
+import { Position } from '../core/position.js';
+import { PrefixSumComputer } from './prefixSumComputer.js';
+export class MirrorTextModel {
     constructor(uri, lines, eol, versionId) {
         this._uri = uri;
         this._lines = lines;
@@ -113,5 +112,3 @@ class MirrorTextModel {
         }
     }
 }
-
-export { MirrorTextModel };

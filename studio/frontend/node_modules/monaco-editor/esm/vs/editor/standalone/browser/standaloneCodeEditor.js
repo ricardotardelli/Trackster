@@ -1,14 +1,27 @@
-import { setARIAContainer } from '../../../base/browser/ui/aria/aria.js';
-import { Disposable, DisposableStore, toDisposable } from '../../../base/common/lifecycle.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+import * as aria from '../../../base/browser/ui/aria/aria.js';
+import { Disposable, toDisposable, DisposableStore } from '../../../base/common/lifecycle.js';
 import { ICodeEditorService } from '../../browser/services/codeEditorService.js';
-import { CodeEditorWidget } from '../../browser/widget/codeEditor/codeEditorWidget.js';
+import { CodeEditorWidget } from '../../browser/widget/codeEditorWidget.js';
 import { InternalEditorAction } from '../../common/editorAction.js';
 import { StandaloneKeybindingService, updateConfigurationService } from './standaloneServices.js';
 import { IStandaloneThemeService } from '../common/standaloneTheme.js';
-import { MenuRegistry, MenuId } from '../../../platform/actions/common/actions.js';
-import { ICommandService, CommandsRegistry } from '../../../platform/commands/common/commands.js';
+import { MenuId, MenuRegistry } from '../../../platform/actions/common/actions.js';
+import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
 import { IConfigurationService } from '../../../platform/configuration/common/configuration.js';
-import { IContextKeyService, ContextKeyExpr } from '../../../platform/contextkey/common/contextkey.js';
+import { ContextKeyExpr, IContextKeyService } from '../../../platform/contextkey/common/contextkey.js';
 import { IContextMenuService } from '../../../platform/contextview/browser/contextView.js';
 import { IInstantiationService } from '../../../platform/instantiation/common/instantiation.js';
 import { IKeybindingService } from '../../../platform/keybinding/common/keybinding.js';
@@ -27,25 +40,8 @@ import { ILanguageFeaturesService } from '../../common/services/languageFeatures
 import { DiffEditorWidget } from '../../browser/widget/diffEditor/diffEditorWidget.js';
 import { IAccessibilitySignalService } from '../../../platform/accessibilitySignal/browser/accessibilitySignalService.js';
 import { mainWindow } from '../../../base/browser/window.js';
-import { setHoverDelegateFactory } from '../../../base/browser/ui/hover/hoverDelegateFactory.js';
-import { IHoverService, WorkbenchHoverDelegate } from '../../../platform/hover/browser/hover.js';
-import { setBaseLayerHoverDelegate } from '../../../base/browser/ui/hover/hoverDelegate2.js';
-import { IMarkdownRendererService } from '../../../platform/markdown/browser/markdownRenderer.js';
-import { EditorMarkdownCodeBlockRenderer } from '../../browser/widget/markdownRenderer/browser/editorMarkdownCodeBlockRenderer.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
+import { setHoverDelegateFactory } from '../../../base/browser/ui/hover/hoverDelegate.js';
+import { WorkbenchHoverDelegate } from '../../../platform/hover/browser/hover.js';
 let LAST_GENERATED_COMMAND_ID = 0;
 let ariaDomNodeCreated = false;
 /**
@@ -60,15 +56,16 @@ function createAriaDomNode(parent) {
         }
         ariaDomNodeCreated = true;
     }
-    setARIAContainer(parent || mainWindow.document.body);
+    aria.setARIAContainer(parent || mainWindow.document.body);
 }
 /**
  * A code editor to be used both by the standalone editor and the standalone diff editor.
  */
 let StandaloneCodeEditor = class StandaloneCodeEditor extends CodeEditorWidget {
-    constructor(domElement, _options, instantiationService, codeEditorService, commandService, contextKeyService, hoverService, keybindingService, themeService, notificationService, accessibilityService, languageConfigurationService, languageFeaturesService, markdownRendererService) {
+    constructor(domElement, _options, instantiationService, codeEditorService, commandService, contextKeyService, keybindingService, themeService, notificationService, accessibilityService, languageConfigurationService, languageFeaturesService) {
         const options = { ..._options };
         options.ariaLabel = options.ariaLabel || StandaloneCodeEditorNLS.editorViewAccessibleLabel;
+        options.ariaLabel = options.ariaLabel + ';' + (StandaloneCodeEditorNLS.accessibilityHelpMessage);
         super(domElement, options, {}, instantiationService, codeEditorService, commandService, contextKeyService, themeService, notificationService, accessibilityService, languageConfigurationService, languageFeaturesService);
         if (keybindingService instanceof StandaloneKeybindingService) {
             this._standaloneKeybindingService = keybindingService;
@@ -77,9 +74,7 @@ let StandaloneCodeEditor = class StandaloneCodeEditor extends CodeEditorWidget {
             this._standaloneKeybindingService = null;
         }
         createAriaDomNode(options.ariaContainerElement);
-        setHoverDelegateFactory((placement, enableInstantHover) => instantiationService.createInstance(WorkbenchHoverDelegate, placement, { instantHover: enableInstantHover }, {}));
-        setBaseLayerHoverDelegate(hoverService);
-        markdownRendererService.setDefaultCodeBlockRenderer(instantiationService.createInstance(EditorMarkdownCodeBlockRenderer));
+        setHoverDelegateFactory((placement, enableInstantHover) => instantiationService.createInstance(WorkbenchHoverDelegate, placement, enableInstantHover, {}));
     }
     addCommand(keybinding, handler, context) {
         if (!this._standaloneKeybindingService) {
@@ -167,17 +162,16 @@ StandaloneCodeEditor = __decorate([
     __param(3, ICodeEditorService),
     __param(4, ICommandService),
     __param(5, IContextKeyService),
-    __param(6, IHoverService),
-    __param(7, IKeybindingService),
-    __param(8, IThemeService),
-    __param(9, INotificationService),
-    __param(10, IAccessibilityService),
-    __param(11, ILanguageConfigurationService),
-    __param(12, ILanguageFeaturesService),
-    __param(13, IMarkdownRendererService)
+    __param(6, IKeybindingService),
+    __param(7, IThemeService),
+    __param(8, INotificationService),
+    __param(9, IAccessibilityService),
+    __param(10, ILanguageConfigurationService),
+    __param(11, ILanguageFeaturesService)
 ], StandaloneCodeEditor);
+export { StandaloneCodeEditor };
 let StandaloneEditor = class StandaloneEditor extends StandaloneCodeEditor {
-    constructor(domElement, _options, instantiationService, codeEditorService, commandService, contextKeyService, hoverService, keybindingService, themeService, notificationService, configurationService, accessibilityService, modelService, languageService, languageConfigurationService, languageFeaturesService, markdownRendererService) {
+    constructor(domElement, _options, instantiationService, codeEditorService, commandService, contextKeyService, keybindingService, themeService, notificationService, configurationService, accessibilityService, modelService, languageService, languageConfigurationService, languageFeaturesService) {
         const options = { ..._options };
         updateConfigurationService(configurationService, options, false);
         const themeDomRegistration = themeService.registerEditorContainer(domElement);
@@ -189,7 +183,7 @@ let StandaloneEditor = class StandaloneEditor extends StandaloneCodeEditor {
         }
         const _model = options.model;
         delete options.model;
-        super(domElement, options, instantiationService, codeEditorService, commandService, contextKeyService, hoverService, keybindingService, themeService, notificationService, accessibilityService, languageConfigurationService, languageFeaturesService, markdownRendererService);
+        super(domElement, options, instantiationService, codeEditorService, commandService, contextKeyService, keybindingService, themeService, notificationService, accessibilityService, languageConfigurationService, languageFeaturesService);
         this._configurationService = configurationService;
         this._standaloneThemeService = themeService;
         this._register(themeDomRegistration);
@@ -238,18 +232,17 @@ StandaloneEditor = __decorate([
     __param(3, ICodeEditorService),
     __param(4, ICommandService),
     __param(5, IContextKeyService),
-    __param(6, IHoverService),
-    __param(7, IKeybindingService),
-    __param(8, IStandaloneThemeService),
-    __param(9, INotificationService),
-    __param(10, IConfigurationService),
-    __param(11, IAccessibilityService),
-    __param(12, IModelService),
-    __param(13, ILanguageService),
-    __param(14, ILanguageConfigurationService),
-    __param(15, ILanguageFeaturesService),
-    __param(16, IMarkdownRendererService)
+    __param(6, IKeybindingService),
+    __param(7, IStandaloneThemeService),
+    __param(8, INotificationService),
+    __param(9, IConfigurationService),
+    __param(10, IAccessibilityService),
+    __param(11, IModelService),
+    __param(12, ILanguageService),
+    __param(13, ILanguageConfigurationService),
+    __param(14, ILanguageFeaturesService)
 ], StandaloneEditor);
+export { StandaloneEditor };
 let StandaloneDiffEditor2 = class StandaloneDiffEditor2 extends DiffEditorWidget {
     constructor(domElement, _options, instantiationService, contextKeyService, codeEditorService, themeService, notificationService, configurationService, contextMenuService, editorProgressService, clipboardService, accessibilitySignalService) {
         const options = { ..._options };
@@ -310,10 +303,11 @@ StandaloneDiffEditor2 = __decorate([
     __param(10, IClipboardService),
     __param(11, IAccessibilitySignalService)
 ], StandaloneDiffEditor2);
+export { StandaloneDiffEditor2 };
 /**
  * @internal
  */
-function createTextModel(modelService, languageService, value, languageId, uri) {
+export function createTextModel(modelService, languageService, value, languageId, uri) {
     value = value || '';
     if (!languageId) {
         const firstLF = value.indexOf('\n');
@@ -331,5 +325,3 @@ function createTextModel(modelService, languageService, value, languageId, uri) 
 function doCreateModel(modelService, value, languageSelection, uri) {
     return modelService.createModel(value, languageSelection, uri);
 }
-
-export { StandaloneCodeEditor, StandaloneDiffEditor2, StandaloneEditor, createTextModel };

@@ -1,16 +1,15 @@
-import './linesDecorations.css';
-import { DedupOverlay, DecorationToRender } from '../glyphMargin/glyphMargin.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class LinesDecorationsOverlay extends DedupOverlay {
+import './linesDecorations.css';
+import { DecorationToRender, DedupOverlay } from '../glyphMargin/glyphMargin.js';
+export class LinesDecorationsOverlay extends DedupOverlay {
     constructor(context) {
         super();
         this._context = context;
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
         this._decorationsLeft = layoutInfo.decorationsLeft;
         this._decorationsWidth = layoutInfo.decorationsWidth;
         this._renderResult = null;
@@ -24,7 +23,7 @@ class LinesDecorationsOverlay extends DedupOverlay {
     // --- begin event handlers
     onConfigurationChanged(e) {
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
         this._decorationsLeft = layoutInfo.decorationsLeft;
         this._decorationsWidth = layoutInfo.decorationsWidth;
         return true;
@@ -52,6 +51,7 @@ class LinesDecorationsOverlay extends DedupOverlay {
     }
     // --- end event handlers
     _getDecorations(ctx) {
+        var _a, _b;
         const decorations = ctx.getDecorationsInViewport();
         const r = [];
         let rLen = 0;
@@ -60,11 +60,11 @@ class LinesDecorationsOverlay extends DedupOverlay {
             const linesDecorationsClassName = d.options.linesDecorationsClassName;
             const zIndex = d.options.zIndex;
             if (linesDecorationsClassName) {
-                r[rLen++] = new DecorationToRender(d.range.startLineNumber, d.range.endLineNumber, linesDecorationsClassName, d.options.linesDecorationsTooltip ?? null, zIndex);
+                r[rLen++] = new DecorationToRender(d.range.startLineNumber, d.range.endLineNumber, linesDecorationsClassName, (_a = d.options.linesDecorationsTooltip) !== null && _a !== void 0 ? _a : null, zIndex);
             }
             const firstLineDecorationClassName = d.options.firstLineDecorationClassName;
             if (firstLineDecorationClassName) {
-                r[rLen++] = new DecorationToRender(d.range.startLineNumber, d.range.startLineNumber, firstLineDecorationClassName, d.options.linesDecorationsTooltip ?? null, zIndex);
+                r[rLen++] = new DecorationToRender(d.range.startLineNumber, d.range.startLineNumber, firstLineDecorationClassName, (_b = d.options.linesDecorationsTooltip) !== null && _b !== void 0 ? _b : null, zIndex);
             }
         }
         return r;
@@ -100,5 +100,3 @@ class LinesDecorationsOverlay extends DedupOverlay {
         return this._renderResult[lineNumber - startLineNumber];
     }
 }
-
-export { LinesDecorationsOverlay };

@@ -1,11 +1,10 @@
-import { Range } from '../core/range.js';
-import { Selection } from '../core/selection.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class SurroundSelectionCommand {
+import { Range } from '../core/range.js';
+import { Selection } from '../core/selection.js';
+export class SurroundSelectionCommand {
     constructor(range, charBeforeSelection, charAfterSelection) {
         this._range = range;
         this._charBeforeSelection = charBeforeSelection;
@@ -13,7 +12,7 @@ class SurroundSelectionCommand {
     }
     getEditOperations(model, builder) {
         builder.addTrackedEditOperation(new Range(this._range.startLineNumber, this._range.startColumn, this._range.startLineNumber, this._range.startColumn), this._charBeforeSelection);
-        builder.addTrackedEditOperation(new Range(this._range.endLineNumber, this._range.endColumn, this._range.endLineNumber, this._range.endColumn), this._charAfterSelection || null); // addTrackedEditOperation() ignores us if the text == ''. Causing a chain of errors in computeCursorState()
+        builder.addTrackedEditOperation(new Range(this._range.endLineNumber, this._range.endColumn, this._range.endLineNumber, this._range.endColumn), this._charAfterSelection);
     }
     computeCursorState(model, helper) {
         const inverseEditOperations = helper.getInverseEditOperations();
@@ -25,7 +24,7 @@ class SurroundSelectionCommand {
 /**
  * A surround selection command that runs after composition finished.
  */
-class CompositionSurroundSelectionCommand {
+export class CompositionSurroundSelectionCommand {
     constructor(_position, _text, _charAfter) {
         this._position = _position;
         this._text = _text;
@@ -40,5 +39,3 @@ class CompositionSurroundSelectionCommand {
         return new Selection(opRange.endLineNumber, opRange.startColumn, opRange.endLineNumber, opRange.endColumn - this._charAfter.length);
     }
 }
-
-export { CompositionSurroundSelectionCommand, SurroundSelectionCommand };

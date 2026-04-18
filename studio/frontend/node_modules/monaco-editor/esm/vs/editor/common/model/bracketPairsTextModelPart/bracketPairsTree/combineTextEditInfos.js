@@ -1,12 +1,11 @@
-import { ArrayQueue } from '../../../../../base/common/arrays.js';
-import { TextEditInfo } from './beforeEditPositionMapper.js';
-import { sumLengths, lengthAdd, lengthDiffNonNegative, lengthIsZero, lengthEquals, lengthZero, lengthToObj } from './length.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function combineTextEditInfos(textEditInfoFirst, textEditInfoSecond) {
+import { ArrayQueue } from '../../../../../base/common/arrays.js';
+import { TextEditInfo } from './beforeEditPositionMapper.js';
+import { lengthAdd, lengthDiffNonNegative, lengthEquals, lengthIsZero, lengthToObj, lengthZero, sumLengths } from './length.js';
+export function combineTextEditInfos(textEditInfoFirst, textEditInfoSecond) {
     if (textEditInfoFirst.length === 0) {
         return textEditInfoSecond;
     }
@@ -36,7 +35,7 @@ function combineTextEditInfos(textEditInfoFirst, textEditInfoSecond) {
             const [item, remainingItem] = curItem.splitAt(s1Length);
             result.push(item);
             s1Length = lengthDiffNonNegative(item.lengthAfter, s1Length);
-            curItem = remainingItem ?? s0ToS1Map.dequeue();
+            curItem = remainingItem !== null && remainingItem !== void 0 ? remainingItem : s0ToS1Map.dequeue();
         }
         if (!lengthIsZero(s1Length)) {
             result.push(new LengthMapping(false, s1Length, s1Length));
@@ -120,5 +119,3 @@ function toLengthMapping(textEditInfos) {
     }
     return result;
 }
-
-export { combineTextEditInfos };

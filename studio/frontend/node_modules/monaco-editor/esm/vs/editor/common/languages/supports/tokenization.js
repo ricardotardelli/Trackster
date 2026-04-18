@@ -1,10 +1,9 @@
-import { Color } from '../../../../base/common/color.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ParsedTokenThemeRule {
+import { Color } from '../../../../base/common/color.js';
+export class ParsedTokenThemeRule {
     constructor(token, index, fontStyle, foreground, background) {
         this._parsedThemeRuleBrand = undefined;
         this.token = token;
@@ -17,7 +16,7 @@ class ParsedTokenThemeRule {
 /**
  * Parse a raw theme into rules.
  */
-function parseTokenTheme(source) {
+export function parseTokenTheme(source) {
     if (!source || !Array.isArray(source)) {
         return [];
     }
@@ -103,7 +102,7 @@ function resolveParsedTokenThemeRules(parsedThemeRules, customTokenColors) {
     return new TokenTheme(colorMap, root);
 }
 const colorRegExp = /^#?([0-9A-Fa-f]{6})([0-9A-Fa-f]{2})?$/;
-class ColorMap {
+export class ColorMap {
     constructor() {
         this._lastColorId = 0;
         this._id2color = [];
@@ -131,7 +130,7 @@ class ColorMap {
         return this._id2color.slice(0);
     }
 }
-class TokenTheme {
+export class TokenTheme {
     static createFromRawTokenTheme(source, customTokenColors) {
         return this.createFromParsedTokenTheme(parseTokenTheme(source), customTokenColors);
     }
@@ -164,7 +163,7 @@ class TokenTheme {
     }
 }
 const STANDARD_TOKEN_TYPE_REGEXP = /\b(comment|string|regex|regexp)\b/;
-function toStandardTokenType(tokenType) {
+export function toStandardTokenType(tokenType) {
     const m = tokenType.match(STANDARD_TOKEN_TYPE_REGEXP);
     if (!m) {
         return 0 /* StandardTokenType.Other */;
@@ -181,7 +180,7 @@ function toStandardTokenType(tokenType) {
     }
     throw new Error('Unexpected match for standard token type!');
 }
-function strcmp(a, b) {
+export function strcmp(a, b) {
     if (a < b) {
         return -1;
     }
@@ -190,7 +189,7 @@ function strcmp(a, b) {
     }
     return 0;
 }
-class ThemeTrieElementRule {
+export class ThemeTrieElementRule {
     constructor(fontStyle, foreground, background) {
         this._themeTrieElementRuleBrand = undefined;
         this._fontStyle = fontStyle;
@@ -218,7 +217,7 @@ class ThemeTrieElementRule {
             | (this._background << 24 /* MetadataConsts.BACKGROUND_OFFSET */)) >>> 0;
     }
 }
-class ThemeTrieElement {
+export class ThemeTrieElement {
     constructor(mainRule) {
         this._themeTrieElementBrand = undefined;
         this._mainRule = mainRule;
@@ -270,7 +269,7 @@ class ThemeTrieElement {
         child.insert(tail, fontStyle, foreground, background);
     }
 }
-function generateTokensCSSForColorMap(colorMap) {
+export function generateTokensCSSForColorMap(colorMap) {
     const rules = [];
     for (let i = 1, len = colorMap.length; i < len; i++) {
         const color = colorMap[i];
@@ -283,5 +282,3 @@ function generateTokensCSSForColorMap(colorMap) {
     rules.push('.mtks.mtku { text-decoration: underline line-through; text-underline-position: under; }');
     return rules.join('\n');
 }
-
-export { ColorMap, ParsedTokenThemeRule, ThemeTrieElement, ThemeTrieElementRule, TokenTheme, generateTokensCSSForColorMap, parseTokenTheme, strcmp, toStandardTokenType };

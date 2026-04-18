@@ -1,14 +1,13 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
 import { Scrollable } from '../../../base/common/scrollable.js';
 import { LinesLayout } from './linesLayout.js';
 import { Viewport } from '../viewModel.js';
 import { ContentSizeChangedEvent } from '../viewModelEventDispatcher.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
 const SMOOTH_SCROLLING_TIME = 125;
 class EditorScrollDimensions {
     constructor(width, contentWidth, height, contentHeight) {
@@ -101,14 +100,14 @@ class EditorScrollable extends Disposable {
         return this._scrollable.hasPendingScrollAnimation();
     }
 }
-class ViewLayout extends Disposable {
-    constructor(configuration, lineCount, customLineHeightData, scheduleAtNextAnimationFrame) {
+export class ViewLayout extends Disposable {
+    constructor(configuration, lineCount, scheduleAtNextAnimationFrame) {
         super();
         this._configuration = configuration;
         const options = this._configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
-        const padding = options.get(96 /* EditorOption.padding */);
-        this._linesLayout = new LinesLayout(lineCount, options.get(75 /* EditorOption.lineHeight */), padding.top, padding.bottom, customLineHeightData);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
+        const padding = options.get(84 /* EditorOption.padding */);
+        this._linesLayout = new LinesLayout(lineCount, options.get(67 /* EditorOption.lineHeight */), padding.top, padding.bottom);
         this._maxLineWidth = 0;
         this._overlayWidgetsMinWidth = 0;
         this._scrollable = this._register(new EditorScrollable(0, scheduleAtNextAnimationFrame));
@@ -128,20 +127,20 @@ class ViewLayout extends Disposable {
         this._updateHeight();
     }
     _configureSmoothScrollDuration() {
-        this._scrollable.setSmoothScrollDuration(this._configuration.options.get(130 /* EditorOption.smoothScrolling */) ? SMOOTH_SCROLLING_TIME : 0);
+        this._scrollable.setSmoothScrollDuration(this._configuration.options.get(114 /* EditorOption.smoothScrolling */) ? SMOOTH_SCROLLING_TIME : 0);
     }
     // ---- begin view event handlers
     onConfigurationChanged(e) {
         const options = this._configuration.options;
-        if (e.hasChanged(75 /* EditorOption.lineHeight */)) {
-            this._linesLayout.setDefaultLineHeight(options.get(75 /* EditorOption.lineHeight */));
+        if (e.hasChanged(67 /* EditorOption.lineHeight */)) {
+            this._linesLayout.setLineHeight(options.get(67 /* EditorOption.lineHeight */));
         }
-        if (e.hasChanged(96 /* EditorOption.padding */)) {
-            const padding = options.get(96 /* EditorOption.padding */);
+        if (e.hasChanged(84 /* EditorOption.padding */)) {
+            const padding = options.get(84 /* EditorOption.padding */);
             this._linesLayout.setPadding(padding.top, padding.bottom);
         }
-        if (e.hasChanged(165 /* EditorOption.layoutInfo */)) {
-            const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
+        if (e.hasChanged(144 /* EditorOption.layoutInfo */)) {
+            const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
             const width = layoutInfo.contentWidth;
             const height = layoutInfo.height;
             const scrollDimensions = this._scrollable.getScrollDimensions();
@@ -151,12 +150,12 @@ class ViewLayout extends Disposable {
         else {
             this._updateHeight();
         }
-        if (e.hasChanged(130 /* EditorOption.smoothScrolling */)) {
+        if (e.hasChanged(114 /* EditorOption.smoothScrolling */)) {
             this._configureSmoothScrollDuration();
         }
     }
-    onFlushed(lineCount, customLineHeightData) {
-        this._linesLayout.onFlushed(lineCount, customLineHeightData);
+    onFlushed(lineCount) {
+        this._linesLayout.onFlushed(lineCount);
     }
     onLinesDeleted(fromLineNumber, toLineNumber) {
         this._linesLayout.onLinesDeleted(fromLineNumber, toLineNumber);
@@ -167,7 +166,7 @@ class ViewLayout extends Disposable {
     // ---- end view event handlers
     _getHorizontalScrollbarHeight(width, scrollWidth) {
         const options = this._configuration.options;
-        const scrollbar = options.get(117 /* EditorOption.scrollbar */);
+        const scrollbar = options.get(103 /* EditorOption.scrollbar */);
         if (scrollbar.horizontal === 2 /* ScrollbarVisibility.Hidden */) {
             // horizontal scrollbar not visible
             return 0;
@@ -181,10 +180,10 @@ class ViewLayout extends Disposable {
     _getContentHeight(width, height, contentWidth) {
         const options = this._configuration.options;
         let result = this._linesLayout.getLinesTotalHeight();
-        if (options.get(119 /* EditorOption.scrollBeyondLastLine */)) {
-            result += Math.max(0, height - options.get(75 /* EditorOption.lineHeight */) - options.get(96 /* EditorOption.padding */).bottom);
+        if (options.get(105 /* EditorOption.scrollBeyondLastLine */)) {
+            result += Math.max(0, height - options.get(67 /* EditorOption.lineHeight */) - options.get(84 /* EditorOption.padding */).bottom);
         }
-        else if (!options.get(117 /* EditorOption.scrollbar */).ignoreHorizontalScrollbarInContentHeight) {
+        else if (!options.get(103 /* EditorOption.scrollbar */).ignoreHorizontalScrollbarInContentHeight) {
             result += this._getHorizontalScrollbarHeight(width, contentWidth);
         }
         return result;
@@ -210,11 +209,11 @@ class ViewLayout extends Disposable {
     _computeContentWidth() {
         const options = this._configuration.options;
         const maxLineWidth = this._maxLineWidth;
-        const wrappingInfo = options.get(166 /* EditorOption.wrappingInfo */);
-        const fontInfo = options.get(59 /* EditorOption.fontInfo */);
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
+        const wrappingInfo = options.get(145 /* EditorOption.wrappingInfo */);
+        const fontInfo = options.get(50 /* EditorOption.fontInfo */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
         if (wrappingInfo.isViewportWrapping) {
-            const minimap = options.get(81 /* EditorOption.minimap */);
+            const minimap = options.get(73 /* EditorOption.minimap */);
             if (maxLineWidth > layoutInfo.contentWidth + fontInfo.typicalHalfwidthCharacterWidth) {
                 // This is a case where viewport wrapping is on, but the line extends above the viewport
                 if (minimap.enabled && minimap.side === 'right') {
@@ -225,7 +224,7 @@ class ViewLayout extends Disposable {
             return maxLineWidth;
         }
         else {
-            const extraHorizontalSpace = options.get(118 /* EditorOption.scrollBeyondLastColumn */) * fontInfo.typicalHalfwidthCharacterWidth;
+            const extraHorizontalSpace = options.get(104 /* EditorOption.scrollBeyondLastColumn */) * fontInfo.typicalHalfwidthCharacterWidth;
             const whitespaceMinWidth = this._linesLayout.getWhitespaceMinWidth();
             return Math.max(maxLineWidth + extraHorizontalSpace + layoutInfo.verticalScrollbarWidth, whitespaceMinWidth, this._overlayWidgetsMinWidth);
         }
@@ -264,21 +263,11 @@ class ViewLayout extends Disposable {
         }
         return hadAChange;
     }
-    changeSpecialLineHeights(callback) {
-        const hadAChange = this._linesLayout.changeLineHeights(callback);
-        if (hadAChange) {
-            this.onHeightMaybeChanged();
-        }
-        return hadAChange;
-    }
     getVerticalOffsetForLineNumber(lineNumber, includeViewZones = false) {
         return this._linesLayout.getVerticalOffsetForLineNumber(lineNumber, includeViewZones);
     }
     getVerticalOffsetAfterLineNumber(lineNumber, includeViewZones = false) {
         return this._linesLayout.getVerticalOffsetAfterLineNumber(lineNumber, includeViewZones);
-    }
-    getLineHeightForLineNumber(lineNumber) {
-        return this._linesLayout.getLineHeightForLineNumber(lineNumber);
     }
     isAfterLines(verticalOffset) {
         return this._linesLayout.isAfterLines(verticalOffset);
@@ -364,5 +353,3 @@ class ViewLayout extends Disposable {
         });
     }
 }
-
-export { ViewLayout };

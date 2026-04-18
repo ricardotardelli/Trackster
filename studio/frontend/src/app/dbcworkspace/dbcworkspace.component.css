@@ -230,7 +230,7 @@
 /* MATERIAL TABLE */
 .file-table {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
   background: transparent;
   border-collapse: collapse;
 }
@@ -751,3 +751,54 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* SCROLLBAR STANDARD - MATCH MODAL */
+.table-shell,
+.details-body,
+.signal-table-shell,
+.placeholder-body {
+  scrollbar-width: thin;
+  scrollbar-color: #93c5fd transparent;
+}
+
+.table-shell::-webkit-scrollbar,
+.details-body::-webkit-scrollbar,
+.signal-table-shell::-webkit-scrollbar,
+.placeholder-body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.table-shell::-webkit-scrollbar-track,
+.details-body::-webkit-scrollbar-track,
+.signal-table-shell::-webkit-scrollbar-track,
+.placeholder-body::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.table-shell::-webkit-scrollbar-thumb,
+.details-body::-webkit-scrollbar-thumb,
+.signal-table-shell::-webkit-scrollbar-thumb,
+.placeholder-body::-webkit-scrollbar-thumb {
+  background: #93c5fd;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.table-shell::-webkit-scrollbar-thumb:hover,
+.details-body::-webkit-scrollbar-thumb:hover,
+.signal-table-shell::-webkit-scrollbar-thumb:hover,
+.placeholder-body::-webkit-scrollbar-thumb:hover {
+  background: #60a5fa;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.table-shell::-webkit-scrollbar-corner,
+.details-body::-webkit-scrollbar-corner,
+.signal-table-shell::-webkit-scrollbar-corner,
+.placeholder-body::-webkit-scrollbar-corner {
+  background: transparent;
+} 

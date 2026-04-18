@@ -1,9 +1,6 @@
-import Severity$1 from '../../../base/common/severity.js';
+import BaseSeverity from '../../../base/common/severity.js';
 import { createDecorator } from '../../instantiation/common/instantiation.js';
-
-var Severity = Severity$1;
-const INotificationService = createDecorator('notificationService');
-class NoOpNotification {
+export var Severity = BaseSeverity;
+export const INotificationService = createDecorator('notificationService');
+export class NoOpNotification {
 }
-
-export { INotificationService, NoOpNotification, Severity };

@@ -1,14 +1,12 @@
-import { Emitter } from '../../../base/common/event.js';
-import { Disposable, markAsSingleton } from '../../../base/common/lifecycle.js';
-import { RGBA8 } from '../core/misc/rgba.js';
-import { TokenizationRegistry } from '../languages.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class MinimapTokensColorTracker extends Disposable {
-    static { this._INSTANCE = null; }
+import { Emitter } from '../../../base/common/event.js';
+import { Disposable, markAsSingleton } from '../../../base/common/lifecycle.js';
+import { RGBA8 } from '../core/rgba.js';
+import { TokenizationRegistry } from '../languages.js';
+export class MinimapTokensColorTracker extends Disposable {
     static getInstance() {
         if (!this._INSTANCE) {
             this._INSTANCE = markAsSingleton(new MinimapTokensColorTracker());
@@ -54,5 +52,4 @@ class MinimapTokensColorTracker extends Disposable {
         return this._backgroundIsLight;
     }
 }
-
-export { MinimapTokensColorTracker };
+MinimapTokensColorTracker._INSTANCE = null;

@@ -1,11 +1,10 @@
-import { createRegExp, escapeRegExpCharacters } from '../../../../base/common/strings.js';
-import { getPlatformTextDecoder } from '../../core/stringBuilder.js';
-import { Range } from '../../core/range.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as strings from '../../../../base/common/strings.js';
+import * as stringBuilder from '../../core/stringBuilder.js';
+import { Range } from '../../core/range.js';
 /**
  * Represents a grouping of colliding bracket pairs.
  *
@@ -21,7 +20,7 @@ import { Range } from '../../core/range.js';
  * e.g. of a group containing multiple pairs:
  *   open: ['if', 'for'], close: ['end', 'end']
  */
-class RichEditBracket {
+export class RichEditBracket {
     constructor(languageId, index, open, close, forwardRegex, reversedRegex) {
         this._richEditBracketBrand = undefined;
         this.languageId = languageId;
@@ -117,7 +116,7 @@ function groupFuzzyBrackets(brackets) {
     }
     return result;
 }
-class RichEditBrackets {
+export class RichEditBrackets {
     constructor(languageId, _brackets) {
         this._richEditBracketsBrand = undefined;
         const brackets = groupFuzzyBrackets(_brackets);
@@ -290,12 +289,12 @@ function getReversedRegexForBrackets(brackets) {
 function prepareBracketForRegExp(str) {
     // This bracket pair uses letters like e.g. "begin" - "end"
     const insertWordBoundaries = (/^[\w ]+$/.test(str));
-    str = escapeRegExpCharacters(str);
+    str = strings.escapeRegExpCharacters(str);
     return (insertWordBoundaries ? `\\b${str}\\b` : str);
 }
-function createBracketOrRegExp(pieces, options) {
+function createBracketOrRegExp(pieces) {
     const regexStr = `(${pieces.map(prepareBracketForRegExp).join(')|(')})`;
-    return createRegExp(regexStr, true, options);
+    return strings.createRegExp(regexStr, true);
 }
 const toReversedString = (function () {
     function reverse(str) {
@@ -305,7 +304,7 @@ const toReversedString = (function () {
         for (let i = str.length - 1; i >= 0; i--) {
             arr[offset++] = str.charCodeAt(i);
         }
-        return getPlatformTextDecoder().decode(arr);
+        return stringBuilder.getPlatformTextDecoder().decode(arr);
     }
     let lastInput = null;
     let lastOutput = null;
@@ -317,7 +316,7 @@ const toReversedString = (function () {
         return lastOutput;
     };
 })();
-class BracketsUtils {
+export class BracketsUtils {
     static _findPrevBracketInText(reversedBracketRegex, lineNumber, reversedText, offset) {
         const m = reversedText.match(reversedBracketRegex);
         if (!m) {
@@ -352,5 +351,3 @@ class BracketsUtils {
         return this.findNextBracketInText(bracketRegex, lineNumber, substr, startOffset);
     }
 }
-
-export { BracketsUtils, RichEditBracket, RichEditBrackets, createBracketOrRegExp };

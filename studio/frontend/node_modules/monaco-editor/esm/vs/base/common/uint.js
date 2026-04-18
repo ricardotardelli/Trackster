@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function toUint8(v) {
+export function toUint8(v) {
     if (v < 0) {
         return 0;
     }
@@ -11,7 +11,7 @@ function toUint8(v) {
     }
     return v | 0;
 }
-function toUint32(v) {
+export function toUint32(v) {
     if (v < 0) {
         return 0;
     }
@@ -20,5 +20,3 @@ function toUint32(v) {
     }
     return v | 0;
 }
-
-export { toUint32, toUint8 };

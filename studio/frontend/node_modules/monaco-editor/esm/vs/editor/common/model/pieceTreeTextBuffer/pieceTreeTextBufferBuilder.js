@@ -1,11 +1,10 @@
-import { startsWithUTF8BOM, UTF8_BOM_CHARACTER, containsRTL, containsUnusualLineTerminators } from '../../../../base/common/strings.js';
-import { createLineStarts, StringBuffer, createLineStartsFast } from './pieceTreeBase.js';
-import { PieceTreeTextBuffer } from './pieceTreeTextBuffer.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as strings from '../../../../base/common/strings.js';
+import { StringBuffer, createLineStarts, createLineStartsFast } from './pieceTreeBase.js';
+import { PieceTreeTextBuffer } from './pieceTreeTextBuffer.js';
 class PieceTreeTextBufferFactory {
     constructor(_chunks, _bom, _cr, _lf, _crlf, _containsRTL, _containsUnusualLineTerminators, _isBasicASCII, _normalizeEOL) {
         this._chunks = _chunks;
@@ -49,7 +48,7 @@ class PieceTreeTextBufferFactory {
         return { textBuffer: textBuffer, disposable: textBuffer };
     }
 }
-class PieceTreeTextBufferBuilder {
+export class PieceTreeTextBufferBuilder {
     constructor() {
         this.chunks = [];
         this.BOM = '';
@@ -68,8 +67,8 @@ class PieceTreeTextBufferBuilder {
             return;
         }
         if (this.chunks.length === 0) {
-            if (startsWithUTF8BOM(chunk)) {
-                this.BOM = UTF8_BOM_CHARACTER;
+            if (strings.startsWithUTF8BOM(chunk)) {
+                this.BOM = strings.UTF8_BOM_CHARACTER;
                 chunk = chunk.substr(1);
             }
         }
@@ -108,10 +107,10 @@ class PieceTreeTextBufferBuilder {
             // this chunk contains non basic ASCII characters
             this.isBasicASCII = false;
             if (!this.containsRTL) {
-                this.containsRTL = containsRTL(chunk);
+                this.containsRTL = strings.containsRTL(chunk);
             }
             if (!this.containsUnusualLineTerminators) {
-                this.containsUnusualLineTerminators = containsUnusualLineTerminators(chunk);
+                this.containsUnusualLineTerminators = strings.containsUnusualLineTerminators(chunk);
             }
         }
     }
@@ -136,5 +135,3 @@ class PieceTreeTextBufferBuilder {
         }
     }
 }
-
-export { PieceTreeTextBufferBuilder };

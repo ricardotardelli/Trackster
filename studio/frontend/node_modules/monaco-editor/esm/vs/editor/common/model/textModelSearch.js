@@ -1,15 +1,14 @@
-import { createRegExp, getNextCodePoint } from '../../../base/common/strings.js';
-import { getMapForWordSeparators } from '../core/wordCharacterClassifier.js';
-import { Position } from '../core/position.js';
-import { Range } from '../core/range.js';
-import { SearchData, FindMatch } from '../model.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as strings from '../../../base/common/strings.js';
+import { getMapForWordSeparators } from '../core/wordCharacterClassifier.js';
+import { Position } from '../core/position.js';
+import { Range } from '../core/range.js';
+import { FindMatch, SearchData } from '../model.js';
 const LIMIT_FIND_COUNT = 999;
-class SearchParams {
+export class SearchParams {
     constructor(searchString, isRegex, matchCase, wordSeparators) {
         this.searchString = searchString;
         this.isRegex = isRegex;
@@ -30,7 +29,7 @@ class SearchParams {
         }
         let regex = null;
         try {
-            regex = createRegExp(this.searchString, this.isRegex, {
+            regex = strings.createRegExp(this.searchString, this.isRegex, {
                 matchCase: this.matchCase,
                 wholeWord: false,
                 multiline: multiline,
@@ -49,10 +48,10 @@ class SearchParams {
             // casing might make a difference
             canUseSimpleSearch = this.matchCase;
         }
-        return new SearchData(regex, this.wordSeparators ? getMapForWordSeparators(this.wordSeparators, []) : null, canUseSimpleSearch ? this.searchString : null);
+        return new SearchData(regex, this.wordSeparators ? getMapForWordSeparators(this.wordSeparators) : null, canUseSimpleSearch ? this.searchString : null);
     }
 }
-function isMultilineRegexSource(searchString) {
+export function isMultilineRegexSource(searchString) {
     if (!searchString || searchString.length === 0) {
         return false;
     }
@@ -76,7 +75,7 @@ function isMultilineRegexSource(searchString) {
     }
     return false;
 }
-function createFindMatch(range, rawMatches, captureMatches) {
+export function createFindMatch(range, rawMatches, captureMatches) {
     if (!captureMatches) {
         return new FindMatch(range, null);
     }
@@ -128,7 +127,7 @@ class LineFeedCounter {
         return min + 1;
     }
 }
-class TextModelSearch {
+export class TextModelSearch {
     static findMatches(model, searchParams, searchRange, captureMatches, limitResultCount) {
         const searchData = searchParams.parseSearchRequest();
         if (!searchData) {
@@ -397,11 +396,11 @@ function rightIsWordBounday(wordSeparators, text, textLength, matchStartIndex, m
     }
     return false;
 }
-function isValidMatch(wordSeparators, text, textLength, matchStartIndex, matchLength) {
+export function isValidMatch(wordSeparators, text, textLength, matchStartIndex, matchLength) {
     return (leftIsWordBounday(wordSeparators, text, textLength, matchStartIndex, matchLength)
         && rightIsWordBounday(wordSeparators, text, textLength, matchStartIndex, matchLength));
 }
-class Searcher {
+export class Searcher {
     constructor(wordSeparators, searchRegex) {
         this._wordSeparators = wordSeparators;
         this._searchRegex = searchRegex;
@@ -431,7 +430,7 @@ class Searcher {
                 if (matchLength === 0) {
                     // the search result is an empty string and won't advance `regex.lastIndex`, so `regex.exec` will stuck here
                     // we attempt to recover from that by advancing by two if surrogate pair found and by one otherwise
-                    if (getNextCodePoint(text, textLength, this._searchRegex.lastIndex) > 0xFFFF) {
+                    if (strings.getNextCodePoint(text, textLength, this._searchRegex.lastIndex) > 0xFFFF) {
                         this._searchRegex.lastIndex += 2;
                     }
                     else {
@@ -451,5 +450,3 @@ class Searcher {
         return null;
     }
 }
-
-export { SearchParams, Searcher, TextModelSearch, createFindMatch, isMultilineRegexSource, isValidMatch };

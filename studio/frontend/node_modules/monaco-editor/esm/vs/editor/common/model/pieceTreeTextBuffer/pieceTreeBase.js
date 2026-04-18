@@ -1,13 +1,12 @@
-import { Position } from '../../core/position.js';
-import { Range } from '../../core/range.js';
-import { FindMatch } from '../../model.js';
-import { SENTINEL, rbDelete, updateTreeMetadata, TreeNode, leftest, fixInsert, righttest } from './rbTreeBase.js';
-import { createFindMatch, Searcher, isValidMatch } from '../textModelSearch.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Position } from '../../core/position.js';
+import { Range } from '../../core/range.js';
+import { FindMatch } from '../../model.js';
+import { SENTINEL, TreeNode, fixInsert, leftest, rbDelete, righttest, updateTreeMetadata } from './rbTreeBase.js';
+import { Searcher, createFindMatch, isValidMatch } from '../textModelSearch.js';
 // const lfRegex = new RegExp(/\r\n|\r|\n/g);
 const AverageBufferSize = 65535;
 function createUintArray(arr) {
@@ -30,7 +29,7 @@ class LineStarts {
         this.isBasicASCII = isBasicASCII;
     }
 }
-function createLineStartsFast(str, readonly = true) {
+export function createLineStartsFast(str, readonly = true) {
     const r = [0];
     let rLength = 1;
     for (let i = 0, len = str.length; i < len; i++) {
@@ -57,7 +56,7 @@ function createLineStartsFast(str, readonly = true) {
         return r;
     }
 }
-function createLineStarts(r, str) {
+export function createLineStarts(r, str) {
     r.length = 0;
     r[0] = 0;
     let rLength = 1;
@@ -94,7 +93,7 @@ function createLineStarts(r, str) {
     r.length = 0;
     return result;
 }
-class Piece {
+export class Piece {
     constructor(bufferIndex, start, end, lineFeedCnt, length) {
         this.bufferIndex = bufferIndex;
         this.start = start;
@@ -103,7 +102,7 @@ class Piece {
         this.length = length;
     }
 }
-class StringBuffer {
+export class StringBuffer {
     constructor(buffer, lineStarts) {
         this.buffer = buffer;
         this.lineStarts = lineStarts;
@@ -200,7 +199,7 @@ class PieceTreeSearchCache {
         }
     }
 }
-class PieceTreeBase {
+export class PieceTreeBase {
     constructor(chunks, eol, eolNormalized) {
         this.create(chunks, eol, eolNormalized);
     }
@@ -339,6 +338,8 @@ class PieceTreeBase {
                 return value.replace(/\r\n|\r|\n/g, eol);
             }
             if (eol === this.getEOL() && this._EOLNormalized) {
+                if (eol === '\r\n') {
+                }
                 return value;
             }
             return value.replace(/\r\n|\r|\n/g, eol);
@@ -497,26 +498,6 @@ class PieceTreeBase {
             return this.getLength() - startOffset;
         }
         return this.getOffsetAt(lineNumber + 1, 1) - this.getOffsetAt(lineNumber, 1) - this._EOLLength;
-    }
-    getNearestChunk(offset) {
-        const nodePos = this.nodeAt(offset);
-        if (nodePos.remainder === nodePos.node.piece.length) {
-            // the offset is at the head of next node.
-            const matchingNode = nodePos.node.next();
-            if (!matchingNode || matchingNode === SENTINEL) {
-                return '';
-            }
-            const buffer = this._buffers[matchingNode.piece.bufferIndex];
-            const startOffset = this.offsetInBuffer(matchingNode.piece.bufferIndex, matchingNode.piece.start);
-            return buffer.buffer.substring(startOffset, startOffset + matchingNode.piece.length);
-        }
-        else {
-            const buffer = this._buffers[nodePos.node.piece.bufferIndex];
-            const startOffset = this.offsetInBuffer(nodePos.node.piece.bufferIndex, nodePos.node.piece.start);
-            const targetOffset = startOffset + nodePos.remainder;
-            const targetEnd = startOffset + nodePos.node.piece.length;
-            return buffer.buffer.substring(targetOffset, targetEnd);
-        }
     }
     findMatchesInNode(node, searcher, startLineNumber, startColumn, startCursor, endCursor, searchData, captureMatches, limitResultCount, resultLen, result) {
         const buffer = this._buffers[node.piece.bufferIndex];
@@ -1469,5 +1450,3 @@ class PieceTreeBase {
         return z;
     }
 }
-
-export { Piece, PieceTreeBase, StringBuffer, createLineStarts, createLineStartsFast };

@@ -1,4 +1,13 @@
-const conf = {
+/*!-----------------------------------------------------------------------------
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Version: 0.47.0(69991d66135e4a1fc1cf0b1ac4ad25d429866a0d)
+ * Released under the MIT license
+ * https://github.com/microsoft/monaco-editor/blob/main/LICENSE.txt
+ *-----------------------------------------------------------------------------*/
+
+
+// src/basic-languages/wgsl/wgsl.ts
+var conf = {
   comments: {
     lineComment: "//",
     blockComment: ["/*", "*/"]
@@ -29,8 +38,8 @@ function qw(str) {
   }
   return result;
 }
-const atoms = qw("true false");
-const keywords = qw(`
+var atoms = qw("true false");
+var keywords = qw(`
 			  alias
 			  break
 			  case
@@ -56,7 +65,7 @@ const keywords = qw(`
 			  var
 			  while
 			  `);
-const reserved = qw(`
+var reserved = qw(`
 			  NULL
 			  Self
 			  abstract
@@ -203,7 +212,7 @@ const reserved = qw(`
 			  writeonly
 			  yield
 			  `);
-const predeclared_enums = qw(`
+var predeclared_enums = qw(`
 		read write read_write
 		function private workgroup uniform storage
 		perspective linear flat
@@ -230,7 +239,7 @@ const predeclared_enums = qw(`
 		rgba32float
 		bgra8unorm
 `);
-const predeclared_types = qw(`
+var predeclared_types = qw(`
 		bool
 		f16
 		f32
@@ -245,7 +254,7 @@ const predeclared_types = qw(`
 		texture_external
 		u32
 		`);
-const predeclared_type_generators = qw(`
+var predeclared_type_generators = qw(`
 		array
 		atomic
 		mat2x2
@@ -273,7 +282,7 @@ const predeclared_type_generators = qw(`
 		vec3
 		vec4
 		`);
-const predeclared_type_aliases = qw(`
+var predeclared_type_aliases = qw(`
 		vec2i vec3i vec4i
 		vec2u vec3u vec4u
 		vec2f vec3f vec4f
@@ -285,7 +294,7 @@ const predeclared_type_aliases = qw(`
 		mat3x2h mat3x3h mat3x4h
 		mat4x2h mat4x3h mat4x4h
 		`);
-const predeclared_intrinsics = qw(`
+var predeclared_intrinsics = qw(`
   bitcast all any select arrayLength abs acos acosh asin asinh atan atanh atan2
   ceil clamp cos cosh countLeadingZeros countOneBits countTrailingZeros cross
   degrees determinant distance dot exp exp2 extractBits faceForward firstLeadingBit
@@ -302,7 +311,7 @@ const predeclared_intrinsics = qw(`
   unpack2x16snorm unpack2x16unorm unpack2x16float storageBarrier workgroupBarrier
   workgroupUniformLoad
 `);
-const operators = qw(`
+var operators = qw(`
 					 &
 					 &&
 					 ->
@@ -335,10 +344,10 @@ const operators = qw(`
 					 >>=
 					 <<=
 					 `);
-const directive_re = /enable|requires|diagnostic/;
-const ident_re = /[_\p{XID_Start}]\p{XID_Continue}*/u;
-const predefined_token = "variable.predefined";
-const language = {
+var directive_re = /enable|requires|diagnostic/;
+var ident_re = /[_\p{XID_Start}]\p{XID_Continue}*/u;
+var predefined_token = "variable.predefined";
+var language = {
   tokenPostfix: ".wgsl",
   defaultToken: "invalid",
   unicode: true,
@@ -448,5 +457,7 @@ const language = {
     ]
   }
 };
-
-export { conf, language };
+export {
+  conf,
+  language
+};

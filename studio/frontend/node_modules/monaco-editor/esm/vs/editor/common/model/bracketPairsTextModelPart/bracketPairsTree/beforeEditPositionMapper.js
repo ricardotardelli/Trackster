@@ -1,11 +1,10 @@
-import { Range } from '../../../core/range.js';
-import { positionToLength, lengthOfString, lengthToObj, lengthDiffNonNegative, toLength, lengthLessThanEqual, lengthAdd } from './length.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class TextEditInfo {
+import { Range } from '../../../core/range.js';
+import { lengthAdd, lengthDiffNonNegative, lengthLessThanEqual, lengthOfString, lengthToObj, positionToLength, toLength } from './length.js';
+export class TextEditInfo {
     static fromModelContentChanges(changes) {
         // Must be sorted in ascending order
         const edits = changes.map(c => {
@@ -23,7 +22,7 @@ class TextEditInfo {
         return `[${lengthToObj(this.startOffset)}...${lengthToObj(this.endOffset)}) -> ${lengthToObj(this.newLength)}`;
     }
 }
-class BeforeEditPositionMapper {
+export class BeforeEditPositionMapper {
     /**
      * @param edits Must be sorted by offset in ascending order.
     */
@@ -106,5 +105,3 @@ class TextEditInfoCache {
         this.offsetObj = lengthToObj(startOffset);
     }
 }
-
-export { BeforeEditPositionMapper, TextEditInfo };

@@ -1,12 +1,11 @@
-import { Emitter } from '../../base/common/event.js';
-import { toDisposable } from '../../base/common/lifecycle.js';
-import { shouldSynchronizeModel } from './model.js';
-import { score } from './languageSelector.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Emitter } from '../../base/common/event.js';
+import { toDisposable } from '../../base/common/lifecycle.js';
+import { shouldSynchronizeModel } from './model.js';
+import { score } from './languageSelector.js';
 function isExclusive(selector) {
     if (typeof selector === 'string') {
         return false;
@@ -19,28 +18,27 @@ function isExclusive(selector) {
     }
 }
 class MatchCandidate {
-    constructor(uri, languageId, notebookUri, notebookType, recursive) {
+    constructor(uri, languageId, notebookUri, notebookType) {
         this.uri = uri;
         this.languageId = languageId;
         this.notebookUri = notebookUri;
         this.notebookType = notebookType;
-        this.recursive = recursive;
     }
     equals(other) {
+        var _a, _b;
         return this.notebookType === other.notebookType
             && this.languageId === other.languageId
             && this.uri.toString() === other.uri.toString()
-            && this.notebookUri?.toString() === other.notebookUri?.toString()
-            && this.recursive === other.recursive;
+            && ((_a = this.notebookUri) === null || _a === void 0 ? void 0 : _a.toString()) === ((_b = other.notebookUri) === null || _b === void 0 ? void 0 : _b.toString());
     }
 }
-class LanguageFeatureRegistry {
-    get onDidChange() { return this._onDidChange.event; }
+export class LanguageFeatureRegistry {
     constructor(_notebookInfoResolver) {
         this._notebookInfoResolver = _notebookInfoResolver;
         this._clock = 0;
         this._entries = [];
         this._onDidChange = new Emitter();
+        this.onDidChange = this._onDidChange.event;
     }
     register(selector, provider) {
         let entry = {
@@ -71,7 +69,7 @@ class LanguageFeatureRegistry {
         if (!model) {
             return [];
         }
-        this._updateScores(model, false);
+        this._updateScores(model);
         const result = [];
         // from registry
         for (const entry of this._entries) {
@@ -81,16 +79,16 @@ class LanguageFeatureRegistry {
         }
         return result;
     }
-    ordered(model, recursive = false) {
+    ordered(model) {
         const result = [];
-        this._orderedForEach(model, recursive, entry => result.push(entry.provider));
+        this._orderedForEach(model, entry => result.push(entry.provider));
         return result;
     }
     orderedGroups(model) {
         const result = [];
         let lastBucket;
         let lastBucketScore;
-        this._orderedForEach(model, false, entry => {
+        this._orderedForEach(model, entry => {
             if (lastBucket && lastBucketScore === entry._score) {
                 lastBucket.push(entry.provider);
             }
@@ -102,22 +100,23 @@ class LanguageFeatureRegistry {
         });
         return result;
     }
-    _orderedForEach(model, recursive, callback) {
-        this._updateScores(model, recursive);
+    _orderedForEach(model, callback) {
+        this._updateScores(model);
         for (const entry of this._entries) {
             if (entry._score > 0) {
                 callback(entry);
             }
         }
     }
-    _updateScores(model, recursive) {
-        const notebookInfo = this._notebookInfoResolver?.(model.uri);
+    _updateScores(model) {
+        var _a, _b;
+        const notebookInfo = (_a = this._notebookInfoResolver) === null || _a === void 0 ? void 0 : _a.call(this, model.uri);
         // use the uri (scheme, pattern) of the notebook info iff we have one
         // otherwise it's the model's/document's uri
         const candidate = notebookInfo
-            ? new MatchCandidate(model.uri, model.getLanguageId(), notebookInfo.uri, notebookInfo.type, recursive)
-            : new MatchCandidate(model.uri, model.getLanguageId(), undefined, undefined, recursive);
-        if (this._lastCandidate?.equals(candidate)) {
+            ? new MatchCandidate(model.uri, model.getLanguageId(), notebookInfo.uri, notebookInfo.type)
+            : new MatchCandidate(model.uri, model.getLanguageId(), undefined, undefined);
+        if ((_b = this._lastCandidate) === null || _b === void 0 ? void 0 : _b.equals(candidate)) {
             // nothing has changed
             return;
         }
@@ -125,18 +124,13 @@ class LanguageFeatureRegistry {
         for (const entry of this._entries) {
             entry._score = score(entry.selector, candidate.uri, candidate.languageId, shouldSynchronizeModel(model), candidate.notebookUri, candidate.notebookType);
             if (isExclusive(entry.selector) && entry._score > 0) {
-                if (recursive) {
+                // support for one exclusive selector that overwrites
+                // any other selector
+                for (const entry of this._entries) {
                     entry._score = 0;
                 }
-                else {
-                    // support for one exclusive selector that overwrites
-                    // any other selector
-                    for (const entry of this._entries) {
-                        entry._score = 0;
-                    }
-                    entry._score = 1000;
-                    break;
-                }
+                entry._score = 1000;
+                break;
             }
         }
         // needs sorting
@@ -176,5 +170,3 @@ function isBuiltinSelector(selector) {
     }
     return Boolean(selector.isBuiltin);
 }
-
-export { LanguageFeatureRegistry };

@@ -1,14 +1,12 @@
-import { LineTokens } from '../tokens/lineTokens.js';
-import { Position } from '../core/position.js';
-import { LineInjectedText } from '../textModelEvents.js';
-import { ViewLineData } from '../viewModel.js';
-import { SingleLineInlineDecoration } from './inlineDecorations.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function createModelLineProjection(lineBreakData, isVisible) {
+import { LineTokens } from '../tokens/lineTokens.js';
+import { Position } from '../core/position.js';
+import { LineInjectedText } from '../textModelEvents.js';
+import { SingleLineInlineDecoration, ViewLineData } from '../viewModel.js';
+export function createModelLineProjection(lineBreakData, isVisible) {
     if (lineBreakData === null) {
         // No mapping needed
         if (isVisible) {
@@ -137,28 +135,11 @@ class ModelLineProjection {
         }
         let lineWithInjections;
         if (injectionOffsets) {
-            const tokensToInsert = [];
-            for (let idx = 0; idx < injectionOffsets.length; idx++) {
-                const offset = injectionOffsets[idx];
-                const tokens = injectionOptions[idx].tokens;
-                if (tokens) {
-                    tokens.forEach((range, info) => {
-                        tokensToInsert.push({
-                            offset,
-                            text: range.substring(injectionOptions[idx].content),
-                            tokenMetadata: info.metadata,
-                        });
-                    });
-                }
-                else {
-                    tokensToInsert.push({
-                        offset,
-                        text: injectionOptions[idx].content,
-                        tokenMetadata: LineTokens.defaultTokenMetadata,
-                    });
-                }
-            }
-            lineWithInjections = model.tokenization.getLineTokens(modelLineNumber).withInserted(tokensToInsert);
+            lineWithInjections = model.tokenization.getLineTokens(modelLineNumber).withInserted(injectionOffsets.map((offset, idx) => ({
+                offset,
+                text: injectionOptions[idx].content,
+                tokenMetadata: LineTokens.defaultTokenMetadata
+            })));
         }
         else {
             lineWithInjections = model.tokenization.getLineTokens(modelLineNumber);
@@ -222,7 +203,6 @@ class ModelLineProjection {
  * This projection does not change the model line.
 */
 class IdentityModelLineProjection {
-    static { this.INSTANCE = new IdentityModelLineProjection(); }
     constructor() { }
     isVisible() {
         return true;
@@ -279,11 +259,11 @@ class IdentityModelLineProjection {
         return null;
     }
 }
+IdentityModelLineProjection.INSTANCE = new IdentityModelLineProjection();
 /**
  * This projection hides the model line.
  */
 class HiddenModelLineProjection {
-    static { this.INSTANCE = new HiddenModelLineProjection(); }
     constructor() { }
     isVisible() {
         return false;
@@ -334,6 +314,7 @@ class HiddenModelLineProjection {
         throw new Error('Not supported');
     }
 }
+HiddenModelLineProjection.INSTANCE = new HiddenModelLineProjection();
 const _spaces = [''];
 function spaces(count) {
     if (count >= _spaces.length) {
@@ -346,5 +327,3 @@ function spaces(count) {
 function _makeSpaces(count) {
     return new Array(count + 1).join(' ');
 }
-
-export { createModelLineProjection };

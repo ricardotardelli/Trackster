@@ -1,20 +1,19 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { Emitter } from '../../../../../base/common/event.js';
 import { Disposable } from '../../../../../base/common/lifecycle.js';
 import { BracketInfo, BracketPairWithMinIndentationInfo } from '../../../textModelBracketPairs.js';
 import { TextEditInfo } from './beforeEditPositionMapper.js';
 import { LanguageAgnosticBracketTokens } from './brackets.js';
-import { toLength, lengthZero, positionToLength, lengthsToRange, lengthAdd, lengthLessThanEqual, lengthGreaterThanEqual, lengthLessThan } from './length.js';
+import { lengthAdd, lengthGreaterThanEqual, lengthLessThan, lengthLessThanEqual, lengthsToRange, lengthZero, positionToLength, toLength } from './length.js';
 import { parseDocument } from './parser.js';
 import { DenseKeyProvider } from './smallImmutableSet.js';
 import { FastTokenizer, TextBufferTokenizer } from './tokenizer.js';
 import { CallbackIterable } from '../../../../../base/common/arrays.js';
 import { combineTextEditInfos } from './combineTextEditInfos.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class BracketPairsTree extends Disposable {
+export class BracketPairsTree extends Disposable {
     didLanguageChange(languageId) {
         return this.brackets.didLanguageChange(languageId);
     }
@@ -93,7 +92,9 @@ class BracketPairsTree extends Disposable {
      * @pure (only if isPure = true)
     */
     parseDocumentFromTextBuffer(edits, previousAst, immutable) {
-        const previousAstClone = previousAst;
+        // Is much faster if `isPure = false`.
+        const isPure = false;
+        const previousAstClone = isPure ? previousAst === null || previousAst === void 0 ? void 0 : previousAst.deepClone() : previousAst;
         const tokenizer = new TextBufferTokenizer(this.textModel, this.brackets);
         const result = parseDocument(tokenizer, edits, previousAstClone, immutable);
         return result;
@@ -262,7 +263,7 @@ function collectBrackets(node, nodeOffsetStart, nodeOffsetEnd, startOffset, endO
                     }
                     nodeOffsetStart = nodeOffsetEnd;
                 }
-                levelPerBracketType?.set(node.openingBracket.text, levelPerBracket);
+                levelPerBracketType === null || levelPerBracketType === void 0 ? void 0 : levelPerBracketType.set(node.openingBracket.text, levelPerBracket);
                 return true;
             }
             case 3 /* AstNodeKind.UnexpectedClosingBracket */: {
@@ -286,6 +287,7 @@ class CollectBracketPairsContext {
     }
 }
 function collectBracketPairs(node, nodeOffsetStart, nodeOffsetEnd, startOffset, endOffset, context, level, levelPerBracketType) {
+    var _a;
     if (level > 200) {
         return true;
     }
@@ -307,7 +309,7 @@ function collectBracketPairs(node, nodeOffsetStart, nodeOffsetEnd, startOffset, 
             minIndentation = node.computeMinIndentation(nodeOffsetStart, context.textModel);
         }
         shouldContinue = context.push(new BracketPairWithMinIndentationInfo(lengthsToRange(nodeOffsetStart, nodeOffsetEnd), lengthsToRange(nodeOffsetStart, openingBracketEnd), node.closingBracket
-            ? lengthsToRange(lengthAdd(openingBracketEnd, node.child?.length || lengthZero), nodeOffsetEnd)
+            ? lengthsToRange(lengthAdd(openingBracketEnd, ((_a = node.child) === null || _a === void 0 ? void 0 : _a.length) || lengthZero), nodeOffsetEnd)
             : undefined, level, levelPerBracket, node, minIndentation));
         nodeOffsetStart = openingBracketEnd;
         if (shouldContinue && node.child) {
@@ -321,7 +323,7 @@ function collectBracketPairs(node, nodeOffsetStart, nodeOffsetEnd, startOffset, 
                 }
             }
         }
-        levelPerBracketType?.set(node.openingBracket.text, levelPerBracket);
+        levelPerBracketType === null || levelPerBracketType === void 0 ? void 0 : levelPerBracketType.set(node.openingBracket.text, levelPerBracket);
     }
     else {
         let curOffset = nodeOffsetStart;
@@ -339,5 +341,3 @@ function collectBracketPairs(node, nodeOffsetStart, nodeOffsetEnd, startOffset, 
     }
     return shouldContinue;
 }
-
-export { BracketPairsTree };

@@ -1,14 +1,13 @@
-import { Range } from '../../../common/range.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Range } from '../../../common/range.js';
 /**
  * Returns the intersection between a ranged group and a range.
  * Returns `[]` if the intersection is empty.
  */
-function groupIntersect(range, groups) {
+export function groupIntersect(range, groups) {
     const result = [];
     for (const r of groups) {
         if (range.start >= r.range.end) {
@@ -31,7 +30,7 @@ function groupIntersect(range, groups) {
 /**
  * Shifts a range by that `much`.
  */
-function shift({ start, end }, much) {
+export function shift({ start, end }, much) {
     return { start: start + much, end: end + much };
 }
 /**
@@ -40,7 +39,7 @@ function shift({ start, end }, much) {
  * Consolidation is the process of merging consecutive ranged groups
  * that share the same `size`.
  */
-function consolidate(groups) {
+export function consolidate(groups) {
     const result = [];
     let previousGroup = null;
     for (const group of groups) {
@@ -63,7 +62,7 @@ function consolidate(groups) {
 function concat(...groups) {
     return consolidate(groups.reduce((r, g) => r.concat(g), []));
 }
-class RangeMap {
+export class RangeMap {
     get paddingTop() {
         return this._paddingTop;
     }
@@ -75,7 +74,7 @@ class RangeMap {
         this.groups = [];
         this._size = 0;
         this._paddingTop = 0;
-        this._paddingTop = topPadding ?? 0;
+        this._paddingTop = topPadding !== null && topPadding !== void 0 ? topPadding : 0;
         this._size = this._paddingTop;
     }
     splice(index, deleteCount, items = []) {
@@ -157,5 +156,3 @@ class RangeMap {
         return -1;
     }
 }
-
-export { RangeMap, consolidate, groupIntersect, shift };

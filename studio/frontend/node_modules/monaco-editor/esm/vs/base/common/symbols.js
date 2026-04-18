@@ -5,6 +5,4 @@
 /**
  * Can be passed into the Delayed to defer using a microtask
  * */
-const MicrotaskDelay = Symbol('MicrotaskDelay');
-
-export { MicrotaskDelay };
+export const MicrotaskDelay = Symbol('MicrotaskDelay');

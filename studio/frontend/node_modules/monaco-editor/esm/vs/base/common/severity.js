@@ -1,9 +1,8 @@
-import { equalsIgnoreCase } from './strings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as strings from './strings.js';
 var Severity;
 (function (Severity) {
     Severity[Severity["Ignore"] = 0] = "Ignore";
@@ -25,13 +24,13 @@ var Severity;
         if (!value) {
             return Severity.Ignore;
         }
-        if (equalsIgnoreCase(_error, value)) {
+        if (strings.equalsIgnoreCase(_error, value)) {
             return Severity.Error;
         }
-        if (equalsIgnoreCase(_warning, value) || equalsIgnoreCase(_warn, value)) {
+        if (strings.equalsIgnoreCase(_warning, value) || strings.equalsIgnoreCase(_warn, value)) {
             return Severity.Warning;
         }
-        if (equalsIgnoreCase(_info, value)) {
+        if (strings.equalsIgnoreCase(_info, value)) {
             return Severity.Info;
         }
         return Severity.Ignore;
@@ -47,6 +46,4 @@ var Severity;
     }
     Severity.toString = toString;
 })(Severity || (Severity = {}));
-var Severity$1 = Severity;
-
-export { Severity$1 as default };
+export default Severity;

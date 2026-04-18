@@ -1,39 +1,33 @@
-import { isEditableElement, EventHelper, getWindow, isHTMLElement, getActiveElement, isMouseEvent } from '../../dom.js';
-import { createStyleSheet } from '../../domStylesheets.js';
-import { asCssValueWithDefault } from '../../cssValue.js';
-import { DomEmitter } from '../../event.js';
-import { StandardKeyboardEvent } from '../../keyboardEvent.js';
-import { Gesture } from '../../touch.js';
-import { alert } from '../aria/aria.js';
-import { CombinedSpliceable } from './splice.js';
-import { binarySearch, range } from '../../../common/arrays.js';
-import { timeout } from '../../../common/async.js';
-import { Color } from '../../../common/color.js';
-import { memoize } from '../../../common/decorators.js';
-import { Emitter, Event, EventBufferer } from '../../../common/event.js';
-import { matchesPrefix, matchesFuzzy2 } from '../../../common/filters.js';
-import { dispose, DisposableStore } from '../../../common/lifecycle.js';
-import { clamp } from '../../../common/numbers.js';
-import { isMacintosh } from '../../../common/platform.js';
-import { isNumber } from '../../../common/types.js';
-import './list.css';
-import { ListError } from './list.js';
-import { ListView } from './listView.js';
-import { StandardMouseEvent } from '../../mouseEvent.js';
-import '../../../common/observableInternal/index.js';
-import { constObservable } from '../../../common/observableInternal/observables/constObservable.js';
-import { autorun } from '../../../common/observableInternal/reactions/autorun.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+import { asCssValueWithDefault, createStyleSheet, EventHelper, getActiveElement, getWindow, isActiveElement, isMouseEvent } from '../../dom.js';
+import { DomEmitter } from '../../event.js';
+import { StandardKeyboardEvent } from '../../keyboardEvent.js';
+import { Gesture } from '../../touch.js';
+import { alert } from '../aria/aria.js';
+import { CombinedSpliceable } from './splice.js';
+import { binarySearch, firstOrDefault, range } from '../../../common/arrays.js';
+import { timeout } from '../../../common/async.js';
+import { Color } from '../../../common/color.js';
+import { memoize } from '../../../common/decorators.js';
+import { Emitter, Event, EventBufferer } from '../../../common/event.js';
+import { matchesFuzzy2, matchesPrefix } from '../../../common/filters.js';
+import { DisposableStore, dispose } from '../../../common/lifecycle.js';
+import { clamp } from '../../../common/numbers.js';
+import * as platform from '../../../common/platform.js';
+import { isNumber } from '../../../common/types.js';
+import './list.css';
+import { ListError } from './list.js';
+import { ListView } from './listView.js';
+import { StandardMouseEvent } from '../../mouseEvent.js';
 class TraitRenderer {
     constructor(trait) {
         this.trait = trait;
@@ -89,7 +83,6 @@ class TraitRenderer {
     }
 }
 class Trait {
-    get onChange() { return this._onChange.event; }
     get name() { return this._trait; }
     get renderer() {
         return new TraitRenderer(this);
@@ -99,6 +92,7 @@ class Trait {
         this.indexes = [];
         this.sortedIndexes = [];
         this._onChange = new Emitter();
+        this.onChange = this._onChange.event;
     }
     splice(start, deleteCount, elements) {
         const diff = elements.length - deleteCount;
@@ -198,6 +192,9 @@ class TraitSpliceable {
         this.trait.splice(start, deleteCount, elementsWithTrait);
     }
 }
+export function isInputElement(e) {
+    return e.tagName === 'INPUT' || e.tagName === 'TEXTAREA';
+}
 function isListElementDescendantOfClass(e, className) {
     if (e.classList.contains(className)) {
         return true;
@@ -210,22 +207,22 @@ function isListElementDescendantOfClass(e, className) {
     }
     return isListElementDescendantOfClass(e.parentElement, className);
 }
-function isMonacoEditor(e) {
+export function isMonacoEditor(e) {
     return isListElementDescendantOfClass(e, 'monaco-editor');
 }
-function isMonacoCustomToggle(e) {
+export function isMonacoCustomToggle(e) {
     return isListElementDescendantOfClass(e, 'monaco-custom-toggle');
 }
-function isActionItem(e) {
+export function isActionItem(e) {
     return isListElementDescendantOfClass(e, 'action-item');
 }
-function isStickyScrollElement(e) {
+export function isStickyScrollElement(e) {
     return isListElementDescendantOfClass(e, 'monaco-tree-sticky-row');
 }
-function isStickyScrollContainer(e) {
+export function isStickyScrollContainer(e) {
     return e.classList.contains('monaco-tree-sticky-container');
 }
-function isButton(e) {
+export function isButton(e) {
     if ((e.tagName === 'A' && e.classList.contains('monaco-button')) ||
         (e.tagName === 'DIV' && e.classList.contains('monaco-button-dropdown'))) {
         return true;
@@ -240,7 +237,7 @@ function isButton(e) {
 }
 class KeyboardController {
     get onKeyDown() {
-        return Event.chain(this.disposables.add(new DomEmitter(this.view.domNode, 'keydown')).event, $ => $.filter(e => !isEditableElement(e.target))
+        return Event.chain(this.disposables.add(new DomEmitter(this.view.domNode, 'keydown')).event, $ => $.filter(e => !isInputElement(e.target))
             .map(e => new StandardKeyboardEvent(e)));
     }
     constructor(list, view, options) {
@@ -264,7 +261,7 @@ class KeyboardController {
                 case 9 /* KeyCode.Escape */:
                     return this.onEscape(e);
                 case 31 /* KeyCode.KeyA */:
-                    if (this.multipleSelectionSupport && (isMacintosh ? e.metaKey : e.ctrlKey)) {
+                    if (this.multipleSelectionSupport && (platform.isMacintosh ? e.metaKey : e.ctrlKey)) {
                         this.onCtrlA(e);
                     }
             }
@@ -340,7 +337,7 @@ class KeyboardController {
 __decorate([
     memoize
 ], KeyboardController.prototype, "onKeyDown", null);
-var TypeNavigationMode;
+export var TypeNavigationMode;
 (function (TypeNavigationMode) {
     TypeNavigationMode[TypeNavigationMode["Automatic"] = 0] = "Automatic";
     TypeNavigationMode[TypeNavigationMode["Trigger"] = 1] = "Trigger";
@@ -350,7 +347,7 @@ var TypeNavigationControllerState;
     TypeNavigationControllerState[TypeNavigationControllerState["Idle"] = 0] = "Idle";
     TypeNavigationControllerState[TypeNavigationControllerState["Typing"] = 1] = "Typing";
 })(TypeNavigationControllerState || (TypeNavigationControllerState = {}));
-const DefaultKeyboardNavigationDelegate = new class {
+export const DefaultKeyboardNavigationDelegate = new class {
     mightProducePrintableCharacter(event) {
         if (event.ctrlKey || event.metaKey || event.altKey) {
             return false;
@@ -378,20 +375,21 @@ class TypeNavigationController {
         this.updateOptions(list.options);
     }
     updateOptions(options) {
-        if (options.typeNavigationEnabled ?? true) {
+        var _a, _b;
+        if ((_a = options.typeNavigationEnabled) !== null && _a !== void 0 ? _a : true) {
             this.enable();
         }
         else {
             this.disable();
         }
-        this.mode = options.typeNavigationMode ?? TypeNavigationMode.Automatic;
+        this.mode = (_b = options.typeNavigationMode) !== null && _b !== void 0 ? _b : TypeNavigationMode.Automatic;
     }
     enable() {
         if (this.enabled) {
             return;
         }
         let typing = false;
-        const onChar = Event.chain(this.enabledDisposables.add(new DomEmitter(this.view.domNode, 'keydown')).event, $ => $.filter(e => !isEditableElement(e.target))
+        const onChar = Event.chain(this.enabledDisposables.add(new DomEmitter(this.view.domNode, 'keydown')).event, $ => $.filter(e => !isInputElement(e.target))
             .filter(() => this.mode === TypeNavigationMode.Automatic || this.triggered)
             .map(event => new StandardKeyboardEvent(event))
             .filter(e => typing || this.keyboardNavigationEventFilter(e))
@@ -416,16 +414,14 @@ class TypeNavigationController {
         this.triggered = false;
     }
     onClear() {
+        var _a;
         const focus = this.list.getFocus();
         if (focus.length > 0 && focus[0] === this.previouslyFocused) {
             // List: re-announce element on typing end since typed keys will interrupt aria label of focused element
             // Do not announce if there was a focus change at the end to prevent duplication https://github.com/microsoft/vscode/issues/95961
-            const ariaLabel = this.list.options.accessibilityProvider?.getAriaLabel(this.list.element(focus[0]));
-            if (typeof ariaLabel === 'string') {
+            const ariaLabel = (_a = this.list.options.accessibilityProvider) === null || _a === void 0 ? void 0 : _a.getAriaLabel(this.list.element(focus[0]));
+            if (ariaLabel) {
                 alert(ariaLabel);
-            }
-            else if (ariaLabel) {
-                alert(ariaLabel.get());
             }
         }
         this.previouslyFocused = -1;
@@ -486,7 +482,7 @@ class DOMFocusController {
         this.view = view;
         this.disposables = new DisposableStore();
         const onKeyDown = Event.chain(this.disposables.add(new DomEmitter(view.domNode, 'keydown')).event, $ => $
-            .filter(e => !isEditableElement(e.target))
+            .filter(e => !isInputElement(e.target))
             .map(e => new StandardKeyboardEvent(e)));
         const onTab = Event.chain(onKeyDown, $ => $.filter(e => e.keyCode === 2 /* KeyCode.Tab */ && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey));
         onTab(this.onTab, this, this.disposables);
@@ -503,9 +499,8 @@ class DOMFocusController {
         if (!focusedDomElement) {
             return;
         }
-        // eslint-disable-next-line no-restricted-syntax
         const tabIndexElement = focusedDomElement.querySelector('[tabIndex]');
-        if (!tabIndexElement || !(isHTMLElement(tabIndexElement)) || tabIndexElement.tabIndex === -1) {
+        if (!tabIndexElement || !(tabIndexElement instanceof HTMLElement) || tabIndexElement.tabIndex === -1) {
             return;
         }
         const style = getWindow(tabIndexElement).getComputedStyle(tabIndexElement);
@@ -520,10 +515,10 @@ class DOMFocusController {
         this.disposables.dispose();
     }
 }
-function isSelectionSingleChangeEvent(event) {
-    return isMacintosh ? event.browserEvent.metaKey : event.browserEvent.ctrlKey;
+export function isSelectionSingleChangeEvent(event) {
+    return platform.isMacintosh ? event.browserEvent.metaKey : event.browserEvent.ctrlKey;
 }
-function isSelectionRangeChangeEvent(event) {
+export function isSelectionRangeChangeEvent(event) {
     return event.browserEvent.shiftKey;
 }
 function isMouseRightClick(event) {
@@ -533,12 +528,12 @@ const DefaultMultipleSelectionController = {
     isSelectionSingleChangeEvent,
     isSelectionRangeChangeEvent
 };
-class MouseController {
-    get onPointer() { return this._onPointer.event; }
+export class MouseController {
     constructor(list) {
         this.list = list;
         this.disposables = new DisposableStore();
-        this._onPointer = this.disposables.add(new Emitter());
+        this._onPointer = new Emitter();
+        this.onPointer = this._onPointer.event;
         if (list.options.multipleSelectionSupport !== false) {
             this.multipleSelectionController = this.list.options.multipleSelectionController || DefaultMultipleSelectionController;
         }
@@ -584,7 +579,7 @@ class MouseController {
         }
     }
     onContextMenu(e) {
-        if (isEditableElement(e.browserEvent.target) || isMonacoEditor(e.browserEvent.target)) {
+        if (isInputElement(e.browserEvent.target) || isMonacoEditor(e.browserEvent.target)) {
             return;
         }
         const focus = typeof e.index === 'undefined' ? [] : [e.index];
@@ -594,7 +589,7 @@ class MouseController {
         if (!this.mouseSupport) {
             return;
         }
-        if (isEditableElement(e.browserEvent.target) || isMonacoEditor(e.browserEvent.target)) {
+        if (isInputElement(e.browserEvent.target) || isMonacoEditor(e.browserEvent.target)) {
             return;
         }
         if (e.browserEvent.isHandledByList) {
@@ -619,7 +614,7 @@ class MouseController {
         this._onPointer.fire(e);
     }
     onDoubleClick(e) {
-        if (isEditableElement(e.browserEvent.target) || isMonacoEditor(e.browserEvent.target)) {
+        if (isInputElement(e.browserEvent.target) || isMonacoEditor(e.browserEvent.target)) {
             return;
         }
         if (this.isSelectionChangeEvent(e)) {
@@ -638,7 +633,7 @@ class MouseController {
         if (this.isSelectionRangeChangeEvent(e)) {
             if (typeof anchor === 'undefined') {
                 const currentFocus = this.list.getFocus()[0];
-                anchor = currentFocus ?? focus;
+                anchor = currentFocus !== null && currentFocus !== void 0 ? currentFocus : focus;
                 this.list.setAnchor(anchor);
             }
             const min = Math.min(anchor, focus);
@@ -670,12 +665,13 @@ class MouseController {
         this.disposables.dispose();
     }
 }
-class DefaultStyleController {
+export class DefaultStyleController {
     constructor(styleElement, selectorSuffix) {
         this.styleElement = styleElement;
         this.selectorSuffix = selectorSuffix;
     }
     style(styles) {
+        var _a, _b;
         const suffix = this.selectorSuffix && `.${this.selectorSuffix}`;
         const content = [];
         if (styles.listBackground) {
@@ -700,13 +696,13 @@ class DefaultStyleController {
         }
         if (styles.listFocusAndSelectionBackground) {
             content.push(`
-				.monaco-drag-image${suffix},
+				.monaco-drag-image,
 				.monaco-list${suffix}:focus .monaco-list-row.selected.focused { background-color: ${styles.listFocusAndSelectionBackground}; }
 			`);
         }
         if (styles.listFocusAndSelectionForeground) {
             content.push(`
-				.monaco-drag-image${suffix},
+				.monaco-drag-image,
 				.monaco-list${suffix}:focus .monaco-list-row.selected.focused { color: ${styles.listFocusAndSelectionForeground}; }
 			`);
         }
@@ -737,18 +733,18 @@ class DefaultStyleController {
         /**
          * Outlines
          */
-        const focusAndSelectionOutline = asCssValueWithDefault(styles.listFocusAndSelectionOutline, asCssValueWithDefault(styles.listSelectionOutline, styles.listFocusOutline ?? ''));
+        const focusAndSelectionOutline = asCssValueWithDefault(styles.listFocusAndSelectionOutline, asCssValueWithDefault(styles.listSelectionOutline, (_a = styles.listFocusOutline) !== null && _a !== void 0 ? _a : ''));
         if (focusAndSelectionOutline) { // default: listFocusOutline
             content.push(`.monaco-list${suffix}:focus .monaco-list-row.focused.selected { outline: 1px solid ${focusAndSelectionOutline}; outline-offset: -1px;}`);
         }
         if (styles.listFocusOutline) { // default: set
             content.push(`
-				.monaco-drag-image${suffix},
-				.monaco-list${suffix}:focus .monaco-list-row.focused,
-				.context-menu-visible .monaco-list${suffix}.last-focused .monaco-list-row.focused { outline: 1px solid ${styles.listFocusOutline}; outline-offset: -1px; }
+				.monaco-drag-image,
+				.monaco-list${suffix}:focus .monaco-list-row.focused { outline: 1px solid ${styles.listFocusOutline}; outline-offset: -1px; }
+				.monaco-workbench.context-menu-visible .monaco-list${suffix}.last-focused .monaco-list-row.focused { outline: 1px solid ${styles.listFocusOutline}; outline-offset: -1px; }
 			`);
         }
-        const inactiveFocusAndSelectionOutline = asCssValueWithDefault(styles.listSelectionOutline, styles.listInactiveFocusOutline ?? '');
+        const inactiveFocusAndSelectionOutline = asCssValueWithDefault(styles.listSelectionOutline, (_b = styles.listInactiveFocusOutline) !== null && _b !== void 0 ? _b : '');
         if (inactiveFocusAndSelectionOutline) {
             content.push(`.monaco-list${suffix} .monaco-list-row.focused.selected { outline: 1px dotted ${inactiveFocusAndSelectionOutline}; outline-offset: -1px; }`);
         }
@@ -786,13 +782,13 @@ class DefaultStyleController {
             content.push(`
 				.monaco-table > .monaco-split-view2,
 				.monaco-table > .monaco-split-view2 .monaco-sash.vertical::before,
-				.monaco-enable-motion .monaco-table:hover > .monaco-split-view2,
-				.monaco-enable-motion .monaco-table:hover > .monaco-split-view2 .monaco-sash.vertical::before {
+				.monaco-workbench:not(.reduce-motion) .monaco-table:hover > .monaco-split-view2,
+				.monaco-workbench:not(.reduce-motion) .monaco-table:hover > .monaco-split-view2 .monaco-sash.vertical::before {
 					border-color: ${styles.tableColumnsBorder};
 				}
 
-				.monaco-enable-motion .monaco-table > .monaco-split-view2,
-				.monaco-enable-motion .monaco-table > .monaco-split-view2 .monaco-sash.vertical::before {
+				.monaco-workbench:not(.reduce-motion) .monaco-table > .monaco-split-view2,
+				.monaco-workbench:not(.reduce-motion) .monaco-table > .monaco-split-view2 .monaco-sash.vertical::before {
 					border-color: transparent;
 				}
 			`);
@@ -809,7 +805,7 @@ class DefaultStyleController {
         this.styleElement.textContent = content.join('\n');
     }
 }
-const unthemedListStyles = {
+export const unthemedListStyles = {
     listFocusBackground: '#7FB0D0',
     listActiveSelectionBackground: '#0E639C',
     listActiveSelectionForeground: '#FFFFFF',
@@ -835,10 +831,7 @@ const unthemedListStyles = {
     listFocusOutline: undefined,
     listInactiveFocusOutline: undefined,
     listSelectionOutline: undefined,
-    listHoverOutline: undefined,
-    treeStickyScrollBackground: undefined,
-    treeStickyScrollBorder: undefined,
-    treeStickyScrollShadow: undefined
+    listHoverOutline: undefined
 };
 const DefaultOptions = {
     keyboardSupport: true,
@@ -939,16 +932,17 @@ class PipelineRenderer {
     renderTemplate(container) {
         return this.renderers.map(r => r.renderTemplate(container));
     }
-    renderElement(element, index, templateData, renderDetails) {
+    renderElement(element, index, templateData, height) {
         let i = 0;
         for (const renderer of this.renderers) {
-            renderer.renderElement(element, index, templateData[i++], renderDetails);
+            renderer.renderElement(element, index, templateData[i++], height);
         }
     }
-    disposeElement(element, index, templateData, renderDetails) {
+    disposeElement(element, index, templateData, height) {
+        var _a;
         let i = 0;
         for (const renderer of this.renderers) {
-            renderer.disposeElement?.(element, index, templateData[i], renderDetails);
+            (_a = renderer.disposeElement) === null || _a === void 0 ? void 0 : _a.call(renderer, element, index, templateData[i], height);
             i += 1;
         }
     }
@@ -965,35 +959,26 @@ class AccessibiltyRenderer {
         this.templateId = 'a18n';
     }
     renderTemplate(container) {
-        return { container, disposables: new DisposableStore() };
+        return container;
     }
-    renderElement(element, index, data) {
+    renderElement(element, index, container) {
         const ariaLabel = this.accessibilityProvider.getAriaLabel(element);
-        const observable = (ariaLabel && typeof ariaLabel !== 'string') ? ariaLabel : constObservable(ariaLabel);
-        data.disposables.add(autorun(reader => {
-            this.setAriaLabel(reader.readObservable(observable), data.container);
-        }));
+        if (ariaLabel) {
+            container.setAttribute('aria-label', ariaLabel);
+        }
+        else {
+            container.removeAttribute('aria-label');
+        }
         const ariaLevel = this.accessibilityProvider.getAriaLevel && this.accessibilityProvider.getAriaLevel(element);
         if (typeof ariaLevel === 'number') {
-            data.container.setAttribute('aria-level', `${ariaLevel}`);
+            container.setAttribute('aria-level', `${ariaLevel}`);
         }
         else {
-            data.container.removeAttribute('aria-level');
+            container.removeAttribute('aria-level');
         }
-    }
-    setAriaLabel(ariaLabel, element) {
-        if (ariaLabel) {
-            element.setAttribute('aria-label', ariaLabel);
-        }
-        else {
-            element.removeAttribute('aria-label');
-        }
-    }
-    disposeElement(element, index, templateData) {
-        templateData.disposables.clear();
     }
     disposeTemplate(templateData) {
-        templateData.disposables.dispose();
+        // noop
     }
 }
 class ListViewDragAndDrop {
@@ -1016,16 +1001,19 @@ class ListViewDragAndDrop {
         return undefined;
     }
     onDragStart(data, originalEvent) {
-        this.dnd.onDragStart?.(data, originalEvent);
+        var _a, _b;
+        (_b = (_a = this.dnd).onDragStart) === null || _b === void 0 ? void 0 : _b.call(_a, data, originalEvent);
     }
     onDragOver(data, targetElement, targetIndex, targetSector, originalEvent) {
         return this.dnd.onDragOver(data, targetElement, targetIndex, targetSector, originalEvent);
     }
     onDragLeave(data, targetElement, targetIndex, originalEvent) {
-        this.dnd.onDragLeave?.(data, targetElement, targetIndex, originalEvent);
+        var _a, _b;
+        (_b = (_a = this.dnd).onDragLeave) === null || _b === void 0 ? void 0 : _b.call(_a, data, targetElement, targetIndex, originalEvent);
     }
     onDragEnd(originalEvent) {
-        this.dnd.onDragEnd?.(originalEvent);
+        var _a, _b;
+        (_b = (_a = this.dnd).onDragEnd) === null || _b === void 0 ? void 0 : _b.call(_a, originalEvent);
     }
     drop(data, targetElement, targetIndex, targetSector, originalEvent) {
         this.dnd.drop(data, targetElement, targetIndex, targetSector, originalEvent);
@@ -1049,7 +1037,7 @@ class ListViewDragAndDrop {
  * - Dynamic element height support
  * - Drag-and-drop support
  */
-class List {
+export class List {
     get onDidChangeFocus() {
         return Event.map(this.eventBufferer.wrapEvent(this.focus.onChange), e => this.toListEvent(e), this.disposables);
     }
@@ -1099,6 +1087,7 @@ class List {
     get onDidFocus() { return Event.signal(this.disposables.add(new DomEmitter(this.view.domNode, 'focus', true)).event); }
     get onDidBlur() { return Event.signal(this.disposables.add(new DomEmitter(this.view.domNode, 'blur', true)).event); }
     constructor(user, container, virtualDelegate, renderers, _options = DefaultOptions) {
+        var _a, _b, _c, _d;
         this.user = user;
         this._options = _options;
         this.focus = new Trait('focused');
@@ -1108,13 +1097,13 @@ class List {
         this.disposables = new DisposableStore();
         this._onDidDispose = new Emitter();
         this.onDidDispose = this._onDidDispose.event;
-        const role = this._options.accessibilityProvider && this._options.accessibilityProvider.getWidgetRole ? this._options.accessibilityProvider?.getWidgetRole() : 'list';
+        const role = this._options.accessibilityProvider && this._options.accessibilityProvider.getWidgetRole ? (_a = this._options.accessibilityProvider) === null || _a === void 0 ? void 0 : _a.getWidgetRole() : 'list';
         this.selection = new SelectionTrait(role !== 'listbox');
         const baseRenderers = [this.focus.renderer, this.selection.renderer];
         this.accessibilityProvider = _options.accessibilityProvider;
         if (this.accessibilityProvider) {
             baseRenderers.push(new AccessibiltyRenderer(this.accessibilityProvider));
-            this.accessibilityProvider.onDidChangeActiveDescendant?.(this.onDidChangeActiveDescendant, this, this.disposables);
+            (_c = (_b = this.accessibilityProvider).onDidChangeActiveDescendant) === null || _c === void 0 ? void 0 : _c.call(_b, this.onDidChangeActiveDescendant, this, this.disposables);
         }
         renderers = renderers.map(r => new PipelineRenderer(r.templateId, [...baseRenderers, r]));
         const viewOptions = {
@@ -1148,7 +1137,7 @@ class List {
         }
         if (_options.keyboardNavigationLabelProvider) {
             const delegate = _options.keyboardNavigationDelegate || DefaultKeyboardNavigationDelegate;
-            this.typeNavigationController = new TypeNavigationController(this, this.view, _options.keyboardNavigationLabelProvider, _options.keyboardNavigationEventFilter ?? (() => true), delegate);
+            this.typeNavigationController = new TypeNavigationController(this, this.view, _options.keyboardNavigationLabelProvider, (_d = _options.keyboardNavigationEventFilter) !== null && _d !== void 0 ? _d : (() => true), delegate);
             this.disposables.add(this.typeNavigationController);
         }
         this.mouseController = this.createMouseController(_options);
@@ -1156,11 +1145,7 @@ class List {
         this.onDidChangeFocus(this._onFocusChange, this, this.disposables);
         this.onDidChangeSelection(this._onSelectionChange, this, this.disposables);
         if (this.accessibilityProvider) {
-            const ariaLabel = this.accessibilityProvider.getWidgetAriaLabel();
-            const observable = (ariaLabel && typeof ariaLabel !== 'string') ? ariaLabel : constObservable(ariaLabel);
-            this.disposables.add(autorun(reader => {
-                this.ariaLabel = reader.readObservable(observable);
-            }));
+            this.ariaLabel = this.accessibilityProvider.getWidgetAriaLabel();
         }
         if (this._options.multipleSelectionSupport !== false) {
             this.view.domNode.setAttribute('aria-multiselectable', 'true');
@@ -1173,8 +1158,9 @@ class List {
         return new MouseController(this);
     }
     updateOptions(optionsUpdate = {}) {
+        var _a, _b;
         this._options = { ...this._options, ...optionsUpdate };
-        this.typeNavigationController?.updateOptions(this._options);
+        (_a = this.typeNavigationController) === null || _a === void 0 ? void 0 : _a.updateOptions(this._options);
         if (this._options.multipleSelectionController !== undefined) {
             if (this._options.multipleSelectionSupport) {
                 this.view.domNode.setAttribute('aria-multiselectable', 'true');
@@ -1184,7 +1170,7 @@ class List {
             }
         }
         this.mouseController.updateOptions(optionsUpdate);
-        this.keyboardController?.updateOptions(optionsUpdate);
+        (_b = this.keyboardController) === null || _b === void 0 ? void 0 : _b.updateOptions(optionsUpdate);
         this.view.updateOptions(optionsUpdate);
     }
     get options() {
@@ -1276,7 +1262,7 @@ class List {
         this.anchor.set([index]);
     }
     getAnchor() {
-        return this.anchor.get().at(0);
+        return firstOrDefault(this.anchor.get(), undefined);
     }
     getAnchorElement() {
         const anchor = this.getAnchor();
@@ -1438,7 +1424,9 @@ class List {
         else {
             const viewItemBottom = elementTop + elementHeight;
             const scrollBottom = scrollTop + this.view.renderHeight;
-            if (elementTop < scrollTop + paddingTop && viewItemBottom >= scrollBottom) ;
+            if (elementTop < scrollTop + paddingTop && viewItemBottom >= scrollBottom) {
+                // The element is already overflowing the viewport, no-op
+            }
             else if (elementTop < scrollTop + paddingTop || (viewItemBottom >= scrollBottom && elementHeight >= this.view.renderHeight)) {
                 this.view.setScrollTop(elementTop - paddingTop);
             }
@@ -1465,6 +1453,9 @@ class List {
         const m = elementHeight - this.view.renderHeight + paddingTop;
         return Math.abs((scrollTop + paddingTop - elementTop) / m);
     }
+    isDOMFocused() {
+        return isActiveElement(this.view.domNode);
+    }
     getHTMLElement() {
         return this.view.domNode;
     }
@@ -1489,10 +1480,11 @@ class List {
         this.onDidChangeActiveDescendant();
     }
     onDidChangeActiveDescendant() {
+        var _a;
         const focus = this.focus.get();
         if (focus.length > 0) {
             let id;
-            if (this.accessibilityProvider?.getActiveDescendantId) {
+            if ((_a = this.accessibilityProvider) === null || _a === void 0 ? void 0 : _a.getActiveDescendantId) {
                 id = this.accessibilityProvider.getActiveDescendantId(this.view.element(focus[0]));
             }
             this.view.domNode.setAttribute('aria-activedescendant', id || this.view.getElementDomId(focus[0]));
@@ -1531,5 +1523,3 @@ __decorate([
 __decorate([
     memoize
 ], List.prototype, "onDidBlur", null);
-
-export { DefaultKeyboardNavigationDelegate, DefaultStyleController, List, MouseController, TypeNavigationMode, isActionItem, isButton, isMonacoCustomToggle, isMonacoEditor, isSelectionRangeChangeEvent, isSelectionSingleChangeEvent, isStickyScrollContainer, isStickyScrollElement, unthemedListStyles };

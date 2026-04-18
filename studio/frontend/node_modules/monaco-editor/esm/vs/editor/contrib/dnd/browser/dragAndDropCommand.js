@@ -1,11 +1,10 @@
-import { Range } from '../../../common/core/range.js';
-import { Selection } from '../../../common/core/selection.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class DragAndDropCommand {
+import { Range } from '../../../common/core/range.js';
+import { Selection } from '../../../common/core/selection.js';
+export class DragAndDropCommand {
     constructor(selection, targetPosition, copy) {
         this.selection = selection;
         this.targetPosition = targetPosition;
@@ -61,5 +60,3 @@ class DragAndDropCommand {
         return this.targetSelection;
     }
 }
-
-export { DragAndDropCommand };

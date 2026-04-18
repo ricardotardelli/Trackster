@@ -1,12 +1,11 @@
-import { sep, posix } from './path.js';
-import { isWindows } from './platform.js';
-import { startsWithIgnoreCase } from './strings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function isPathSeparator(code) {
+import { posix, sep } from './path.js';
+import { isWindows } from './platform.js';
+import { startsWithIgnoreCase } from './strings.js';
+export function isPathSeparator(code) {
     return code === 47 /* CharCode.Slash */ || code === 92 /* CharCode.Backslash */;
 }
 /**
@@ -14,7 +13,7 @@ function isPathSeparator(code) {
  * This should only be done for OS paths from Windows (or user provided paths potentially from Windows).
  * Using it on a Linux or MaxOS path might change it.
  */
-function toSlashes(osPath) {
+export function toSlashes(osPath) {
     return osPath.replace(/[\\/]/g, posix.sep);
 }
 /**
@@ -24,7 +23,7 @@ function toSlashes(osPath) {
  * This should only be done for OS paths from Windows (or user provided paths potentially from Windows).
  * Using it on a Linux or MaxOS path might change it.
  */
-function toPosixPath(osPath) {
+export function toPosixPath(osPath) {
     if (osPath.indexOf('/') === -1) {
         osPath = toSlashes(osPath);
     }
@@ -38,7 +37,7 @@ function toPosixPath(osPath) {
  * `getRoot('files:///files/path') === files:///`,
  * or `getRoot('\\server\shares\path') === \\server\shares\`
  */
-function getRoot(path, sep = posix.sep) {
+export function getRoot(path, sep = posix.sep) {
     if (!path) {
         return '';
     }
@@ -105,7 +104,7 @@ function getRoot(path, sep = posix.sep) {
  * you are in a context without services, consider to pass down the `extUri` from the
  * outside, or use `extUriBiasedIgnorePathCase` if you know what you are doing.
  */
-function isEqualOrParent(base, parentCandidate, ignoreCase, separator = sep) {
+export function isEqualOrParent(base, parentCandidate, ignoreCase, separator = sep) {
     if (base === parentCandidate) {
         return true;
     }
@@ -134,14 +133,12 @@ function isEqualOrParent(base, parentCandidate, ignoreCase, separator = sep) {
     }
     return base.indexOf(parentCandidate) === 0;
 }
-function isWindowsDriveLetter(char0) {
+export function isWindowsDriveLetter(char0) {
     return char0 >= 65 /* CharCode.A */ && char0 <= 90 /* CharCode.Z */ || char0 >= 97 /* CharCode.a */ && char0 <= 122 /* CharCode.z */;
 }
-function hasDriveLetter(path, isWindowsOS = isWindows) {
+export function hasDriveLetter(path, isWindowsOS = isWindows) {
     if (isWindowsOS) {
         return isWindowsDriveLetter(path.charCodeAt(0)) && path.charCodeAt(1) === 58 /* CharCode.Colon */;
     }
     return false;
 }
-
-export { getRoot, hasDriveLetter, isEqualOrParent, isPathSeparator, isWindowsDriveLetter, toPosixPath, toSlashes };

@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class BasicInplaceReplace {
+export class BasicInplaceReplace {
     constructor() {
         this._defaultValueSet = [
             ['true', 'false'],
@@ -11,7 +11,6 @@ class BasicInplaceReplace {
             ['public', 'protected', 'private'],
         ];
     }
-    static { this.INSTANCE = new BasicInplaceReplace(); }
     navigateValueSet(range1, text1, range2, text2, up) {
         if (range1 && text1) {
             const result = this.doNavigateValueSet(text1, up);
@@ -71,7 +70,7 @@ class BasicInplaceReplace {
     valueSetReplace(valueSet, value, up) {
         let idx = valueSet.indexOf(value);
         if (idx >= 0) {
-            idx += up ? 1 : -1;
+            idx += up ? +1 : -1;
             if (idx < 0) {
                 idx = valueSet.length - 1;
             }
@@ -83,5 +82,4 @@ class BasicInplaceReplace {
         return null;
     }
 }
-
-export { BasicInplaceReplace };
+BasicInplaceReplace.INSTANCE = new BasicInplaceReplace();

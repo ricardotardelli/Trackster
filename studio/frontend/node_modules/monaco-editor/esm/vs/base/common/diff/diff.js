@@ -1,11 +1,10 @@
-import { DiffChange } from './diffChange.js';
-import { stringHash } from '../hash.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class StringDiffSequence {
+import { DiffChange } from './diffChange.js';
+import { stringHash } from '../hash.js';
+export class StringDiffSequence {
     constructor(source) {
         this.source = source;
     }
@@ -18,7 +17,7 @@ class StringDiffSequence {
         return characters;
     }
 }
-function stringDiff(original, modified, pretty) {
+export function stringDiff(original, modified, pretty) {
     return new LcsDiff(new StringDiffSequence(original), new StringDiffSequence(modified)).ComputeDiff(pretty).changes;
 }
 //
@@ -144,7 +143,7 @@ class DiffChangeHelper {
  * An implementation of the difference algorithm described in
  * "An O(ND) Difference Algorithm and its variations" by Eugene W. Myers
  */
-class LcsDiff {
+export class LcsDiff {
     /**
      * Constructs the DiffFinder
      */
@@ -898,5 +897,3 @@ class LcsDiff {
         }
     }
 }
-
-export { LcsDiff, StringDiffSequence, stringDiff };

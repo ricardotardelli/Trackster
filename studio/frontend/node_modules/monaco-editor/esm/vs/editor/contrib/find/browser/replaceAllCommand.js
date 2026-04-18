@@ -1,10 +1,9 @@
-import { Range } from '../../../common/core/range.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ReplaceAllCommand {
+import { Range } from '../../../common/core/range.js';
+export class ReplaceAllCommand {
     constructor(editorSelection, ranges, replaceStrings) {
         this._editorSelection = editorSelection;
         this._ranges = ranges;
@@ -50,5 +49,3 @@ class ReplaceAllCommand {
         return helper.getTrackedSelection(this._trackedEditorSelectionId);
     }
 }
-
-export { ReplaceAllCommand };

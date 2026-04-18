@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class BracketInfo {
+export class BracketInfo {
     constructor(range, 
     /** 0-based level */
     nestingLevel, nestingLevelOfEqualBracketType, isInvalid) {
@@ -12,7 +12,7 @@ class BracketInfo {
         this.isInvalid = isInvalid;
     }
 }
-class BracketPairInfo {
+export class BracketPairInfo {
     constructor(range, openingBracketRange, closingBracketRange, 
     /** 0-based */
     nestingLevel, nestingLevelOfEqualBracketType, bracketPairNode) {
@@ -27,7 +27,7 @@ class BracketPairInfo {
         return this.bracketPairNode.openingBracket.bracketInfo;
     }
 }
-class BracketPairWithMinIndentationInfo extends BracketPairInfo {
+export class BracketPairWithMinIndentationInfo extends BracketPairInfo {
     constructor(range, openingBracketRange, closingBracketRange, 
     /**
      * 0-based
@@ -41,5 +41,3 @@ class BracketPairWithMinIndentationInfo extends BracketPairInfo {
         this.minVisibleColumnIndentation = minVisibleColumnIndentation;
     }
 }
-
-export { BracketInfo, BracketPairInfo, BracketPairWithMinIndentationInfo };

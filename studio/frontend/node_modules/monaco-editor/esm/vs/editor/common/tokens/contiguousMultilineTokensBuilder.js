@@ -1,6 +1,5 @@
 import { ContiguousMultilineTokens } from './contiguousMultilineTokens.js';
-
-class ContiguousMultilineTokensBuilder {
+export class ContiguousMultilineTokensBuilder {
     constructor() {
         this._tokens = [];
     }
@@ -19,5 +18,3 @@ class ContiguousMultilineTokensBuilder {
         return this._tokens;
     }
 }
-
-export { ContiguousMultilineTokensBuilder };

@@ -1,40 +1,32 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { isFirefox } from '../../browser.js';
-import { Gesture, EventType as EventType$1 } from '../../touch.js';
-import { addDisposableListener, EventType, EventHelper, isAncestor, getWindow, isInShadowDOM, getActiveElement, append, $, Dimension, clearNode } from '../../dom.js';
-import { createStyleSheet } from '../../domStylesheets.js';
+import { EventType as TouchEventType, Gesture } from '../../touch.js';
+import { $, addDisposableListener, append, clearNode, createStyleSheet, Dimension, EventHelper, EventType, getActiveElement, getWindow, isAncestor, isInShadowDOM } from '../../dom.js';
 import { StandardKeyboardEvent } from '../../keyboardEvent.js';
 import { StandardMouseEvent } from '../../mouseEvent.js';
 import { ActionBar } from '../actionbar/actionbar.js';
 import { ActionViewItem, BaseActionViewItem } from '../actionbar/actionViewItems.js';
 import { layout } from '../contextview/contextview.js';
 import { DomScrollableElement } from '../scrollbar/scrollableElement.js';
-import { Separator, SubmenuAction, EmptySubmenuAction } from '../../../common/actions.js';
+import { EmptySubmenuAction, Separator, SubmenuAction } from '../../../common/actions.js';
 import { RunOnceScheduler } from '../../../common/async.js';
-import { Codicon } from '../../../common/codicons.js';
-import { getCodiconFontCharacters } from '../../../common/codiconsUtil.js';
+import { Codicon, getCodiconFontCharacters } from '../../../common/codicons.js';
 import { ThemeIcon } from '../../../common/themables.js';
 import { stripIcons } from '../../../common/iconLabels.js';
 import { DisposableStore } from '../../../common/lifecycle.js';
-import { isMacintosh, isLinux } from '../../../common/platform.js';
-import { escape, ltrim, rtrim } from '../../../common/strings.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-const MENU_MNEMONIC_REGEX = /\(&([^\s&])\)|(^|[^&])&([^\s&])/;
-const MENU_ESCAPED_MNEMONIC_REGEX = /(&amp;)?(&amp;)([^\s&])/g;
-var HorizontalDirection;
-(function (HorizontalDirection) {
-    HorizontalDirection[HorizontalDirection["Right"] = 0] = "Right";
-    HorizontalDirection[HorizontalDirection["Left"] = 1] = "Left";
-})(HorizontalDirection || (HorizontalDirection = {}));
-var VerticalDirection;
-(function (VerticalDirection) {
-    VerticalDirection[VerticalDirection["Above"] = 0] = "Above";
-    VerticalDirection[VerticalDirection["Below"] = 1] = "Below";
-})(VerticalDirection || (VerticalDirection = {}));
-class Menu extends ActionBar {
+import { isLinux, isMacintosh } from '../../../common/platform.js';
+import * as strings from '../../../common/strings.js';
+export const MENU_MNEMONIC_REGEX = /\(&([^\s&])\)|(^|[^&])&([^\s&])/;
+export const MENU_ESCAPED_MNEMONIC_REGEX = /(&amp;)?(&amp;)([^\s&])/g;
+export var Direction;
+(function (Direction) {
+    Direction[Direction["Right"] = 0] = "Right";
+    Direction[Direction["Left"] = 1] = "Left";
+})(Direction || (Direction = {}));
+export class Menu extends ActionBar {
     constructor(container, actions, options, menuStyles) {
         container.classList.add('monaco-menu-container');
         container.setAttribute('role', 'presentation');
@@ -127,7 +119,7 @@ class Menu extends ActionBar {
         }));
         // Support touch on actions list to focus items (needed for submenus)
         this._register(Gesture.addTarget(this.actionsList));
-        this._register(addDisposableListener(this.actionsList, EventType$1.Tap, e => {
+        this._register(addDisposableListener(this.actionsList, TouchEventType.Tap, e => {
             let target = e.initialTarget;
             if (!target || !isAncestor(target, this.actionsList) || target === this.actionsList) {
                 return;
@@ -160,7 +152,7 @@ class Menu extends ActionBar {
         scrollElement.style.position = '';
         this.styleScrollElement(scrollElement, menuStyles);
         // Support scroll on menu drag
-        this._register(addDisposableListener(menuElement, EventType$1.Change, e => {
+        this._register(addDisposableListener(menuElement, TouchEventType.Change, e => {
             EventHelper.stop(e, true);
             const scrollTop = this.scrollableElement.getScrollPosition().scrollTop;
             this.scrollableElement.setScrollPosition({ scrollTop: scrollTop - e.translationY });
@@ -173,7 +165,8 @@ class Menu extends ActionBar {
         const window = getWindow(container);
         menuElement.style.maxHeight = `${Math.max(10, window.innerHeight - container.getBoundingClientRect().top - 35)}px`;
         actions = actions.filter((a, idx) => {
-            if (options.submenuIds?.has(a.id)) {
+            var _a;
+            if ((_a = options.submenuIds) === null || _a === void 0 ? void 0 : _a.has(a.id)) {
                 console.warn(`Found submenu cycle: ${a.id}`);
                 return false;
             }
@@ -211,8 +204,9 @@ class Menu extends ActionBar {
         this.styleSheet.textContent = getMenuWidgetCSS(style, isInShadowDOM(container));
     }
     styleScrollElement(scrollElement, style) {
-        const fgColor = style.foregroundColor ?? '';
-        const bgColor = style.backgroundColor ?? '';
+        var _a, _b;
+        const fgColor = (_a = style.foregroundColor) !== null && _a !== void 0 ? _a : '';
+        const bgColor = (_b = style.backgroundColor) !== null && _b !== void 0 ? _b : '';
         const border = style.borderColor ? `1px solid ${style.borderColor}` : '';
         const borderRadius = '5px';
         const shadow = style.shadowColor ? `0 2px 8px ${style.shadowColor}` : '';
@@ -275,12 +269,16 @@ class Menu extends ActionBar {
             return menuActionViewItem;
         }
         else {
-            const keybindingLabel = options.getKeyBinding?.(action)?.getLabel();
-            const menuItemOptions = {
-                enableMnemonics: options.enableMnemonics,
-                useEventAsContext: options.useEventAsContext,
-                keybinding: keybindingLabel,
-            };
+            const menuItemOptions = { enableMnemonics: options.enableMnemonics, useEventAsContext: options.useEventAsContext };
+            if (options.getKeyBinding) {
+                const keybinding = options.getKeyBinding(action);
+                if (keybinding) {
+                    const keybindingLabel = keybinding.getLabel();
+                    if (keybindingLabel) {
+                        menuItemOptions.keybinding = keybindingLabel;
+                    }
+                }
+            }
             const menuActionViewItem = new BaseMenuActionViewItem(options.context, action, menuItemOptions, this.menuStyles);
             if (options.enableMnemonics) {
                 const mnemonic = menuActionViewItem.getMnemonic();
@@ -299,15 +297,12 @@ class Menu extends ActionBar {
 }
 class BaseMenuActionViewItem extends BaseActionViewItem {
     constructor(ctx, action, options, menuStyle) {
-        options = {
-            ...options,
-            isMenu: true,
-            icon: options.icon !== undefined ? options.icon : false,
-            label: options.label !== undefined ? options.label : true,
-        };
+        options.isMenu = true;
         super(action, action, options);
         this.menuStyle = menuStyle;
         this.options = options;
+        this.options.icon = options.icon !== undefined ? options.icon : false;
+        this.options.label = options.label !== undefined ? options.label : true;
         this.cssClass = '';
         // Set mnemonic
         if (this.options.label && options.enableMnemonics) {
@@ -397,8 +392,9 @@ class BaseMenuActionViewItem extends BaseActionViewItem {
         this.applyStyle();
     }
     focus() {
+        var _a;
         super.focus();
-        this.item?.focus();
+        (_a = this.item) === null || _a === void 0 ? void 0 : _a.focus();
         this.applyStyle();
     }
     updatePositionInSet(pos, setSize) {
@@ -408,6 +404,7 @@ class BaseMenuActionViewItem extends BaseActionViewItem {
         }
     }
     updateLabel() {
+        var _a;
         if (!this.label) {
             return;
         }
@@ -422,7 +419,7 @@ class BaseMenuActionViewItem extends BaseActionViewItem {
                 this.label.setAttribute('aria-label', cleanLabel.replace(/&&/g, '&'));
                 const matches = MENU_MNEMONIC_REGEX.exec(label);
                 if (matches) {
-                    label = escape(label);
+                    label = strings.escape(label);
                     // This is global, reset it
                     MENU_ESCAPED_MNEMONIC_REGEX.lastIndex = 0;
                     let escMatch = MENU_ESCAPED_MNEMONIC_REGEX.exec(label);
@@ -432,15 +429,15 @@ class BaseMenuActionViewItem extends BaseActionViewItem {
                     }
                     const replaceDoubleEscapes = (str) => str.replace(/&amp;&amp;/g, '&amp;');
                     if (escMatch) {
-                        this.label.append(ltrim(replaceDoubleEscapes(label.substr(0, escMatch.index)), ' '), $('u', { 'aria-hidden': 'true' }, escMatch[3]), rtrim(replaceDoubleEscapes(label.substr(escMatch.index + escMatch[0].length)), ' '));
+                        this.label.append(strings.ltrim(replaceDoubleEscapes(label.substr(0, escMatch.index)), ' '), $('u', { 'aria-hidden': 'true' }, escMatch[3]), strings.rtrim(replaceDoubleEscapes(label.substr(escMatch.index + escMatch[0].length)), ' '));
                     }
                     else {
-                        this.label.textContent = replaceDoubleEscapes(label).trim();
+                        this.label.innerText = replaceDoubleEscapes(label).trim();
                     }
-                    this.item?.setAttribute('aria-keyshortcuts', (!!matches[1] ? matches[1] : matches[3]).toLocaleLowerCase());
+                    (_a = this.item) === null || _a === void 0 ? void 0 : _a.setAttribute('aria-keyshortcuts', (!!matches[1] ? matches[1] : matches[3]).toLocaleLowerCase());
                 }
                 else {
-                    this.label.textContent = label.replace(/&&/g, '&').trim();
+                    this.label.innerText = label.replace(/&&/g, '&').trim();
                 }
             }
         }
@@ -512,13 +509,13 @@ class BaseMenuActionViewItem extends BaseActionViewItem {
         const outline = isSelected && this.menuStyle.selectionBorderColor ? `1px solid ${this.menuStyle.selectionBorderColor}` : '';
         const outlineOffset = isSelected && this.menuStyle.selectionBorderColor ? `-1px` : '';
         if (this.item) {
-            this.item.style.color = fgColor ?? '';
-            this.item.style.backgroundColor = bgColor ?? '';
+            this.item.style.color = fgColor !== null && fgColor !== void 0 ? fgColor : '';
+            this.item.style.backgroundColor = bgColor !== null && bgColor !== void 0 ? bgColor : '';
             this.item.style.outline = outline;
             this.item.style.outlineOffset = outlineOffset;
         }
         if (this.check) {
-            this.check.style.color = fgColor ?? '';
+            this.check.style.color = fgColor !== null && fgColor !== void 0 ? fgColor : '';
         }
     }
 }
@@ -531,7 +528,7 @@ class SubmenuMenuActionViewItem extends BaseMenuActionViewItem {
         this.mysubmenu = null;
         this.submenuDisposables = this._register(new DisposableStore());
         this.mouseOver = false;
-        this.expandDirection = submenuOptions && submenuOptions.expandDirection !== undefined ? submenuOptions.expandDirection : { horizontal: HorizontalDirection.Right, vertical: VerticalDirection.Below };
+        this.expandDirection = submenuOptions && submenuOptions.expandDirection !== undefined ? submenuOptions.expandDirection : Direction.Right;
         this.showScheduler = new RunOnceScheduler(() => {
             if (this.mouseOver) {
                 this.cleanupExistingSubmenu(false);
@@ -611,7 +608,7 @@ class SubmenuMenuActionViewItem extends BaseMenuActionViewItem {
             try {
                 this.parentData.submenu.dispose();
             }
-            catch { }
+            catch (_a) { }
             this.parentData.submenu = undefined;
             this.updateAriaExpanded('false');
             if (this.submenuContainer) {
@@ -623,7 +620,7 @@ class SubmenuMenuActionViewItem extends BaseMenuActionViewItem {
     calculateSubmenuMenuLayout(windowDimensions, submenu, entry, expandDirection) {
         const ret = { top: 0, left: 0 };
         // Start with horizontal
-        ret.left = layout(windowDimensions.width, submenu.width, { position: expandDirection.horizontal === HorizontalDirection.Right ? 0 /* LayoutAnchorPosition.Before */ : 1 /* LayoutAnchorPosition.After */, offset: entry.left, size: entry.width });
+        ret.left = layout(windowDimensions.width, submenu.width, { position: expandDirection === Direction.Right ? 0 /* LayoutAnchorPosition.Before */ : 1 /* LayoutAnchorPosition.After */, offset: entry.left, size: entry.width });
         // We don't have enough room to layout the menu fully, so we are overlapping the menu
         if (ret.left >= entry.left && ret.left < entry.left + entry.width) {
             if (entry.left + 10 + submenu.width <= windowDimensions.width) {
@@ -652,11 +649,11 @@ class SubmenuMenuActionViewItem extends BaseMenuActionViewItem {
             // This allows the menu constructor to calculate the proper max height
             const computedStyles = getWindow(this.parentData.parent.domNode).getComputedStyle(this.parentData.parent.domNode);
             const paddingTop = parseFloat(computedStyles.paddingTop || '0') || 0;
+            // this.submenuContainer.style.top = `${this.element.offsetTop - this.parentData.parent.scrollOffset - paddingTop}px`;
+            this.submenuContainer.style.zIndex = '1';
             this.submenuContainer.style.position = 'fixed';
             this.submenuContainer.style.top = '0';
             this.submenuContainer.style.left = '0';
-            // Fix to #263546, for submenu of treeView view/item/context z-index issue - ensure submenu appears above other elements
-            this.submenuContainer.style.zIndex = '1';
             this.parentData.submenu = new Menu(this.submenuContainer, this.submenuActions.length ? this.submenuActions : [new EmptySubmenuAction()], this.submenuOptions, this.menuStyle);
             // layout submenu
             const entryBox = this.element.getBoundingClientRect();
@@ -698,8 +695,9 @@ class SubmenuMenuActionViewItem extends BaseMenuActionViewItem {
         }
     }
     updateAriaExpanded(value) {
+        var _a;
         if (this.item) {
-            this.item?.setAttribute('aria-expanded', value);
+            (_a = this.item) === null || _a === void 0 ? void 0 : _a.setAttribute('aria-expanded', value);
         }
     }
     applyStyle() {
@@ -707,7 +705,7 @@ class SubmenuMenuActionViewItem extends BaseMenuActionViewItem {
         const isSelected = this.element && this.element.classList.contains('focused');
         const fgColor = isSelected && this.menuStyle.selectionForegroundColor ? this.menuStyle.selectionForegroundColor : this.menuStyle.foregroundColor;
         if (this.submenuIndicator) {
-            this.submenuIndicator.style.color = fgColor ?? '';
+            this.submenuIndicator.style.color = fgColor !== null && fgColor !== void 0 ? fgColor : '';
         }
     }
     dispose() {
@@ -734,7 +732,7 @@ class MenuSeparatorActionViewItem extends ActionViewItem {
         }
     }
 }
-function cleanMnemonic(label) {
+export function cleanMnemonic(label) {
     const regex = MENU_MNEMONIC_REGEX;
     const matches = regex.exec(label);
     if (!matches) {
@@ -743,7 +741,7 @@ function cleanMnemonic(label) {
     const mnemonicInText = !matches[1];
     return label.replace(regex, mnemonicInText ? '$2$3' : '').trim();
 }
-function formatRule(c) {
+export function formatRule(c) {
     const fontCharacter = getCodiconFontCharacters()[c.id];
     return `.codicon-${c.id}:before { content: '\\${fontCharacter.toString(16)}'; }`;
 }
@@ -895,7 +893,6 @@ ${formatRule(Codicon.menuSubmenu)}
 	text-align: right;
 	font-size: 12px;
 	line-height: 1;
-	opacity: 0.7;
 }
 
 .monaco-menu .monaco-action-bar.vertical .submenu-indicator {
@@ -1006,7 +1003,6 @@ ${formatRule(Codicon.menuSubmenu)}
 .monaco-menu .monaco-action-bar.vertical .keybinding {
 	font-size: inherit;
 	padding: 0 2em;
-	max-height: 100%;
 }
 
 .monaco-menu .monaco-action-bar.vertical .menu-item-check {
@@ -1094,10 +1090,6 @@ ${formatRule(Codicon.menuSubmenu)}
 				height: 3px;
 				width: 3px;
 			}
-			/* Fix for https://github.com/microsoft/vscode/issues/103170 */
-			.monaco-menu .action-item .monaco-submenu {
-				z-index: 1;
-			}
 		`;
         // Scrollbars
         const scrollbarShadowColor = style.scrollbarShadow;
@@ -1143,5 +1135,3 @@ ${formatRule(Codicon.menuSubmenu)}
     }
     return result;
 }
-
-export { HorizontalDirection, MENU_ESCAPED_MNEMONIC_REGEX, MENU_MNEMONIC_REGEX, Menu, VerticalDirection, cleanMnemonic, formatRule, getMenuWidgetCSS };

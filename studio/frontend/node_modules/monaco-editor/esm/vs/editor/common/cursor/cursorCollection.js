@@ -1,16 +1,15 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { compareBy } from '../../../base/common/arrays.js';
-import { findFirstMin, findLastMax } from '../../../base/common/arraysFind.js';
+import { findLastMaxBy, findFirstMinBy } from '../../../base/common/arraysFind.js';
 import { CursorState } from '../cursorCommon.js';
 import { Cursor } from './oneCursor.js';
 import { Position } from '../core/position.js';
 import { Range } from '../core/range.js';
 import { Selection } from '../core/selection.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class CursorCollection {
+export class CursorCollection {
     constructor(context) {
         this.context = context;
         this.cursors = [new Cursor(context)];
@@ -49,10 +48,10 @@ class CursorCollection {
         return this.cursors.map(c => c.viewState.position);
     }
     getTopMostViewPosition() {
-        return findFirstMin(this.cursors, compareBy(c => c.viewState.position, Position.compare)).viewState.position;
+        return findFirstMinBy(this.cursors, compareBy(c => c.viewState.position, Position.compare)).viewState.position;
     }
     getBottomMostViewPosition() {
-        return findLastMax(this.cursors, compareBy(c => c.viewState.position, Position.compare)).viewState.position;
+        return findLastMaxBy(this.cursors, compareBy(c => c.viewState.position, Position.compare)).viewState.position;
     }
     getSelections() {
         return this.cursors.map(c => c.modelState.selection);
@@ -190,5 +189,3 @@ class CursorCollection {
         }
     }
 }
-
-export { CursorCollection };

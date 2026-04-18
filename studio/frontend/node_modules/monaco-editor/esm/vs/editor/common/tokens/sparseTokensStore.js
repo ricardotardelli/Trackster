@@ -1,14 +1,13 @@
-import { arrayInsert } from '../../../base/common/arrays.js';
-import { LineTokens } from './lineTokens.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as arrays from '../../../base/common/arrays.js';
+import { LineTokens } from './lineTokens.js';
 /**
  * Represents sparse tokens in a text model.
  */
-class SparseTokensStore {
+export class SparseTokensStore {
     constructor(languageIdCodec) {
         this._pieces = [];
         this._isComplete = false;
@@ -21,14 +20,9 @@ class SparseTokensStore {
     isEmpty() {
         return (this._pieces.length === 0);
     }
-    set(pieces, isComplete, textModel = undefined) {
+    set(pieces, isComplete) {
         this._pieces = pieces || [];
         this._isComplete = isComplete;
-        if (textModel) {
-            for (const p of this._pieces) {
-                p.reportIfInvalid(textModel);
-            }
-        }
     }
     setPartial(_range, pieces) {
         // console.log(`setPartial ${_range} ${pieces.map(p => p.toString()).join(', ')}`);
@@ -90,7 +84,7 @@ class SparseTokensStore {
         }
         insertPosition = insertPosition || { index: this._pieces.length };
         if (pieces.length > 0) {
-            this._pieces = arrayInsert(this._pieces, insertPosition.index, pieces);
+            this._pieces = arrays.arrayInsert(this._pieces, insertPosition.index, pieces);
         }
         // console.log(`I HAVE ${this._pieces.length} pieces`);
         // console.log(`${this._pieces.map(p => p.toString()).join('\n')}`);
@@ -100,7 +94,7 @@ class SparseTokensStore {
         return this._isComplete;
     }
     addSparseTokens(lineNumber, aTokens) {
-        if (aTokens.getTextLength() === 0) {
+        if (aTokens.getLineContent().length === 0) {
             // Don't do anything for empty lines
             return aTokens;
         }
@@ -128,10 +122,8 @@ class SparseTokensStore {
             result[resultLen++] = metadata;
         };
         for (let bIndex = 0; bIndex < bLen; bIndex++) {
-            // bTokens is not validated yet, but aTokens is. We want to make sure that the LineTokens we return
-            // are valid, so we clamp the ranges to ensure that.
-            const bStartCharacter = Math.min(bTokens.getStartCharacter(bIndex), aTokens.getTextLength());
-            const bEndCharacter = Math.min(bTokens.getEndCharacter(bIndex), aTokens.getTextLength());
+            const bStartCharacter = bTokens.getStartCharacter(bIndex);
+            const bEndCharacter = bTokens.getEndCharacter(bIndex);
             const bMetadata = bTokens.getMetadata(bIndex);
             const bMask = (((bMetadata & 1 /* MetadataConsts.SEMANTIC_USE_ITALIC */) ? 2048 /* MetadataConsts.ITALIC_MASK */ : 0)
                 | ((bMetadata & 2 /* MetadataConsts.SEMANTIC_USE_BOLD */) ? 4096 /* MetadataConsts.BOLD_MASK */ : 0)
@@ -195,16 +187,8 @@ class SparseTokensStore {
         return low;
     }
     acceptEdit(range, eolCount, firstLineLength, lastLineLength, firstCharCode) {
-        for (let i = 0; i < this._pieces.length; i++) {
-            const piece = this._pieces[i];
+        for (const piece of this._pieces) {
             piece.acceptEdit(range, eolCount, firstLineLength, lastLineLength, firstCharCode);
-            if (piece.isEmpty()) {
-                // Remove empty pieces
-                this._pieces.splice(i, 1);
-                i--;
-            }
         }
     }
 }
-
-export { SparseTokensStore };

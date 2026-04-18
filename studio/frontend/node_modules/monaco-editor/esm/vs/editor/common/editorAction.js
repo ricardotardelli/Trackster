@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class InternalEditorAction {
+export class InternalEditorAction {
     constructor(id, label, alias, metadata, _precondition, _run, _contextKeyService) {
         this.id = id;
         this.label = label;
@@ -22,5 +22,3 @@ class InternalEditorAction {
         return this._run(args);
     }
 }
-
-export { InternalEditorAction };

@@ -1,13 +1,36 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var RenameController_1;
 import { alert } from '../../../../base/browser/ui/aria/aria.js';
 import { raceCancellation } from '../../../../base/common/async.js';
-import { CancellationTokenSource, CancellationToken } from '../../../../base/common/cancellation.js';
-import { CancellationError, onUnexpectedError } from '../../../../base/common/errors.js';
-import { isMarkdownString } from '../../../../base/common/htmlContent.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
+import { onUnexpectedError } from '../../../../base/common/errors.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { assertType } from '../../../../base/common/types.js';
 import { URI } from '../../../../base/common/uri.js';
-import { localize, localize2 } from '../../../../nls.js';
-import { registerAction2, Action2 } from '../../../../platform/actions/common/actions.js';
+import { EditorAction, EditorCommand, registerEditorAction, registerEditorCommand, registerEditorContribution, registerModelAndPositionCommand } from '../../../browser/editorExtensions.js';
+import { IBulkEditService } from '../../../browser/services/bulkEditService.js';
+import { ICodeEditorService } from '../../../browser/services/codeEditorService.js';
+import { Position } from '../../../common/core/position.js';
+import { Range } from '../../../common/core/range.js';
+import { EditorContextKeys } from '../../../common/editorContextKeys.js';
+import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
+import { ITextResourceConfigurationService } from '../../../common/services/textResourceConfiguration.js';
+import { EditorStateCancellationTokenSource } from '../../editorState/browser/editorState.js';
+import { MessageController } from '../../message/browser/messageController.js';
+import * as nls from '../../../../nls.js';
+import { Action2, registerAction2 } from '../../../../platform/actions/common/actions.js';
 import { Extensions } from '../../../../platform/configuration/common/configurationRegistry.js';
 import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
@@ -15,34 +38,8 @@ import { ILogService } from '../../../../platform/log/common/log.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { IEditorProgressService } from '../../../../platform/progress/common/progress.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
-import { registerEditorContribution, registerEditorAction, EditorCommand, registerEditorCommand, registerModelAndPositionCommand, EditorAction } from '../../../browser/editorExtensions.js';
-import { IBulkEditService } from '../../../browser/services/bulkEditService.js';
-import { ICodeEditorService } from '../../../browser/services/codeEditorService.js';
-import { Position } from '../../../common/core/position.js';
-import { Range } from '../../../common/core/range.js';
-import { EditorContextKeys } from '../../../common/editorContextKeys.js';
-import { NewSymbolNameTriggerKind } from '../../../common/languages.js';
-import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
-import { ITextResourceConfigurationService } from '../../../common/services/textResourceConfiguration.js';
-import { EditSources } from '../../../common/textModelEditSource.js';
-import { EditorStateCancellationTokenSource } from '../../editorState/browser/editorState.js';
-import { MessageController } from '../../message/browser/messageController.js';
-import { RenameWidget, CONTEXT_RENAME_INPUT_VISIBLE } from './renameWidget.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-var RenameController_1;
+import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
+import { CONTEXT_RENAME_INPUT_FOCUSED, CONTEXT_RENAME_INPUT_VISIBLE, RenameInputField } from './renameInputField.js';
 class RenameSkeleton {
     constructor(model, position, registry) {
         this.model = model;
@@ -100,7 +97,7 @@ class RenameSkeleton {
         }
         const result = await provider.provideRenameEdits(this.model, this.position, newName, token);
         if (!result) {
-            return this._provideRenameEdits(newName, i + 1, rejects.concat(localize(1380, "No result.")), token);
+            return this._provideRenameEdits(newName, i + 1, rejects.concat(nls.localize('no result', "No result.")), token);
         }
         else if (result.rejectReason) {
             return this._provideRenameEdits(newName, i + 1, rejects.concat(result.rejectReason), token);
@@ -108,22 +105,20 @@ class RenameSkeleton {
         return result;
     }
 }
-async function rename(registry, model, position, newName) {
+export async function rename(registry, model, position, newName) {
     const skeleton = new RenameSkeleton(model, position, registry);
     const loc = await skeleton.resolveRenameLocation(CancellationToken.None);
-    if (loc?.rejectReason) {
+    if (loc === null || loc === void 0 ? void 0 : loc.rejectReason) {
         return { edits: [], rejectReason: loc.rejectReason };
     }
     return skeleton.provideRenameEdits(newName, CancellationToken.None);
 }
 // ---  register actions and commands
-let RenameController = class RenameController {
-    static { RenameController_1 = this; }
-    static { this.ID = 'editor.contrib.renameController'; }
+let RenameController = RenameController_1 = class RenameController {
     static get(editor) {
         return editor.getContribution(RenameController_1.ID);
     }
-    constructor(editor, _instaService, _notificationService, _bulkEditService, _progressService, _logService, _configService, _languageFeaturesService) {
+    constructor(editor, _instaService, _notificationService, _bulkEditService, _progressService, _logService, _configService, _languageFeaturesService, _telemetryService) {
         this.editor = editor;
         this._instaService = _instaService;
         this._notificationService = _notificationService;
@@ -132,15 +127,17 @@ let RenameController = class RenameController {
         this._logService = _logService;
         this._configService = _configService;
         this._languageFeaturesService = _languageFeaturesService;
+        this._telemetryService = _telemetryService;
         this._disposableStore = new DisposableStore();
         this._cts = new CancellationTokenSource();
-        this._renameWidget = this._disposableStore.add(this._instaService.createInstance(RenameWidget, this.editor, ['acceptRenameInput', 'acceptRenameInputWithPreview']));
+        this._renameInputField = this._disposableStore.add(this._instaService.createInstance(RenameInputField, this.editor, ['acceptRenameInput', 'acceptRenameInputWithPreview']));
     }
     dispose() {
         this._disposableStore.dispose();
         this._cts.dispose(true);
     }
     async run() {
+        var _a, _b;
         const trace = this._logService.trace.bind(this._logService, '[rename]');
         // set up cancellation token to prevent reentrant rename, this
         // is the parent to the resolve- and rename-tokens
@@ -167,15 +164,8 @@ let RenameController = class RenameController {
             trace('resolved rename location');
         }
         catch (e) {
-            if (e instanceof CancellationError) {
-                trace('resolve rename location cancelled', JSON.stringify(e, null, '\t'));
-            }
-            else {
-                trace('resolve rename location failed', e instanceof Error ? e : JSON.stringify(e, null, '\t'));
-                if (typeof e === 'string' || isMarkdownString(e)) {
-                    MessageController.get(this.editor)?.showMessage(e || localize(1381, "An unknown error occurred while resolving rename location"), position);
-                }
-            }
+            trace('resolve rename location failed', JSON.stringify(e, null, '\t'));
+            (_a = MessageController.get(this.editor)) === null || _a === void 0 ? void 0 : _a.showMessage(e || nls.localize('resolveRenameLocationFailed', "An unknown error occurred while resolving rename location"), position);
             return undefined;
         }
         finally {
@@ -187,7 +177,7 @@ let RenameController = class RenameController {
         }
         if (loc.rejectReason) {
             trace(`returning early - rejected with reason: ${loc.rejectReason}`, loc.rejectReason);
-            MessageController.get(this.editor)?.showMessage(loc.rejectReason, position);
+            (_b = MessageController.get(this.editor)) === null || _b === void 0 ? void 0 : _b.showMessage(loc.rejectReason, position);
             return undefined;
         }
         if (cts1.token.isCancellationRequested) {
@@ -197,19 +187,25 @@ let RenameController = class RenameController {
         // part 2 - do rename at location
         const cts2 = new EditorStateCancellationTokenSource(this.editor, 4 /* CodeEditorStateFlag.Position */ | 1 /* CodeEditorStateFlag.Value */, loc.range, this._cts.token);
         const model = this.editor.getModel(); // @ulugbekna: assumes editor still has a model, otherwise, cts1 should've been cancelled
+        const renameCandidatesCts = new CancellationTokenSource(cts2.token);
         const newSymbolNamesProviders = this._languageFeaturesService.newSymbolNamesProvider.all(model);
-        const resolvedNewSymbolnamesProviders = await Promise.all(newSymbolNamesProviders.map(async (p) => [p, await p.supportsAutomaticNewSymbolNamesTriggerKind ?? false]));
-        const requestRenameSuggestions = (triggerKind, cts) => {
-            let providers = resolvedNewSymbolnamesProviders.slice();
-            if (triggerKind === NewSymbolNameTriggerKind.Automatic) {
-                providers = providers.filter(([_, supportsAutomatic]) => supportsAutomatic);
-            }
-            return providers.map(([p,]) => p.provideNewSymbolNames(model, loc.range, triggerKind, cts));
-        };
+        // TODO@ulugbekna: providers should get timeout token (use createTimeoutCancellation(x))
+        const newSymbolNameProvidersResults = newSymbolNamesProviders.map(p => p.provideNewSymbolNames(model, loc.range, renameCandidatesCts.token));
+        trace(`requested new symbol names from ${newSymbolNamesProviders.length} providers`);
+        const selection = this.editor.getSelection();
+        let selectionStart = 0;
+        let selectionEnd = loc.text.length;
+        if (!Range.isEmpty(selection) && !Range.spansMultipleLines(selection) && Range.containsRange(loc.range, selection)) {
+            selectionStart = Math.max(0, selection.startColumn - loc.range.startColumn);
+            selectionEnd = Math.min(loc.range.endColumn, selection.endColumn) - loc.range.startColumn;
+        }
         trace('creating rename input field and awaiting its result');
         const supportPreview = this._bulkEditService.hasPreviewHandler() && this._configService.getValue(this.editor.getModel().uri, 'editor.rename.enablePreview');
-        const inputFieldResult = await this._renameWidget.getInput(loc.range, loc.text, supportPreview, newSymbolNamesProviders.length > 0 ? requestRenameSuggestions : undefined, cts2);
+        const inputFieldResult = await this._renameInputField.getInput(loc.range, loc.text, selectionStart, selectionEnd, supportPreview, newSymbolNameProvidersResults, renameCandidatesCts);
         trace('received response from rename input field');
+        if (newSymbolNamesProviders.length > 0) { // @ulugbekna: we're interested only in telemetry for rename suggestions currently
+            this._reportTelemetry(newSymbolNamesProviders.length, model.getLanguageId(), inputFieldResult);
+        }
         // no result, only hint to focus the editor or not
         if (typeof inputFieldResult === 'boolean') {
             trace(`returning early - rename input field response - ${inputFieldResult}`);
@@ -241,24 +237,23 @@ let RenameController = class RenameController {
             this._bulkEditService.apply(renameResult, {
                 editor: this.editor,
                 showPreview: inputFieldResult.wantsPreview,
-                label: localize(1382, "Renaming '{0}' to '{1}'", loc?.text, inputFieldResult.newName),
+                label: nls.localize('label', "Renaming '{0}' to '{1}'", loc === null || loc === void 0 ? void 0 : loc.text, inputFieldResult.newName),
                 code: 'undoredo.rename',
-                quotableLabel: localize(1383, "Renaming {0} to {1}", loc?.text, inputFieldResult.newName),
-                respectAutoSaveConfig: true,
-                reason: EditSources.rename(),
+                quotableLabel: nls.localize('quotableLabel', "Renaming {0} to {1}", loc === null || loc === void 0 ? void 0 : loc.text, inputFieldResult.newName),
+                respectAutoSaveConfig: true
             }).then(result => {
                 trace('edits applied');
                 if (result.ariaSummary) {
-                    alert(localize(1384, "Successfully renamed '{0}' to '{1}'. Summary: {2}", loc.text, inputFieldResult.newName, result.ariaSummary));
+                    alert(nls.localize('aria', "Successfully renamed '{0}' to '{1}'. Summary: {2}", loc.text, inputFieldResult.newName, result.ariaSummary));
                 }
             }).catch(err => {
                 trace(`error when applying edits ${JSON.stringify(err, null, '\t')}`);
-                this._notificationService.error(localize(1385, "Rename failed to apply edits"));
+                this._notificationService.error(nls.localize('rename.failedApply', "Rename failed to apply edits"));
                 this._logService.error(err);
             });
         }, err => {
             trace('error when providing rename edits', JSON.stringify(err, null, '\t'));
-            this._notificationService.error(localize(1386, "Rename failed to compute edits"));
+            this._notificationService.error(nls.localize('rename.failed', "Rename failed to compute edits"));
             this._logService.error(err);
         }).finally(() => {
             cts2.dispose();
@@ -268,18 +263,36 @@ let RenameController = class RenameController {
         return renameOperation;
     }
     acceptRenameInput(wantsPreview) {
-        this._renameWidget.acceptInput(wantsPreview);
+        this._renameInputField.acceptInput(wantsPreview);
     }
     cancelRenameInput() {
-        this._renameWidget.cancelInput(true, 'cancelRenameInput command');
+        this._renameInputField.cancelInput(true, 'cancelRenameInput command');
     }
     focusNextRenameSuggestion() {
-        this._renameWidget.focusNextRenameSuggestion();
+        this._renameInputField.focusNextRenameSuggestion();
     }
     focusPreviousRenameSuggestion() {
-        this._renameWidget.focusPreviousRenameSuggestion();
+        this._renameInputField.focusPreviousRenameSuggestion();
+    }
+    _reportTelemetry(nRenameSuggestionProviders, languageId, inputFieldResult) {
+        const value = typeof inputFieldResult === 'boolean'
+            ? {
+                kind: 'cancelled',
+                languageId,
+                nRenameSuggestionProviders,
+            }
+            : {
+                kind: 'accepted',
+                languageId,
+                nRenameSuggestionProviders,
+                source: inputFieldResult.source,
+                nRenameSuggestions: inputFieldResult.nRenameSuggestions,
+                wantsPreview: inputFieldResult.wantsPreview,
+            };
+        this._telemetryService.publicLog2('renameInvokedEvent', value);
     }
 };
+RenameController.ID = 'editor.contrib.renameController';
 RenameController = RenameController_1 = __decorate([
     __param(1, IInstantiationService),
     __param(2, INotificationService),
@@ -287,14 +300,16 @@ RenameController = RenameController_1 = __decorate([
     __param(4, IEditorProgressService),
     __param(5, ILogService),
     __param(6, ITextResourceConfigurationService),
-    __param(7, ILanguageFeaturesService)
+    __param(7, ILanguageFeaturesService),
+    __param(8, ITelemetryService)
 ], RenameController);
 // ---- action implementation
-class RenameAction extends EditorAction {
+export class RenameAction extends EditorAction {
     constructor() {
         super({
             id: 'editor.action.rename',
-            label: localize2(1388, "Rename Symbol"),
+            label: nls.localize('rename.label', "Rename Symbol"),
+            alias: 'Rename Symbol',
             precondition: ContextKeyExpr.and(EditorContextKeys.writable, EditorContextKeys.hasRenameProvider),
             kbOpts: {
                 kbExpr: EditorContextKeys.editorTextFocus,
@@ -304,8 +319,7 @@ class RenameAction extends EditorAction {
             contextMenuOpts: {
                 group: '1_modification',
                 order: 1.1
-            },
-            canTriggerInlineEdits: true,
+            }
         });
     }
     runCommand(accessor, args) {
@@ -356,7 +370,7 @@ registerEditorCommand(new RenameCommand({
     kbOpts: {
         weight: 100 /* KeybindingWeight.EditorContrib */ + 99,
         kbExpr: ContextKeyExpr.and(EditorContextKeys.focus, ContextKeyExpr.not('isComposing')),
-        primary: 2048 /* KeyMod.CtrlCmd */ + 3 /* KeyCode.Enter */
+        primary: 1024 /* KeyMod.Shift */ + 3 /* KeyCode.Enter */
     }
 }));
 registerEditorCommand(new RenameCommand({
@@ -375,12 +389,13 @@ registerAction2(class FocusNextRenameSuggestion extends Action2 {
         super({
             id: 'focusNextRenameSuggestion',
             title: {
-                ...localize2(1389, "Focus Next Rename Suggestion"),
+                ...nls.localize2('focusNextRenameSuggestion', "Focus Next Rename Suggestion"),
             },
             precondition: CONTEXT_RENAME_INPUT_VISIBLE,
             keybinding: [
                 {
-                    primary: 18 /* KeyCode.DownArrow */,
+                    primary: 2 /* KeyCode.Tab */,
+                    secondary: [18 /* KeyCode.DownArrow */],
                     weight: 100 /* KeybindingWeight.EditorContrib */ + 99,
                 }
             ]
@@ -403,12 +418,19 @@ registerAction2(class FocusPreviousRenameSuggestion extends Action2 {
         super({
             id: 'focusPreviousRenameSuggestion',
             title: {
-                ...localize2(1390, "Focus Previous Rename Suggestion"),
+                ...nls.localize2('focusPreviousRenameSuggestion', "Focus Previous Rename Suggestion"),
             },
             precondition: CONTEXT_RENAME_INPUT_VISIBLE,
             keybinding: [
                 {
-                    primary: 16 /* KeyCode.UpArrow */,
+                    when: CONTEXT_RENAME_INPUT_FOCUSED,
+                    primary: 2 /* KeyCode.Tab */ | 4 /* KeyCode.Shift */,
+                    weight: 100 /* KeybindingWeight.EditorContrib */ + 99,
+                },
+                {
+                    when: CONTEXT_RENAME_INPUT_FOCUSED.toNegated(),
+                    primary: 1024 /* KeyMod.Shift */ | 2 /* KeyCode.Tab */,
+                    secondary: [16 /* KeyCode.UpArrow */],
                     weight: 100 /* KeybindingWeight.EditorContrib */ + 99,
                 }
             ]
@@ -437,7 +459,7 @@ registerModelAndPositionCommand('_executePrepareRename', async function (accesso
     const { renameProvider } = accessor.get(ILanguageFeaturesService);
     const skeleton = new RenameSkeleton(model, position, renameProvider);
     const loc = await skeleton.resolveRenameLocation(CancellationToken.None);
-    if (loc?.rejectReason) {
+    if (loc === null || loc === void 0 ? void 0 : loc.rejectReason) {
         throw new Error(loc.rejectReason);
     }
     return loc;
@@ -447,12 +469,10 @@ Registry.as(Extensions.Configuration).registerConfiguration({
     id: 'editor',
     properties: {
         'editor.rename.enablePreview': {
-            scope: 6 /* ConfigurationScope.LANGUAGE_OVERRIDABLE */,
-            description: localize(1387, "Enable/disable the ability to preview changes before renaming"),
+            scope: 5 /* ConfigurationScope.LANGUAGE_OVERRIDABLE */,
+            description: nls.localize('enablePreview', "Enable/disable the ability to preview changes before renaming"),
             default: true,
             type: 'boolean'
         }
     }
 });
-
-export { RenameAction, rename };

@@ -1,20 +1,15 @@
-import { encodeHex, VSBuffer } from './buffer.js';
-import { isHighSurrogate, isLowSurrogate, computeCodePoint } from './strings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as strings from './strings.js';
 /**
  * Return a hash value for an object.
- *
- * Note that this should not be used for binary data types. Instead,
- * prefer {@link hashAsync}.
  */
-function hash(obj) {
+export function hash(obj) {
     return doHash(obj, 0);
 }
-function doHash(obj, hashVal) {
+export function doHash(obj, hashVal) {
     switch (typeof obj) {
         case 'object':
             if (obj === null) {
@@ -36,13 +31,13 @@ function doHash(obj, hashVal) {
             return numberHash(617, hashVal);
     }
 }
-function numberHash(val, initialHashVal) {
+export function numberHash(val, initialHashVal) {
     return (((initialHashVal << 5) - initialHashVal) + val) | 0; // hashVal * 31 + ch, keep as int32
 }
 function booleanHash(b, initialHashVal) {
     return numberHash(b ? 433 : 863, initialHashVal);
 }
-function stringHash(s, hashVal) {
+export function stringHash(s, hashVal) {
     hashVal = numberHash(149417, hashVal);
     for (let i = 0, length = s.length; i < length; i++) {
         hashVal = numberHash(s.charCodeAt(i), hashVal);
@@ -68,19 +63,27 @@ function leftRotate(value, bits, totalBits = 32) {
     // Join (value left-shifted `bits` bits) with (masked value right-shifted `delta` bits)
     return ((value << bits) | ((mask & value) >>> delta)) >>> 0;
 }
-function toHexString(bufferOrValue, bitsize = 32) {
-    if (bufferOrValue instanceof ArrayBuffer) {
-        return encodeHex(VSBuffer.wrap(new Uint8Array(bufferOrValue)));
+function fill(dest, index = 0, count = dest.byteLength, value = 0) {
+    for (let i = 0; i < count; i++) {
+        dest[index + i] = value;
     }
-    return (bufferOrValue >>> 0).toString(16).padStart(bitsize / 4, '0');
+}
+function leftPad(value, length, char = '0') {
+    while (value.length < length) {
+        value = char + value;
+    }
+    return value;
+}
+export function toHexString(bufferOrValue, bitsize = 32) {
+    if (bufferOrValue instanceof ArrayBuffer) {
+        return Array.from(new Uint8Array(bufferOrValue)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    return leftPad((bufferOrValue >>> 0).toString(16), bitsize / 4);
 }
 /**
  * A SHA1 implementation that works with strings and does not allocate.
- *
- * Prefer to use {@link hashAsync} in async contexts
  */
-class StringSHA1 {
-    static { this._bigBlock32 = new DataView(new ArrayBuffer(320)); } // 80 * 4 = 320
+export class StringSHA1 {
     constructor() {
         this._h0 = 0x67452301;
         this._h1 = 0xEFCDAB89;
@@ -115,12 +118,12 @@ class StringSHA1 {
         }
         while (true) {
             let codePoint = charCode;
-            if (isHighSurrogate(charCode)) {
+            if (strings.isHighSurrogate(charCode)) {
                 if (offset + 1 < strLen) {
                     const nextCharCode = str.charCodeAt(offset + 1);
-                    if (isLowSurrogate(nextCharCode)) {
+                    if (strings.isLowSurrogate(nextCharCode)) {
                         offset++;
-                        codePoint = computeCodePoint(charCode, nextCharCode);
+                        codePoint = strings.computeCodePoint(charCode, nextCharCode);
                     }
                     else {
                         // illegal => unicode replacement character
@@ -133,7 +136,7 @@ class StringSHA1 {
                     break;
                 }
             }
-            else if (isLowSurrogate(charCode)) {
+            else if (strings.isLowSurrogate(charCode)) {
                 // illegal => unicode replacement character
                 codePoint = 65533 /* SHA1Constant.UNICODE_REPLACEMENT */;
             }
@@ -194,10 +197,10 @@ class StringSHA1 {
     }
     _wrapUp() {
         this._buff[this._buffLen++] = 0x80;
-        this._buff.subarray(this._buffLen).fill(0);
+        fill(this._buff, this._buffLen);
         if (this._buffLen > 56) {
             this._step();
-            this._buff.fill(0);
+            fill(this._buff);
         }
         // this will fit because the mantissa can cover up to 52 bits
         const ml = 8 * this._totalLen;
@@ -252,5 +255,4 @@ class StringSHA1 {
         this._h4 = (this._h4 + e) & 0xffffffff;
     }
 }
-
-export { StringSHA1, doHash, hash, numberHash, stringHash };
+StringSHA1._bigBlock32 = new DataView(new ArrayBuffer(320)); // 80 * 4 = 320

@@ -1,4 +1,17 @@
-import { $, addDisposableListener, EventType } from '../../../../base/browser/dom.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+import * as dom from '../../../../base/browser/dom.js';
 import { disposableTimeout } from '../../../../base/common/async.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { Disposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
@@ -8,20 +21,6 @@ import './inlineProgressWidget.css';
 import { Range } from '../../../common/core/range.js';
 import { ModelDecorationOptions } from '../../../common/model/textModel.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 const inlineProgressDecoration = ModelDecorationOptions.register({
     description: 'inline-progress-widget',
     stickiness: 1 /* TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges */,
@@ -33,7 +32,6 @@ const inlineProgressDecoration = ModelDecorationOptions.register({
     }
 });
 class InlineProgressWidget extends Disposable {
-    static { this.baseId = 'editor.widget.inlineProgressWidget'; }
     constructor(typeId, editor, range, title, delegate) {
         super();
         this.typeId = typeId;
@@ -47,24 +45,24 @@ class InlineProgressWidget extends Disposable {
         this.editor.layoutContentWidget(this);
     }
     create(title) {
-        this.domNode = $('.inline-progress-widget');
+        this.domNode = dom.$('.inline-progress-widget');
         this.domNode.role = 'button';
         this.domNode.title = title;
-        const iconElement = $('span.icon');
+        const iconElement = dom.$('span.icon');
         this.domNode.append(iconElement);
         iconElement.classList.add(...ThemeIcon.asClassNameArray(Codicon.loading), 'codicon-modifier-spin');
         const updateSize = () => {
-            const lineHeight = this.editor.getOption(75 /* EditorOption.lineHeight */);
+            const lineHeight = this.editor.getOption(67 /* EditorOption.lineHeight */);
             this.domNode.style.height = `${lineHeight}px`;
             this.domNode.style.width = `${Math.ceil(0.8 * lineHeight)}px`;
         };
         updateSize();
         this._register(this.editor.onDidChangeConfiguration(c => {
-            if (c.hasChanged(61 /* EditorOption.fontSize */) || c.hasChanged(75 /* EditorOption.lineHeight */)) {
+            if (c.hasChanged(52 /* EditorOption.fontSize */) || c.hasChanged(67 /* EditorOption.lineHeight */)) {
                 updateSize();
             }
         }));
-        this._register(addDisposableListener(this.domNode, EventType.CLICK, e => {
+        this._register(dom.addDisposableListener(this.domNode, dom.EventType.CLICK, e => {
             this.delegate.cancel();
         }));
     }
@@ -85,6 +83,7 @@ class InlineProgressWidget extends Disposable {
         this.editor.removeContentWidget(this);
     }
 }
+InlineProgressWidget.baseId = 'editor.widget.inlineProgressWidget';
 let InlineProgressManager = class InlineProgressManager extends Disposable {
     constructor(id, _editor, _instantiationService) {
         super();
@@ -94,15 +93,11 @@ let InlineProgressManager = class InlineProgressManager extends Disposable {
         /** Delay before showing the progress widget */
         this._showDelay = 500; // ms
         this._showPromise = this._register(new MutableDisposable());
-        this._currentWidget = this._register(new MutableDisposable());
+        this._currentWidget = new MutableDisposable();
         this._operationIdPool = 0;
         this._currentDecorations = _editor.createDecorationsCollection();
     }
-    dispose() {
-        super.dispose();
-        this._currentDecorations.clear();
-    }
-    async showWhile(position, title, promise, delegate, delayOverride) {
+    async showWhile(position, title, promise) {
         const operationId = this._operationIdPool++;
         this._currentOperation = operationId;
         this.clear();
@@ -113,9 +108,9 @@ let InlineProgressManager = class InlineProgressManager extends Disposable {
                     options: inlineProgressDecoration,
                 }]);
             if (decorationIds.length > 0) {
-                this._currentWidget.value = this._instantiationService.createInstance(InlineProgressWidget, this.id, this._editor, range, title, delegate);
+                this._currentWidget.value = this._instantiationService.createInstance(InlineProgressWidget, this.id, this._editor, range, title, promise);
             }
-        }, delayOverride ?? this._showDelay);
+        }, this._showDelay);
         try {
             return await promise;
         }
@@ -135,5 +130,4 @@ let InlineProgressManager = class InlineProgressManager extends Disposable {
 InlineProgressManager = __decorate([
     __param(2, IInstantiationService)
 ], InlineProgressManager);
-
 export { InlineProgressManager };

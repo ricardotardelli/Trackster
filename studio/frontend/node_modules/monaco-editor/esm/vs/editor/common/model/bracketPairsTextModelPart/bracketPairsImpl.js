@@ -1,18 +1,17 @@
-import { CallbackIterable, compareBy } from '../../../../base/common/arrays.js';
-import { Emitter } from '../../../../base/common/event.js';
-import { Disposable, MutableDisposable, DisposableStore } from '../../../../base/common/lifecycle.js';
-import { Range } from '../../core/range.js';
-import { ignoreBracketsInToken } from '../../languages/supports.js';
-import { BracketsUtils } from '../../languages/supports/richEditBrackets.js';
-import { BracketPairsTree } from './bracketPairsTree/bracketPairsTree.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class BracketPairsTextModelPart extends Disposable {
+import { CallbackIterable, compareBy } from '../../../../base/common/arrays.js';
+import { Emitter } from '../../../../base/common/event.js';
+import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
+import { Range } from '../../core/range.js';
+import { ignoreBracketsInToken } from '../../languages/supports.js';
+import { BracketsUtils } from '../../languages/supports/richEditBrackets.js';
+import { BracketPairsTree } from './bracketPairsTree/bracketPairsTree.js';
+export class BracketPairsTextModelPart extends Disposable {
     get canBuildAST() {
-        const maxSupportedDocumentLength = /* max lines */ 50_000 * /* average column count */ 100;
+        const maxSupportedDocumentLength = /* max lines */ 50000 * /* average column count */ 100;
         return this.textModel.getValueLength() <= maxSupportedDocumentLength;
     }
     constructor(textModel, languageConfigurationService) {
@@ -23,14 +22,15 @@ class BracketPairsTextModelPart extends Disposable {
         this.onDidChangeEmitter = new Emitter();
         this.onDidChange = this.onDidChangeEmitter.event;
         this.bracketsRequested = false;
+        this._register(this.languageConfigurationService.onDidChange(e => {
+            var _a;
+            if (!e.languageId || ((_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.didLanguageChange(e.languageId))) {
+                this.bracketPairsTree.clear();
+                this.updateBracketPairsTree();
+            }
+        }));
     }
     //#region TextModel events
-    handleLanguageConfigurationServiceChange(e) {
-        if (!e.languageId || this.bracketPairsTree.value?.object.didLanguageChange(e.languageId)) {
-            this.bracketPairsTree.clear();
-            this.updateBracketPairsTree();
-        }
-    }
     handleDidChangeOptions(e) {
         this.bracketPairsTree.clear();
         this.updateBracketPairsTree();
@@ -40,13 +40,16 @@ class BracketPairsTextModelPart extends Disposable {
         this.updateBracketPairsTree();
     }
     handleDidChangeContent(change) {
-        this.bracketPairsTree.value?.object.handleContentChanged(change);
+        var _a;
+        (_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.handleContentChanged(change);
     }
     handleDidChangeBackgroundTokenizationState() {
-        this.bracketPairsTree.value?.object.handleDidChangeBackgroundTokenizationState();
+        var _a;
+        (_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.handleDidChangeBackgroundTokenizationState();
     }
     handleDidChangeTokens(e) {
-        this.bracketPairsTree.value?.object.handleDidChangeTokens(e);
+        var _a;
+        (_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.handleDidChangeTokens(e);
     }
     //#endregion
     updateBracketPairsTree() {
@@ -73,19 +76,22 @@ class BracketPairsTextModelPart extends Disposable {
      * The result is sorted by the start position.
     */
     getBracketPairsInRange(range) {
+        var _a;
         this.bracketsRequested = true;
         this.updateBracketPairsTree();
-        return this.bracketPairsTree.value?.object.getBracketPairsInRange(range, false) || CallbackIterable.empty;
+        return ((_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.getBracketPairsInRange(range, false)) || CallbackIterable.empty;
     }
     getBracketPairsInRangeWithMinIndentation(range) {
+        var _a;
         this.bracketsRequested = true;
         this.updateBracketPairsTree();
-        return this.bracketPairsTree.value?.object.getBracketPairsInRange(range, true) || CallbackIterable.empty;
+        return ((_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.getBracketPairsInRange(range, true)) || CallbackIterable.empty;
     }
     getBracketsInRange(range, onlyColorizedBrackets = false) {
+        var _a;
         this.bracketsRequested = true;
         this.updateBracketPairsTree();
-        return this.bracketPairsTree.value?.object.getBracketsInRange(range, onlyColorizedBrackets) || CallbackIterable.empty;
+        return ((_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.getBracketsInRange(range, onlyColorizedBrackets)) || CallbackIterable.empty;
     }
     findMatchingBracketUp(_bracket, _position, maxDuration) {
         const position = this.textModel.validatePosition(_position);
@@ -394,11 +400,12 @@ class BracketPairsTextModelPart extends Disposable {
         return null;
     }
     findPrevBracket(_position) {
+        var _a;
         const position = this.textModel.validatePosition(_position);
         if (this.canBuildAST) {
             this.bracketsRequested = true;
             this.updateBracketPairsTree();
-            return this.bracketPairsTree.value?.object.getFirstBracketBefore(position) || null;
+            return ((_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.getFirstBracketBefore(position)) || null;
         }
         let languageId = null;
         let modeBrackets = null;
@@ -471,11 +478,12 @@ class BracketPairsTextModelPart extends Disposable {
         return null;
     }
     findNextBracket(_position) {
+        var _a;
         const position = this.textModel.validatePosition(_position);
         if (this.canBuildAST) {
             this.bracketsRequested = true;
             this.updateBracketPairsTree();
-            return this.bracketPairsTree.value?.object.getFirstBracketAfter(position) || null;
+            return ((_a = this.bracketPairsTree.value) === null || _a === void 0 ? void 0 : _a.object.getFirstBracketAfter(position)) || null;
         }
         const lineCount = this.textModel.getLineCount();
         let languageId = null;
@@ -687,7 +695,7 @@ class BracketPairsTextModelPart extends Disposable {
 function createDisposableRef(object, disposable) {
     return {
         object,
-        dispose: () => disposable?.dispose(),
+        dispose: () => disposable === null || disposable === void 0 ? void 0 : disposable.dispose(),
     };
 }
 function createTimeBasedContinueBracketSearchPredicate(maxDuration) {
@@ -702,16 +710,14 @@ function createTimeBasedContinueBracketSearchPredicate(maxDuration) {
     }
 }
 class BracketSearchCanceled {
-    static { this.INSTANCE = new BracketSearchCanceled(); }
     constructor() {
         this._searchCanceledBrand = undefined;
     }
 }
+BracketSearchCanceled.INSTANCE = new BracketSearchCanceled();
 function stripBracketSearchCanceled(result) {
     if (result instanceof BracketSearchCanceled) {
         return null;
     }
     return result;
 }
-
-export { BracketPairsTextModelPart };

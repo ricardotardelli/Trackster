@@ -1,12 +1,11 @@
-import './scrollDecoration.css';
-import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
-import { ViewPart } from '../../view/viewPart.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ScrollDecorationViewPart extends ViewPart {
+import './scrollDecoration.css';
+import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
+import { ViewPart } from '../../view/viewPart.js';
+export class ScrollDecorationViewPart extends ViewPart {
     constructor(context) {
         super(context);
         this._scrollTop = 0;
@@ -14,7 +13,7 @@ class ScrollDecorationViewPart extends ViewPart {
         this._updateWidth();
         this._shouldShow = false;
         const options = this._context.configuration.options;
-        const scrollbar = options.get(117 /* EditorOption.scrollbar */);
+        const scrollbar = options.get(103 /* EditorOption.scrollbar */);
         this._useShadows = scrollbar.useShadows;
         this._domNode = createFastDomNode(document.createElement('div'));
         this._domNode.setAttribute('role', 'presentation');
@@ -36,7 +35,7 @@ class ScrollDecorationViewPart extends ViewPart {
     }
     _updateWidth() {
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
         if (layoutInfo.minimap.renderMinimap === 0 || (layoutInfo.minimap.minimapWidth > 0 && layoutInfo.minimap.minimapLeft === 0)) {
             this._width = layoutInfo.width;
         }
@@ -47,7 +46,7 @@ class ScrollDecorationViewPart extends ViewPart {
     // --- begin event handlers
     onConfigurationChanged(e) {
         const options = this._context.configuration.options;
-        const scrollbar = options.get(117 /* EditorOption.scrollbar */);
+        const scrollbar = options.get(103 /* EditorOption.scrollbar */);
         this._useShadows = scrollbar.useShadows;
         this._updateWidth();
         this._updateShouldShow();
@@ -66,5 +65,3 @@ class ScrollDecorationViewPart extends ViewPart {
         this._domNode.setClassName(this._shouldShow ? 'scroll-decoration' : '');
     }
 }
-
-export { ScrollDecorationViewPart };

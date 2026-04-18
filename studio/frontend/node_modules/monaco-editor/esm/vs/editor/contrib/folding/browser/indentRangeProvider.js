@@ -1,13 +1,12 @@
-import { computeIndentLevel } from '../../../common/model/utils.js';
-import { MAX_LINE_NUMBER, FoldingRegions } from './foldingRanges.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { computeIndentLevel } from '../../../common/model/utils.js';
+import { FoldingRegions, MAX_LINE_NUMBER } from './foldingRanges.js';
 const MAX_FOLDING_REGIONS_FOR_INDENT_DEFAULT = 5000;
 const ID_INDENT_PROVIDER = 'indent';
-class IndentRangeProvider {
+export class IndentRangeProvider {
     constructor(editorModel, languageConfigurationService, foldingRangesLimit) {
         this.editorModel = editorModel;
         this.languageConfigurationService = languageConfigurationService;
@@ -23,7 +22,7 @@ class IndentRangeProvider {
     }
 }
 // public only for testing
-class RangesCollector {
+export class RangesCollector {
     constructor(foldingRangesLimit) {
         this._startIndexes = [];
         this._endIndexes = [];
@@ -92,7 +91,7 @@ const foldingRangesLimitDefault = {
     limit: MAX_FOLDING_REGIONS_FOR_INDENT_DEFAULT,
     update: () => { }
 };
-function computeRanges(model, offSide, markers, foldingRangesLimit = foldingRangesLimitDefault) {
+export function computeRanges(model, offSide, markers, foldingRangesLimit = foldingRangesLimitDefault) {
     const tabSize = model.getOptions().tabSize;
     const result = new RangesCollector(foldingRangesLimit);
     let pattern = undefined;
@@ -134,6 +133,9 @@ function computeRanges(model, offSide, markers, foldingRangesLimit = foldingRang
                     previous.endAbove = line;
                     continue;
                 }
+                else {
+                    // no end marker found, treat line as a regular line
+                }
             }
             else { // end pattern match
                 previousRegions.push({ indent: -2, endAbove: line, line });
@@ -162,5 +164,3 @@ function computeRanges(model, offSide, markers, foldingRangesLimit = foldingRang
     }
     return result.toIndentRanges(model);
 }
-
-export { IndentRangeProvider, RangesCollector, computeRanges };

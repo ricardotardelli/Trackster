@@ -1,32 +1,31 @@
-import { Emitter } from '../../../../base/common/event.js';
-import { combinedDisposable, DisposableStore, dispose } from '../../../../base/common/lifecycle.js';
-import { isEqual } from '../../../../base/common/resources.js';
-import { registerEditorCommand, EditorCommand } from '../../../browser/editorExtensions.js';
-import { ICodeEditorService } from '../../../browser/services/codeEditorService.js';
-import { Range } from '../../../common/core/range.js';
-import { localize } from '../../../../nls.js';
-import { RawContextKey, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-import { registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
-import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
-import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
-import { KeybindingsRegistry } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
-import { INotificationService } from '../../../../platform/notification/common/notification.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-const ctxHasSymbols = new RawContextKey('hasSymbols', false, localize(1095, "Whether there are symbol locations that can be navigated via keyboard-only."));
-const ISymbolNavigationService = createDecorator('ISymbolNavigationService');
+import { Emitter } from '../../../../base/common/event.js';
+import { combinedDisposable, DisposableStore, dispose } from '../../../../base/common/lifecycle.js';
+import { isEqual } from '../../../../base/common/resources.js';
+import { EditorCommand, registerEditorCommand } from '../../../browser/editorExtensions.js';
+import { ICodeEditorService } from '../../../browser/services/codeEditorService.js';
+import { Range } from '../../../common/core/range.js';
+import { localize } from '../../../../nls.js';
+import { IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
+import { registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
+import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
+import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+import { KeybindingsRegistry } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
+import { INotificationService } from '../../../../platform/notification/common/notification.js';
+export const ctxHasSymbols = new RawContextKey('hasSymbols', false, localize('hasSymbols', "Whether there are symbol locations that can be navigated via keyboard-only."));
+export const ISymbolNavigationService = createDecorator('ISymbolNavigationService');
 let SymbolNavigationService = class SymbolNavigationService {
     constructor(contextKeyService, _editorService, _notificationService, _keybindingService) {
         this._editorService = _editorService;
@@ -38,9 +37,10 @@ let SymbolNavigationService = class SymbolNavigationService {
         this._ctxHasSymbols = ctxHasSymbols.bindTo(contextKeyService);
     }
     reset() {
+        var _a, _b;
         this._ctxHasSymbols.reset();
-        this._currentState?.dispose();
-        this._currentMessage?.close();
+        (_a = this._currentState) === null || _a === void 0 ? void 0 : _a.dispose();
+        (_b = this._currentMessage) === null || _b === void 0 ? void 0 : _b.dispose();
         this._currentModel = undefined;
         this._currentIdx = -1;
     }
@@ -108,11 +108,12 @@ let SymbolNavigationService = class SymbolNavigationService {
         });
     }
     _showMessage() {
-        this._currentMessage?.close();
+        var _a;
+        (_a = this._currentMessage) === null || _a === void 0 ? void 0 : _a.dispose();
         const kb = this._keybindingService.lookupKeybinding('editor.gotoNextSymbolFromResult');
         const message = kb
-            ? localize(1096, "Symbol {0} of {1}, {2} for next", this._currentIdx + 1, this._currentModel.references.length, kb.getLabel())
-            : localize(1097, "Symbol {0} of {1}", this._currentIdx + 1, this._currentModel.references.length);
+            ? localize('location.kb', "Symbol {0} of {1}, {2} for next", this._currentIdx + 1, this._currentModel.references.length, kb.getLabel())
+            : localize('location', "Symbol {0} of {1}", this._currentIdx + 1, this._currentModel.references.length);
         this._currentMessage = this._notificationService.status(message);
     }
 };
@@ -167,12 +168,11 @@ let EditorState = class EditorState {
         this._listener.set(editor, combinedDisposable(editor.onDidChangeCursorPosition(_ => this._onDidChange.fire({ editor })), editor.onDidChangeModelContent(_ => this._onDidChange.fire({ editor }))));
     }
     _onDidRemoveEditor(editor) {
-        this._listener.get(editor)?.dispose();
+        var _a;
+        (_a = this._listener.get(editor)) === null || _a === void 0 ? void 0 : _a.dispose();
         this._listener.delete(editor);
     }
 };
 EditorState = __decorate([
     __param(0, ICodeEditorService)
 ], EditorState);
-
-export { ISymbolNavigationService, ctxHasSymbols };

@@ -1,35 +1,32 @@
-import './browser.js';
-import { BrowserFeatures } from './canIUse.js';
-import { StandardKeyboardEvent } from './keyboardEvent.js';
-import { StandardMouseEvent } from './mouseEvent.js';
-import { IntervalTimer, _runWhenIdle, AbstractIdleValue } from '../common/async.js';
-import { BugIndicatingError, onUnexpectedError } from '../common/errors.js';
-import { Emitter, Event } from '../common/event.js';
-import { DisposableStore, Disposable, toDisposable } from '../common/lifecycle.js';
-import { RemoteAuthorities } from '../common/network.js';
-import { isIOS } from '../common/platform.js';
-import { hash } from '../common/hash.js';
-import { ensureCodeWindow, mainWindow } from './window.js';
-import '../common/observableInternal/index.js';
-import { observableValue } from '../common/observableInternal/observables/observableValue.js';
-import { derived, derivedOpts } from '../common/observableInternal/observables/derived.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as browser from './browser.js';
+import { BrowserFeatures } from './canIUse.js';
+import { StandardKeyboardEvent } from './keyboardEvent.js';
+import { StandardMouseEvent } from './mouseEvent.js';
+import { AbstractIdleValue, IntervalTimer, _runWhenIdle } from '../common/async.js';
+import { onUnexpectedError } from '../common/errors.js';
+import * as event from '../common/event.js';
+import * as dompurify from './dompurify/dompurify.js';
+import { Disposable, DisposableStore, toDisposable } from '../common/lifecycle.js';
+import { FileAccess, RemoteAuthorities } from '../common/network.js';
+import * as platform from '../common/platform.js';
+import { hash } from '../common/hash.js';
+import { ensureCodeWindow, mainWindow } from './window.js';
 //# region Multi-Window Support Utilities
-const { getWindow, getDocument, getWindows, getWindowsCount, getWindowId, getWindowById, onDidRegisterWindow, onWillUnregisterWindow, onDidUnregisterWindow } = (function () {
+export const { registerWindow, getWindow, getDocument, getWindows, getWindowsCount, getWindowId, getWindowById, hasWindow, onDidRegisterWindow, onWillUnregisterWindow, onDidUnregisterWindow } = (function () {
     const windows = new Map();
     ensureCodeWindow(mainWindow, 1);
     const mainWindowRegistration = { window: mainWindow, disposables: new DisposableStore() };
     windows.set(mainWindow.vscodeWindowId, mainWindowRegistration);
-    const onDidRegisterWindow = new Emitter();
-    const onDidUnregisterWindow = new Emitter();
-    const onWillUnregisterWindow = new Emitter();
+    const onDidRegisterWindow = new event.Emitter();
+    const onDidUnregisterWindow = new event.Emitter();
+    const onWillUnregisterWindow = new event.Emitter();
     function getWindowById(windowId, fallbackToMain) {
         const window = typeof windowId === 'number' ? windows.get(windowId) : undefined;
-        return window ?? (fallbackToMain ? mainWindowRegistration : undefined);
+        return window !== null && window !== void 0 ? window : (fallbackToMain ? mainWindowRegistration : undefined);
     }
     return {
         onDidRegisterWindow: onDidRegisterWindow.event,
@@ -69,12 +66,13 @@ const { getWindow, getDocument, getWindows, getWindowsCount, getWindowId, getWin
         },
         getWindowById,
         getWindow(e) {
+            var _a;
             const candidateNode = e;
-            if (candidateNode?.ownerDocument?.defaultView) {
+            if ((_a = candidateNode === null || candidateNode === void 0 ? void 0 : candidateNode.ownerDocument) === null || _a === void 0 ? void 0 : _a.defaultView) {
                 return candidateNode.ownerDocument.defaultView.window;
             }
             const candidateEvent = e;
-            if (candidateEvent?.view) {
+            if (candidateEvent === null || candidateEvent === void 0 ? void 0 : candidateEvent.view) {
                 return candidateEvent.view.window;
             }
             return mainWindow;
@@ -86,7 +84,7 @@ const { getWindow, getDocument, getWindows, getWindowsCount, getWindowId, getWin
     };
 })();
 //#endregion
-function clearNode(node) {
+export function clearNode(node) {
     while (node.firstChild) {
         node.firstChild.remove();
     }
@@ -110,7 +108,7 @@ class DomListener {
         this._handler = null;
     }
 }
-function addDisposableListener(node, type, handler, useCaptureOrOptions) {
+export function addDisposableListener(node, type, handler, useCaptureOrOptions) {
     return new DomListener(node, type, handler, useCaptureOrOptions);
 }
 function _wrapAsStandardMouseEvent(targetWindow, handler) {
@@ -123,9 +121,9 @@ function _wrapAsStandardKeyboardEvent(handler) {
         return handler(new StandardKeyboardEvent(e));
     };
 }
-const addStandardDisposableListener = function addStandardDisposableListener(node, type, handler, useCapture) {
+export const addStandardDisposableListener = function addStandardDisposableListener(node, type, handler, useCapture) {
     let wrapHandler = handler;
-    if (type === 'click' || type === 'mousedown' || type === 'contextmenu') {
+    if (type === 'click' || type === 'mousedown') {
         wrapHandler = _wrapAsStandardMouseEvent(getWindow(node), handler);
     }
     else if (type === 'keydown' || type === 'keypress' || type === 'keyup') {
@@ -133,18 +131,19 @@ const addStandardDisposableListener = function addStandardDisposableListener(nod
     }
     return addDisposableListener(node, type, wrapHandler, useCapture);
 };
-const addStandardDisposableGenericMouseDownListener = function addStandardDisposableListener(node, handler, useCapture) {
+export const addStandardDisposableGenericMouseDownListener = function addStandardDisposableListener(node, handler, useCapture) {
     const wrapHandler = _wrapAsStandardMouseEvent(getWindow(node), handler);
     return addDisposableGenericMouseDownListener(node, wrapHandler, useCapture);
 };
-function addDisposableGenericMouseDownListener(node, handler, useCapture) {
-    return addDisposableListener(node, isIOS && BrowserFeatures.pointerEvents ? EventType.POINTER_DOWN : EventType.MOUSE_DOWN, handler, useCapture);
+export const addStandardDisposableGenericMouseUpListener = function addStandardDisposableListener(node, handler, useCapture) {
+    const wrapHandler = _wrapAsStandardMouseEvent(getWindow(node), handler);
+    return addDisposableGenericMouseUpListener(node, wrapHandler, useCapture);
+};
+export function addDisposableGenericMouseDownListener(node, handler, useCapture) {
+    return addDisposableListener(node, platform.isIOS && BrowserFeatures.pointerEvents ? EventType.POINTER_DOWN : EventType.MOUSE_DOWN, handler, useCapture);
 }
-function addDisposableGenericMouseMoveListener(node, handler, useCapture) {
-    return addDisposableListener(node, isIOS && BrowserFeatures.pointerEvents ? EventType.POINTER_MOVE : EventType.MOUSE_MOVE, handler, useCapture);
-}
-function addDisposableGenericMouseUpListener(node, handler, useCapture) {
-    return addDisposableListener(node, isIOS && BrowserFeatures.pointerEvents ? EventType.POINTER_UP : EventType.MOUSE_UP, handler, useCapture);
+export function addDisposableGenericMouseUpListener(node, handler, useCapture) {
+    return addDisposableListener(node, platform.isIOS && BrowserFeatures.pointerEvents ? EventType.POINTER_UP : EventType.MOUSE_UP, handler, useCapture);
 }
 /**
  * Execute the callback the next time the browser is idle, returning an
@@ -165,14 +164,14 @@ function addDisposableGenericMouseUpListener(node, handler, useCapture) {
  * [requestIdleCallback]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback
  * [setTimeout]: https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout
  */
-function runWhenWindowIdle(targetWindow, callback, timeout) {
+export function runWhenWindowIdle(targetWindow, callback, timeout) {
     return _runWhenIdle(targetWindow, callback, timeout);
 }
 /**
  * An implementation of the "idle-until-urgent"-strategy as introduced
  * here: https://philipwalton.com/articles/idle-until-urgent/
  */
-class WindowIdleValue extends AbstractIdleValue {
+export class WindowIdleValue extends AbstractIdleValue {
     constructor(targetWindow, executor) {
         super(targetWindow, executor);
     }
@@ -183,15 +182,15 @@ class WindowIdleValue extends AbstractIdleValue {
  * If currently in an animation frame, `runner` will be executed immediately.
  * @return token that can be used to cancel the scheduled runner (only if `runner` was not executed immediately).
  */
-let runAtThisOrScheduleAtNextAnimationFrame;
+export let runAtThisOrScheduleAtNextAnimationFrame;
 /**
  * Schedule a callback to be run at the next animation frame.
  * This allows multiple parties to register callbacks that should run at the next animation frame.
  * If currently in an animation frame, `runner` will be executed at the next animation frame.
  * @return token that can be used to cancel the scheduled runner.
  */
-let scheduleAtNextAnimationFrame;
-class WindowIntervalTimer extends IntervalTimer {
+export let scheduleAtNextAnimationFrame;
+export class WindowIntervalTimer extends IntervalTimer {
     /**
      *
      * @param node The optional node from which the target window is determined
@@ -201,7 +200,7 @@ class WindowIntervalTimer extends IntervalTimer {
         this.defaultTarget = node && getWindow(node);
     }
     cancelAndSet(runner, interval, targetWindow) {
-        return super.cancelAndSet(runner, interval, targetWindow ?? this.defaultTarget);
+        return super.cancelAndSet(runner, interval, targetWindow !== null && targetWindow !== void 0 ? targetWindow : this.defaultTarget);
     }
 }
 class AnimationFrameQueueItem {
@@ -247,8 +246,9 @@ class AnimationFrameQueueItem {
      */
     const inAnimationFrameRunner = new Map();
     const animationFrameRunner = (targetWindowId) => {
+        var _a;
         animFrameRequested.set(targetWindowId, false);
-        const currentQueue = NEXT_QUEUE.get(targetWindowId) ?? [];
+        const currentQueue = (_a = NEXT_QUEUE.get(targetWindowId)) !== null && _a !== void 0 ? _a : [];
         CURRENT_QUEUE.set(targetWindowId, currentQueue);
         NEXT_QUEUE.set(targetWindowId, []);
         inAnimationFrameRunner.set(targetWindowId, true);
@@ -291,10 +291,10 @@ class AnimationFrameQueueItem {
         }
     };
 })();
-function getComputedStyle(el) {
+export function getComputedStyle(el) {
     return getWindow(el).getComputedStyle(el, null);
 }
-function getClientArea(element, defaultValue, fallbackElement) {
+export function getClientArea(element, fallback) {
     const elWindow = getWindow(element);
     const elDocument = elWindow.document;
     // Try with DOM clientWidth / clientHeight
@@ -302,11 +302,11 @@ function getClientArea(element, defaultValue, fallbackElement) {
         return new Dimension(element.clientWidth, element.clientHeight);
     }
     // If visual view port exits and it's on mobile, it should be used instead of window innerWidth / innerHeight, or document.body.clientWidth / document.body.clientHeight
-    if (isIOS && elWindow?.visualViewport) {
+    if (platform.isIOS && (elWindow === null || elWindow === void 0 ? void 0 : elWindow.visualViewport)) {
         return new Dimension(elWindow.visualViewport.width, elWindow.visualViewport.height);
     }
     // Try innerWidth / innerHeight
-    if (elWindow?.innerWidth && elWindow.innerHeight) {
+    if ((elWindow === null || elWindow === void 0 ? void 0 : elWindow.innerWidth) && elWindow.innerHeight) {
         return new Dimension(elWindow.innerWidth, elWindow.innerHeight);
     }
     // Try with document.body.clientWidth / document.body.clientHeight
@@ -317,6 +317,9 @@ function getClientArea(element, defaultValue, fallbackElement) {
     if (elDocument.documentElement && elDocument.documentElement.clientWidth && elDocument.documentElement.clientHeight) {
         return new Dimension(elDocument.documentElement.clientWidth, elDocument.documentElement.clientHeight);
     }
+    if (fallback) {
+        return getClientArea(fallback);
+    }
     throw new Error('Unable to figure out browser width and height');
 }
 class SizeUtils {
@@ -325,50 +328,49 @@ class SizeUtils {
     static convertToPixels(element, value) {
         return parseFloat(value) || 0;
     }
-    static getDimension(element, cssPropertyName) {
+    static getDimension(element, cssPropertyName, jsPropertyName) {
         const computedStyle = getComputedStyle(element);
         const value = computedStyle ? computedStyle.getPropertyValue(cssPropertyName) : '0';
         return SizeUtils.convertToPixels(element, value);
     }
     static getBorderLeftWidth(element) {
-        return SizeUtils.getDimension(element, 'border-left-width');
+        return SizeUtils.getDimension(element, 'border-left-width', 'borderLeftWidth');
     }
     static getBorderRightWidth(element) {
-        return SizeUtils.getDimension(element, 'border-right-width');
+        return SizeUtils.getDimension(element, 'border-right-width', 'borderRightWidth');
     }
     static getBorderTopWidth(element) {
-        return SizeUtils.getDimension(element, 'border-top-width');
+        return SizeUtils.getDimension(element, 'border-top-width', 'borderTopWidth');
     }
     static getBorderBottomWidth(element) {
-        return SizeUtils.getDimension(element, 'border-bottom-width');
+        return SizeUtils.getDimension(element, 'border-bottom-width', 'borderBottomWidth');
     }
     static getPaddingLeft(element) {
-        return SizeUtils.getDimension(element, 'padding-left');
+        return SizeUtils.getDimension(element, 'padding-left', 'paddingLeft');
     }
     static getPaddingRight(element) {
-        return SizeUtils.getDimension(element, 'padding-right');
+        return SizeUtils.getDimension(element, 'padding-right', 'paddingRight');
     }
     static getPaddingTop(element) {
-        return SizeUtils.getDimension(element, 'padding-top');
+        return SizeUtils.getDimension(element, 'padding-top', 'paddingTop');
     }
     static getPaddingBottom(element) {
-        return SizeUtils.getDimension(element, 'padding-bottom');
+        return SizeUtils.getDimension(element, 'padding-bottom', 'paddingBottom');
     }
     static getMarginLeft(element) {
-        return SizeUtils.getDimension(element, 'margin-left');
+        return SizeUtils.getDimension(element, 'margin-left', 'marginLeft');
     }
     static getMarginTop(element) {
-        return SizeUtils.getDimension(element, 'margin-top');
+        return SizeUtils.getDimension(element, 'margin-top', 'marginTop');
     }
     static getMarginRight(element) {
-        return SizeUtils.getDimension(element, 'margin-right');
+        return SizeUtils.getDimension(element, 'margin-right', 'marginRight');
     }
     static getMarginBottom(element) {
-        return SizeUtils.getDimension(element, 'margin-bottom');
+        return SizeUtils.getDimension(element, 'margin-bottom', 'marginBottom');
     }
 }
-class Dimension {
-    static { this.None = new Dimension(0, 0); }
+export class Dimension {
     constructor(width, height) {
         this.width = width;
         this.height = height;
@@ -402,7 +404,8 @@ class Dimension {
         return a.width === b.width && a.height === b.height;
     }
 }
-function getTopLeftOffset(element) {
+Dimension.None = new Dimension(0, 0);
+export function getTopLeftOffset(element) {
     // Adapted from WinJS.Utilities.getPosition
     // and added borders to the mix
     let offsetParent = element.offsetParent;
@@ -429,7 +432,7 @@ function getTopLeftOffset(element) {
         top: top
     };
 }
-function size(element, width, height) {
+export function size(element, width, height) {
     if (typeof width === 'number') {
         element.style.width = `${width}px`;
     }
@@ -440,7 +443,7 @@ function size(element, width, height) {
 /**
  * Returns the position of a dom node relative to the entire page.
  */
-function getDomNodePagePosition(domNode) {
+export function getDomNodePagePosition(domNode) {
     const bb = domNode.getBoundingClientRect();
     const window = getWindow(domNode);
     return {
@@ -453,11 +456,10 @@ function getDomNodePagePosition(domNode) {
 /**
  * Returns the effective zoom on a given element before window zoom level is applied
  */
-function getDomNodeZoomLevel(domNode) {
+export function getDomNodeZoomLevel(domNode) {
     let testElement = domNode;
     let zoom = 1.0;
     do {
-        // eslint-disable-next-line local/code-no-any-casts
         const elementZoomLevel = getComputedStyle(testElement).zoom;
         if (elementZoomLevel !== null && elementZoomLevel !== undefined && elementZoomLevel !== '1') {
             zoom *= elementZoomLevel;
@@ -468,33 +470,33 @@ function getDomNodeZoomLevel(domNode) {
 }
 // Adapted from WinJS
 // Gets the width of the element, including margins.
-function getTotalWidth(element) {
+export function getTotalWidth(element) {
     const margin = SizeUtils.getMarginLeft(element) + SizeUtils.getMarginRight(element);
     return element.offsetWidth + margin;
 }
-function getContentWidth(element) {
+export function getContentWidth(element) {
     const border = SizeUtils.getBorderLeftWidth(element) + SizeUtils.getBorderRightWidth(element);
     const padding = SizeUtils.getPaddingLeft(element) + SizeUtils.getPaddingRight(element);
     return element.offsetWidth - border - padding;
 }
 // Adapted from WinJS
 // Gets the height of the content of the specified element. The content height does not include borders or padding.
-function getContentHeight(element) {
+export function getContentHeight(element) {
     const border = SizeUtils.getBorderTopWidth(element) + SizeUtils.getBorderBottomWidth(element);
     const padding = SizeUtils.getPaddingTop(element) + SizeUtils.getPaddingBottom(element);
     return element.offsetHeight - border - padding;
 }
 // Adapted from WinJS
 // Gets the height of the element, including its margins.
-function getTotalHeight(element) {
+export function getTotalHeight(element) {
     const margin = SizeUtils.getMarginTop(element) + SizeUtils.getMarginBottom(element);
     return element.offsetHeight + margin;
 }
 // ----------------------------------------------------------------------------------------
-function isAncestor(testChild, testAncestor) {
-    return Boolean(testAncestor?.contains(testChild));
+export function isAncestor(testChild, testAncestor) {
+    return Boolean(testAncestor === null || testAncestor === void 0 ? void 0 : testAncestor.contains(testChild));
 }
-function findParentWithClass(node, clazz, stopAtClazzOrNode) {
+export function findParentWithClass(node, clazz, stopAtClazzOrNode) {
     while (node && node.nodeType === node.ELEMENT_NODE) {
         if (node.classList.contains(clazz)) {
             return node;
@@ -515,18 +517,19 @@ function findParentWithClass(node, clazz, stopAtClazzOrNode) {
     }
     return null;
 }
-function hasParentWithClass(node, clazz, stopAtClazzOrNode) {
+export function hasParentWithClass(node, clazz, stopAtClazzOrNode) {
     return !!findParentWithClass(node, clazz, stopAtClazzOrNode);
 }
-function isShadowRoot(node) {
+export function isShadowRoot(node) {
     return (node && !!node.host && !!node.mode);
 }
-function isInShadowDOM(domNode) {
+export function isInShadowDOM(domNode) {
     return !!getShadowRoot(domNode);
 }
-function getShadowRoot(domNode) {
+export function getShadowRoot(domNode) {
+    var _a;
     while (domNode.parentNode) {
-        if (domNode === domNode.ownerDocument?.body) {
+        if (domNode === ((_a = domNode.ownerDocument) === null || _a === void 0 ? void 0 : _a.body)) {
             // reached the body
             return null;
         }
@@ -539,9 +542,9 @@ function getShadowRoot(domNode) {
  * based on document focus. Falls back to the main
  * window if no window has focus.
  */
-function getActiveElement() {
+export function getActiveElement() {
     let result = getActiveDocument().activeElement;
-    while (result?.shadowRoot) {
+    while (result === null || result === void 0 ? void 0 : result.shadowRoot) {
         result = result.shadowRoot.activeElement;
     }
     return result;
@@ -551,14 +554,14 @@ function getActiveElement() {
  * the provided element. Falls back to the main window if no
  * window has focus.
  */
-function isActiveElement(element) {
+export function isActiveElement(element) {
     return getActiveElement() === element;
 }
 /**
  * Returns true if the focused window active element is contained in
  * `ancestor`. Falls back to the main window if no window has focus.
  */
-function isAncestorOfActiveElement(ancestor) {
+export function isAncestorOfActiveElement(ancestor) {
     return isAncestor(getActiveElement(), ancestor);
 }
 /**
@@ -566,23 +569,96 @@ function isAncestorOfActiveElement(ancestor) {
  * Prefers the window with focus, otherwise falls back to
  * the main windows document.
  */
-function getActiveDocument() {
+export function getActiveDocument() {
+    var _a;
     if (getWindowsCount() <= 1) {
         return mainWindow.document;
     }
     const documents = Array.from(getWindows()).map(({ window }) => window.document);
-    return documents.find(doc => doc.hasFocus()) ?? mainWindow.document;
+    return (_a = documents.find(doc => doc.hasFocus())) !== null && _a !== void 0 ? _a : mainWindow.document;
 }
 /**
  * Returns the active window across main and child windows.
  * Prefers the window with focus, otherwise falls back to
  * the main window.
  */
-function getActiveWindow() {
+export function getActiveWindow() {
+    var _a, _b;
     const document = getActiveDocument();
-    return (document.defaultView?.window ?? mainWindow);
+    return ((_b = (_a = document.defaultView) === null || _a === void 0 ? void 0 : _a.window) !== null && _b !== void 0 ? _b : mainWindow);
 }
-const sharedMutationObserver = new class {
+const globalStylesheets = new Map();
+/**
+ * A version of createStyleSheet which has a unified API to initialize/set the style content.
+ */
+export function createStyleSheet2() {
+    return new WrappedStyleElement();
+}
+class WrappedStyleElement {
+    constructor() {
+        this._currentCssStyle = '';
+        this._styleSheet = undefined;
+    }
+    setStyle(cssStyle) {
+        if (cssStyle === this._currentCssStyle) {
+            return;
+        }
+        this._currentCssStyle = cssStyle;
+        if (!this._styleSheet) {
+            this._styleSheet = createStyleSheet(mainWindow.document.head, (s) => s.innerText = cssStyle);
+        }
+        else {
+            this._styleSheet.innerText = cssStyle;
+        }
+    }
+    dispose() {
+        if (this._styleSheet) {
+            this._styleSheet.remove();
+            this._styleSheet = undefined;
+        }
+    }
+}
+export function createStyleSheet(container = mainWindow.document.head, beforeAppend, disposableStore) {
+    const style = document.createElement('style');
+    style.type = 'text/css';
+    style.media = 'screen';
+    beforeAppend === null || beforeAppend === void 0 ? void 0 : beforeAppend(style);
+    container.appendChild(style);
+    if (disposableStore) {
+        disposableStore.add(toDisposable(() => container.removeChild(style)));
+    }
+    // With <head> as container, the stylesheet becomes global and is tracked
+    // to support auxiliary windows to clone the stylesheet.
+    if (container === mainWindow.document.head) {
+        const globalStylesheetClones = new Set();
+        globalStylesheets.set(style, globalStylesheetClones);
+        for (const { window: targetWindow, disposables } of getWindows()) {
+            if (targetWindow === mainWindow) {
+                continue; // main window is already tracked
+            }
+            const cloneDisposable = disposables.add(cloneGlobalStyleSheet(style, globalStylesheetClones, targetWindow));
+            disposableStore === null || disposableStore === void 0 ? void 0 : disposableStore.add(cloneDisposable);
+        }
+    }
+    return style;
+}
+function cloneGlobalStyleSheet(globalStylesheet, globalStylesheetClones, targetWindow) {
+    var _a, _b;
+    const disposables = new DisposableStore();
+    const clone = globalStylesheet.cloneNode(true);
+    targetWindow.document.head.appendChild(clone);
+    disposables.add(toDisposable(() => targetWindow.document.head.removeChild(clone)));
+    for (const rule of getDynamicStyleSheetRules(globalStylesheet)) {
+        (_a = clone.sheet) === null || _a === void 0 ? void 0 : _a.insertRule(rule.cssText, (_b = clone.sheet) === null || _b === void 0 ? void 0 : _b.cssRules.length);
+    }
+    disposables.add(sharedMutationObserver.observe(globalStylesheet, disposables, { childList: true })(() => {
+        clone.textContent = globalStylesheet.textContent;
+    }));
+    globalStylesheetClones.add(clone);
+    disposables.add(toDisposable(() => globalStylesheetClones.delete(clone)));
+    return disposables;
+}
+export const sharedMutationObserver = new class {
     constructor() {
         this.mutationObservers = new Map();
     }
@@ -595,7 +671,7 @@ const sharedMutationObserver = new class {
         const optionsHash = hash(options);
         let mutationObserverPerOptions = mutationObserversPerTarget.get(optionsHash);
         if (!mutationObserverPerOptions) {
-            const onDidMutate = new Emitter();
+            const onDidMutate = new event.Emitter();
             const observer = new MutationObserver(mutations => onDidMutate.fire(mutations));
             observer.observe(target, options);
             const resolvedMutationObserverPerOptions = mutationObserverPerOptions = {
@@ -608,8 +684,8 @@ const sharedMutationObserver = new class {
                 if (resolvedMutationObserverPerOptions.users === 0) {
                     onDidMutate.dispose();
                     observer.disconnect();
-                    mutationObserversPerTarget?.delete(optionsHash);
-                    if (mutationObserversPerTarget?.size === 0) {
+                    mutationObserversPerTarget === null || mutationObserversPerTarget === void 0 ? void 0 : mutationObserversPerTarget.delete(optionsHash);
+                    if ((mutationObserversPerTarget === null || mutationObserversPerTarget === void 0 ? void 0 : mutationObserversPerTarget.size) === 0) {
                         this.mutationObservers.delete(target);
                     }
                 }
@@ -622,27 +698,69 @@ const sharedMutationObserver = new class {
         return mutationObserverPerOptions.onDidMutate;
     }
 };
-function isHTMLElement(e) {
-    // eslint-disable-next-line no-restricted-syntax
-    return e instanceof HTMLElement || e instanceof getWindow(e).HTMLElement;
+let _sharedStyleSheet = null;
+function getSharedStyleSheet() {
+    if (!_sharedStyleSheet) {
+        _sharedStyleSheet = createStyleSheet();
+    }
+    return _sharedStyleSheet;
 }
-function isHTMLAnchorElement(e) {
-    // eslint-disable-next-line no-restricted-syntax
-    return e instanceof HTMLAnchorElement || e instanceof getWindow(e).HTMLAnchorElement;
+function getDynamicStyleSheetRules(style) {
+    var _a, _b;
+    if ((_a = style === null || style === void 0 ? void 0 : style.sheet) === null || _a === void 0 ? void 0 : _a.rules) {
+        // Chrome, IE
+        return style.sheet.rules;
+    }
+    if ((_b = style === null || style === void 0 ? void 0 : style.sheet) === null || _b === void 0 ? void 0 : _b.cssRules) {
+        // FF
+        return style.sheet.cssRules;
+    }
+    return [];
 }
-function isSVGElement(e) {
-    // eslint-disable-next-line no-restricted-syntax
-    return e instanceof SVGElement || e instanceof getWindow(e).SVGElement;
+export function createCSSRule(selector, cssText, style = getSharedStyleSheet()) {
+    var _a, _b;
+    if (!style || !cssText) {
+        return;
+    }
+    (_a = style.sheet) === null || _a === void 0 ? void 0 : _a.insertRule(`${selector} {${cssText}}`, 0);
+    // Apply rule also to all cloned global stylesheets
+    for (const clonedGlobalStylesheet of (_b = globalStylesheets.get(style)) !== null && _b !== void 0 ? _b : []) {
+        createCSSRule(selector, cssText, clonedGlobalStylesheet);
+    }
 }
-function isMouseEvent(e) {
+export function removeCSSRulesContainingSelector(ruleName, style = getSharedStyleSheet()) {
+    var _a, _b;
+    if (!style) {
+        return;
+    }
+    const rules = getDynamicStyleSheetRules(style);
+    const toDelete = [];
+    for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        if (isCSSStyleRule(rule) && rule.selectorText.indexOf(ruleName) !== -1) {
+            toDelete.push(i);
+        }
+    }
+    for (let i = toDelete.length - 1; i >= 0; i--) {
+        (_a = style.sheet) === null || _a === void 0 ? void 0 : _a.deleteRule(toDelete[i]);
+    }
+    // Remove rules also from all cloned global stylesheets
+    for (const clonedGlobalStylesheet of (_b = globalStylesheets.get(style)) !== null && _b !== void 0 ? _b : []) {
+        removeCSSRulesContainingSelector(ruleName, clonedGlobalStylesheet);
+    }
+}
+function isCSSStyleRule(rule) {
+    return typeof rule.selectorText === 'string';
+}
+export function isMouseEvent(e) {
     // eslint-disable-next-line no-restricted-syntax
     return e instanceof MouseEvent || e instanceof getWindow(e).MouseEvent;
 }
-function isKeyboardEvent(e) {
+export function isKeyboardEvent(e) {
     // eslint-disable-next-line no-restricted-syntax
     return e instanceof KeyboardEvent || e instanceof getWindow(e).KeyboardEvent;
 }
-const EventType = {
+export const EventType = {
     // Mouse
     CLICK: 'click',
     AUXCLICK: 'auxclick',
@@ -660,15 +778,36 @@ const EventType = {
     POINTER_MOVE: 'pointermove',
     POINTER_LEAVE: 'pointerleave',
     CONTEXT_MENU: 'contextmenu',
+    WHEEL: 'wheel',
     // Keyboard
     KEY_DOWN: 'keydown',
+    KEY_PRESS: 'keypress',
     KEY_UP: 'keyup',
+    // HTML Document
+    LOAD: 'load',
     BEFORE_UNLOAD: 'beforeunload',
+    UNLOAD: 'unload',
+    PAGE_SHOW: 'pageshow',
+    PAGE_HIDE: 'pagehide',
+    PASTE: 'paste',
+    ABORT: 'abort',
+    ERROR: 'error',
+    RESIZE: 'resize',
+    SCROLL: 'scroll',
+    FULLSCREEN_CHANGE: 'fullscreenchange',
+    WK_FULLSCREEN_CHANGE: 'webkitfullscreenchange',
+    // Form
+    SELECT: 'select',
+    CHANGE: 'change',
+    SUBMIT: 'submit',
+    RESET: 'reset',
     FOCUS: 'focus',
     FOCUS_IN: 'focusin',
     FOCUS_OUT: 'focusout',
     BLUR: 'blur',
     INPUT: 'input',
+    // Local Storage
+    STORAGE: 'storage',
     // Drag
     DRAG_START: 'dragstart',
     DRAG: 'drag',
@@ -676,12 +815,17 @@ const EventType = {
     DRAG_LEAVE: 'dragleave',
     DRAG_OVER: 'dragover',
     DROP: 'drop',
-    DRAG_END: 'dragend'};
-function isEventLike(obj) {
+    DRAG_END: 'dragend',
+    // Animation
+    ANIMATION_START: browser.isWebKit ? 'webkitAnimationStart' : 'animationstart',
+    ANIMATION_END: browser.isWebKit ? 'webkitAnimationEnd' : 'animationend',
+    ANIMATION_ITERATION: browser.isWebKit ? 'webkitAnimationIteration' : 'animationiteration'
+};
+export function isEventLike(obj) {
     const candidate = obj;
     return !!(candidate && typeof candidate.preventDefault === 'function' && typeof candidate.stopPropagation === 'function');
 }
-const EventHelper = {
+export const EventHelper = {
     stop: (e, cancelBubble) => {
         e.preventDefault();
         if (cancelBubble) {
@@ -690,7 +834,7 @@ const EventHelper = {
         return e;
     }
 };
-function saveParentsScrollTop(node) {
+export function saveParentsScrollTop(node) {
     const r = [];
     for (let i = 0; node && node.nodeType === node.ELEMENT_NODE; i++) {
         r[i] = node.scrollTop;
@@ -698,7 +842,7 @@ function saveParentsScrollTop(node) {
     }
     return r;
 }
-function restoreParentsScrollTop(node, state) {
+export function restoreParentsScrollTop(node, state) {
     for (let i = 0; node && node.nodeType === node.ELEMENT_NODE; i++) {
         if (node.scrollTop !== state[i]) {
             node.scrollTop = state[i];
@@ -707,10 +851,8 @@ function restoreParentsScrollTop(node, state) {
     }
 }
 class FocusTracker extends Disposable {
-    get onDidFocus() { return this._onDidFocus.event; }
-    get onDidBlur() { return this._onDidBlur.event; }
     static hasFocusWithin(element) {
-        if (isHTMLElement(element)) {
+        if (element instanceof HTMLElement) {
             const shadowRoot = getShadowRoot(element);
             const activeElement = (shadowRoot ? shadowRoot.activeElement : element.ownerDocument.activeElement);
             return isAncestor(activeElement, element);
@@ -722,8 +864,10 @@ class FocusTracker extends Disposable {
     }
     constructor(element) {
         super();
-        this._onDidFocus = this._register(new Emitter());
-        this._onDidBlur = this._register(new Emitter());
+        this._onDidFocus = this._register(new event.Emitter());
+        this.onDidFocus = this._onDidFocus.event;
+        this._onDidBlur = this._register(new event.Emitter());
+        this.onDidBlur = this._onDidBlur.event;
         let hasFocus = FocusTracker.hasFocusWithin(element);
         let loosingFocus = false;
         const onFocus = () => {
@@ -736,7 +880,7 @@ class FocusTracker extends Disposable {
         const onBlur = () => {
             if (hasFocus) {
                 loosingFocus = true;
-                (isHTMLElement(element) ? getWindow(element) : element).setTimeout(() => {
+                (element instanceof HTMLElement ? getWindow(element) : element).setTimeout(() => {
                     if (loosingFocus) {
                         loosingFocus = false;
                         hasFocus = false;
@@ -758,7 +902,7 @@ class FocusTracker extends Disposable {
         };
         this._register(addDisposableListener(element, EventType.FOCUS, onFocus, true));
         this._register(addDisposableListener(element, EventType.BLUR, onBlur, true));
-        if (isHTMLElement(element)) {
+        if (element instanceof HTMLElement) {
             this._register(addDisposableListener(element, EventType.FOCUS_IN, () => this._refreshStateHandler()));
             this._register(addDisposableListener(element, EventType.FOCUS_OUT, () => this._refreshStateHandler()));
         }
@@ -770,32 +914,32 @@ class FocusTracker extends Disposable {
  * @param element The `HTMLElement` or `Window` to track focus changes on.
  * @returns An `IFocusTracker` instance.
  */
-function trackFocus(element) {
+export function trackFocus(element) {
     return new FocusTracker(element);
 }
-function after(sibling, child) {
+export function after(sibling, child) {
     sibling.after(child);
     return child;
 }
-function append(parent, ...children) {
+export function append(parent, ...children) {
     parent.append(...children);
     if (children.length === 1 && typeof children[0] !== 'string') {
         return children[0];
     }
 }
-function prepend(parent, child) {
+export function prepend(parent, child) {
     parent.insertBefore(child, parent.firstChild);
     return child;
 }
 /**
  * Removes all children from `parent` and appends `children`
  */
-function reset(parent, ...children) {
-    parent.textContent = '';
+export function reset(parent, ...children) {
+    parent.innerText = '';
     append(parent, ...children);
 }
 const SELECTOR_REGEX = /([\w\-]+)?(#([\w\-]+))?((\.([\w\-]+))*)/;
-var Namespace;
+export var Namespace;
 (function (Namespace) {
     Namespace["HTML"] = "http://www.w3.org/1999/xhtml";
     Namespace["SVG"] = "http://www.w3.org/2000/svg";
@@ -825,7 +969,6 @@ function _$(namespace, description, attrs, ...children) {
                 return;
             }
             if (/^on\w+$/.test(name)) {
-                // eslint-disable-next-line local/code-no-any-casts
                 result[name] = value;
             }
             else if (name === 'selected') {
@@ -841,13 +984,13 @@ function _$(namespace, description, attrs, ...children) {
     result.append(...children);
     return result;
 }
-function $(description, attrs, ...children) {
+export function $(description, attrs, ...children) {
     return _$(Namespace.HTML, description, attrs, ...children);
 }
 $.SVG = function (description, attrs, ...children) {
     return _$(Namespace.SVG, description, attrs, ...children);
 };
-function setVisibility(visible, ...elements) {
+export function setVisibility(visible, ...elements) {
     if (visible) {
         show(...elements);
     }
@@ -855,13 +998,13 @@ function setVisibility(visible, ...elements) {
         hide(...elements);
     }
 }
-function show(...elements) {
+export function show(...elements) {
     for (const element of elements) {
         element.style.display = '';
         element.removeAttribute('aria-hidden');
     }
 }
-function hide(...elements) {
+export function hide(...elements) {
     for (const element of elements) {
         element.style.display = 'none';
         element.setAttribute('aria-hidden', 'true');
@@ -875,7 +1018,7 @@ function hide(...elements) {
  * of 1.25, the cursor will be 2.5 screen pixels wide. Depending on how the dom node aligns/"snaps"
  * with the screen pixels, it will sometimes be rendered with 2 screen pixels, and sometimes with 3 screen pixels.
  */
-function computeScreenAwareSize(window, cssPx) {
+export function computeScreenAwareSize(window, cssPx) {
     const screenPx = window.devicePixelRatio * cssPx;
     return Math.max(1, Math.floor(screenPx)) / window.devicePixelRatio;
 }
@@ -890,7 +1033,7 @@ function computeScreenAwareSize(window, cssPx) {
  * to change the location of the current page.
  * See https://mathiasbynens.github.io/rel-noopener/
  */
-function windowOpenNoOpener(url) {
+export function windowOpenNoOpener(url) {
     // By using 'noopener' in the `windowFeatures` argument, the newly created window will
     // not be able to use `window.opener` to reach back to the current page.
     // See https://stackoverflow.com/a/46958731
@@ -899,7 +1042,7 @@ function windowOpenNoOpener(url) {
     // the creation of the window.
     mainWindow.open(url, '_blank', 'noopener');
 }
-function animate(targetWindow, fn) {
+export function animate(targetWindow, fn) {
     const step = () => {
         fn();
         stepDisposable = scheduleAtNextAnimationFrame(targetWindow, step);
@@ -908,7 +1051,144 @@ function animate(targetWindow, fn) {
     return toDisposable(() => stepDisposable.dispose());
 }
 RemoteAuthorities.setPreferredWebSchema(/^https:/.test(mainWindow.location.href) ? 'https' : 'http');
-class ModifierKeyEmitter extends Emitter {
+/**
+ * returns url('...')
+ */
+export function asCSSUrl(uri) {
+    if (!uri) {
+        return `url('')`;
+    }
+    return `url('${FileAccess.uriToBrowserUri(uri).toString(true).replace(/'/g, '%27')}')`;
+}
+export function asCSSPropertyValue(value) {
+    return `'${value.replace(/'/g, '%27')}'`;
+}
+export function asCssValueWithDefault(cssPropertyValue, dflt) {
+    if (cssPropertyValue !== undefined) {
+        const variableMatch = cssPropertyValue.match(/^\s*var\((.+)\)$/);
+        if (variableMatch) {
+            const varArguments = variableMatch[1].split(',', 2);
+            if (varArguments.length === 2) {
+                dflt = asCssValueWithDefault(varArguments[1].trim(), dflt);
+            }
+            return `var(${varArguments[0]}, ${dflt})`;
+        }
+        return cssPropertyValue;
+    }
+    return dflt;
+}
+// -- sanitize and trusted html
+/**
+ * Hooks dompurify using `afterSanitizeAttributes` to check that all `href` and `src`
+ * attributes are valid.
+ */
+export function hookDomPurifyHrefAndSrcSanitizer(allowedProtocols, allowDataImages = false) {
+    // https://github.com/cure53/DOMPurify/blob/main/demos/hooks-scheme-allowlist.html
+    // build an anchor to map URLs to
+    const anchor = document.createElement('a');
+    dompurify.addHook('afterSanitizeAttributes', (node) => {
+        // check all href/src attributes for validity
+        for (const attr of ['href', 'src']) {
+            if (node.hasAttribute(attr)) {
+                const attrValue = node.getAttribute(attr);
+                if (attr === 'href' && attrValue.startsWith('#')) {
+                    // Allow fragment links
+                    continue;
+                }
+                anchor.href = attrValue;
+                if (!allowedProtocols.includes(anchor.protocol.replace(/:$/, ''))) {
+                    if (allowDataImages && attr === 'src' && anchor.href.startsWith('data:')) {
+                        continue;
+                    }
+                    node.removeAttribute(attr);
+                }
+            }
+        }
+    });
+    return toDisposable(() => {
+        dompurify.removeHook('afterSanitizeAttributes');
+    });
+}
+/**
+ * List of safe, non-input html tags.
+ */
+export const basicMarkupHtmlTags = Object.freeze([
+    'a',
+    'abbr',
+    'b',
+    'bdo',
+    'blockquote',
+    'br',
+    'caption',
+    'cite',
+    'code',
+    'col',
+    'colgroup',
+    'dd',
+    'del',
+    'details',
+    'dfn',
+    'div',
+    'dl',
+    'dt',
+    'em',
+    'figcaption',
+    'figure',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'hr',
+    'i',
+    'img',
+    'input',
+    'ins',
+    'kbd',
+    'label',
+    'li',
+    'mark',
+    'ol',
+    'p',
+    'pre',
+    'q',
+    'rp',
+    'rt',
+    'ruby',
+    'samp',
+    'small',
+    'small',
+    'source',
+    'span',
+    'strike',
+    'strong',
+    'sub',
+    'summary',
+    'sup',
+    'table',
+    'tbody',
+    'td',
+    'tfoot',
+    'th',
+    'thead',
+    'time',
+    'tr',
+    'tt',
+    'u',
+    'ul',
+    'var',
+    'video',
+    'wbr',
+]);
+const defaultDomPurifyConfig = Object.freeze({
+    ALLOWED_TAGS: ['a', 'button', 'blockquote', 'code', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'input', 'label', 'li', 'p', 'pre', 'select', 'small', 'span', 'strong', 'textarea', 'ul', 'ol'],
+    ALLOWED_ATTR: ['href', 'data-href', 'data-command', 'target', 'title', 'name', 'src', 'alt', 'class', 'id', 'role', 'tabindex', 'style', 'data-code', 'width', 'height', 'align', 'x-dispatch', 'required', 'checked', 'placeholder', 'type', 'start'],
+    RETURN_DOM: false,
+    RETURN_DOM_FRAGMENT: false,
+    RETURN_TRUSTED_TYPE: true
+});
+export class ModifierKeyEmitter extends event.Emitter {
     constructor() {
         super();
         this._subscriptions = new DisposableStore();
@@ -918,7 +1198,7 @@ class ModifierKeyEmitter extends Emitter {
             ctrlKey: false,
             metaKey: false
         };
-        this._subscriptions.add(Event.runAndSubscribe(onDidRegisterWindow, ({ window, disposables }) => this.registerListeners(window, disposables), { window: mainWindow, disposables: this._subscriptions }));
+        this._subscriptions.add(event.Event.runAndSubscribe(onDidRegisterWindow, ({ window, disposables }) => this.registerListeners(window, disposables), { window: mainWindow, disposables: this._subscriptions }));
     }
     registerListeners(window, disposables) {
         disposables.add(addDisposableListener(window, 'keydown', e => {
@@ -1033,7 +1313,7 @@ class ModifierKeyEmitter extends Emitter {
         this._subscriptions.dispose();
     }
 }
-class DragAndDropObserver extends Disposable {
+export class DragAndDropObserver extends Disposable {
     constructor(element, callbacks) {
         super();
         this.element = element;
@@ -1050,44 +1330,51 @@ class DragAndDropObserver extends Disposable {
     registerListeners() {
         if (this.callbacks.onDragStart) {
             this._register(addDisposableListener(this.element, EventType.DRAG_START, (e) => {
-                this.callbacks.onDragStart?.(e);
+                var _a, _b;
+                (_b = (_a = this.callbacks).onDragStart) === null || _b === void 0 ? void 0 : _b.call(_a, e);
             }));
         }
         if (this.callbacks.onDrag) {
             this._register(addDisposableListener(this.element, EventType.DRAG, (e) => {
-                this.callbacks.onDrag?.(e);
+                var _a, _b;
+                (_b = (_a = this.callbacks).onDrag) === null || _b === void 0 ? void 0 : _b.call(_a, e);
             }));
         }
         this._register(addDisposableListener(this.element, EventType.DRAG_ENTER, (e) => {
+            var _a, _b;
             this.counter++;
             this.dragStartTime = e.timeStamp;
-            this.callbacks.onDragEnter?.(e);
+            (_b = (_a = this.callbacks).onDragEnter) === null || _b === void 0 ? void 0 : _b.call(_a, e);
         }));
         this._register(addDisposableListener(this.element, EventType.DRAG_OVER, (e) => {
+            var _a, _b;
             e.preventDefault(); // needed so that the drop event fires (https://stackoverflow.com/questions/21339924/drop-event-not-firing-in-chrome)
-            this.callbacks.onDragOver?.(e, e.timeStamp - this.dragStartTime);
+            (_b = (_a = this.callbacks).onDragOver) === null || _b === void 0 ? void 0 : _b.call(_a, e, e.timeStamp - this.dragStartTime);
         }));
         this._register(addDisposableListener(this.element, EventType.DRAG_LEAVE, (e) => {
+            var _a, _b;
             this.counter--;
             if (this.counter === 0) {
                 this.dragStartTime = 0;
-                this.callbacks.onDragLeave?.(e);
+                (_b = (_a = this.callbacks).onDragLeave) === null || _b === void 0 ? void 0 : _b.call(_a, e);
             }
         }));
         this._register(addDisposableListener(this.element, EventType.DRAG_END, (e) => {
+            var _a, _b;
             this.counter = 0;
             this.dragStartTime = 0;
-            this.callbacks.onDragEnd?.(e);
+            (_b = (_a = this.callbacks).onDragEnd) === null || _b === void 0 ? void 0 : _b.call(_a, e);
         }));
         this._register(addDisposableListener(this.element, EventType.DROP, (e) => {
+            var _a, _b;
             this.counter = 0;
             this.dragStartTime = 0;
-            this.callbacks.onDrop?.(e);
+            (_b = (_a = this.callbacks).onDrop) === null || _b === void 0 ? void 0 : _b.call(_a, e);
         }));
     }
 }
 const H_REGEX = /(?<tag>[\w\-]+)?(?:#(?<id>[\w\-]+))?(?<class>(?:\.(?:[\w\-]+))*)(?:@(?<name>(?:[\w\_])+))?/;
-function h(tag, ...args) {
+export function h(tag, ...args) {
     let attributes;
     let children;
     if (Array.isArray(args[0])) {
@@ -1095,7 +1382,6 @@ function h(tag, ...args) {
         children = args[0];
     }
     else {
-        // eslint-disable-next-line local/code-no-any-casts
         attributes = args[0] || {};
         children = args[1];
     }
@@ -1132,7 +1418,7 @@ function h(tag, ...args) {
     }
     if (children) {
         for (const c of children) {
-            if (isHTMLElement(c)) {
+            if (c instanceof HTMLElement) {
                 el.appendChild(c);
             }
             else if (typeof c === 'string') {
@@ -1166,289 +1452,3 @@ function h(tag, ...args) {
 function camelCaseToHyphenCase(str) {
     return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 }
-function isEditableElement(element) {
-    return element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea' || isHTMLElement(element) && !!element.editContext;
-}
-var n;
-(function (n) {
-    function nodeNs(elementNs = undefined) {
-        return (tag, attributes, children) => {
-            const className = attributes.class;
-            delete attributes.class;
-            const ref = attributes.ref;
-            delete attributes.ref;
-            const obsRef = attributes.obsRef;
-            delete attributes.obsRef;
-            // eslint-disable-next-line local/code-no-any-casts
-            return new ObserverNodeWithElement(tag, ref, obsRef, elementNs, className, attributes, children);
-        };
-    }
-    function node(tag, elementNs = undefined) {
-        // eslint-disable-next-line local/code-no-any-casts
-        const f = nodeNs(elementNs);
-        return (attributes, children) => {
-            return f(tag, attributes, children);
-        };
-    }
-    n.div = node('div');
-    n.elem = nodeNs(undefined);
-    n.svg = node('svg', 'http://www.w3.org/2000/svg');
-    n.svgElem = nodeNs('http://www.w3.org/2000/svg');
-    function ref() {
-        let value = undefined;
-        const result = function (val) {
-            value = val;
-        };
-        Object.defineProperty(result, 'element', {
-            get() {
-                if (!value) {
-                    throw new BugIndicatingError('Make sure the ref is set before accessing the element. Maybe wrong initialization order?');
-                }
-                return value;
-            }
-        });
-        // eslint-disable-next-line local/code-no-any-casts
-        return result;
-    }
-    n.ref = ref;
-})(n || (n = {}));
-class ObserverNode {
-    constructor(tag, ref, obsRef, ns, className, attributes, children) {
-        this._deriveds = [];
-        this._element = (ns ? document.createElementNS(ns, tag) : document.createElement(tag));
-        if (ref) {
-            ref(this._element);
-        }
-        if (obsRef) {
-            this._deriveds.push(derived((_reader) => {
-                obsRef(this);
-                _reader.store.add({
-                    dispose: () => {
-                        obsRef(null);
-                    }
-                });
-            }));
-        }
-        if (className) {
-            if (hasObservable(className)) {
-                this._deriveds.push(derived(this, reader => {
-                    /** @description set.class */
-                    setClassName(this._element, getClassName(className, reader));
-                }));
-            }
-            else {
-                setClassName(this._element, getClassName(className, undefined));
-            }
-        }
-        for (const [key, value] of Object.entries(attributes)) {
-            if (key === 'style') {
-                for (const [cssKey, cssValue] of Object.entries(value)) {
-                    const key = camelCaseToHyphenCase(cssKey);
-                    if (isObservable(cssValue)) {
-                        this._deriveds.push(derivedOpts({ owner: this, debugName: () => `set.style.${key}` }, reader => {
-                            this._element.style.setProperty(key, convertCssValue(cssValue.read(reader)));
-                        }));
-                    }
-                    else {
-                        this._element.style.setProperty(key, convertCssValue(cssValue));
-                    }
-                }
-            }
-            else if (key === 'tabIndex') {
-                if (isObservable(value)) {
-                    this._deriveds.push(derived(this, reader => {
-                        /** @description set.tabIndex */
-                        // eslint-disable-next-line local/code-no-any-casts
-                        this._element.tabIndex = value.read(reader);
-                    }));
-                }
-                else {
-                    this._element.tabIndex = value;
-                }
-            }
-            else if (key.startsWith('on')) {
-                // eslint-disable-next-line local/code-no-any-casts
-                this._element[key] = value;
-            }
-            else {
-                if (isObservable(value)) {
-                    this._deriveds.push(derivedOpts({ owner: this, debugName: () => `set.${key}` }, reader => {
-                        setOrRemoveAttribute(this._element, key, value.read(reader));
-                    }));
-                }
-                else {
-                    setOrRemoveAttribute(this._element, key, value);
-                }
-            }
-        }
-        if (children) {
-            function getChildren(reader, children) {
-                if (isObservable(children)) {
-                    return getChildren(reader, children.read(reader));
-                }
-                if (Array.isArray(children)) {
-                    return children.flatMap(c => getChildren(reader, c));
-                }
-                if (children instanceof ObserverNode) {
-                    if (reader) {
-                        children.readEffect(reader);
-                    }
-                    return [children._element];
-                }
-                if (children) {
-                    return [children];
-                }
-                return [];
-            }
-            const d = derived(this, reader => {
-                /** @description set.children */
-                this._element.replaceChildren(...getChildren(reader, children));
-            });
-            this._deriveds.push(d);
-            if (!childrenIsObservable(children)) {
-                d.get();
-            }
-        }
-    }
-    readEffect(reader) {
-        for (const d of this._deriveds) {
-            d.read(reader);
-        }
-    }
-    keepUpdated(store) {
-        derived(reader => {
-            /** update */
-            this.readEffect(reader);
-        }).recomputeInitiallyAndOnChange(store);
-        return this;
-    }
-    /**
-     * Creates a live element that will keep the element updated as long as the returned object is not disposed.
-    */
-    toDisposableLiveElement() {
-        const store = new DisposableStore();
-        this.keepUpdated(store);
-        return new LiveElement(this._element, store);
-    }
-}
-function setClassName(domNode, className) {
-    if (isSVGElement(domNode)) {
-        domNode.setAttribute('class', className);
-    }
-    else {
-        domNode.className = className;
-    }
-}
-function resolve(value, reader, cb) {
-    if (isObservable(value)) {
-        cb(value.read(reader));
-        return;
-    }
-    if (Array.isArray(value)) {
-        for (const v of value) {
-            resolve(v, reader, cb);
-        }
-        return;
-    }
-    // eslint-disable-next-line local/code-no-any-casts
-    cb(value);
-}
-function getClassName(className, reader) {
-    let result = '';
-    resolve(className, reader, val => {
-        if (val) {
-            if (result.length === 0) {
-                result = val;
-            }
-            else {
-                result += ' ' + val;
-            }
-        }
-    });
-    return result;
-}
-function hasObservable(value) {
-    if (isObservable(value)) {
-        return true;
-    }
-    if (Array.isArray(value)) {
-        return value.some(v => hasObservable(v));
-    }
-    return false;
-}
-function convertCssValue(value) {
-    if (typeof value === 'number') {
-        return value + 'px';
-    }
-    return value;
-}
-function childrenIsObservable(children) {
-    if (isObservable(children)) {
-        return true;
-    }
-    if (Array.isArray(children)) {
-        return children.some(c => childrenIsObservable(c));
-    }
-    return false;
-}
-class LiveElement {
-    constructor(element, _disposable) {
-        this.element = element;
-        this._disposable = _disposable;
-    }
-    dispose() {
-        this._disposable.dispose();
-    }
-}
-class ObserverNodeWithElement extends ObserverNode {
-    constructor() {
-        super(...arguments);
-        this._isHovered = undefined;
-        this._didMouseMoveDuringHover = undefined;
-    }
-    get element() {
-        return this._element;
-    }
-    get isHovered() {
-        if (!this._isHovered) {
-            const hovered = observableValue('hovered', false);
-            this._element.addEventListener('mouseenter', (_e) => hovered.set(true, undefined));
-            this._element.addEventListener('mouseleave', (_e) => hovered.set(false, undefined));
-            this._isHovered = hovered;
-        }
-        return this._isHovered;
-    }
-    get didMouseMoveDuringHover() {
-        if (!this._didMouseMoveDuringHover) {
-            let _hovering = false;
-            const hovered = observableValue('didMouseMoveDuringHover', false);
-            this._element.addEventListener('mouseenter', (_e) => {
-                _hovering = true;
-            });
-            this._element.addEventListener('mousemove', (_e) => {
-                if (_hovering) {
-                    hovered.set(true, undefined);
-                }
-            });
-            this._element.addEventListener('mouseleave', (_e) => {
-                _hovering = false;
-                hovered.set(false, undefined);
-            });
-            this._didMouseMoveDuringHover = hovered;
-        }
-        return this._didMouseMoveDuringHover;
-    }
-}
-function setOrRemoveAttribute(element, key, value) {
-    if (value === null || value === undefined) {
-        element.removeAttribute(camelCaseToHyphenCase(key));
-    }
-    else {
-        element.setAttribute(camelCaseToHyphenCase(key), String(value));
-    }
-}
-function isObservable(obj) {
-    return !!obj && obj.read !== undefined && obj.reportChanges !== undefined;
-}
-
-export { $, Dimension, DragAndDropObserver, EventHelper, EventType, LiveElement, ModifierKeyEmitter, Namespace, ObserverNode, ObserverNodeWithElement, WindowIdleValue, WindowIntervalTimer, addDisposableGenericMouseDownListener, addDisposableGenericMouseMoveListener, addDisposableGenericMouseUpListener, addDisposableListener, addStandardDisposableGenericMouseDownListener, addStandardDisposableListener, after, animate, append, clearNode, computeScreenAwareSize, findParentWithClass, getActiveDocument, getActiveElement, getActiveWindow, getClientArea, getComputedStyle, getContentHeight, getContentWidth, getDocument, getDomNodePagePosition, getDomNodeZoomLevel, getShadowRoot, getTopLeftOffset, getTotalHeight, getTotalWidth, getWindow, getWindowById, getWindowId, getWindows, getWindowsCount, h, hasParentWithClass, hide, isActiveElement, isAncestor, isAncestorOfActiveElement, isEditableElement, isEventLike, isHTMLAnchorElement, isHTMLElement, isInShadowDOM, isKeyboardEvent, isMouseEvent, isSVGElement, isShadowRoot, n, onDidRegisterWindow, onDidUnregisterWindow, onWillUnregisterWindow, prepend, reset, restoreParentsScrollTop, runAtThisOrScheduleAtNextAnimationFrame, runWhenWindowIdle, saveParentsScrollTop, scheduleAtNextAnimationFrame, setVisibility, sharedMutationObserver, show, size, trackFocus, windowOpenNoOpener };

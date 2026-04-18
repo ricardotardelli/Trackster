@@ -2,13 +2,13 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var HorizontalGuidesState;
+export var HorizontalGuidesState;
 (function (HorizontalGuidesState) {
     HorizontalGuidesState[HorizontalGuidesState["Disabled"] = 0] = "Disabled";
     HorizontalGuidesState[HorizontalGuidesState["EnabledForActive"] = 1] = "EnabledForActive";
     HorizontalGuidesState[HorizontalGuidesState["Enabled"] = 2] = "Enabled";
 })(HorizontalGuidesState || (HorizontalGuidesState = {}));
-class IndentGuide {
+export class IndentGuide {
     constructor(visibleColumn, column, className, 
     /**
      * If set, this indent guide is a horizontal guide (no vertical part).
@@ -30,11 +30,9 @@ class IndentGuide {
         }
     }
 }
-class IndentGuideHorizontalLine {
+export class IndentGuideHorizontalLine {
     constructor(top, endColumn) {
         this.top = top;
         this.endColumn = endColumn;
     }
 }
-
-export { HorizontalGuidesState, IndentGuide, IndentGuideHorizontalLine };

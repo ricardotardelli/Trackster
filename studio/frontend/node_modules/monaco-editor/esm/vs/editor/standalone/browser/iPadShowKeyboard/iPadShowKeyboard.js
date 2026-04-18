@@ -1,15 +1,13 @@
-import './iPadShowKeyboard.css';
-import { addDisposableListener } from '../../../../base/browser/dom.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { registerEditorContribution } from '../../../browser/editorExtensions.js';
-import { isIOS } from '../../../../base/common/platform.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class IPadShowKeyboard extends Disposable {
-    static { this.ID = 'editor.contrib.iPadShowKeyboard'; }
+import './iPadShowKeyboard.css';
+import * as dom from '../../../../base/browser/dom.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { registerEditorContribution } from '../../../browser/editorExtensions.js';
+import { isIOS } from '../../../../base/common/platform.js';
+export class IPadShowKeyboard extends Disposable {
     constructor(editor) {
         super();
         this.editor = editor;
@@ -20,7 +18,7 @@ class IPadShowKeyboard extends Disposable {
         }
     }
     update() {
-        const shouldHaveWidget = (!this.editor.getOption(104 /* EditorOption.readOnly */));
+        const shouldHaveWidget = (!this.editor.getOption(91 /* EditorOption.readOnly */));
         if (!this.widget && shouldHaveWidget) {
             this.widget = new ShowKeyboardWidget(this.editor);
         }
@@ -37,17 +35,17 @@ class IPadShowKeyboard extends Disposable {
         }
     }
 }
+IPadShowKeyboard.ID = 'editor.contrib.iPadShowKeyboard';
 class ShowKeyboardWidget extends Disposable {
-    static { this.ID = 'editor.contrib.ShowKeyboardWidget'; }
     constructor(editor) {
         super();
         this.editor = editor;
         this._domNode = document.createElement('textarea');
         this._domNode.className = 'iPadShowKeyboard';
-        this._register(addDisposableListener(this._domNode, 'touchstart', (e) => {
+        this._register(dom.addDisposableListener(this._domNode, 'touchstart', (e) => {
             this.editor.focus();
         }));
-        this._register(addDisposableListener(this._domNode, 'focus', (e) => {
+        this._register(dom.addDisposableListener(this._domNode, 'focus', (e) => {
             this.editor.focus();
         }));
         this.editor.addOverlayWidget(this);
@@ -69,6 +67,5 @@ class ShowKeyboardWidget extends Disposable {
         };
     }
 }
+ShowKeyboardWidget.ID = 'editor.contrib.ShowKeyboardWidget';
 registerEditorContribution(IPadShowKeyboard.ID, IPadShowKeyboard, 3 /* EditorContributionInstantiation.Eventually */);
-
-export { IPadShowKeyboard };

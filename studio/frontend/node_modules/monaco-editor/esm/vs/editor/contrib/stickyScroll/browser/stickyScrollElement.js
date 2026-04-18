@@ -2,13 +2,13 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class StickyRange {
+export class StickyRange {
     constructor(startLineNumber, endLineNumber) {
         this.startLineNumber = startLineNumber;
         this.endLineNumber = endLineNumber;
     }
 }
-class StickyElement {
+export class StickyElement {
     constructor(
     /**
      * Range of line numbers spanned by the current scope
@@ -27,7 +27,7 @@ class StickyElement {
         this.parent = parent;
     }
 }
-class StickyModel {
+export class StickyModel {
     constructor(uri, version, element, outlineProviderId) {
         this.uri = uri;
         this.version = version;
@@ -35,5 +35,3 @@ class StickyModel {
         this.outlineProviderId = outlineProviderId;
     }
 }
-
-export { StickyElement, StickyModel, StickyRange };

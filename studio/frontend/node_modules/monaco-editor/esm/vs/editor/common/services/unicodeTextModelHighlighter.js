@@ -1,14 +1,13 @@
-import { Range } from '../core/range.js';
-import { Searcher } from '../model/textModelSearch.js';
-import { isHighSurrogate, AmbiguousCharacters, InvisibleCharacters, escapeRegExpCharacters, isBasicASCII } from '../../../base/common/strings.js';
-import { assertNever } from '../../../base/common/assert.js';
-import { getWordAtText, DEFAULT_WORD_REGEXP } from '../core/wordHelper.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class UnicodeTextModelHighlighter {
+import { Range } from '../core/range.js';
+import { Searcher } from '../model/textModelSearch.js';
+import * as strings from '../../../base/common/strings.js';
+import { assertNever } from '../../../base/common/assert.js';
+import { DEFAULT_WORD_REGEXP, getWordAtText } from '../core/wordHelper.js';
+export class UnicodeTextModelHighlighter {
     static computeUnicodeHighlights(model, options, range) {
         const startLine = range ? range.startLineNumber : 1;
         const endLine = range ? range.endLineNumber : model.getLineCount();
@@ -41,13 +40,13 @@ class UnicodeTextModelHighlighter {
                     // Extend range to entire code point
                     if (startIndex > 0) {
                         const charCodeBefore = lineContent.charCodeAt(startIndex - 1);
-                        if (isHighSurrogate(charCodeBefore)) {
+                        if (strings.isHighSurrogate(charCodeBefore)) {
                             startIndex--;
                         }
                     }
                     if (endIndex + 1 < lineLength) {
                         const charCodeBefore = lineContent.charCodeAt(endIndex - 1);
-                        if (isHighSurrogate(charCodeBefore)) {
+                        if (strings.isHighSurrogate(charCodeBefore)) {
                             endIndex++;
                         }
                     }
@@ -69,7 +68,7 @@ class UnicodeTextModelHighlighter {
                             nonBasicAsciiCharacterCount++;
                         }
                         else {
-                            assertNever();
+                            assertNever(highlightReason);
                         }
                         const MAX_RESULT_LENGTH = 1000;
                         if (ranges.length >= MAX_RESULT_LENGTH) {
@@ -100,7 +99,7 @@ class UnicodeTextModelHighlighter {
             case 3 /* SimpleHighlightReason.Ambiguous */: {
                 const codePoint = char.codePointAt(0);
                 const primaryConfusable = codePointHighlighter.ambiguousCharacters.getPrimaryConfusable(codePoint);
-                const notAmbiguousInLocales = AmbiguousCharacters.getLocales().filter((l) => !AmbiguousCharacters.getInstance(new Set([...options.allowedLocales, l])).isAmbiguous(codePoint));
+                const notAmbiguousInLocales = strings.AmbiguousCharacters.getLocales().filter((l) => !strings.AmbiguousCharacters.getInstance(new Set([...options.allowedLocales, l])).isAmbiguous(codePoint));
                 return { kind: 0 /* UnicodeHighlighterReasonKind.Ambiguous */, confusableWith: String.fromCodePoint(primaryConfusable), notAmbiguousInLocales };
             }
             case 1 /* SimpleHighlightReason.NonBasicASCII */:
@@ -109,14 +108,14 @@ class UnicodeTextModelHighlighter {
     }
 }
 function buildRegExpCharClassExpr(codePoints, flags) {
-    const src = `[${escapeRegExpCharacters(codePoints.map((i) => String.fromCodePoint(i)).join(''))}]`;
+    const src = `[${strings.escapeRegExpCharacters(codePoints.map((i) => String.fromCodePoint(i)).join(''))}]`;
     return src;
 }
 class CodePointHighlighter {
     constructor(options) {
         this.options = options;
         this.allowedCodePoints = new Set(options.allowedCodePoints);
-        this.ambiguousCharacters = AmbiguousCharacters.getInstance(new Set(options.allowedLocales));
+        this.ambiguousCharacters = strings.AmbiguousCharacters.getInstance(new Set(options.allowedLocales));
     }
     getCandidateCodePoints() {
         if (this.options.nonBasicASCII) {
@@ -124,7 +123,7 @@ class CodePointHighlighter {
         }
         const set = new Set();
         if (this.options.invisibleCharacters) {
-            for (const cp of InvisibleCharacters.codePoints) {
+            for (const cp of strings.InvisibleCharacters.codePoints) {
                 if (!isAllowedInvisibleCharacter(String.fromCodePoint(cp))) {
                     set.add(cp);
                 }
@@ -153,11 +152,11 @@ class CodePointHighlighter {
         if (wordContext) {
             for (const char of wordContext) {
                 const codePoint = char.codePointAt(0);
-                const isBasicASCII$1 = isBasicASCII(char);
-                hasBasicASCIICharacters = hasBasicASCIICharacters || isBasicASCII$1;
-                if (!isBasicASCII$1 &&
+                const isBasicASCII = strings.isBasicASCII(char);
+                hasBasicASCIICharacters = hasBasicASCIICharacters || isBasicASCII;
+                if (!isBasicASCII &&
                     !this.ambiguousCharacters.isAmbiguous(codePoint) &&
-                    !InvisibleCharacters.isInvisibleCharacter(codePoint)) {
+                    !strings.InvisibleCharacters.isInvisibleCharacter(codePoint)) {
                     hasNonConfusableNonBasicAsciiCharacter = true;
                 }
             }
@@ -169,7 +168,7 @@ class CodePointHighlighter {
         }
         if (this.options.invisibleCharacters) {
             // TODO check for emojis
-            if (!isAllowedInvisibleCharacter(character) && InvisibleCharacters.isInvisibleCharacter(codePoint)) {
+            if (!isAllowedInvisibleCharacter(character) && strings.InvisibleCharacters.isInvisibleCharacter(codePoint)) {
                 return 2 /* SimpleHighlightReason.Invisible */;
             }
         }
@@ -184,5 +183,3 @@ class CodePointHighlighter {
 function isAllowedInvisibleCharacter(character) {
     return character === ' ' || character === '\n' || character === '\t';
 }
-
-export { UnicodeTextModelHighlighter };

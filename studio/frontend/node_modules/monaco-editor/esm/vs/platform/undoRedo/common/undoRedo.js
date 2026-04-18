@@ -1,18 +1,16 @@
-import { createDecorator } from '../../instantiation/common/instantiation.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-const IUndoRedoService = createDecorator('undoRedoService');
-class ResourceEditStackSnapshot {
+import { createDecorator } from '../../instantiation/common/instantiation.js';
+export const IUndoRedoService = createDecorator('undoRedoService');
+export class ResourceEditStackSnapshot {
     constructor(resource, elements) {
         this.resource = resource;
         this.elements = elements;
     }
 }
-class UndoRedoGroup {
-    static { this._ID = 0; }
+export class UndoRedoGroup {
     constructor() {
         this.id = UndoRedoGroup._ID++;
         this.order = 1;
@@ -23,10 +21,10 @@ class UndoRedoGroup {
         }
         return this.order++;
     }
-    static { this.None = new UndoRedoGroup(); }
 }
-class UndoRedoSource {
-    static { this._ID = 0; }
+UndoRedoGroup._ID = 0;
+UndoRedoGroup.None = new UndoRedoGroup();
+export class UndoRedoSource {
     constructor() {
         this.id = UndoRedoSource._ID++;
         this.order = 1;
@@ -37,7 +35,6 @@ class UndoRedoSource {
         }
         return this.order++;
     }
-    static { this.None = new UndoRedoSource(); }
 }
-
-export { IUndoRedoService, ResourceEditStackSnapshot, UndoRedoGroup, UndoRedoSource };
+UndoRedoSource._ID = 0;
+UndoRedoSource.None = new UndoRedoSource();

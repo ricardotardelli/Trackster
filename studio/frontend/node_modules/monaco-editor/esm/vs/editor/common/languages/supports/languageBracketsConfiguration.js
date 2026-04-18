@@ -1,15 +1,13 @@
-import { CachedFunction } from '../../../../base/common/cache.js';
-import { createBracketOrRegExp } from './richEditBrackets.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { CachedFunction } from '../../../../base/common/cache.js';
 /**
  * Captures all bracket related configurations for a single language.
  * Immutable.
 */
-class LanguageBracketsConfiguration {
+export class LanguageBracketsConfiguration {
     constructor(languageId, config) {
         this.languageId = languageId;
         const bracketPairs = config.brackets ? filterValidBrackets(config.brackets) : [];
@@ -74,15 +72,11 @@ class LanguageBracketsConfiguration {
     getBracketInfo(bracketText) {
         return this.getOpeningBracketInfo(bracketText) || this.getClosingBracketInfo(bracketText);
     }
-    getBracketRegExp(options) {
-        const brackets = Array.from([...this._openingBrackets.keys(), ...this._closingBrackets.keys()]);
-        return createBracketOrRegExp(brackets, options);
-    }
 }
 function filterValidBrackets(bracketPairs) {
     return bracketPairs.filter(([open, close]) => open !== '' && close !== '');
 }
-class BracketKindBase {
+export class BracketKindBase {
     constructor(config, bracketText) {
         this.config = config;
         this.bracketText = bracketText;
@@ -91,14 +85,14 @@ class BracketKindBase {
         return this.config.languageId;
     }
 }
-class OpeningBracketKind extends BracketKindBase {
+export class OpeningBracketKind extends BracketKindBase {
     constructor(config, bracketText, openedBrackets) {
         super(config, bracketText);
         this.openedBrackets = openedBrackets;
         this.isOpeningBracket = true;
     }
 }
-class ClosingBracketKind extends BracketKindBase {
+export class ClosingBracketKind extends BracketKindBase {
     constructor(config, bracketText, 
     /**
      * Non empty array of all opening brackets this bracket closes.
@@ -129,5 +123,3 @@ class ClosingBracketKind extends BracketKindBase {
         return [...this.openingBrackets];
     }
 }
-
-export { BracketKindBase, ClosingBracketKind, LanguageBracketsConfiguration, OpeningBracketKind };

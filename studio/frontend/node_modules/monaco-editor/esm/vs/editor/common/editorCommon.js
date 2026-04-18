@@ -5,9 +5,7 @@
 /**
  * The type of the `IEditor`.
  */
-const EditorType = {
+export const EditorType = {
     ICodeEditor: 'vs.editor.ICodeEditor',
     IDiffEditor: 'vs.editor.IDiffEditor'
 };
-
-export { EditorType };

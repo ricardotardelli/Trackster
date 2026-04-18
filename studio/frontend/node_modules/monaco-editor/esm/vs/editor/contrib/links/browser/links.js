@@ -1,41 +1,38 @@
-import { RunOnceScheduler, createCancelablePromise } from '../../../../base/common/async.js';
-import { CancellationToken } from '../../../../base/common/cancellation.js';
-import { onUnexpectedError } from '../../../../base/common/errors.js';
-import { MarkdownString } from '../../../../base/common/htmlContent.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { Schemas } from '../../../../base/common/network.js';
-import { isMacintosh } from '../../../../base/common/platform.js';
-import { originalFSPath, joinPath } from '../../../../base/common/resources.js';
-import { StopWatch } from '../../../../base/common/stopwatch.js';
-import { URI } from '../../../../base/common/uri.js';
-import './links.css';
-import { registerEditorContribution, registerEditorAction, EditorAction } from '../../../browser/editorExtensions.js';
-import { ModelDecorationOptions } from '../../../common/model/textModel.js';
-import { ILanguageFeatureDebounceService } from '../../../common/services/languageFeatureDebounce.js';
-import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
-import { ClickLinkGesture } from '../../gotoSymbol/browser/link/clickLinkGesture.js';
-import { getLinks } from './getLinks.js';
-import { localize, localize2 } from '../../../../nls.js';
-import { INotificationService } from '../../../../platform/notification/common/notification.js';
-import { IOpenerService } from '../../../../platform/opener/common/opener.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 var LinkDetector_1;
-let LinkDetector = class LinkDetector extends Disposable {
-    static { LinkDetector_1 = this; }
-    static { this.ID = 'editor.linkDetector'; }
+import { createCancelablePromise, RunOnceScheduler } from '../../../../base/common/async.js';
+import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { onUnexpectedError } from '../../../../base/common/errors.js';
+import { MarkdownString } from '../../../../base/common/htmlContent.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { Schemas } from '../../../../base/common/network.js';
+import * as platform from '../../../../base/common/platform.js';
+import * as resources from '../../../../base/common/resources.js';
+import { StopWatch } from '../../../../base/common/stopwatch.js';
+import { URI } from '../../../../base/common/uri.js';
+import './links.css';
+import { EditorAction, registerEditorAction, registerEditorContribution } from '../../../browser/editorExtensions.js';
+import { ModelDecorationOptions } from '../../../common/model/textModel.js';
+import { ILanguageFeatureDebounceService } from '../../../common/services/languageFeatureDebounce.js';
+import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
+import { ClickLinkGesture } from '../../gotoSymbol/browser/link/clickLinkGesture.js';
+import { getLinks } from './getLinks.js';
+import * as nls from '../../../../nls.js';
+import { INotificationService } from '../../../../platform/notification/common/notification.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+let LinkDetector = LinkDetector_1 = class LinkDetector extends Disposable {
     static get(editor) {
         return editor.getContribution(LinkDetector_1.ID);
     }
@@ -63,7 +60,7 @@ let LinkDetector = class LinkDetector extends Disposable {
             this.cleanUpActiveLinkDecoration();
         }));
         this._register(editor.onDidChangeConfiguration((e) => {
-            if (!e.hasChanged(79 /* EditorOption.links */)) {
+            if (!e.hasChanged(71 /* EditorOption.links */)) {
                 return;
             }
             // Remove any links (for the getting disabled case)
@@ -96,7 +93,7 @@ let LinkDetector = class LinkDetector extends Disposable {
         this.computeLinks.schedule(0);
     }
     async computeLinksNow() {
-        if (!this.editor.hasModel() || !this.editor.getOption(79 /* EditorOption.links */)) {
+        if (!this.editor.hasModel() || !this.editor.getOption(71 /* EditorOption.links */)) {
             return;
         }
         const model = this.editor.getModel();
@@ -128,7 +125,7 @@ let LinkDetector = class LinkDetector extends Disposable {
         }
     }
     updateDecorations(links) {
-        const useMetaKey = (this.editor.getOption(86 /* EditorOption.multiCursorModifier */) === 'altKey');
+        const useMetaKey = (this.editor.getOption(78 /* EditorOption.multiCursorModifier */) === 'altKey');
         const oldDecorations = [];
         const keys = Object.keys(this.currentOccurrences);
         for (const decorationId of keys) {
@@ -153,7 +150,7 @@ let LinkDetector = class LinkDetector extends Disposable {
         });
     }
     _onEditorMouseMove(mouseEvent, withKey) {
-        const useMetaKey = (this.editor.getOption(86 /* EditorOption.multiCursorModifier */) === 'altKey');
+        const useMetaKey = (this.editor.getOption(78 /* EditorOption.multiCursorModifier */) === 'altKey');
         if (this.isEnabled(mouseEvent, withKey)) {
             this.cleanUpActiveLinkDecoration(); // always remove previous link decoration as their can only be one
             const occurrence = this.getLinkOccurrence(mouseEvent.target.position);
@@ -169,7 +166,7 @@ let LinkDetector = class LinkDetector extends Disposable {
         }
     }
     cleanUpActiveLinkDecoration() {
-        const useMetaKey = (this.editor.getOption(86 /* EditorOption.multiCursorModifier */) === 'altKey');
+        const useMetaKey = (this.editor.getOption(78 /* EditorOption.multiCursorModifier */) === 'altKey');
         if (this.activeLinkDecorationId) {
             const occurrence = this.currentOccurrences[this.activeLinkDecorationId];
             if (occurrence) {
@@ -202,16 +199,16 @@ let LinkDetector = class LinkDetector extends Disposable {
                 if (modelUri.scheme === Schemas.file && uri.startsWith(`${Schemas.file}:`)) {
                     const parsedUri = URI.parse(uri);
                     if (parsedUri.scheme === Schemas.file) {
-                        const fsPath = originalFSPath(parsedUri);
+                        const fsPath = resources.originalFSPath(parsedUri);
                         let relativePath = null;
-                        if (fsPath.startsWith('/./') || fsPath.startsWith('\\.\\')) {
+                        if (fsPath.startsWith('/./')) {
                             relativePath = `.${fsPath.substr(1)}`;
                         }
-                        else if (fsPath.startsWith('//./') || fsPath.startsWith('\\\\.\\')) {
+                        else if (fsPath.startsWith('//./')) {
                             relativePath = `.${fsPath.substr(2)}`;
                         }
                         if (relativePath) {
-                            uri = joinPath(modelUri, relativePath);
+                            uri = resources.joinPath(modelUri, relativePath);
                         }
                     }
                 }
@@ -221,10 +218,10 @@ let LinkDetector = class LinkDetector extends Disposable {
             const messageOrError = err instanceof Error ? err.message : err;
             // different error cases
             if (messageOrError === 'invalid') {
-                this.notificationService.warn(localize(1277, 'Failed to open this link because it is not well-formed: {0}', link.url.toString()));
+                this.notificationService.warn(nls.localize('invalid.url', 'Failed to open this link because it is not well-formed: {0}', link.url.toString()));
             }
             else if (messageOrError === 'missing') {
-                this.notificationService.warn(localize(1278, 'Failed to open this link because its target is missing.'));
+                this.notificationService.warn(nls.localize('missing.url', 'Failed to open this link because its target is missing.'));
             }
             else {
                 onUnexpectedError(err);
@@ -251,12 +248,13 @@ let LinkDetector = class LinkDetector extends Disposable {
     }
     isEnabled(mouseEvent, withKey) {
         return Boolean((mouseEvent.target.type === 6 /* MouseTargetType.CONTENT_TEXT */)
-            && ((mouseEvent.hasTriggerModifier || (withKey && withKey.keyCodeIsTriggerKey)) || mouseEvent.isMiddleClick && mouseEvent.mouseMiddleClickAction === 'openLink'));
+            && (mouseEvent.hasTriggerModifier || (withKey && withKey.keyCodeIsTriggerKey)));
     }
     stop() {
+        var _a;
         this.computeLinks.cancel();
         if (this.activeLinksList) {
-            this.activeLinksList?.dispose();
+            (_a = this.activeLinksList) === null || _a === void 0 ? void 0 : _a.dispose();
             this.activeLinksList = null;
         }
         if (this.computePromise) {
@@ -269,12 +267,14 @@ let LinkDetector = class LinkDetector extends Disposable {
         this.stop();
     }
 };
+LinkDetector.ID = 'editor.linkDetector';
 LinkDetector = LinkDetector_1 = __decorate([
     __param(1, IOpenerService),
     __param(2, INotificationService),
     __param(3, ILanguageFeaturesService),
     __param(4, ILanguageFeatureDebounceService)
 ], LinkDetector);
+export { LinkDetector };
 const decoration = {
     general: ModelDecorationOptions.register({
         description: 'detected-link',
@@ -317,15 +317,15 @@ function getHoverMessage(link, useMetaKey) {
     const label = link.tooltip
         ? link.tooltip
         : executeCmd
-            ? localize(1279, 'Execute command')
-            : localize(1280, 'Follow link');
+            ? nls.localize('links.navigate.executeCmd', 'Execute command')
+            : nls.localize('links.navigate.follow', 'Follow link');
     const kb = useMetaKey
-        ? isMacintosh
-            ? localize(1281, "cmd + click")
-            : localize(1282, "ctrl + click")
-        : isMacintosh
-            ? localize(1283, "option + click")
-            : localize(1284, "alt + click");
+        ? platform.isMacintosh
+            ? nls.localize('links.navigate.kb.meta.mac', "cmd + click")
+            : nls.localize('links.navigate.kb.meta', "ctrl + click")
+        : platform.isMacintosh
+            ? nls.localize('links.navigate.kb.alt.mac', "option + click")
+            : nls.localize('links.navigate.kb.alt', "alt + click");
     if (link.url) {
         let nativeLabel = '';
         if (/^command:/i.test(link.url.toString())) {
@@ -333,7 +333,7 @@ function getHoverMessage(link, useMetaKey) {
             const match = link.url.toString().match(/^command:([^?#]+)/);
             if (match) {
                 const commandId = match[1];
-                nativeLabel = localize(1285, "Execute command {0}", commandId);
+                nativeLabel = nls.localize('tooltip.explanation', "Execute command {0}", commandId);
             }
         }
         const hoverMessage = new MarkdownString('', true)
@@ -349,7 +349,8 @@ class OpenLinkAction extends EditorAction {
     constructor() {
         super({
             id: 'editor.action.openLink',
-            label: localize2(1286, "Open Link"),
+            label: nls.localize('label', "Open Link"),
+            alias: 'Open Link',
             precondition: undefined
         });
     }
@@ -372,5 +373,3 @@ class OpenLinkAction extends EditorAction {
 }
 registerEditorContribution(LinkDetector.ID, LinkDetector, 1 /* EditorContributionInstantiation.AfterFirstRender */);
 registerEditorAction(OpenLinkAction);
-
-export { LinkDetector };

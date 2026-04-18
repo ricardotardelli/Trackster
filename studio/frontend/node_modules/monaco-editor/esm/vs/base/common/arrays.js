@@ -1,19 +1,18 @@
 /**
- * Returns the last entry and the initial N-1 entries of the array, as a tuple of [rest, last].
- *
- * The array must have at least one element.
- *
- * @param arr The input array
- * @returns A tuple of [rest, last] where rest is all but the last element and last is the last element
- * @throws Error if the array is empty
+ * Returns the last element of an array.
+ * @param array The array.
+ * @param n Which element from the end (default is zero).
  */
-function tail(arr) {
+export function tail(array, n = 0) {
+    return array[array.length - (1 + n)];
+}
+export function tail2(arr) {
     if (arr.length === 0) {
         throw new Error('Invalid tail call');
     }
     return [arr.slice(0, arr.length - 1), arr[arr.length - 1]];
 }
-function equals(one, other, itemEquals = (a, b) => a === b) {
+export function equals(one, other, itemEquals = (a, b) => a === b) {
     if (one === other) {
         return true;
     }
@@ -34,7 +33,7 @@ function equals(one, other, itemEquals = (a, b) => a === b) {
  * Remove the element at `index` by replacing it with the last element. This is faster than `splice`
  * but changes the order of the array
  */
-function removeFastWithoutKeepingOrder(array, index) {
+export function removeFastWithoutKeepingOrder(array, index) {
     const last = array.length - 1;
     if (index < last) {
         array[index] = array[last];
@@ -52,7 +51,7 @@ function removeFastWithoutKeepingOrder(array, index) {
  *   precedes the first one.
  * @return See {@link binarySearch2}
  */
-function binarySearch(array, key, comparator) {
+export function binarySearch(array, key, comparator) {
     return binarySearch2(array.length, i => comparator(array[i], key));
 }
 /**
@@ -70,7 +69,7 @@ function binarySearch(array, key, comparator) {
  *   result is -(n+1) (or ~n, using bitwise notation), where n is the index
  *   where the key should be inserted to maintain the sorting order.
  */
-function binarySearch2(length, compareToKey) {
+export function binarySearch2(length, compareToKey) {
     let low = 0, high = length - 1;
     while (low <= high) {
         const mid = ((low + high) / 2) | 0;
@@ -87,7 +86,7 @@ function binarySearch2(length, compareToKey) {
     }
     return -(low + 1);
 }
-function quickSelect(nth, data, compare) {
+export function quickSelect(nth, data, compare) {
     nth = nth | 0;
     if (nth >= data.length) {
         throw new TypeError('invalid index');
@@ -118,7 +117,7 @@ function quickSelect(nth, data, compare) {
         return quickSelect(nth - (lower.length + pivots.length), higher, compare);
     }
 }
-function groupBy(data, compare) {
+export function groupBy(data, compare) {
     const result = [];
     let currentGroup = undefined;
     for (const element of data.slice(0).sort(compare)) {
@@ -137,7 +136,7 @@ function groupBy(data, compare) {
  * `shouldBeGrouped` is used to decide if two consecutive items should be in the same group.
  * The order of the items is preserved.
  */
-function* groupAdjacentBy(items, shouldBeGrouped) {
+export function* groupAdjacentBy(items, shouldBeGrouped) {
     let currentGroup;
     let last;
     for (const item of items) {
@@ -156,12 +155,12 @@ function* groupAdjacentBy(items, shouldBeGrouped) {
         yield currentGroup;
     }
 }
-function forEachAdjacent(arr, f) {
+export function forEachAdjacent(arr, f) {
     for (let i = 0; i <= arr.length; i++) {
         f(i === 0 ? undefined : arr[i - 1], i === arr.length ? undefined : arr[i]);
     }
 }
-function forEachWithNeighbors(arr, f) {
+export function forEachWithNeighbors(arr, f) {
     for (let i = 0; i < arr.length; i++) {
         f(i === 0 ? undefined : arr[i - 1], arr[i], i + 1 === arr.length ? undefined : arr[i + 1]);
     }
@@ -169,13 +168,13 @@ function forEachWithNeighbors(arr, f) {
 /**
  * @returns New array with all falsy values removed. The original array IS NOT modified.
  */
-function coalesce(array) {
-    return array.filter((e) => !!e);
+export function coalesce(array) {
+    return array.filter(e => !!e);
 }
 /**
  * Remove all falsy values from `array`. The original array IS modified.
  */
-function coalesceInPlace(array) {
+export function coalesceInPlace(array) {
     let to = 0;
     for (let i = 0; i < array.length; i++) {
         if (!!array[i]) {
@@ -188,17 +187,17 @@ function coalesceInPlace(array) {
 /**
  * @returns false if the provided object is an array and not empty.
  */
-function isFalsyOrEmpty(obj) {
+export function isFalsyOrEmpty(obj) {
     return !Array.isArray(obj) || obj.length === 0;
 }
-function isNonEmptyArray(obj) {
+export function isNonEmptyArray(obj) {
     return Array.isArray(obj) && obj.length > 0;
 }
 /**
  * Removes duplicates from the given array. The optional keyFn allows to specify
  * how elements are checked for equality by returning an alternate value for each.
  */
-function distinct(array, keyFn = value => value) {
+export function distinct(array, keyFn = value => value) {
     const seen = new Set();
     return array.filter(element => {
         const key = keyFn(element);
@@ -209,7 +208,10 @@ function distinct(array, keyFn = value => value) {
         return true;
     });
 }
-function range(arg, to) {
+export function firstOrDefault(array, notFoundValue) {
+    return array.length > 0 ? array[0] : notFoundValue;
+}
+export function range(arg, to) {
     let from = typeof to === 'number' ? arg : 0;
     if (typeof to === 'number') {
         from = arg;
@@ -235,7 +237,7 @@ function range(arg, to) {
  * Insert `insertArr` inside `target` at `insertIndex`.
  * Please don't touch unless you understand https://jsperf.com/inserting-an-array-within-an-array
  */
-function arrayInsert(target, insertIndex, insertArr) {
+export function arrayInsert(target, insertIndex, insertArr) {
     const before = target.slice(0, insertIndex);
     const after = target.slice(insertIndex);
     return before.concat(insertArr, after);
@@ -243,7 +245,7 @@ function arrayInsert(target, insertIndex, insertArr) {
 /**
  * Pushes an element to the start of the array, if found.
  */
-function pushToStart(arr, value) {
+export function pushToStart(arr, value) {
     const index = arr.indexOf(value);
     if (index > -1) {
         arr.splice(index, 1);
@@ -253,29 +255,19 @@ function pushToStart(arr, value) {
 /**
  * Pushes an element to the end of the array, if found.
  */
-function pushToEnd(arr, value) {
+export function pushToEnd(arr, value) {
     const index = arr.indexOf(value);
     if (index > -1) {
         arr.splice(index, 1);
         arr.push(value);
     }
 }
-function pushMany(arr, items) {
+export function pushMany(arr, items) {
     for (const item of items) {
         arr.push(item);
     }
 }
-function mapFilter(array, fn) {
-    const result = [];
-    for (const item of array) {
-        const mapped = fn(item);
-        if (mapped !== undefined) {
-            result.push(mapped);
-        }
-    }
-    return result;
-}
-function asArray(x) {
+export function asArray(x) {
     return Array.isArray(x) ? x : [x];
 }
 /**
@@ -284,7 +276,7 @@ function asArray(x) {
  * @param start The zero-based location in the array from which to start inserting elements.
  * @param newItems The items to be inserted
  */
-function insertInto(array, start, newItems) {
+export function insertInto(array, start, newItems) {
     const startIdx = getActualStartIndex(array, start);
     const originalLength = array.length;
     const newItemsLength = newItems.length;
@@ -305,7 +297,7 @@ function insertInto(array, start, newItems) {
  * @param deleteCount The number of elements to remove.
  * @returns An array containing the elements that were deleted.
  */
-function splice(array, start, deleteCount, newItems) {
+export function splice(array, start, deleteCount, newItems) {
     const index = getActualStartIndex(array, start);
     let result = array.splice(index, deleteCount);
     if (result === undefined) {
@@ -325,7 +317,7 @@ function splice(array, start, deleteCount, newItems) {
 function getActualStartIndex(array, start) {
     return start < 0 ? Math.max(start + array.length, 0) : Math.min(start, array.length);
 }
-var CompareResult;
+export var CompareResult;
 (function (CompareResult) {
     function isLessThan(result) {
         return result < 0;
@@ -347,10 +339,10 @@ var CompareResult;
     CompareResult.lessThan = -1;
     CompareResult.neitherLessOrGreaterThan = 0;
 })(CompareResult || (CompareResult = {}));
-function compareBy(selector, comparator) {
+export function compareBy(selector, comparator) {
     return (a, b) => comparator(selector(a), selector(b));
 }
-function tieBreakComparators(...comparators) {
+export function tieBreakComparators(...comparators) {
     return (item1, item2) => {
         for (const comparator of comparators) {
             const result = comparator(item1, item2);
@@ -364,33 +356,18 @@ function tieBreakComparators(...comparators) {
 /**
  * The natural order on numbers.
 */
-const numberComparator = (a, b) => a - b;
-const booleanComparator = (a, b) => numberComparator(a ? 1 : 0, b ? 1 : 0);
-function reverseOrder(comparator) {
+export const numberComparator = (a, b) => a - b;
+export const booleanComparator = (a, b) => numberComparator(a ? 1 : 0, b ? 1 : 0);
+export function reverseOrder(comparator) {
     return (a, b) => -comparator(a, b);
 }
-/**
- * Returns a new comparator that treats `undefined` as the smallest value.
- * All other values are compared using the given comparator.
-*/
-function compareUndefinedSmallest(comparator) {
-    return (a, b) => {
-        if (a === undefined) {
-            return b === undefined ? CompareResult.neitherLessOrGreaterThan : CompareResult.lessThan;
-        }
-        else if (b === undefined) {
-            return CompareResult.greaterThan;
-        }
-        return comparator(a, b);
-    };
-}
-class ArrayQueue {
+export class ArrayQueue {
     /**
      * Constructs a queue that is backed by the given array. Runtime is O(1).
     */
     constructor(items) {
-        this.firstIdx = 0;
         this.items = items;
+        this.firstIdx = 0;
         this.lastIdx = this.items.length - 1;
     }
     get length() {
@@ -447,8 +424,7 @@ class ArrayQueue {
 /**
  * This class is faster than an iterator and array for lazy computed data.
 */
-class CallbackIterable {
-    static { this.empty = new CallbackIterable(_callback => { }); }
+export class CallbackIterable {
     constructor(
     /**
      * Calls the callback for every item.
@@ -491,39 +467,4 @@ class CallbackIterable {
         return result;
     }
 }
-/**
- * Represents a re-arrangement of items in an array.
- */
-class Permutation {
-    constructor(_indexMap) {
-        this._indexMap = _indexMap;
-    }
-    /**
-     * Returns a permutation that sorts the given array according to the given compare function.
-     */
-    static createSortPermutation(arr, compareFn) {
-        const sortIndices = Array.from(arr.keys()).sort((index1, index2) => compareFn(arr[index1], arr[index2]));
-        return new Permutation(sortIndices);
-    }
-    /**
-     * Returns a new array with the elements of the given array re-arranged according to this permutation.
-     */
-    apply(arr) {
-        return arr.map((_, index) => arr[this._indexMap[index]]);
-    }
-    /**
-     * Returns a new permutation that undoes the re-arrangement of this permutation.
-    */
-    inverse() {
-        const inverseIndexMap = this._indexMap.slice();
-        for (let i = 0; i < this._indexMap.length; i++) {
-            inverseIndexMap[this._indexMap[i]] = i;
-        }
-        return new Permutation(inverseIndexMap);
-    }
-}
-function sum(array) {
-    return array.reduce((acc, value) => acc + value, 0);
-}
-
-export { ArrayQueue, CallbackIterable, CompareResult, Permutation, arrayInsert, asArray, binarySearch, binarySearch2, booleanComparator, coalesce, coalesceInPlace, compareBy, compareUndefinedSmallest, distinct, equals, forEachAdjacent, forEachWithNeighbors, groupAdjacentBy, groupBy, insertInto, isFalsyOrEmpty, isNonEmptyArray, mapFilter, numberComparator, pushMany, pushToEnd, pushToStart, quickSelect, range, removeFastWithoutKeepingOrder, reverseOrder, splice, sum, tail, tieBreakComparators };
+CallbackIterable.empty = new CallbackIterable(_callback => { });

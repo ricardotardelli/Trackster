@@ -1,13 +1,12 @@
-import { $, reset } from '../../../../base/browser/dom.js';
-import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
-import './codelensWidget.css';
-import { Range } from '../../../common/core/range.js';
-import { ModelDecorationOptions } from '../../../common/model/textModel.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as dom from '../../../../base/browser/dom.js';
+import { renderLabelWithIcons } from '../../../../base/browser/ui/iconLabel/iconLabels.js';
+import './codelensWidget.css';
+import { Range } from '../../../common/core/range.js';
+import { ModelDecorationOptions } from '../../../common/model/textModel.js';
 class CodeLensViewZone {
     constructor(afterLineNumber, heightInPx, onHeight) {
         /**
@@ -36,7 +35,6 @@ class CodeLensViewZone {
     }
 }
 class CodeLensContentWidget {
-    static { this._idPool = 0; }
     constructor(editor, line) {
         // Editor.IContentWidget.allowEditorOverflow
         this.allowEditorOverflow = false;
@@ -63,24 +61,24 @@ class CodeLensContentWidget {
                 const title = renderLabelWithIcons(lens.command.title.trim());
                 if (lens.command.id) {
                     const id = `c${(CodeLensContentWidget._idPool++)}`;
-                    children.push($('a', { id, title: lens.command.tooltip, role: 'button' }, ...title));
+                    children.push(dom.$('a', { id, title: lens.command.tooltip, role: 'button' }, ...title));
                     this._commands.set(id, lens.command);
                 }
                 else {
-                    children.push($('span', { title: lens.command.tooltip }, ...title));
+                    children.push(dom.$('span', { title: lens.command.tooltip }, ...title));
                 }
                 if (i + 1 < lenses.length) {
-                    children.push($('span', undefined, '\u00a0|\u00a0'));
+                    children.push(dom.$('span', undefined, '\u00a0|\u00a0'));
                 }
             }
         }
         if (!hasSymbol) {
             // symbols but no commands
-            reset(this._domNode, $('span', undefined, 'no commands'));
+            dom.reset(this._domNode, dom.$('span', undefined, 'no commands'));
         }
         else {
             // symbols and commands
-            reset(this._domNode, ...children);
+            dom.reset(this._domNode, ...children);
             if (this._isEmpty && animate) {
                 this._domNode.classList.add('fadein');
             }
@@ -109,7 +107,8 @@ class CodeLensContentWidget {
         return this._widgetPosition || null;
     }
 }
-class CodeLensHelper {
+CodeLensContentWidget._idPool = 0;
+export class CodeLensHelper {
     constructor() {
         this._removeDecorations = [];
         this._addDecorations = [];
@@ -133,7 +132,7 @@ const codeLensDecorationOptions = ModelDecorationOptions.register({
     collapseOnReplaceEdit: true,
     description: 'codelens'
 });
-class CodeLensWidget {
+export class CodeLensWidget {
     constructor(data, editor, helper, viewZoneChangeAccessor, heightInPx, updateCallback) {
         this._isDisposed = false;
         this._editor = editor;
@@ -178,7 +177,7 @@ class CodeLensWidget {
     dispose(helper, viewZoneChangeAccessor) {
         this._decorationIds.forEach(helper.removeDecoration, helper);
         this._decorationIds = [];
-        viewZoneChangeAccessor?.removeZone(this._viewZoneId);
+        viewZoneChangeAccessor === null || viewZoneChangeAccessor === void 0 ? void 0 : viewZoneChangeAccessor.removeZone(this._viewZoneId);
         if (this._contentWidget) {
             this._editor.removeContentWidget(this._contentWidget);
             this._contentWidget = undefined;
@@ -238,7 +237,8 @@ class CodeLensWidget {
         }
     }
     getCommand(link) {
-        return this._contentWidget?.getCommand(link);
+        var _a;
+        return (_a = this._contentWidget) === null || _a === void 0 ? void 0 : _a.getCommand(link);
     }
     getLineNumber() {
         const range = this._editor.getModel().getDecorationRange(this._decorationIds[0]);
@@ -261,5 +261,3 @@ class CodeLensWidget {
         }
     }
 }
-
-export { CodeLensHelper, CodeLensWidget };

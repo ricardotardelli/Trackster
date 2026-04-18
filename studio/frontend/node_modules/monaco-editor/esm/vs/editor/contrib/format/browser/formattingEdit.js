@@ -1,12 +1,11 @@
-import { EditOperation } from '../../../common/core/editOperation.js';
-import { Range } from '../../../common/core/range.js';
-import { StableEditorScrollState } from '../../../browser/stableEditorScroll.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class FormattingEdit {
+import { EditOperation } from '../../../common/core/editOperation.js';
+import { Range } from '../../../common/core/range.js';
+import { StableEditorScrollState } from '../../../browser/stableEditorScroll.js';
+export class FormattingEdit {
     static _handleEolEdits(editor, edits) {
         let newEol = undefined;
         const singleEdits = [];
@@ -53,5 +52,3 @@ class FormattingEdit {
         scrollState.restoreRelativeVerticalPositionOfCursor(editor);
     }
 }
-
-export { FormattingEdit };

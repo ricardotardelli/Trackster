@@ -1,14 +1,13 @@
-import { range } from '../../../common/arrays.js';
-import { CancellationTokenSource } from '../../../common/cancellation.js';
-import { Event } from '../../../common/event.js';
-import { DisposableStore, Disposable } from '../../../common/lifecycle.js';
-import './list.css';
-import { List } from './listWidget.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { range } from '../../../common/arrays.js';
+import { CancellationTokenSource } from '../../../common/cancellation.js';
+import { Event } from '../../../common/event.js';
+import { Disposable } from '../../../common/lifecycle.js';
+import './list.css';
+import { List } from './listWidget.js';
 class PagedRenderer {
     get templateId() { return this.renderer.templateId; }
     constructor(renderer, modelProvider) {
@@ -19,20 +18,21 @@ class PagedRenderer {
         const data = this.renderer.renderTemplate(container);
         return { data, disposable: Disposable.None };
     }
-    renderElement(index, _, data, details) {
-        data.disposable?.dispose();
+    renderElement(index, _, data, height) {
+        var _a;
+        (_a = data.disposable) === null || _a === void 0 ? void 0 : _a.dispose();
         if (!data.data) {
             return;
         }
         const model = this.modelProvider();
         if (model.isResolved(index)) {
-            return this.renderer.renderElement(model.get(index), index, data.data, details);
+            return this.renderer.renderElement(model.get(index), index, data.data, height);
         }
         const cts = new CancellationTokenSource();
         const promise = model.resolve(index, cts.token);
         data.disposable = { dispose: () => cts.cancel() };
         this.renderer.renderPlaceholder(index, data.data);
-        promise.then(entry => this.renderer.renderElement(entry, index, data.data, details));
+        promise.then(entry => this.renderer.renderElement(entry, index, data.data, height));
     }
     disposeTemplate(data) {
         if (data.disposable) {
@@ -67,9 +67,8 @@ function fromPagedListOptions(modelProvider, options) {
         accessibilityProvider: options.accessibilityProvider && new PagedAccessibilityProvider(modelProvider, options.accessibilityProvider)
     };
 }
-class PagedList {
+export class PagedList {
     constructor(user, container, virtualDelegate, renderers, options = {}) {
-        this.modelDisposables = new DisposableStore();
         const modelProvider = () => this.model;
         const pagedRenderers = renderers.map(r => new PagedRenderer(r, modelProvider));
         this.list = new List(user, container, virtualDelegate, pagedRenderers, fromPagedListOptions(modelProvider, options));
@@ -102,10 +101,8 @@ class PagedList {
         return this._model;
     }
     set model(model) {
-        this.modelDisposables.clear();
         this._model = model;
         this.list.splice(0, this.list.length, range(model.length));
-        this.modelDisposables.add(model.onDidIncrementLength(newLength => this.list.splice(this.list.length, 0, range(this.list.length, newLength))));
     }
     getFocus() {
         return this.list.getFocus();
@@ -121,8 +118,5 @@ class PagedList {
     }
     dispose() {
         this.list.dispose();
-        this.modelDisposables.dispose();
     }
 }
-
-export { PagedList };

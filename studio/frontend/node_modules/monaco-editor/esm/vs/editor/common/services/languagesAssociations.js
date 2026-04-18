@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { parse } from '../../../base/common/glob.js';
 import { Mimes } from '../../../base/common/mime.js';
 import { Schemas } from '../../../base/common/network.js';
@@ -5,11 +9,6 @@ import { basename, posix } from '../../../base/common/path.js';
 import { DataUri } from '../../../base/common/resources.js';
 import { startsWithUTF8BOM } from '../../../base/common/strings.js';
 import { PLAINTEXT_LANGUAGE_ID } from '../languages/modesRegistry.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
 let registeredAssociations = [];
 let nonUserRegisteredAssociations = [];
 let userRegisteredAssociations = [];
@@ -18,7 +17,7 @@ let userRegisteredAssociations = [];
  * * **NOTE**: This association will lose over associations registered using `registerConfiguredLanguageAssociation`.
  * * **NOTE**: Use `clearPlatformLanguageAssociations` to remove all associations registered using this function.
  */
-function registerPlatformLanguageAssociation(association, warnOnOverwrite = false) {
+export function registerPlatformLanguageAssociation(association, warnOnOverwrite = false) {
     _registerLanguageAssociation(association, false, warnOnOverwrite);
 }
 function _registerLanguageAssociation(association, userConfigured, warnOnOverwrite) {
@@ -70,14 +69,14 @@ function toLanguageAssociationItem(association, userConfigured) {
 /**
  * Clear language associations from the registry (platform).
  */
-function clearPlatformLanguageAssociations() {
+export function clearPlatformLanguageAssociations() {
     registeredAssociations = registeredAssociations.filter(a => a.userConfigured);
     nonUserRegisteredAssociations = [];
 }
 /**
  * @see `getMimeTypes`
  */
-function getLanguageIds(resource, firstLine) {
+export function getLanguageIds(resource, firstLine) {
     return getAssociations(resource, firstLine).map(item => item.id);
 }
 function getAssociations(resource, firstLine) {
@@ -125,6 +124,7 @@ function getAssociations(resource, firstLine) {
     return [{ id: 'unknown', mime: Mimes.unknown }];
 }
 function getAssociationByPath(path, filename, associations) {
+    var _a;
     let filenameMatch = undefined;
     let patternMatch = undefined;
     let extensionMatch = undefined;
@@ -141,7 +141,7 @@ function getAssociationByPath(path, filename, associations) {
         if (association.filepattern) {
             if (!patternMatch || association.filepattern.length > patternMatch.filepattern.length) {
                 const target = association.filepatternOnPath ? path : filename; // match on full path if pattern contains path separator
-                if (association.filepatternLowercase?.(target)) {
+                if ((_a = association.filepatternLowercase) === null || _a === void 0 ? void 0 : _a.call(association, target)) {
                     patternMatch = association;
                 }
             }
@@ -189,5 +189,3 @@ function getAssociationByFirstline(firstLine) {
     }
     return undefined;
 }
-
-export { clearPlatformLanguageAssociations, getLanguageIds, registerPlatformLanguageAssociation };

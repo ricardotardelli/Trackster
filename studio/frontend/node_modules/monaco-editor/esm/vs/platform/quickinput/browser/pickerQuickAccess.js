@@ -1,13 +1,12 @@
-import { timeout } from '../../../base/common/async.js';
-import { CancellationTokenSource } from '../../../base/common/cancellation.js';
-import { Disposable, DisposableStore, MutableDisposable } from '../../../base/common/lifecycle.js';
-import { isFunction } from '../../../base/common/types.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var TriggerAction;
+import { timeout } from '../../../base/common/async.js';
+import { CancellationTokenSource } from '../../../base/common/cancellation.js';
+import { Disposable, DisposableStore, MutableDisposable } from '../../../base/common/lifecycle.js';
+import { isFunction } from '../../../base/common/types.js';
+export var TriggerAction;
 (function (TriggerAction) {
     /**
      * Do nothing after the button was clicked.
@@ -34,37 +33,39 @@ function isFastAndSlowPicks(obj) {
     const candidate = obj;
     return !!candidate.picks && candidate.additionalPicks instanceof Promise;
 }
-class PickerQuickAccessProvider extends Disposable {
+export class PickerQuickAccessProvider extends Disposable {
     constructor(prefix, options) {
         super();
         this.prefix = prefix;
         this.options = options;
     }
     provide(picker, token, runOptions) {
+        var _a;
         const disposables = new DisposableStore();
         // Apply options if any
-        picker.canAcceptInBackground = !!this.options?.canAcceptInBackground;
+        picker.canAcceptInBackground = !!((_a = this.options) === null || _a === void 0 ? void 0 : _a.canAcceptInBackground);
         // Disable filtering & sorting, we control the results
         picker.matchOnLabel = picker.matchOnDescription = picker.matchOnDetail = picker.sortByLabel = false;
         // Set initial picks and update on type
         let picksCts = undefined;
         const picksDisposable = disposables.add(new MutableDisposable());
         const updatePickerItems = async () => {
-            // Cancel any previous ask for picks and busy
-            picksCts?.dispose(true);
-            picker.busy = false;
-            // Setting the .value will call dispose() on the previous value, so we need to do this AFTER cancelling with dispose(true).
+            var _a;
             const picksDisposables = picksDisposable.value = new DisposableStore();
+            // Cancel any previous ask for picks and busy
+            picksCts === null || picksCts === void 0 ? void 0 : picksCts.dispose(true);
+            picker.busy = false;
             // Create new cancellation source for this run
-            picksCts = picksDisposables.add(new CancellationTokenSource(token));
+            picksCts = new CancellationTokenSource(token);
             // Collect picks and support both long running and short or combined
             const picksToken = picksCts.token;
             let picksFilter = picker.value.substring(this.prefix.length);
-            if (!this.options?.shouldSkipTrimPickFilter) {
+            if (!((_a = this.options) === null || _a === void 0 ? void 0 : _a.shouldSkipTrimPickFilter)) {
                 picksFilter = picksFilter.trim();
             }
             const providedPicks = this._getPicks(picksFilter, picksDisposables, picksToken, runOptions);
             const applyPicks = (picks, skipEmpty) => {
+                var _a;
                 let items;
                 let activeItem = undefined;
                 if (isPicksWithActive(picks)) {
@@ -79,7 +80,7 @@ class PickerQuickAccessProvider extends Disposable {
                         return false;
                     }
                     // We show the no results pick if we have no input to prevent completely empty pickers #172613
-                    if ((picksFilter.length > 0 || picker.hideInput) && this.options?.noResultsPick) {
+                    if ((picksFilter.length > 0 || picker.hideInput) && ((_a = this.options) === null || _a === void 0 ? void 0 : _a.noResultsPick)) {
                         if (isFunction(this.options.noResultsPick)) {
                             items = [this.options.noResultsPick(picksFilter)];
                         }
@@ -172,7 +173,9 @@ class PickerQuickAccessProvider extends Disposable {
                 ]);
             };
             // No Picks
-            if (providedPicks === null) ;
+            if (providedPicks === null) {
+                // Ignore
+            }
             // Fast and Slow Picks
             else if (isFastAndSlowPicks(providedPicks)) {
                 await applyFastAndSlowPicks(providedPicks);
@@ -207,65 +210,54 @@ class PickerQuickAccessProvider extends Disposable {
         updatePickerItems();
         // Accept the pick on accept and hide picker
         disposables.add(picker.onDidAccept(event => {
-            if (runOptions?.handleAccept) {
-                if (!event.inBackground) {
-                    picker.hide(); // hide picker unless we accept in background
-                }
-                runOptions.handleAccept?.(picker.activeItems[0], event.inBackground);
-                return;
-            }
             const [item] = picker.selectedItems;
-            if (typeof item?.accept === 'function') {
+            if (typeof (item === null || item === void 0 ? void 0 : item.accept) === 'function') {
                 if (!event.inBackground) {
                     picker.hide(); // hide picker unless we accept in background
                 }
                 item.accept(picker.keyMods, event);
             }
         }));
-        const buttonTrigger = async (button, item) => {
-            if (typeof item.trigger !== 'function') {
-                return;
-            }
-            const buttonIndex = item.buttons?.indexOf(button) ?? -1;
-            if (buttonIndex >= 0) {
-                const result = item.trigger(buttonIndex, picker.keyMods);
-                const action = (typeof result === 'number') ? result : await result;
-                if (token.isCancellationRequested) {
-                    return;
-                }
-                switch (action) {
-                    case TriggerAction.NO_ACTION:
-                        break;
-                    case TriggerAction.CLOSE_PICKER:
-                        picker.hide();
-                        break;
-                    case TriggerAction.REFRESH_PICKER:
-                        updatePickerItems();
-                        break;
-                    case TriggerAction.REMOVE_ITEM: {
-                        const index = picker.items.indexOf(item);
-                        if (index !== -1) {
-                            const items = picker.items.slice();
-                            const removed = items.splice(index, 1);
-                            const activeItems = picker.activeItems.filter(activeItem => activeItem !== removed[0]);
-                            const keepScrollPositionBefore = picker.keepScrollPosition;
-                            picker.keepScrollPosition = true;
-                            picker.items = items;
-                            if (activeItems) {
-                                picker.activeItems = activeItems;
+        // Trigger the pick with button index if button triggered
+        disposables.add(picker.onDidTriggerItemButton(async ({ button, item }) => {
+            var _a, _b;
+            if (typeof item.trigger === 'function') {
+                const buttonIndex = (_b = (_a = item.buttons) === null || _a === void 0 ? void 0 : _a.indexOf(button)) !== null && _b !== void 0 ? _b : -1;
+                if (buttonIndex >= 0) {
+                    const result = item.trigger(buttonIndex, picker.keyMods);
+                    const action = (typeof result === 'number') ? result : await result;
+                    if (token.isCancellationRequested) {
+                        return;
+                    }
+                    switch (action) {
+                        case TriggerAction.NO_ACTION:
+                            break;
+                        case TriggerAction.CLOSE_PICKER:
+                            picker.hide();
+                            break;
+                        case TriggerAction.REFRESH_PICKER:
+                            updatePickerItems();
+                            break;
+                        case TriggerAction.REMOVE_ITEM: {
+                            const index = picker.items.indexOf(item);
+                            if (index !== -1) {
+                                const items = picker.items.slice();
+                                const removed = items.splice(index, 1);
+                                const activeItems = picker.activeItems.filter(activeItem => activeItem !== removed[0]);
+                                const keepScrollPositionBefore = picker.keepScrollPosition;
+                                picker.keepScrollPosition = true;
+                                picker.items = items;
+                                if (activeItems) {
+                                    picker.activeItems = activeItems;
+                                }
+                                picker.keepScrollPosition = keepScrollPositionBefore;
                             }
-                            picker.keepScrollPosition = keepScrollPositionBefore;
+                            break;
                         }
-                        break;
                     }
                 }
             }
-        };
-        // Trigger the pick with button index if button triggered
-        disposables.add(picker.onDidTriggerItemButton(({ button, item }) => buttonTrigger(button, item)));
-        disposables.add(picker.onDidTriggerSeparatorButton(({ button, separator }) => buttonTrigger(button, separator)));
+        }));
         return disposables;
     }
 }
-
-export { PickerQuickAccessProvider, TriggerAction };

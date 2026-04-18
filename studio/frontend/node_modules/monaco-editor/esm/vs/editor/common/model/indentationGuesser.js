@@ -75,7 +75,7 @@ function spacesDiff(a, aLength, b, bLength, result) {
         return;
     }
 }
-function guessIndentation(source, defaultTabSize, defaultInsertSpaces) {
+export function guessIndentation(source, defaultTabSize, defaultInsertSpaces) {
     // Look at most at the first 10k lines
     const linesCount = Math.min(source.getLineCount(), 10000);
     let linesIndentedWithTabsCount = 0; // number of lines that contain at least one tab in indentation
@@ -174,5 +174,3 @@ function guessIndentation(source, defaultTabSize, defaultInsertSpaces) {
         tabSize: tabSize
     };
 }
-
-export { guessIndentation };

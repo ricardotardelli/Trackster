@@ -1,42 +1,40 @@
-import { localize } from '../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var InspectTokensNLS;
+import * as nls from '../../nls.js';
+export var InspectTokensNLS;
 (function (InspectTokensNLS) {
-    InspectTokensNLS.inspectTokensAction = localize(786, "Developer: Inspect Tokens");
+    InspectTokensNLS.inspectTokensAction = nls.localize('inspectTokens', "Developer: Inspect Tokens");
 })(InspectTokensNLS || (InspectTokensNLS = {}));
-var GoToLineNLS;
+export var GoToLineNLS;
 (function (GoToLineNLS) {
-    GoToLineNLS.gotoLineActionLabel = localize(787, "Go to Line/Column...");
+    GoToLineNLS.gotoLineActionLabel = nls.localize('gotoLineActionLabel', "Go to Line/Column...");
 })(GoToLineNLS || (GoToLineNLS = {}));
-var QuickHelpNLS;
+export var QuickHelpNLS;
 (function (QuickHelpNLS) {
-    QuickHelpNLS.helpQuickAccessActionLabel = localize(788, "Show all Quick Access Providers");
+    QuickHelpNLS.helpQuickAccessActionLabel = nls.localize('helpQuickAccess', "Show all Quick Access Providers");
 })(QuickHelpNLS || (QuickHelpNLS = {}));
-var QuickCommandNLS;
+export var QuickCommandNLS;
 (function (QuickCommandNLS) {
-    QuickCommandNLS.quickCommandActionLabel = localize(789, "Command Palette");
-    QuickCommandNLS.quickCommandHelp = localize(790, "Show And Run Commands");
+    QuickCommandNLS.quickCommandActionLabel = nls.localize('quickCommandActionLabel', "Command Palette");
+    QuickCommandNLS.quickCommandHelp = nls.localize('quickCommandActionHelp', "Show And Run Commands");
 })(QuickCommandNLS || (QuickCommandNLS = {}));
-var QuickOutlineNLS;
+export var QuickOutlineNLS;
 (function (QuickOutlineNLS) {
-    QuickOutlineNLS.quickOutlineActionLabel = localize(791, "Go to Symbol...");
-    QuickOutlineNLS.quickOutlineByCategoryActionLabel = localize(792, "Go to Symbol by Category...");
+    QuickOutlineNLS.quickOutlineActionLabel = nls.localize('quickOutlineActionLabel', "Go to Symbol...");
+    QuickOutlineNLS.quickOutlineByCategoryActionLabel = nls.localize('quickOutlineByCategoryActionLabel', "Go to Symbol by Category...");
 })(QuickOutlineNLS || (QuickOutlineNLS = {}));
-var StandaloneCodeEditorNLS;
+export var StandaloneCodeEditorNLS;
 (function (StandaloneCodeEditorNLS) {
-    StandaloneCodeEditorNLS.editorViewAccessibleLabel = localize(793, "Editor content");
+    StandaloneCodeEditorNLS.editorViewAccessibleLabel = nls.localize('editorViewAccessibleLabel', "Editor content");
+    StandaloneCodeEditorNLS.accessibilityHelpMessage = nls.localize('accessibilityHelpMessage', "Press Alt+F1 for Accessibility Options.");
 })(StandaloneCodeEditorNLS || (StandaloneCodeEditorNLS = {}));
-var ToggleHighContrastNLS;
+export var ToggleHighContrastNLS;
 (function (ToggleHighContrastNLS) {
-    ToggleHighContrastNLS.toggleHighContrast = localize(794, "Toggle High Contrast Theme");
+    ToggleHighContrastNLS.toggleHighContrast = nls.localize('toggleHighContrast', "Toggle High Contrast Theme");
 })(ToggleHighContrastNLS || (ToggleHighContrastNLS = {}));
-var StandaloneServicesNLS;
+export var StandaloneServicesNLS;
 (function (StandaloneServicesNLS) {
-    StandaloneServicesNLS.bulkEditServiceSummary = localize(795, "Made {0} edits in {1} files");
+    StandaloneServicesNLS.bulkEditServiceSummary = nls.localize('bulkEditServiceSummary', "Made {0} edits in {1} files");
 })(StandaloneServicesNLS || (StandaloneServicesNLS = {}));
-
-export { GoToLineNLS, InspectTokensNLS, QuickCommandNLS, QuickHelpNLS, QuickOutlineNLS, StandaloneCodeEditorNLS, StandaloneServicesNLS, ToggleHighContrastNLS };

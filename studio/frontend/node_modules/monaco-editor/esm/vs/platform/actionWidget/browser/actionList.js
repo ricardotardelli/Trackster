@@ -1,4 +1,17 @@
-import { setVisibility, getWindow } from '../../../base/browser/dom.js';
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+import * as dom from '../../../base/browser/dom.js';
 import { KeybindingLabel } from '../../../base/browser/ui/keybindingLabel/keybindingLabel.js';
 import { List } from '../../../base/browser/ui/list/listWidget.js';
 import { CancellationTokenSource } from '../../../base/common/cancellation.js';
@@ -11,30 +24,9 @@ import { localize } from '../../../nls.js';
 import { IContextViewService } from '../../contextview/browser/contextView.js';
 import { IKeybindingService } from '../../keybinding/common/keybinding.js';
 import { defaultListStyles } from '../../theme/browser/defaultStyles.js';
-import { asCssVariable } from '../../theme/common/colorUtils.js';
-import '../../theme/common/colors/baseColors.js';
-import '../../theme/common/colors/chartsColors.js';
-import '../../theme/common/colors/editorColors.js';
-import '../../theme/common/colors/inputColors.js';
-import '../../theme/common/colors/listColors.js';
-import '../../theme/common/colors/menuColors.js';
-import '../../theme/common/colors/minimapColors.js';
-import '../../theme/common/colors/miscColors.js';
-import '../../theme/common/colors/quickpickColors.js';
-import '../../theme/common/colors/searchColors.js';
-import { ILayoutService } from '../../layout/browser/layoutService.js';
-
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-const acceptSelectedActionCommand = 'acceptSelectedCodeAction';
-const previewSelectedActionCommand = 'previewSelectedCodeAction';
+import { asCssVariable } from '../../theme/common/colorRegistry.js';
+export const acceptSelectedActionCommand = 'acceptSelectedCodeAction';
+export const previewSelectedActionCommand = 'previewSelectedCodeAction';
 class HeaderRenderer {
     get templateId() { return "header" /* ActionListItemKind.Header */; }
     renderTemplate(container) {
@@ -44,22 +36,8 @@ class HeaderRenderer {
         return { container, text };
     }
     renderElement(element, _index, templateData) {
-        templateData.text.textContent = element.group?.title ?? element.label ?? '';
-    }
-    disposeTemplate(_templateData) {
-        // noop
-    }
-}
-class SeparatorRenderer {
-    get templateId() { return "separator" /* ActionListItemKind.Separator */; }
-    renderTemplate(container) {
-        container.classList.add('separator');
-        const text = document.createElement('span');
-        container.append(text);
-        return { container, text };
-    }
-    renderElement(element, _index, templateData) {
-        templateData.text.textContent = element.label ?? '';
+        var _a, _b;
+        templateData.text.textContent = (_b = (_a = element.group) === null || _a === void 0 ? void 0 : _a.title) !== null && _b !== void 0 ? _b : '';
     }
     disposeTemplate(_templateData) {
         // noop
@@ -79,14 +57,12 @@ let ActionItemRenderer = class ActionItemRenderer {
         const text = document.createElement('span');
         text.className = 'title';
         container.append(text);
-        const description = document.createElement('span');
-        description.className = 'description';
-        container.append(description);
         const keybinding = new KeybindingLabel(container, OS);
-        return { container, icon, text, description, keybinding };
+        return { container, icon, text, keybinding };
     }
     renderElement(element, _index, data) {
-        if (element.group?.icon) {
+        var _a, _b, _c;
+        if ((_a = element.group) === null || _a === void 0 ? void 0 : _a.icon) {
             data.icon.className = ThemeIcon.asClassName(element.group.icon);
             if (element.group.icon.color) {
                 data.icon.style.color = asCssVariable(element.group.icon.color.id);
@@ -99,45 +75,29 @@ let ActionItemRenderer = class ActionItemRenderer {
         if (!element.item || !element.label) {
             return;
         }
-        setVisibility(!element.hideIcon, data.icon);
         data.text.textContent = stripNewlines(element.label);
-        // if there is a keybinding, prioritize over description for now
-        if (element.keybinding) {
-            data.description.textContent = element.keybinding.getLabel();
-            data.description.style.display = 'inline';
-            data.description.style.letterSpacing = '0.5px';
-        }
-        else if (element.description) {
-            data.description.textContent = stripNewlines(element.description);
-            data.description.style.display = 'inline';
-        }
-        else {
-            data.description.textContent = '';
-            data.description.style.display = 'none';
-        }
-        const actionTitle = this._keybindingService.lookupKeybinding(acceptSelectedActionCommand)?.getLabel();
-        const previewTitle = this._keybindingService.lookupKeybinding(previewSelectedActionCommand)?.getLabel();
+        data.keybinding.set(element.keybinding);
+        dom.setVisibility(!!element.keybinding, data.keybinding.element);
+        const actionTitle = (_b = this._keybindingService.lookupKeybinding(acceptSelectedActionCommand)) === null || _b === void 0 ? void 0 : _b.getLabel();
+        const previewTitle = (_c = this._keybindingService.lookupKeybinding(previewSelectedActionCommand)) === null || _c === void 0 ? void 0 : _c.getLabel();
         data.container.classList.toggle('option-disabled', element.disabled);
-        if (element.tooltip) {
-            data.container.title = element.tooltip;
-        }
-        else if (element.disabled) {
+        if (element.disabled) {
             data.container.title = element.label;
         }
         else if (actionTitle && previewTitle) {
             if (this._supportsPreview && element.canPreview) {
-                data.container.title = localize(1653, "{0} to Apply, {1} to Preview", actionTitle, previewTitle);
+                data.container.title = localize({ key: 'label-preview', comment: ['placeholders are keybindings, e.g "F2 to apply, Shift+F2 to preview"'] }, "{0} to apply, {1} to preview", actionTitle, previewTitle);
             }
             else {
-                data.container.title = localize(1654, "{0} to Apply", actionTitle);
+                data.container.title = localize({ key: 'label', comment: ['placeholder is a keybinding, e.g "F2 to apply"'] }, "{0} to apply", actionTitle);
             }
         }
         else {
             data.container.title = '';
         }
     }
-    disposeTemplate(templateData) {
-        templateData.keybinding.dispose();
+    disposeTemplate(_templateData) {
+        // noop
     }
 };
 ActionItemRenderer = __decorate([
@@ -150,42 +110,30 @@ class PreviewSelectedEvent extends UIEvent {
     constructor() { super('previewSelectedAction'); }
 }
 function getKeyboardNavigationLabel(item) {
-    // Filter out header vs. action vs. separator
+    // Filter out header vs. action
     if (item.kind === 'action') {
         return item.label;
     }
     return undefined;
 }
 let ActionList = class ActionList extends Disposable {
-    constructor(user, preview, items, _delegate, accessibilityProvider, _contextViewService, _keybindingService, _layoutService) {
+    constructor(user, preview, items, _delegate, _contextViewService, _keybindingService) {
         super();
         this._delegate = _delegate;
         this._contextViewService = _contextViewService;
         this._keybindingService = _keybindingService;
-        this._layoutService = _layoutService;
-        this._actionLineHeight = 28;
-        this._headerLineHeight = 28;
-        this._separatorLineHeight = 8;
+        this._actionLineHeight = 24;
+        this._headerLineHeight = 26;
         this.cts = this._register(new CancellationTokenSource());
         this.domNode = document.createElement('div');
         this.domNode.classList.add('actionList');
         const virtualDelegate = {
-            getHeight: element => {
-                switch (element.kind) {
-                    case "header" /* ActionListItemKind.Header */:
-                        return this._headerLineHeight;
-                    case "separator" /* ActionListItemKind.Separator */:
-                        return this._separatorLineHeight;
-                    default:
-                        return this._actionLineHeight;
-                }
-            },
+            getHeight: element => element.kind === "header" /* ActionListItemKind.Header */ ? this._headerLineHeight : this._actionLineHeight,
             getTemplateId: element => element.kind
         };
         this._list = this._register(new List(user, this.domNode, virtualDelegate, [
             new ActionItemRenderer(preview, this._keybindingService),
             new HeaderRenderer(),
-            new SeparatorRenderer(),
         ], {
             keyboardSupport: false,
             typeNavigationEnabled: true,
@@ -193,30 +141,17 @@ let ActionList = class ActionList extends Disposable {
             accessibilityProvider: {
                 getAriaLabel: element => {
                     if (element.kind === "action" /* ActionListItemKind.Action */) {
-                        let label = element.label ? stripNewlines(element?.label) : '';
-                        if (element.description) {
-                            label = label + ', ' + stripNewlines(element.description);
-                        }
+                        let label = element.label ? stripNewlines(element === null || element === void 0 ? void 0 : element.label) : '';
                         if (element.disabled) {
-                            label = localize(1655, "{0}, Disabled Reason: {1}", label, element.disabled);
+                            label = localize({ key: 'customQuickFixWidget.labels', comment: [`Action widget labels for accessibility.`] }, "{0}, Disabled Reason: {1}", label, element.disabled);
                         }
                         return label;
                     }
                     return null;
                 },
-                getWidgetAriaLabel: () => localize(1656, "Action Widget"),
-                getRole: (e) => {
-                    switch (e.kind) {
-                        case "action" /* ActionListItemKind.Action */:
-                            return 'option';
-                        case "separator" /* ActionListItemKind.Separator */:
-                            return 'separator';
-                        default:
-                            return 'separator';
-                    }
-                },
+                getWidgetAriaLabel: () => localize({ key: 'customQuickFixWidget', comment: [`An action widget option`] }, "Action Widget"),
+                getRole: (e) => e.kind === "action" /* ActionListItemKind.Action */ ? 'option' : 'separator',
                 getWidgetRole: () => 'listbox',
-                ...accessibilityProvider
             },
         }));
         this._list.style(defaultListStyles);
@@ -241,11 +176,9 @@ let ActionList = class ActionList extends Disposable {
     layout(minWidth) {
         // Updating list height, depending on how many separators and headers there are.
         const numHeaders = this._allMenuItems.filter(item => item.kind === 'header').length;
-        const numSeparators = this._allMenuItems.filter(item => item.kind === 'separator').length;
         const itemsHeight = this._allMenuItems.length * this._actionLineHeight;
         const heightWithHeaders = itemsHeight + numHeaders * this._headerLineHeight - numHeaders * this._actionLineHeight;
-        const heightWithSeparators = heightWithHeaders + numSeparators * this._separatorLineHeight - numSeparators * this._actionLineHeight;
-        this._list.layout(heightWithSeparators);
+        this._list.layout(heightWithHeaders);
         let maxWidth = minWidth;
         if (this._allMenuItems.length >= 50) {
             maxWidth = 380;
@@ -253,7 +186,6 @@ let ActionList = class ActionList extends Disposable {
         else {
             // For finding width dynamically (not using resize observer)
             const itemWidths = this._allMenuItems.map((_, index) => {
-                // eslint-disable-next-line no-restricted-syntax
                 const element = this.domNode.ownerDocument.getElementById(this._list.getElementID(index));
                 if (element) {
                     element.style.width = 'auto';
@@ -267,7 +199,7 @@ let ActionList = class ActionList extends Disposable {
             maxWidth = Math.max(...itemWidths, minWidth);
         }
         const maxVhPrecentage = 0.7;
-        const height = Math.min(heightWithSeparators, this._layoutService.getContainer(getWindow(this.domNode)).clientHeight * maxVhPrecentage);
+        const height = Math.min(heightWithHeaders, this.domNode.ownerDocument.body.clientHeight * maxVhPrecentage);
         this._list.layout(height, maxWidth);
         this.domNode.style.height = `${height}px`;
         this._list.domFocus();
@@ -305,13 +237,14 @@ let ActionList = class ActionList extends Disposable {
         }
     }
     onFocus() {
+        var _a, _b;
         const focused = this._list.getFocus();
         if (focused.length === 0) {
             return;
         }
         const focusIndex = focused[0];
         const element = this._list.element(focusIndex);
-        this._delegate.onFocus?.(element.item);
+        (_b = (_a = this._delegate).onFocus) === null || _b === void 0 ? void 0 : _b.call(_a, element.item);
     }
     async onListHover(e) {
         const element = e.element;
@@ -333,12 +266,10 @@ let ActionList = class ActionList extends Disposable {
     }
 };
 ActionList = __decorate([
-    __param(5, IContextViewService),
-    __param(6, IKeybindingService),
-    __param(7, ILayoutService)
+    __param(4, IContextViewService),
+    __param(5, IKeybindingService)
 ], ActionList);
+export { ActionList };
 function stripNewlines(str) {
     return str.replace(/\r\n|\r|\n/g, ' ');
 }
-
-export { ActionList, acceptSelectedActionCommand, previewSelectedActionCommand };

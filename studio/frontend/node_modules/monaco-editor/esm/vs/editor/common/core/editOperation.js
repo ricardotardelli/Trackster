@@ -1,10 +1,9 @@
-import { Range } from './range.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class EditOperation {
+import { Range } from './range.js';
+export class EditOperation {
     static insert(position, text) {
         return {
             range: new Range(position.lineNumber, position.column, position.lineNumber, position.column),
@@ -32,5 +31,3 @@ class EditOperation {
         };
     }
 }
-
-export { EditOperation };

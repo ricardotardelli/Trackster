@@ -1,12 +1,11 @@
 import { isThenable } from './async.js';
 import { isEqualOrParent } from './extpath.js';
 import { LRUCache } from './map.js';
-import { sep, posix, basename, extname } from './path.js';
+import { basename, extname, posix, sep } from './path.js';
 import { isLinux } from './platform.js';
-import { ltrim, escapeRegExpCharacters, endsWithIgnoreCase, equalsIgnoreCase } from './strings.js';
-
-const GLOBSTAR = '**';
-const GLOB_SPLIT = '/';
+import { escapeRegExpCharacters, ltrim } from './strings.js';
+export const GLOBSTAR = '**';
+export const GLOB_SPLIT = '/';
 const PATH_REGEX = '[/\\\\]'; // any slash or backslash
 const NO_PATH_REGEX = '[^/\\\\]'; // any non-slash and non-backslash
 const ALL_FORWARD_SLASHES = /\//g;
@@ -24,7 +23,7 @@ function starsToRegExp(starCount, isLastPattern) {
             return `(?:${PATH_REGEX}|${NO_PATH_REGEX}+${PATH_REGEX}${isLastPattern ? `|${PATH_REGEX}${NO_PATH_REGEX}+` : ''})*?`;
     }
 }
-function splitGlobAware(pattern, splitChar) {
+export function splitGlobAware(pattern, splitChar) {
     if (!pattern) {
         return [];
     }
@@ -199,52 +198,43 @@ function parsePattern(arg1, options) {
     }
     // Whitespace trimming
     pattern = pattern.trim();
-    const ignoreCase = options.ignoreCase ?? false;
-    const internalOptions = {
-        ...options,
-        equals: ignoreCase ? equalsIgnoreCase : (a, b) => a === b,
-        endsWith: ignoreCase ? endsWithIgnoreCase : (str, candidate) => str.endsWith(candidate),
-        // TODO: the '!isLinux' part below is to keep current behavior unchanged, but it should probably be removed
-        // in favor of passing correct options from the caller.
-        isEqualOrParent: (base, candidate) => isEqualOrParent(base, candidate, !isLinux || ignoreCase)
-    };
     // Check cache
-    const patternKey = `${ignoreCase ? pattern.toLowerCase() : pattern}_${!!options.trimForExclusions}_${ignoreCase}`;
+    const patternKey = `${pattern}_${!!options.trimForExclusions}`;
     let parsedPattern = CACHE.get(patternKey);
     if (parsedPattern) {
-        return wrapRelativePattern(parsedPattern, arg1, internalOptions);
+        return wrapRelativePattern(parsedPattern, arg1);
     }
     // Check for Trivials
     let match;
     if (T1.test(pattern)) {
-        parsedPattern = trivia1(pattern.substring(4), pattern, internalOptions); // common pattern: **/*.txt just need endsWith check
+        parsedPattern = trivia1(pattern.substr(4), pattern); // common pattern: **/*.txt just need endsWith check
     }
-    else if (match = T2.exec(trimForExclusions(pattern, internalOptions))) { // common pattern: **/some.txt just need basename check
-        parsedPattern = trivia2(match[1], pattern, internalOptions);
+    else if (match = T2.exec(trimForExclusions(pattern, options))) { // common pattern: **/some.txt just need basename check
+        parsedPattern = trivia2(match[1], pattern);
     }
     else if ((options.trimForExclusions ? T3_2 : T3).test(pattern)) { // repetition of common patterns (see above) {**/*.txt,**/*.png}
-        parsedPattern = trivia3(pattern, internalOptions);
+        parsedPattern = trivia3(pattern, options);
     }
-    else if (match = T4.exec(trimForExclusions(pattern, internalOptions))) { // common pattern: **/something/else just need endsWith check
-        parsedPattern = trivia4and5(match[1].substring(1), pattern, true, internalOptions);
+    else if (match = T4.exec(trimForExclusions(pattern, options))) { // common pattern: **/something/else just need endsWith check
+        parsedPattern = trivia4and5(match[1].substr(1), pattern, true);
     }
-    else if (match = T5.exec(trimForExclusions(pattern, internalOptions))) { // common pattern: something/else just need equals check
-        parsedPattern = trivia4and5(match[1], pattern, false, internalOptions);
+    else if (match = T5.exec(trimForExclusions(pattern, options))) { // common pattern: something/else just need equals check
+        parsedPattern = trivia4and5(match[1], pattern, false);
     }
     // Otherwise convert to pattern
     else {
-        parsedPattern = toRegExp(pattern, internalOptions);
+        parsedPattern = toRegExp(pattern);
     }
     // Cache
     CACHE.set(patternKey, parsedPattern);
-    return wrapRelativePattern(parsedPattern, arg1, internalOptions);
+    return wrapRelativePattern(parsedPattern, arg1);
 }
-function wrapRelativePattern(parsedPattern, arg2, options) {
+function wrapRelativePattern(parsedPattern, arg2) {
     if (typeof arg2 === 'string') {
         return parsedPattern;
     }
     const wrappedPattern = function (path, basename) {
-        if (!options.isEqualOrParent(path, arg2.base)) {
+        if (!isEqualOrParent(path, arg2.base, !isLinux)) {
             // skip glob matching if `base` is not a parent of `path`
             return null;
         }
@@ -255,7 +245,7 @@ function wrapRelativePattern(parsedPattern, arg2, options) {
         // that comes after the `base` portion. We have to account
         // for the fact that `base` might end in a path separator
         // (https://github.com/microsoft/vscode/issues/162498)
-        return parsedPattern(ltrim(path.substring(arg2.base.length), sep), basename);
+        return parsedPattern(ltrim(path.substr(arg2.base.length), sep), basename);
     };
     // Make sure to preserve associated metadata
     wrappedPattern.allBasenames = parsedPattern.allBasenames;
@@ -265,16 +255,16 @@ function wrapRelativePattern(parsedPattern, arg2, options) {
     return wrappedPattern;
 }
 function trimForExclusions(pattern, options) {
-    return options.trimForExclusions && pattern.endsWith('/**') ? pattern.substring(0, pattern.length - 2) : pattern; // dropping **, tailing / is dropped later
+    return options.trimForExclusions && pattern.endsWith('/**') ? pattern.substr(0, pattern.length - 2) : pattern; // dropping **, tailing / is dropped later
 }
 // common pattern: **/*.txt just need endsWith check
-function trivia1(base, pattern, options) {
+function trivia1(base, pattern) {
     return function (path, basename) {
-        return typeof path === 'string' && options.endsWith(path, base) ? pattern : null;
+        return typeof path === 'string' && path.endsWith(base) ? pattern : null;
     };
 }
 // common pattern: **/some.txt just need basename check
-function trivia2(base, pattern, options) {
+function trivia2(base, pattern) {
     const slashBase = `/${base}`;
     const backslashBase = `\\${base}`;
     const parsedPattern = function (path, basename) {
@@ -282,9 +272,9 @@ function trivia2(base, pattern, options) {
             return null;
         }
         if (basename) {
-            return options.equals(basename, base) ? pattern : null;
+            return basename === base ? pattern : null;
         }
-        return options.equals(path, base) || options.endsWith(path, slashBase) || options.endsWith(path, backslashBase) ? pattern : null;
+        return path === base || path.endsWith(slashBase) || path.endsWith(backslashBase) ? pattern : null;
     };
     const basenames = [base];
     parsedPattern.basenames = basenames;
@@ -324,7 +314,7 @@ function trivia3(pattern, options) {
     return parsedPattern;
 }
 // common patterns: **/something/else just need endsWith check, something/else just needs and equals check
-function trivia4and5(targetPath, pattern, matchPathEnds, options) {
+function trivia4and5(targetPath, pattern, matchPathEnds) {
     const usingPosixSep = sep === posix.sep;
     const nativePath = usingPosixSep ? targetPath : targetPath.replace(ALL_FORWARD_SLASHES, sep);
     const nativePathEnd = sep + nativePath;
@@ -332,37 +322,36 @@ function trivia4and5(targetPath, pattern, matchPathEnds, options) {
     let parsedPattern;
     if (matchPathEnds) {
         parsedPattern = function (path, basename) {
-            return typeof path === 'string' && ((options.equals(path, nativePath) || options.endsWith(path, nativePathEnd)) ||
-                !usingPosixSep && (options.equals(path, targetPath) || options.endsWith(path, targetPathEnd))) ? pattern : null;
+            return typeof path === 'string' && ((path === nativePath || path.endsWith(nativePathEnd)) || !usingPosixSep && (path === targetPath || path.endsWith(targetPathEnd))) ? pattern : null;
         };
     }
     else {
         parsedPattern = function (path, basename) {
-            return typeof path === 'string' && (options.equals(path, nativePath) || (!usingPosixSep && options.equals(path, targetPath))) ? pattern : null;
+            return typeof path === 'string' && (path === nativePath || (!usingPosixSep && path === targetPath)) ? pattern : null;
         };
     }
     parsedPattern.allPaths = [(matchPathEnds ? '*/' : './') + targetPath];
     return parsedPattern;
 }
-function toRegExp(pattern, options) {
+function toRegExp(pattern) {
     try {
-        const regExp = new RegExp(`^${parseRegExp(pattern)}$`, options.ignoreCase ? 'i' : undefined);
+        const regExp = new RegExp(`^${parseRegExp(pattern)}$`);
         return function (path) {
             regExp.lastIndex = 0; // reset RegExp to its initial state to reuse it!
             return typeof path === 'string' && regExp.test(path) ? pattern : null;
         };
     }
-    catch {
+    catch (error) {
         return NULL;
     }
 }
-function match(arg1, path, options) {
+export function match(arg1, path, hasSibling) {
     if (!arg1 || typeof path !== 'string') {
         return false;
     }
-    return parse(arg1, options)(path);
+    return parse(arg1)(path, undefined, hasSibling);
 }
-function parse(arg1, options = {}) {
+export function parse(arg1, options = {}) {
     if (!arg1) {
         return FALSE;
     }
@@ -386,7 +375,7 @@ function parse(arg1, options = {}) {
     // Glob with Expression
     return parsedExpression(arg1, options);
 }
-function isRelativePattern(obj) {
+export function isRelativePattern(obj) {
     const rp = obj;
     if (!rp) {
         return false;
@@ -457,7 +446,7 @@ function parsedExpression(expression, options) {
                     base = basename(path);
                 }
                 if (!name) {
-                    name = base.substring(0, base.length - extname(path).length);
+                    name = base.substr(0, base.length - extname(path).length);
                 }
             }
             const result = parsedPattern(path, base, name, hasSibling);
@@ -565,7 +554,7 @@ function aggregateBasenameMatches(parsedPatterns, result) {
                     break;
                 }
             }
-            basename = path.substring(i);
+            basename = path.substr(i);
         }
         const index = basenames.indexOf(basename);
         return index !== -1 ? patterns[index] : null;
@@ -577,5 +566,3 @@ function aggregateBasenameMatches(parsedPatterns, result) {
     aggregatedPatterns.push(aggregate);
     return aggregatedPatterns;
 }
-
-export { GLOBSTAR, GLOB_SPLIT, isRelativePattern, match, parse, splitGlobAware };

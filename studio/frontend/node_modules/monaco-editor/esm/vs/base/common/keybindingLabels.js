@@ -1,10 +1,9 @@
-import { localize } from '../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ModifierLabelProvider {
+import * as nls from '../../nls.js';
+export class ModifierLabelProvider {
     constructor(mac, windows, linux = windows) {
         this.modifierLabels = [null]; // index 0 will never me accessed.
         this.modifierLabels[2 /* OperatingSystem.Macintosh */] = mac;
@@ -31,52 +30,52 @@ class ModifierLabelProvider {
 /**
  * A label provider that prints modifiers in a suitable format for displaying in the UI.
  */
-const UILabelProvider = new ModifierLabelProvider({
+export const UILabelProvider = new ModifierLabelProvider({
     ctrlKey: '\u2303',
     shiftKey: '⇧',
     altKey: '⌥',
     metaKey: '⌘',
     separator: '',
 }, {
-    ctrlKey: localize(35, "Ctrl"),
-    shiftKey: localize(36, "Shift"),
-    altKey: localize(37, "Alt"),
-    metaKey: localize(38, "Windows"),
+    ctrlKey: nls.localize({ key: 'ctrlKey', comment: ['This is the short form for the Control key on the keyboard'] }, "Ctrl"),
+    shiftKey: nls.localize({ key: 'shiftKey', comment: ['This is the short form for the Shift key on the keyboard'] }, "Shift"),
+    altKey: nls.localize({ key: 'altKey', comment: ['This is the short form for the Alt key on the keyboard'] }, "Alt"),
+    metaKey: nls.localize({ key: 'windowsKey', comment: ['This is the short form for the Windows key on the keyboard'] }, "Windows"),
     separator: '+',
 }, {
-    ctrlKey: localize(39, "Ctrl"),
-    shiftKey: localize(40, "Shift"),
-    altKey: localize(41, "Alt"),
-    metaKey: localize(42, "Super"),
+    ctrlKey: nls.localize({ key: 'ctrlKey', comment: ['This is the short form for the Control key on the keyboard'] }, "Ctrl"),
+    shiftKey: nls.localize({ key: 'shiftKey', comment: ['This is the short form for the Shift key on the keyboard'] }, "Shift"),
+    altKey: nls.localize({ key: 'altKey', comment: ['This is the short form for the Alt key on the keyboard'] }, "Alt"),
+    metaKey: nls.localize({ key: 'superKey', comment: ['This is the short form for the Super key on the keyboard'] }, "Super"),
     separator: '+',
 });
 /**
  * A label provider that prints modifiers in a suitable format for ARIA.
  */
-const AriaLabelProvider = new ModifierLabelProvider({
-    ctrlKey: localize(43, "Control"),
-    shiftKey: localize(44, "Shift"),
-    altKey: localize(45, "Option"),
-    metaKey: localize(46, "Command"),
+export const AriaLabelProvider = new ModifierLabelProvider({
+    ctrlKey: nls.localize({ key: 'ctrlKey.long', comment: ['This is the long form for the Control key on the keyboard'] }, "Control"),
+    shiftKey: nls.localize({ key: 'shiftKey.long', comment: ['This is the long form for the Shift key on the keyboard'] }, "Shift"),
+    altKey: nls.localize({ key: 'optKey.long', comment: ['This is the long form for the Alt/Option key on the keyboard'] }, "Option"),
+    metaKey: nls.localize({ key: 'cmdKey.long', comment: ['This is the long form for the Command key on the keyboard'] }, "Command"),
     separator: '+',
 }, {
-    ctrlKey: localize(47, "Control"),
-    shiftKey: localize(48, "Shift"),
-    altKey: localize(49, "Alt"),
-    metaKey: localize(50, "Windows"),
+    ctrlKey: nls.localize({ key: 'ctrlKey.long', comment: ['This is the long form for the Control key on the keyboard'] }, "Control"),
+    shiftKey: nls.localize({ key: 'shiftKey.long', comment: ['This is the long form for the Shift key on the keyboard'] }, "Shift"),
+    altKey: nls.localize({ key: 'altKey.long', comment: ['This is the long form for the Alt key on the keyboard'] }, "Alt"),
+    metaKey: nls.localize({ key: 'windowsKey.long', comment: ['This is the long form for the Windows key on the keyboard'] }, "Windows"),
     separator: '+',
 }, {
-    ctrlKey: localize(51, "Control"),
-    shiftKey: localize(52, "Shift"),
-    altKey: localize(53, "Alt"),
-    metaKey: localize(54, "Super"),
+    ctrlKey: nls.localize({ key: 'ctrlKey.long', comment: ['This is the long form for the Control key on the keyboard'] }, "Control"),
+    shiftKey: nls.localize({ key: 'shiftKey.long', comment: ['This is the long form for the Shift key on the keyboard'] }, "Shift"),
+    altKey: nls.localize({ key: 'altKey.long', comment: ['This is the long form for the Alt key on the keyboard'] }, "Alt"),
+    metaKey: nls.localize({ key: 'superKey.long', comment: ['This is the long form for the Super key on the keyboard'] }, "Super"),
     separator: '+',
 });
 /**
  * A label provider that prints modifiers in a suitable format for Electron Accelerators.
  * See https://github.com/electron/electron/blob/master/docs/api/accelerator.md
  */
-const ElectronAcceleratorLabelProvider = new ModifierLabelProvider({
+export const ElectronAcceleratorLabelProvider = new ModifierLabelProvider({
     ctrlKey: 'Ctrl',
     shiftKey: 'Shift',
     altKey: 'Alt',
@@ -92,7 +91,7 @@ const ElectronAcceleratorLabelProvider = new ModifierLabelProvider({
 /**
  * A label provider that prints modifiers in a suitable format for user settings.
  */
-const UserSettingsLabelProvider = new ModifierLabelProvider({
+export const UserSettingsLabelProvider = new ModifierLabelProvider({
     ctrlKey: 'ctrl',
     shiftKey: 'shift',
     altKey: 'alt',
@@ -135,5 +134,3 @@ function _simpleAsString(modifiers, key, labels) {
     }
     return result.join(labels.separator);
 }
-
-export { AriaLabelProvider, ElectronAcceleratorLabelProvider, ModifierLabelProvider, UILabelProvider, UserSettingsLabelProvider };

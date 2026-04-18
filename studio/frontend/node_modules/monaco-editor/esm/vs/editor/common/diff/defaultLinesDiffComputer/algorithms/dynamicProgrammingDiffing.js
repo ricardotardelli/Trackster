@@ -1,16 +1,15 @@
-import { OffsetRange } from '../../../core/ranges/offsetRange.js';
-import { InfiniteTimeout, DiffAlgorithmResult, SequenceDiff } from './diffAlgorithm.js';
-import { Array2D } from '../utils.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { OffsetRange } from '../../../core/offsetRange.js';
+import { SequenceDiff, InfiniteTimeout, DiffAlgorithmResult } from './diffAlgorithm.js';
+import { Array2D } from '../utils.js';
 /**
  * A O(MN) diffing algorithm that supports a score function.
  * The algorithm can be improved by processing the 2d array diagonally.
 */
-class DynamicProgrammingDiffing {
+export class DynamicProgrammingDiffing {
     compute(sequence1, sequence2, timeout = InfiniteTimeout.instance, equalityScore) {
         if (sequence1.length === 0 || sequence2.length === 0) {
             return DiffAlgorithmResult.trivial(sequence1, sequence2);
@@ -97,5 +96,3 @@ class DynamicProgrammingDiffing {
         return new DiffAlgorithmResult(result, false);
     }
 }
-
-export { DynamicProgrammingDiffing };

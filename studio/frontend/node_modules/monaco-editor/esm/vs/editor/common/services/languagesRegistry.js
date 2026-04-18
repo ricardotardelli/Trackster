@@ -1,18 +1,17 @@
-import { Emitter } from '../../../base/common/event.js';
-import { Disposable } from '../../../base/common/lifecycle.js';
-import { regExpLeadsToEndlessLoop } from '../../../base/common/strings.js';
-import { clearPlatformLanguageAssociations, registerPlatformLanguageAssociation, getLanguageIds } from './languagesAssociations.js';
-import { ModesRegistry, PLAINTEXT_LANGUAGE_ID } from '../languages/modesRegistry.js';
-import { Extensions } from '../../../platform/configuration/common/configurationRegistry.js';
-import { Registry } from '../../../platform/registry/common/platform.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Emitter } from '../../../base/common/event.js';
+import { Disposable } from '../../../base/common/lifecycle.js';
+import { regExpLeadsToEndlessLoop } from '../../../base/common/strings.js';
+import { clearPlatformLanguageAssociations, getLanguageIds, registerPlatformLanguageAssociation } from './languagesAssociations.js';
+import { ModesRegistry, PLAINTEXT_LANGUAGE_ID } from '../languages/modesRegistry.js';
+import { Extensions } from '../../../platform/configuration/common/configurationRegistry.js';
+import { Registry } from '../../../platform/registry/common/platform.js';
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 const NULL_LANGUAGE_ID = 'vs.editor.nullLanguage';
-class LanguageIdCodec {
+export class LanguageIdCodec {
     constructor() {
         this._languageIdToLanguage = [];
         this._languageToLanguageId = new Map();
@@ -38,8 +37,7 @@ class LanguageIdCodec {
         return this._languageIdToLanguage[languageId] || NULL_LANGUAGE_ID;
     }
 }
-class LanguagesRegistry extends Disposable {
-    static { this.instanceCount = 0; }
+export class LanguagesRegistry extends Disposable {
     constructor(useModesRegistry = true, warnOnOverwrite = false) {
         super();
         this._onDidChange = this._register(new Emitter());
@@ -187,7 +185,9 @@ class LanguagesRegistry extends Disposable {
             }
         }
         const containsAliases = (langAliases !== null && langAliases.length > 0);
-        if (containsAliases && langAliases[0] === null) ;
+        if (containsAliases && langAliases[0] === null) {
+            // signal that this language should not get a name
+        }
         else {
             const bestName = (containsAliases ? langAliases[0] : null) || langId;
             if (containsAliases || !resolvedLanguage.name) {
@@ -233,5 +233,4 @@ class LanguagesRegistry extends Disposable {
         return getLanguageIds(resource, firstLine);
     }
 }
-
-export { LanguageIdCodec, LanguagesRegistry };
+LanguagesRegistry.instanceCount = 0;

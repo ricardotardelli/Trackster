@@ -1,34 +1,29 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
 import { Color } from '../../../../base/common/color.js';
 import { ViewPart } from '../../view/viewPart.js';
 import { Position } from '../../../common/core/position.js';
 import { TokenizationRegistry } from '../../../common/languages.js';
-import { editorOverviewRulerBorder, editorCursorForeground, editorMultiCursorPrimaryForeground, editorMultiCursorSecondaryForeground, editorOverviewRulerBackground } from '../../../common/core/editorColorRegistry.js';
+import { editorCursorForeground, editorOverviewRulerBorder, editorOverviewRulerBackground } from '../../../common/core/editorColorRegistry.js';
 import { OverviewRulerDecorationsGroup } from '../../../common/viewModel.js';
 import { equals } from '../../../../base/common/arrays.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
 class Settings {
     constructor(config, theme) {
         const options = config.options;
-        this.lineHeight = options.get(75 /* EditorOption.lineHeight */);
-        this.pixelRatio = options.get(163 /* EditorOption.pixelRatio */);
-        this.overviewRulerLanes = options.get(95 /* EditorOption.overviewRulerLanes */);
-        this.renderBorder = options.get(94 /* EditorOption.overviewRulerBorder */);
+        this.lineHeight = options.get(67 /* EditorOption.lineHeight */);
+        this.pixelRatio = options.get(142 /* EditorOption.pixelRatio */);
+        this.overviewRulerLanes = options.get(83 /* EditorOption.overviewRulerLanes */);
+        this.renderBorder = options.get(82 /* EditorOption.overviewRulerBorder */);
         const borderColor = theme.getColor(editorOverviewRulerBorder);
         this.borderColor = borderColor ? borderColor.toString() : null;
-        this.hideCursor = options.get(68 /* EditorOption.hideCursorInOverviewRuler */);
-        const cursorColorSingle = theme.getColor(editorCursorForeground);
-        this.cursorColorSingle = cursorColorSingle ? cursorColorSingle.transparent(0.7).toString() : null;
-        const cursorColorPrimary = theme.getColor(editorMultiCursorPrimaryForeground);
-        this.cursorColorPrimary = cursorColorPrimary ? cursorColorPrimary.transparent(0.7).toString() : null;
-        const cursorColorSecondary = theme.getColor(editorMultiCursorSecondaryForeground);
-        this.cursorColorSecondary = cursorColorSecondary ? cursorColorSecondary.transparent(0.7).toString() : null;
+        this.hideCursor = options.get(59 /* EditorOption.hideCursorInOverviewRuler */);
+        const cursorColor = theme.getColor(editorCursorForeground);
+        this.cursorColor = cursorColor ? cursorColor.transparent(0.7).toString() : null;
         this.themeType = theme.type;
-        const minimapOpts = options.get(81 /* EditorOption.minimap */);
+        const minimapOpts = options.get(73 /* EditorOption.minimap */);
         const minimapEnabled = minimapOpts.enabled;
         const minimapSide = minimapOpts.side;
         const themeColor = theme.getColor(editorOverviewRulerBackground);
@@ -42,7 +37,7 @@ class Settings {
         else {
             this.backgroundColor = null;
         }
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
         const position = layoutInfo.overviewRuler;
         this.top = position.top;
         this.right = position.right;
@@ -152,9 +147,7 @@ class Settings {
             && this.renderBorder === other.renderBorder
             && this.borderColor === other.borderColor
             && this.hideCursor === other.hideCursor
-            && this.cursorColorSingle === other.cursorColorSingle
-            && this.cursorColorPrimary === other.cursorColorPrimary
-            && this.cursorColorSecondary === other.cursorColorSecondary
+            && this.cursorColor === other.cursorColor
             && this.themeType === other.themeType
             && Color.equals(this.backgroundColor, other.backgroundColor)
             && this.top === other.top
@@ -165,7 +158,7 @@ class Settings {
             && this.canvasHeight === other.canvasHeight);
     }
 }
-class DecorationsOverviewRuler extends ViewPart {
+export class DecorationsOverviewRuler extends ViewPart {
     constructor(context) {
         super(context);
         this._actualShouldRender = 0 /* ShouldRenderValue.NotNeeded */;
@@ -183,7 +176,7 @@ class DecorationsOverviewRuler extends ViewPart {
                 this._updateSettings(true);
             }
         });
-        this._cursorPositions = [{ position: new Position(1, 1), color: this._settings.cursorColorSingle }];
+        this._cursorPositions = [new Position(1, 1)];
     }
     dispose() {
         super.dispose();
@@ -222,13 +215,9 @@ class DecorationsOverviewRuler extends ViewPart {
     onCursorStateChanged(e) {
         this._cursorPositions = [];
         for (let i = 0, len = e.selections.length; i < len; i++) {
-            let color = this._settings.cursorColorSingle;
-            if (len > 1) {
-                color = i === 0 ? this._settings.cursorColorPrimary : this._settings.cursorColorSecondary;
-            }
-            this._cursorPositions.push({ position: e.selections[i].getPosition(), color });
+            this._cursorPositions[i] = e.selections[i].getPosition();
         }
-        this._cursorPositions.sort((a, b) => Position.compare(a.position, b.position));
+        this._cursorPositions.sort(Position.compare);
         return this._markRenderingIsMaybeNeeded();
     }
     onDecorationsChanged(e) {
@@ -273,7 +262,7 @@ class DecorationsOverviewRuler extends ViewPart {
         if (this._actualShouldRender === 1 /* ShouldRenderValue.Maybe */ && !OverviewRulerDecorationsGroup.equalsArr(this._renderedDecorations, decorations)) {
             this._actualShouldRender = 2 /* ShouldRenderValue.Needed */;
         }
-        if (this._actualShouldRender === 1 /* ShouldRenderValue.Maybe */ && !equals(this._renderedCursorPositions, this._cursorPositions, (a, b) => a.position.lineNumber === b.position.lineNumber && a.color === b.color)) {
+        if (this._actualShouldRender === 1 /* ShouldRenderValue.Maybe */ && !equals(this._renderedCursorPositions, this._cursorPositions, (a, b) => a.lineNumber === b.lineNumber)) {
             this._actualShouldRender = 2 /* ShouldRenderValue.Needed */;
         }
         if (this._actualShouldRender === 1 /* ShouldRenderValue.Maybe */) {
@@ -356,20 +345,16 @@ class DecorationsOverviewRuler extends ViewPart {
             canvasCtx.fillRect(x[prevLane], prevY1, w[prevLane], prevY2 - prevY1);
         }
         // Draw cursors
-        if (!this._settings.hideCursor) {
+        if (!this._settings.hideCursor && this._settings.cursorColor) {
             const cursorHeight = (2 * this._settings.pixelRatio) | 0;
             const halfCursorHeight = (cursorHeight / 2) | 0;
             const cursorX = this._settings.x[7 /* OverviewRulerLane.Full */];
             const cursorW = this._settings.w[7 /* OverviewRulerLane.Full */];
+            canvasCtx.fillStyle = this._settings.cursorColor;
             let prevY1 = -100;
             let prevY2 = -100;
-            let prevColor = null;
             for (let i = 0, len = this._cursorPositions.length; i < len; i++) {
-                const color = this._cursorPositions[i].color;
-                if (!color) {
-                    continue;
-                }
-                const cursor = this._cursorPositions[i].position;
+                const cursor = this._cursorPositions[i];
                 let yCenter = (viewLayout.getVerticalOffsetForLineNumber(cursor.lineNumber) * heightRatio) | 0;
                 if (yCenter < halfCursorHeight) {
                     yCenter = halfCursorHeight;
@@ -379,9 +364,9 @@ class DecorationsOverviewRuler extends ViewPart {
                 }
                 const y1 = yCenter - halfCursorHeight;
                 const y2 = y1 + cursorHeight;
-                if (y1 > prevY2 + 1 || color !== prevColor) {
+                if (y1 > prevY2 + 1) {
                     // flush prev
-                    if (i !== 0 && prevColor) {
+                    if (i !== 0) {
                         canvasCtx.fillRect(cursorX, prevY1, cursorW, prevY2 - prevY1);
                     }
                     prevY1 = y1;
@@ -393,12 +378,8 @@ class DecorationsOverviewRuler extends ViewPart {
                         prevY2 = y2;
                     }
                 }
-                prevColor = color;
-                canvasCtx.fillStyle = color;
             }
-            if (prevColor) {
-                canvasCtx.fillRect(cursorX, prevY1, cursorW, prevY2 - prevY1);
-            }
+            canvasCtx.fillRect(cursorX, prevY1, cursorW, prevY2 - prevY1);
         }
         if (this._settings.renderBorder && this._settings.borderColor && this._settings.overviewRulerLanes > 0) {
             canvasCtx.beginPath();
@@ -406,11 +387,10 @@ class DecorationsOverviewRuler extends ViewPart {
             canvasCtx.strokeStyle = this._settings.borderColor;
             canvasCtx.moveTo(0, 0);
             canvasCtx.lineTo(0, canvasHeight);
-            canvasCtx.moveTo(1, 0);
+            canvasCtx.stroke();
+            canvasCtx.moveTo(0, 0);
             canvasCtx.lineTo(canvasWidth, 0);
             canvasCtx.stroke();
         }
     }
 }
-
-export { DecorationsOverviewRuler };

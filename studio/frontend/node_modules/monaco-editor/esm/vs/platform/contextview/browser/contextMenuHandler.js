@@ -1,16 +1,15 @@
-import { getActiveElement, isHTMLElement, isAncestor, $, addDisposableListener, EventType, getWindow } from '../../../base/browser/dom.js';
-import { StandardMouseEvent } from '../../../base/browser/mouseEvent.js';
-import { Menu } from '../../../base/browser/ui/menu/menu.js';
-import { ActionRunner } from '../../../base/common/actions.js';
-import { isCancellationError } from '../../../base/common/errors.js';
-import { DisposableStore, combinedDisposable } from '../../../base/common/lifecycle.js';
-import { defaultMenuStyles } from '../../theme/browser/defaultStyles.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ContextMenuHandler {
+import { $, addDisposableListener, EventType, getActiveElement, getWindow, isAncestor } from '../../../base/browser/dom.js';
+import { StandardMouseEvent } from '../../../base/browser/mouseEvent.js';
+import { Menu } from '../../../base/browser/ui/menu/menu.js';
+import { ActionRunner } from '../../../base/common/actions.js';
+import { isCancellationError } from '../../../base/common/errors.js';
+import { combinedDisposable, DisposableStore } from '../../../base/common/lifecycle.js';
+import { defaultMenuStyles } from '../../theme/browser/defaultStyles.js';
+export class ContextMenuHandler {
     constructor(contextViewService, telemetryService, notificationService, keybindingService) {
         this.contextViewService = contextViewService;
         this.telemetryService = telemetryService;
@@ -32,14 +31,14 @@ class ContextMenuHandler {
         }
         this.focusToReturn = getActiveElement();
         let menu;
-        const shadowRootElement = isHTMLElement(delegate.domForShadowRoot) ? delegate.domForShadowRoot : undefined;
+        const shadowRootElement = delegate.domForShadowRoot instanceof HTMLElement ? delegate.domForShadowRoot : undefined;
         this.contextViewService.showContextView({
             getAnchor: () => delegate.getAnchor(),
             canRelayout: false,
             anchorAlignment: delegate.anchorAlignment,
             anchorAxisAlignment: delegate.anchorAxisAlignment,
-            layer: delegate.layer,
             render: (container) => {
+                var _a;
                 this.lastContainer = container;
                 const className = delegate.getMenuClassName ? delegate.getMenuClassName() : '';
                 if (className) {
@@ -55,11 +54,11 @@ class ContextMenuHandler {
                     this.block.style.width = '100%';
                     this.block.style.height = '100%';
                     this.block.style.zIndex = '-1';
-                    this.blockDisposable?.dispose();
+                    (_a = this.blockDisposable) === null || _a === void 0 ? void 0 : _a.dispose();
                     this.blockDisposable = addDisposableListener(this.block, EventType.MOUSE_DOWN, e => e.stopPropagation());
                 }
                 const menuDisposables = new DisposableStore();
-                const actionRunner = delegate.actionRunner || menuDisposables.add(new ActionRunner());
+                const actionRunner = delegate.actionRunner || new ActionRunner();
                 actionRunner.onWillRun(evt => this.onActionRun(evt, !delegate.skipTelemetry), this, menuDisposables);
                 actionRunner.onDidRun(this.onDidActionRun, this, menuDisposables);
                 menu = new Menu(container, actions, {
@@ -93,18 +92,19 @@ class ContextMenuHandler {
                 return combinedDisposable(menuDisposables, menu);
             },
             focus: () => {
-                menu?.focus(!!delegate.autoSelectFirstItem);
+                menu === null || menu === void 0 ? void 0 : menu.focus(!!delegate.autoSelectFirstItem);
             },
             onHide: (didCancel) => {
-                delegate.onHide?.(!!didCancel);
+                var _a, _b, _c;
+                (_a = delegate.onHide) === null || _a === void 0 ? void 0 : _a.call(delegate, !!didCancel);
                 if (this.block) {
                     this.block.remove();
                     this.block = null;
                 }
-                this.blockDisposable?.dispose();
+                (_b = this.blockDisposable) === null || _b === void 0 ? void 0 : _b.dispose();
                 this.blockDisposable = null;
                 if (!!this.lastContainer && (getActiveElement() === this.lastContainer || isAncestor(getActiveElement(), this.lastContainer))) {
-                    this.focusToReturn?.focus();
+                    (_c = this.focusToReturn) === null || _c === void 0 ? void 0 : _c.focus();
                 }
                 this.lastContainer = null;
             }
@@ -122,5 +122,3 @@ class ContextMenuHandler {
         }
     }
 }
-
-export { ContextMenuHandler };

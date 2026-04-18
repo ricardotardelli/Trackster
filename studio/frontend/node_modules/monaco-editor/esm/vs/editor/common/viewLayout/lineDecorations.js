@@ -1,10 +1,9 @@
-import { isHighSurrogate } from '../../../base/common/strings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class LineDecoration {
+import * as strings from '../../../base/common/strings.js';
+export class LineDecoration {
     constructor(startColumn, endColumn, className, type) {
         this.startColumn = startColumn;
         this.endColumn = endColumn;
@@ -92,7 +91,7 @@ class LineDecoration {
         return 0;
     }
 }
-class DecorationSegment {
+export class DecorationSegment {
     constructor(startOffset, endOffset, className, metadata) {
         this.startOffset = startOffset;
         this.endOffset = endOffset;
@@ -158,7 +157,7 @@ class Stack {
         return;
     }
 }
-class LineDecorationsNormalizer {
+export class LineDecorationsNormalizer {
     /**
      * Normalize line decorations. Overlapping decorations will generate multiple segments
      */
@@ -182,13 +181,13 @@ class LineDecorationsNormalizer {
             // If the position would end up in the middle of a high-low surrogate pair, we move it to before the pair
             if (startColumn > 1) {
                 const charCodeBefore = lineContent.charCodeAt(startColumn - 2);
-                if (isHighSurrogate(charCodeBefore)) {
+                if (strings.isHighSurrogate(charCodeBefore)) {
                     startColumn--;
                 }
             }
             if (endColumn > 1) {
                 const charCodeBefore = lineContent.charCodeAt(endColumn - 2);
-                if (isHighSurrogate(charCodeBefore)) {
+                if (strings.isHighSurrogate(charCodeBefore)) {
                     endColumn--;
                 }
             }
@@ -204,5 +203,3 @@ class LineDecorationsNormalizer {
         return result;
     }
 }
-
-export { DecorationSegment, LineDecoration, LineDecorationsNormalizer };

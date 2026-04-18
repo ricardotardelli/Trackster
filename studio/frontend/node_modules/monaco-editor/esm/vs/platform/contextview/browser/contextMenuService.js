@@ -1,8 +1,21 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 import { ModifierKeyEmitter } from '../../../base/browser/dom.js';
 import { Separator } from '../../../base/common/actions.js';
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
-import { getFlatContextMenuActions } from '../../actions/browser/menuEntryActionViewItem.js';
+import { createAndFillInContextMenuActions } from '../../actions/browser/menuEntryActionViewItem.js';
 import { IMenuService, MenuId } from '../../actions/common/actions.js';
 import { IContextKeyService } from '../../contextkey/common/contextkey.js';
 import { IKeybindingService } from '../../keybinding/common/keybinding.js';
@@ -10,20 +23,6 @@ import { INotificationService } from '../../notification/common/notification.js'
 import { ITelemetryService } from '../../telemetry/common/telemetry.js';
 import { ContextMenuHandler } from './contextMenuHandler.js';
 import { IContextViewService } from './contextView.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 let ContextMenuService = class ContextMenuService extends Disposable {
     get contextMenuHandler() {
         if (!this._contextMenuHandler) {
@@ -43,7 +42,6 @@ let ContextMenuService = class ContextMenuService extends Disposable {
         this._onDidShowContextMenu = this._store.add(new Emitter());
         this.onDidShowContextMenu = this._onDidShowContextMenu.event;
         this._onDidHideContextMenu = this._store.add(new Emitter());
-        this.onDidHideContextMenu = this._onDidHideContextMenu.event;
     }
     configure(options) {
         this.contextMenuHandler.configure(options);
@@ -54,7 +52,8 @@ let ContextMenuService = class ContextMenuService extends Disposable {
         this.contextMenuHandler.showContextMenu({
             ...delegate,
             onHide: (didCancel) => {
-                delegate.onHide?.(didCancel);
+                var _a;
+                (_a = delegate.onHide) === null || _a === void 0 ? void 0 : _a.call(delegate, didCancel);
                 this._onDidHideContextMenu.fire();
             }
         });
@@ -70,7 +69,8 @@ ContextMenuService = __decorate([
     __param(4, IMenuService),
     __param(5, IContextKeyService)
 ], ContextMenuService);
-var ContextMenuMenuDelegate;
+export { ContextMenuService };
+export var ContextMenuMenuDelegate;
 (function (ContextMenuMenuDelegate) {
     function is(thing) {
         return thing && thing.menuId instanceof MenuId;
@@ -83,10 +83,11 @@ var ContextMenuMenuDelegate;
         return {
             ...delegate,
             getActions: () => {
-                let target = [];
+                const target = [];
                 if (menuId) {
-                    const menu = menuService.getMenuActions(menuId, contextKeyService ?? globalContextKeyService, menuActionOptions);
-                    target = getFlatContextMenuActions(menu);
+                    const menu = menuService.createMenu(menuId, contextKeyService !== null && contextKeyService !== void 0 ? contextKeyService : globalContextKeyService);
+                    createAndFillInContextMenuActions(menu, menuActionOptions, target);
+                    menu.dispose();
                 }
                 if (!delegate.getActions) {
                     return target;
@@ -99,5 +100,3 @@ var ContextMenuMenuDelegate;
     }
     ContextMenuMenuDelegate.transform = transform;
 })(ContextMenuMenuDelegate || (ContextMenuMenuDelegate = {}));
-
-export { ContextMenuMenuDelegate, ContextMenuService };

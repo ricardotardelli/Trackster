@@ -1,5 +1,9 @@
-import { isChrome, getZoomFactor } from '../../browser.js';
-import { getWindow, addDisposableListener, EventType, scheduleAtNextAnimationFrame } from '../../dom.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+import { getZoomFactor, isChrome } from '../../browser.js';
+import * as dom from '../../dom.js';
 import { createFastDomNode } from '../../fastDomNode.js';
 import { StandardWheelEvent } from '../../mouseEvent.js';
 import { HorizontalScrollbar } from './horizontalScrollbar.js';
@@ -8,16 +12,12 @@ import { Widget } from '../widget.js';
 import { TimeoutTimer } from '../../../common/async.js';
 import { Emitter } from '../../../common/event.js';
 import { dispose } from '../../../common/lifecycle.js';
-import { isMacintosh } from '../../../common/platform.js';
+import * as platform from '../../../common/platform.js';
 import { Scrollable } from '../../../common/scrollable.js';
 import './media/scrollbars.css';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
 const HIDE_TIMEOUT = 500;
 const SCROLL_WHEEL_SENSITIVITY = 50;
+const SCROLL_WHEEL_SMOOTH_SCROLL_ENABLED = true;
 class MouseWheelClassifierItem {
     constructor(timestamp, deltaX, deltaY) {
         this.timestamp = timestamp;
@@ -26,8 +26,7 @@ class MouseWheelClassifierItem {
         this.score = 0;
     }
 }
-class MouseWheelClassifier {
-    static { this.INSTANCE = new MouseWheelClassifier(); }
+export class MouseWheelClassifier {
     constructor() {
         this._capacity = 5;
         this._memory = [];
@@ -58,7 +57,7 @@ class MouseWheelClassifier {
     }
     acceptStandardWheelEvent(e) {
         if (isChrome) {
-            const targetWindow = getWindow(e.browserEvent);
+            const targetWindow = dom.getWindow(e.browserEvent);
             const pageZoomFactor = getZoomFactor(targetWindow);
             // On Chrome, the incoming delta events are multiplied with the OS zoom factor.
             // The OS zoom factor can be reverse engineered by using the device pixel ratio and the configured zoom factor into account.
@@ -69,15 +68,14 @@ class MouseWheelClassifier {
         }
     }
     accept(timestamp, deltaX, deltaY) {
-        let previousItem = null;
         const item = new MouseWheelClassifierItem(timestamp, deltaX, deltaY);
+        item.score = this._computeScore(item);
         if (this._front === -1 && this._rear === -1) {
             this._memory[0] = item;
             this._front = 0;
             this._rear = 0;
         }
         else {
-            previousItem = this._memory[this._rear];
             this._rear = (this._rear + 1) % this._capacity;
             if (this._rear === this._front) {
                 // Drop oldest
@@ -85,58 +83,50 @@ class MouseWheelClassifier {
             }
             this._memory[this._rear] = item;
         }
-        item.score = this._computeScore(item, previousItem);
     }
     /**
      * A score between 0 and 1 for `item`.
      *  - a score towards 0 indicates that the source appears to be a physical mouse wheel
      *  - a score towards 1 indicates that the source appears to be a touchpad or magic mouse, etc.
      */
-    _computeScore(item, previousItem) {
+    _computeScore(item) {
         if (Math.abs(item.deltaX) > 0 && Math.abs(item.deltaY) > 0) {
             // both axes exercised => definitely not a physical mouse wheel
             return 1;
         }
         let score = 0.5;
+        const prev = (this._front === -1 && this._rear === -1 ? null : this._memory[this._rear]);
+        if (prev) {
+            // const deltaT = item.timestamp - prev.timestamp;
+            // if (deltaT < 1000 / 30) {
+            // 	// sooner than X times per second => indicator that this is not a physical mouse wheel
+            // 	score += 0.25;
+            // }
+            // if (item.deltaX === prev.deltaX && item.deltaY === prev.deltaY) {
+            // 	// equal amplitude => indicator that this is a physical mouse wheel
+            // 	score -= 0.25;
+            // }
+        }
         if (!this._isAlmostInt(item.deltaX) || !this._isAlmostInt(item.deltaY)) {
             // non-integer deltas => indicator that this is not a physical mouse wheel
             score += 0.25;
         }
-        // Non-accelerating scroll => indicator that this is a physical mouse wheel
-        // These can be identified by seeing whether they are the module of one another.
-        if (previousItem) {
-            const absDeltaX = Math.abs(item.deltaX);
-            const absDeltaY = Math.abs(item.deltaY);
-            const absPreviousDeltaX = Math.abs(previousItem.deltaX);
-            const absPreviousDeltaY = Math.abs(previousItem.deltaY);
-            // Min 1 to avoid division by zero, module 1 will still be 0.
-            const minDeltaX = Math.max(Math.min(absDeltaX, absPreviousDeltaX), 1);
-            const minDeltaY = Math.max(Math.min(absDeltaY, absPreviousDeltaY), 1);
-            const maxDeltaX = Math.max(absDeltaX, absPreviousDeltaX);
-            const maxDeltaY = Math.max(absDeltaY, absPreviousDeltaY);
-            const isSameModulo = (maxDeltaX % minDeltaX === 0 && maxDeltaY % minDeltaY === 0);
-            if (isSameModulo) {
-                score -= 0.5;
-            }
-        }
         return Math.min(Math.max(score, 0), 1);
     }
     _isAlmostInt(value) {
-        const epsilon = Number.EPSILON * 100; // Use a small tolerance factor for floating-point errors
         const delta = Math.abs(Math.round(value) - value);
-        return (delta < 0.01 + epsilon);
+        return (delta < 0.01);
     }
 }
-class AbstractScrollableElement extends Widget {
-    get onScroll() { return this._onScroll.event; }
+MouseWheelClassifier.INSTANCE = new MouseWheelClassifier();
+export class AbstractScrollableElement extends Widget {
     get options() {
         return this._options;
     }
     constructor(element, options, scrollable) {
         super();
-        this._inertialTimeout = null;
-        this._inertialSpeed = { X: 0, Y: 0 };
         this._onScroll = this._register(new Emitter());
+        this.onScroll = this._onScroll.event;
         this._onWillScroll = this._register(new Emitter());
         element.style.overflow = 'hidden';
         this._options = resolveOptions(options);
@@ -190,10 +180,6 @@ class AbstractScrollableElement extends Widget {
     }
     dispose() {
         this._mouseWheelToDispose = dispose(this._mouseWheelToDispose);
-        if (this._inertialTimeout) {
-            this._inertialTimeout.dispose();
-            this._inertialTimeout = null;
-        }
         super.dispose();
     }
     /**
@@ -227,7 +213,7 @@ class AbstractScrollableElement extends Widget {
     updateClassName(newClassName) {
         this._options.className = newClassName;
         // Defaults are different on Macs
-        if (isMacintosh) {
+        if (platform.isMacintosh) {
             this._options.className += ' mac';
         }
         this._domNode.className = 'monaco-scrollable-element ' + this._options.className;
@@ -273,34 +259,6 @@ class AbstractScrollableElement extends Widget {
     delegateScrollFromMouseWheelEvent(browserEvent) {
         this._onMouseWheel(new StandardWheelEvent(browserEvent));
     }
-    async _periodicSync() {
-        let scheduleAgain = false;
-        if (this._inertialSpeed.X !== 0 || this._inertialSpeed.Y !== 0) {
-            this._scrollable.setScrollPositionNow({
-                scrollTop: this._scrollable.getCurrentScrollPosition().scrollTop - this._inertialSpeed.Y * 100,
-                scrollLeft: this._scrollable.getCurrentScrollPosition().scrollLeft - this._inertialSpeed.X * 100
-            });
-            this._inertialSpeed.X *= 0.9;
-            this._inertialSpeed.Y *= 0.9;
-            if (Math.abs(this._inertialSpeed.X) < 0.01) {
-                this._inertialSpeed.X = 0;
-            }
-            if (Math.abs(this._inertialSpeed.Y) < 0.01) {
-                this._inertialSpeed.Y = 0;
-            }
-            scheduleAgain = (this._inertialSpeed.X !== 0 || this._inertialSpeed.Y !== 0);
-        }
-        if (scheduleAgain) {
-            if (!this._inertialTimeout) {
-                this._inertialTimeout = new TimeoutTimer();
-            }
-            this._inertialTimeout.cancelAndSet(() => this._periodicSync(), 1000 / 60);
-        }
-        else {
-            this._inertialTimeout?.dispose();
-            this._inertialTimeout = null;
-        }
-    }
     // -------------------- mouse wheel scrolling --------------------
     _setListeningToMouseWheel(shouldListen) {
         const isListening = (this._mouseWheelToDispose.length > 0);
@@ -315,18 +273,18 @@ class AbstractScrollableElement extends Widget {
             const onMouseWheel = (browserEvent) => {
                 this._onMouseWheel(new StandardWheelEvent(browserEvent));
             };
-            this._mouseWheelToDispose.push(addDisposableListener(this._listenOnDomNode, EventType.MOUSE_WHEEL, onMouseWheel, { passive: false }));
+            this._mouseWheelToDispose.push(dom.addDisposableListener(this._listenOnDomNode, dom.EventType.MOUSE_WHEEL, onMouseWheel, { passive: false }));
         }
     }
     _onMouseWheel(e) {
-        if (e.browserEvent?.defaultPrevented) {
+        var _a;
+        if ((_a = e.browserEvent) === null || _a === void 0 ? void 0 : _a.defaultPrevented) {
             return;
         }
         const classifier = MouseWheelClassifier.INSTANCE;
-        {
+        if (SCROLL_WHEEL_SMOOTH_SCROLL_ENABLED) {
             classifier.acceptStandardWheelEvent(e);
         }
-        // useful for creating unit tests:
         // console.log(`${Date.now()}, ${e.deltaY}, ${e.deltaX}`);
         let didScroll = false;
         if (e.deltaY || e.deltaX) {
@@ -352,7 +310,7 @@ class AbstractScrollableElement extends Widget {
             }
             // Convert vertical scrolling to horizontal if shift is held, this
             // is handled at a higher level on Mac
-            const shiftConvert = !isMacintosh && e.browserEvent && e.browserEvent.shiftKey;
+            const shiftConvert = !platform.isMacintosh && e.browserEvent && e.browserEvent.shiftKey;
             if ((this._options.scrollYToX || shiftConvert) && !deltaX) {
                 deltaX = deltaY;
                 deltaY = 0;
@@ -378,20 +336,9 @@ class AbstractScrollableElement extends Widget {
             }
             // Check that we are scrolling towards a location which is valid
             desiredScrollPosition = this._scrollable.validateScrollPosition(desiredScrollPosition);
-            if (this._options.inertialScroll && (deltaX || deltaY) && !classifier.isPhysicalMouseWheel()) {
-                let startPeriodic = false;
-                // Only start periodic if it's not running
-                if (this._inertialSpeed.X === 0 && this._inertialSpeed.Y === 0) {
-                    startPeriodic = true;
-                }
-                this._inertialSpeed.Y = (deltaY < 0 ? -1 : 1) * (Math.abs(deltaY) ** 1.02);
-                this._inertialSpeed.X = (deltaX < 0 ? -1 : 1) * (Math.abs(deltaX) ** 1.02);
-                if (startPeriodic) {
-                    this._periodicSync();
-                }
-            }
             if (futureScrollPosition.scrollLeft !== desiredScrollPosition.scrollLeft || futureScrollPosition.scrollTop !== desiredScrollPosition.scrollTop) {
-                const canPerformSmoothScroll = (this._options.mouseWheelSmoothScroll
+                const canPerformSmoothScroll = (SCROLL_WHEEL_SMOOTH_SCROLL_ENABLED
+                    && this._options.mouseWheelSmoothScroll
                     && classifier.isPhysicalMouseWheel());
                 if (canPerformSmoothScroll) {
                     this._scrollable.setScrollPositionSmooth(desiredScrollPosition);
@@ -490,14 +437,14 @@ class AbstractScrollableElement extends Widget {
         }
     }
 }
-class ScrollableElement extends AbstractScrollableElement {
+export class ScrollableElement extends AbstractScrollableElement {
     constructor(element, options) {
         options = options || {};
         options.mouseWheelSmoothScroll = false;
         const scrollable = new Scrollable({
             forceIntegerValues: true,
             smoothScrollDuration: 0,
-            scheduleAtNextAnimationFrame: (callback) => scheduleAtNextAnimationFrame(getWindow(element), callback)
+            scheduleAtNextAnimationFrame: (callback) => dom.scheduleAtNextAnimationFrame(dom.getWindow(element), callback)
         });
         super(element, options, scrollable);
         this._register(scrollable);
@@ -506,7 +453,7 @@ class ScrollableElement extends AbstractScrollableElement {
         this._scrollable.setScrollPositionNow(update);
     }
 }
-class SmoothScrollableElement extends AbstractScrollableElement {
+export class SmoothScrollableElement extends AbstractScrollableElement {
     constructor(element, options, scrollable) {
         super(element, options, scrollable);
     }
@@ -522,14 +469,14 @@ class SmoothScrollableElement extends AbstractScrollableElement {
         return this._scrollable.getCurrentScrollPosition();
     }
 }
-class DomScrollableElement extends AbstractScrollableElement {
+export class DomScrollableElement extends AbstractScrollableElement {
     constructor(element, options) {
         options = options || {};
         options.mouseWheelSmoothScroll = false;
         const scrollable = new Scrollable({
             forceIntegerValues: false, // See https://github.com/microsoft/vscode/issues/139877
             smoothScrollDuration: 0,
-            scheduleAtNextAnimationFrame: (callback) => scheduleAtNextAnimationFrame(getWindow(element), callback)
+            scheduleAtNextAnimationFrame: (callback) => dom.scheduleAtNextAnimationFrame(dom.getWindow(element), callback)
         });
         super(element, options, scrollable);
         this._register(scrollable);
@@ -578,7 +525,6 @@ function resolveOptions(opts) {
         fastScrollSensitivity: (typeof opts.fastScrollSensitivity !== 'undefined' ? opts.fastScrollSensitivity : 5),
         scrollPredominantAxis: (typeof opts.scrollPredominantAxis !== 'undefined' ? opts.scrollPredominantAxis : true),
         mouseWheelSmoothScroll: (typeof opts.mouseWheelSmoothScroll !== 'undefined' ? opts.mouseWheelSmoothScroll : true),
-        inertialScroll: (typeof opts.inertialScroll !== 'undefined' ? opts.inertialScroll : false),
         arrowSize: (typeof opts.arrowSize !== 'undefined' ? opts.arrowSize : 11),
         listenOnDomNode: (typeof opts.listenOnDomNode !== 'undefined' ? opts.listenOnDomNode : null),
         horizontal: (typeof opts.horizontal !== 'undefined' ? opts.horizontal : 1 /* ScrollbarVisibility.Auto */),
@@ -594,10 +540,8 @@ function resolveOptions(opts) {
     result.horizontalSliderSize = (typeof opts.horizontalSliderSize !== 'undefined' ? opts.horizontalSliderSize : result.horizontalScrollbarSize);
     result.verticalSliderSize = (typeof opts.verticalSliderSize !== 'undefined' ? opts.verticalSliderSize : result.verticalScrollbarSize);
     // Defaults are different on Macs
-    if (isMacintosh) {
+    if (platform.isMacintosh) {
         result.className += ' mac';
     }
     return result;
 }
-
-export { AbstractScrollableElement, DomScrollableElement, MouseWheelClassifier, ScrollableElement, SmoothScrollableElement };

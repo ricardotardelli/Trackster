@@ -1,15 +1,14 @@
-import { Delayer, createCancelablePromise } from '../../../../base/common/async.js';
-import { onUnexpectedError } from '../../../../base/common/errors.js';
-import { Emitter } from '../../../../base/common/event.js';
-import { Disposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
-import { CharacterSet } from '../../../common/core/characterClassifier.js';
-import { SignatureHelpTriggerKind } from '../../../common/languages.js';
-import { provideSignatureHelp } from './provideSignatureHelp.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { createCancelablePromise, Delayer } from '../../../../base/common/async.js';
+import { onUnexpectedError } from '../../../../base/common/errors.js';
+import { Emitter } from '../../../../base/common/event.js';
+import { Disposable, MutableDisposable } from '../../../../base/common/lifecycle.js';
+import { CharacterSet } from '../../../common/core/characterClassifier.js';
+import * as languages from '../../../common/languages.js';
+import { provideSignatureHelp } from './provideSignatureHelp.js';
 var ParameterHintState;
 (function (ParameterHintState) {
     ParameterHintState.Default = { type: 0 /* Type.Default */ };
@@ -29,8 +28,7 @@ var ParameterHintState;
     }
     ParameterHintState.Active = Active;
 })(ParameterHintState || (ParameterHintState = {}));
-class ParameterHintsModel extends Disposable {
-    static { this.DEFAULT_DELAY = 120; } // ms
+export class ParameterHintsModel extends Disposable {
     constructor(editor, providers, delay = ParameterHintsModel.DEFAULT_DELAY) {
         super();
         this._onChangedHints = this._register(new Emitter());
@@ -89,7 +87,7 @@ class ParameterHintsModel extends Disposable {
         const length = this.state.hints.signatures.length;
         const activeSignature = this.state.hints.activeSignature;
         const last = (activeSignature % length) === (length - 1);
-        const cycle = this.editor.getOption(98 /* EditorOption.parameterHints */).cycle;
+        const cycle = this.editor.getOption(86 /* EditorOption.parameterHints */).cycle;
         // If there is only one signature, or we're on last signature of list
         if ((length < 2 || last) && !cycle) {
             this.cancel();
@@ -104,7 +102,7 @@ class ParameterHintsModel extends Disposable {
         const length = this.state.hints.signatures.length;
         const activeSignature = this.state.hints.activeSignature;
         const first = activeSignature === 0;
-        const cycle = this.editor.getOption(98 /* EditorOption.parameterHints */).cycle;
+        const cycle = this.editor.getOption(86 /* EditorOption.parameterHints */).cycle;
         // If there is only one signature, or we're on first signature of list
         if ((length < 2 || first) && !cycle) {
             this.cancel();
@@ -144,11 +142,11 @@ class ParameterHintsModel extends Disposable {
             const result = await this.state.request;
             // Check that we are still resolving the correct signature help
             if (triggerId !== this.triggerId) {
-                result?.dispose();
+                result === null || result === void 0 ? void 0 : result.dispose();
                 return false;
             }
             if (!result || !result.value.signatures || result.value.signatures.length === 0) {
-                result?.dispose();
+                result === null || result === void 0 ? void 0 : result.dispose();
                 this._lastSignatureHelpResult.clear();
                 this.cancel();
                 return false;
@@ -212,7 +210,7 @@ class ParameterHintsModel extends Disposable {
         const triggerCharCode = text.charCodeAt(lastCharIndex);
         if (this.triggerChars.has(triggerCharCode) || this.isTriggered && this.retriggerChars.has(triggerCharCode)) {
             this.trigger({
-                triggerKind: SignatureHelpTriggerKind.TriggerCharacter,
+                triggerKind: languages.SignatureHelpTriggerKind.TriggerCharacter,
                 triggerCharacter: text.charAt(lastCharIndex),
             });
         }
@@ -222,16 +220,16 @@ class ParameterHintsModel extends Disposable {
             this.cancel();
         }
         else if (this.isTriggered) {
-            this.trigger({ triggerKind: SignatureHelpTriggerKind.ContentChange });
+            this.trigger({ triggerKind: languages.SignatureHelpTriggerKind.ContentChange });
         }
     }
     onModelContentChange() {
         if (this.isTriggered) {
-            this.trigger({ triggerKind: SignatureHelpTriggerKind.ContentChange });
+            this.trigger({ triggerKind: languages.SignatureHelpTriggerKind.ContentChange });
         }
     }
     onEditorConfigurationChange() {
-        this.triggerOnType = this.editor.getOption(98 /* EditorOption.parameterHints */).enabled;
+        this.triggerOnType = this.editor.getOption(86 /* EditorOption.parameterHints */).enabled;
         if (!this.triggerOnType) {
             this.cancel();
         }
@@ -241,18 +239,17 @@ class ParameterHintsModel extends Disposable {
         super.dispose();
     }
 }
+ParameterHintsModel.DEFAULT_DELAY = 120; // ms
 function mergeTriggerContexts(previous, current) {
     switch (current.triggerKind) {
-        case SignatureHelpTriggerKind.Invoke:
+        case languages.SignatureHelpTriggerKind.Invoke:
             // Invoke overrides previous triggers.
             return current;
-        case SignatureHelpTriggerKind.ContentChange:
+        case languages.SignatureHelpTriggerKind.ContentChange:
             // Ignore content changes triggers
             return previous;
-        case SignatureHelpTriggerKind.TriggerCharacter:
+        case languages.SignatureHelpTriggerKind.TriggerCharacter:
         default:
             return current;
     }
 }
-
-export { ParameterHintsModel };

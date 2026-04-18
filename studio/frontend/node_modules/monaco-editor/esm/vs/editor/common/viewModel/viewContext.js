@@ -1,10 +1,9 @@
-import { EditorTheme } from '../editorTheme.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ViewContext {
+import { EditorTheme } from '../editorTheme.js';
+export class ViewContext {
     constructor(configuration, theme, model) {
         this.configuration = configuration;
         this.theme = new EditorTheme(theme);
@@ -18,5 +17,3 @@ class ViewContext {
         this.viewModel.removeViewEventHandler(eventHandler);
     }
 }
-
-export { ViewContext };

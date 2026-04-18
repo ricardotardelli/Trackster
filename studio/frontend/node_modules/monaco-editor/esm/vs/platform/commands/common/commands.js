@@ -1,16 +1,15 @@
-import { Emitter } from '../../../base/common/event.js';
-import { Iterable } from '../../../base/common/iterator.js';
-import { markAsSingleton, toDisposable } from '../../../base/common/lifecycle.js';
-import { LinkedList } from '../../../base/common/linkedList.js';
-import { validateConstraints } from '../../../base/common/types.js';
-import { createDecorator } from '../../instantiation/common/instantiation.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-const ICommandService = createDecorator('commandService');
-const CommandsRegistry = new class {
+import { Emitter } from '../../../base/common/event.js';
+import { Iterable } from '../../../base/common/iterator.js';
+import { toDisposable } from '../../../base/common/lifecycle.js';
+import { LinkedList } from '../../../base/common/linkedList.js';
+import { validateConstraints } from '../../../base/common/types.js';
+import { createDecorator } from '../../instantiation/common/instantiation.js';
+export const ICommandService = createDecorator('commandService');
+export const CommandsRegistry = new class {
     constructor() {
         this._commands = new Map();
         this._onDidRegisterCommand = new Emitter();
@@ -49,13 +48,13 @@ const CommandsRegistry = new class {
         const ret = toDisposable(() => {
             removeFn();
             const command = this._commands.get(id);
-            if (command?.isEmpty()) {
+            if (command === null || command === void 0 ? void 0 : command.isEmpty()) {
                 this._commands.delete(id);
             }
         });
         // tell the world about this command
         this._onDidRegisterCommand.fire(id);
-        return markAsSingleton(ret);
+        return ret;
     }
     registerCommandAlias(oldId, newId) {
         return CommandsRegistry.registerCommand(oldId, (accessor, ...args) => accessor.get(ICommandService).executeCommand(newId, ...args));
@@ -79,5 +78,3 @@ const CommandsRegistry = new class {
     }
 };
 CommandsRegistry.registerCommand('noop', () => { });
-
-export { CommandsRegistry, ICommandService };

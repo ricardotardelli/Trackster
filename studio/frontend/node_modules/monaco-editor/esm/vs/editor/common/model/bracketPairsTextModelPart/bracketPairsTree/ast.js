@@ -1,12 +1,11 @@
-import { BugIndicatingError } from '../../../../../base/common/errors.js';
-import { CursorColumns } from '../../../core/cursorColumns.js';
-import { lengthToObj, lengthGetLineCount, lengthAdd, lengthZero } from './length.js';
-import { SmallImmutableSet } from './smallImmutableSet.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { BugIndicatingError } from '../../../../../base/common/errors.js';
+import { CursorColumns } from '../../../core/cursorColumns.js';
+import { lengthAdd, lengthGetLineCount, lengthToObj, lengthZero } from './length.js';
+import { SmallImmutableSet } from './smallImmutableSet.js';
 /**
  * The base implementation for all AST nodes.
 */
@@ -26,7 +25,7 @@ class BaseAstNode {
  * Might be unclosed.
  * Immutable, if all children are immutable.
 */
-class PairAstNode extends BaseAstNode {
+export class PairAstNode extends BaseAstNode {
     static create(openingBracket, child, closingBracket) {
         let length = openingBracket.length;
         if (child) {
@@ -96,7 +95,7 @@ class PairAstNode extends BaseAstNode {
         return this.child ? this.child.computeMinIndentation(lengthAdd(offset, this.openingBracket.length), textModel) : Number.MAX_SAFE_INTEGER;
     }
 }
-class ListAstNode extends BaseAstNode {
+export class ListAstNode extends BaseAstNode {
     /**
      * This method uses more memory-efficient list nodes that can only store 2 or 3 children.
     */
@@ -400,7 +399,7 @@ class ImmutableLeafAstNode extends BaseAstNode {
         return this;
     }
 }
-class TextAstNode extends ImmutableLeafAstNode {
+export class TextAstNode extends ImmutableLeafAstNode {
     get kind() {
         return 0 /* AstNodeKind.Text */;
     }
@@ -429,7 +428,7 @@ class TextAstNode extends ImmutableLeafAstNode {
         return result;
     }
 }
-class BracketAstNode extends ImmutableLeafAstNode {
+export class BracketAstNode extends ImmutableLeafAstNode {
     static create(length, bracketInfo, bracketIds) {
         const node = new BracketAstNode(length, bracketInfo, bracketIds);
         return node;
@@ -466,7 +465,7 @@ class BracketAstNode extends ImmutableLeafAstNode {
         return Number.MAX_SAFE_INTEGER;
     }
 }
-class InvalidBracketAstNode extends ImmutableLeafAstNode {
+export class InvalidBracketAstNode extends ImmutableLeafAstNode {
     get kind() {
         return 3 /* AstNodeKind.UnexpectedClosingBracket */;
     }
@@ -481,5 +480,3 @@ class InvalidBracketAstNode extends ImmutableLeafAstNode {
         return Number.MAX_SAFE_INTEGER;
     }
 }
-
-export { BracketAstNode, InvalidBracketAstNode, ListAstNode, PairAstNode, TextAstNode };

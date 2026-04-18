@@ -14,7 +14,7 @@
  * To make matters more complicated, an extension can optionally have an UUID. When two
  * extensions have the same UUID, they are considered equal even if their identifier is different.
  */
-class ExtensionIdentifier {
+export class ExtensionIdentifier {
     constructor(value) {
         this.value = value;
         this._lower = value.toLowerCase();
@@ -29,7 +29,7 @@ class ExtensionIdentifier {
         return id._lower;
     }
 }
-class ExtensionIdentifierSet {
+export class ExtensionIdentifierSet {
     constructor(iterable) {
         this._set = new Set();
         if (iterable) {
@@ -45,5 +45,3 @@ class ExtensionIdentifierSet {
         return this._set.has(ExtensionIdentifier.toKey(id));
     }
 }
-
-export { ExtensionIdentifier, ExtensionIdentifierSet };

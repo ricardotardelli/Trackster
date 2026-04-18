@@ -1,32 +1,29 @@
-import './inspectTokens.css';
-import { reset, $, append } from '../../../../base/browser/dom.js';
-import { Color } from '../../../../base/common/color.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { registerEditorContribution, registerEditorAction, EditorAction } from '../../../browser/editorExtensions.js';
-import { TokenizationRegistry } from '../../../common/languages.js';
-import { TokenMetadata } from '../../../common/encodedTokenAttributes.js';
-import { nullTokenizeEncoded, nullTokenize, NullState } from '../../../common/languages/nullTokenize.js';
-import { ILanguageService } from '../../../common/languages/language.js';
-import { IStandaloneThemeService } from '../../common/standaloneTheme.js';
-import { InspectTokensNLS } from '../../../common/standaloneStrings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 var InspectTokensController_1;
-let InspectTokensController = class InspectTokensController extends Disposable {
-    static { InspectTokensController_1 = this; }
-    static { this.ID = 'editor.contrib.inspectTokens'; }
+import './inspectTokens.css';
+import { $, append, reset } from '../../../../base/browser/dom.js';
+import { Color } from '../../../../base/common/color.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { EditorAction, registerEditorAction, registerEditorContribution } from '../../../browser/editorExtensions.js';
+import { TokenizationRegistry } from '../../../common/languages.js';
+import { TokenMetadata } from '../../../common/encodedTokenAttributes.js';
+import { NullState, nullTokenize, nullTokenizeEncoded } from '../../../common/languages/nullTokenize.js';
+import { ILanguageService } from '../../../common/languages/language.js';
+import { IStandaloneThemeService } from '../../common/standaloneTheme.js';
+import { InspectTokensNLS } from '../../../common/standaloneStrings.js';
+let InspectTokensController = InspectTokensController_1 = class InspectTokensController extends Disposable {
     static get(editor) {
         return editor.getContribution(InspectTokensController_1.ID);
     }
@@ -60,6 +57,7 @@ let InspectTokensController = class InspectTokensController extends Disposable {
         }
     }
 };
+InspectTokensController.ID = 'editor.contrib.inspectTokens';
 InspectTokensController = InspectTokensController_1 = __decorate([
     __param(1, IStandaloneThemeService),
     __param(2, ILanguageService)
@@ -75,7 +73,7 @@ class InspectTokens extends EditorAction {
     }
     run(accessor, editor) {
         const controller = InspectTokensController.get(editor);
-        controller?.launch();
+        controller === null || controller === void 0 ? void 0 : controller.launch();
     }
 }
 function renderTokenText(tokenText) {
@@ -108,7 +106,6 @@ function getSafeTokenizationSupport(languageIdCodec, languageId) {
     };
 }
 class InspectTokensWidget extends Disposable {
-    static { this._ID = 'editor.contrib.inspectTokensWidget'; }
     constructor(editor, languageService) {
         super();
         // Editor.IContentWidget.allowEditorOverflow
@@ -236,5 +233,6 @@ class InspectTokensWidget extends Disposable {
         };
     }
 }
+InspectTokensWidget._ID = 'editor.contrib.inspectTokensWidget';
 registerEditorContribution(InspectTokensController.ID, InspectTokensController, 4 /* EditorContributionInstantiation.Lazy */);
 registerEditorAction(InspectTokens);

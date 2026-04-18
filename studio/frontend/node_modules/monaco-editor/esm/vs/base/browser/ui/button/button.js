@@ -1,8 +1,10 @@
-import { EventType, addDisposableListener, EventHelper, trackFocus, reset } from '../../dom.js';
+import { addDisposableListener, EventHelper, EventType, reset, trackFocus } from '../../dom.js';
+import { sanitize } from '../../dompurify/dompurify.js';
 import { StandardKeyboardEvent } from '../../keyboardEvent.js';
-import { renderMarkdown, renderAsPlaintext } from '../../markdownRenderer.js';
-import { Gesture, EventType as EventType$1 } from '../../touch.js';
-import { getDefaultHoverDelegate } from '../hover/hoverDelegateFactory.js';
+import { renderMarkdown, renderStringAsPlaintext } from '../../markdownRenderer.js';
+import { Gesture, EventType as TouchEventType } from '../../touch.js';
+import { getDefaultHoverDelegate } from '../hover/hoverDelegate.js';
+import { setupCustomHover } from '../iconLabel/iconLabelHover.js';
 import { renderLabelWithIcons } from '../iconLabel/iconLabels.js';
 import { Color } from '../../../common/color.js';
 import { Emitter } from '../../../common/event.js';
@@ -10,22 +12,17 @@ import { isMarkdownString, markdownStringEqual } from '../../../common/htmlConte
 import { Disposable } from '../../../common/lifecycle.js';
 import { ThemeIcon } from '../../../common/themables.js';
 import './button.css';
-import { getBaseLayerHoverDelegate } from '../hover/hoverDelegate2.js';
-import { safeSetInnerHtml } from '../../domSanitize.js';
-
-({
+export const unthemedButtonStyles = {
+    buttonBackground: '#0E639C',
+    buttonHoverBackground: '#006BB3',
     buttonSeparator: Color.white.toString(),
-    buttonForeground: Color.white.toString()});
-// Only allow a very limited set of inline html tags
-const buttonSanitizerConfig = Object.freeze({
-    allowedTags: {
-        override: ['b', 'i', 'u', 'code', 'span'],
-    },
-    allowedAttributes: {
-        override: ['class'],
-    },
-});
-class Button extends Disposable {
+    buttonForeground: Color.white.toString(),
+    buttonBorder: undefined,
+    buttonSecondaryBackground: undefined,
+    buttonSecondaryForeground: undefined,
+    buttonSecondaryHoverBackground: undefined
+};
+export class Button extends Disposable {
     get onDidClick() { return this._onDidClick.event; }
     constructor(container, options) {
         super();
@@ -51,16 +48,12 @@ class Button extends Disposable {
             this._element.appendChild(this._labelElement);
             this._element.classList.add('monaco-text-button-with-short-label');
         }
-        if (typeof options.title === 'string') {
-            this.setTitle(options.title);
-        }
         if (typeof options.ariaLabel === 'string') {
             this._element.setAttribute('aria-label', options.ariaLabel);
         }
         container.appendChild(this._element);
-        this.enabled = !options.disabled;
         this._register(Gesture.addTarget(this._element));
-        [EventType.CLICK, EventType$1.Tap].forEach(eventType => {
+        [EventType.CLICK, TouchEventType.Tap].forEach(eventType => {
             this._register(addDisposableListener(this._element, eventType, e => {
                 if (!this.enabled) {
                     EventHelper.stop(e);
@@ -142,6 +135,7 @@ class Button extends Disposable {
         return this._element;
     }
     set label(value) {
+        var _a;
         if (this._label === value) {
             return;
         }
@@ -151,13 +145,14 @@ class Button extends Disposable {
         this._element.classList.add('monaco-text-button');
         const labelElement = this.options.supportShortLabel ? this._labelElement : this._element;
         if (isMarkdownString(value)) {
-            const rendered = renderMarkdown(value, undefined, document.createElement('span'));
+            const rendered = renderMarkdown(value, { inline: true });
             rendered.dispose();
             // Don't include outer `<p>`
-            // eslint-disable-next-line no-restricted-syntax
-            const root = rendered.element.querySelector('p')?.innerHTML;
+            const root = (_a = rendered.element.querySelector('p')) === null || _a === void 0 ? void 0 : _a.innerHTML;
             if (root) {
-                safeSetInnerHtml(labelElement, root, buttonSanitizerConfig);
+                // Only allow a very limited set of inline html tags
+                const sanitized = sanitize(root, { ADD_TAGS: ['b', 'i', 'u', 'code', 'span'], ALLOWED_ATTR: ['class'], RETURN_TRUSTED_TYPE: true });
+                labelElement.innerHTML = sanitized;
             }
             else {
                 reset(labelElement);
@@ -176,27 +171,26 @@ class Button extends Disposable {
             title = this.options.title;
         }
         else if (this.options.title) {
-            title = renderAsPlaintext(value);
+            title = renderStringAsPlaintext(value);
         }
-        this.setTitle(title);
-        this._setAriaLabel();
+        if (!this._hover) {
+            this._hover = this._register(setupCustomHover(getDefaultHoverDelegate('mouse'), this._element, title));
+        }
+        else {
+            this._hover.update(title);
+        }
+        if (typeof this.options.ariaLabel === 'string') {
+            this._element.setAttribute('aria-label', this.options.ariaLabel);
+        }
+        else if (this.options.ariaLabel) {
+            this._element.setAttribute('aria-label', this._element.title);
+        }
         this._label = value;
     }
     get label() {
         return this._label;
     }
-    _setAriaLabel() {
-        if (typeof this.options.ariaLabel === 'string') {
-            this._element.setAttribute('aria-label', this.options.ariaLabel);
-        }
-        else if (typeof this.options.title === 'string') {
-            this._element.setAttribute('aria-label', this.options.title);
-        }
-    }
     set icon(icon) {
-        this._setAriaLabel();
-        const oldIcons = Array.from(this._element.classList).filter(item => item.startsWith('codicon-'));
-        this._element.classList.remove(...oldIcons);
         this._element.classList.add(...ThemeIcon.asClassNameArray(icon));
     }
     set enabled(value) {
@@ -213,14 +207,4 @@ class Button extends Disposable {
     get enabled() {
         return !this._element.classList.contains('disabled');
     }
-    setTitle(title) {
-        if (!this._hover && title !== '') {
-            this._hover = this._register(getBaseLayerHoverDelegate().setupManagedHover(this.options.hoverDelegate ?? getDefaultHoverDelegate('element'), this._element, title));
-        }
-        else if (this._hover) {
-            this._hover.update(title);
-        }
-    }
 }
-
-export { Button };

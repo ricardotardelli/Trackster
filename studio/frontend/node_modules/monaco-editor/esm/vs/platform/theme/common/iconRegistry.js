@@ -1,25 +1,22 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { RunOnceScheduler } from '../../../base/common/async.js';
-import { Codicon } from '../../../base/common/codicons.js';
-import { getCodiconFontCharacters } from '../../../base/common/codiconsUtil.js';
+import { Codicon, getCodiconFontCharacters } from '../../../base/common/codicons.js';
 import { ThemeIcon } from '../../../base/common/themables.js';
 import { Emitter } from '../../../base/common/event.js';
 import { isString } from '../../../base/common/types.js';
 import { URI } from '../../../base/common/uri.js';
 import { localize } from '../../../nls.js';
-import { Extensions as Extensions$1 } from '../../jsonschemas/common/jsonContributionRegistry.js';
-import { Registry } from '../../registry/common/platform.js';
-import { Disposable } from '../../../base/common/lifecycle.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
+import { Extensions as JSONExtensions } from '../../jsonschemas/common/jsonContributionRegistry.js';
+import * as platform from '../../registry/common/platform.js';
 //  ------ API types
 // icon registry
-const Extensions = {
+export const Extensions = {
     IconContribution: 'base.contributions.icons'
 };
-var IconContribution;
+export var IconContribution;
 (function (IconContribution) {
     function getDefinition(contribution, registry) {
         let definition = contribution.defaults;
@@ -34,7 +31,7 @@ var IconContribution;
     }
     IconContribution.getDefinition = getDefinition;
 })(IconContribution || (IconContribution = {}));
-var IconFontDefinition;
+export var IconFontDefinition;
 (function (IconFontDefinition) {
     function toJSONObject(iconFont) {
         return {
@@ -57,21 +54,17 @@ var IconFontDefinition;
     }
     IconFontDefinition.fromJSONObject = fromJSONObject;
 })(IconFontDefinition || (IconFontDefinition = {}));
-// regexes for validation of font properties
-const fontIdRegex = /^([\w_-]+)$/;
-const fontIdErrorMessage = localize(2024, 'The font ID must only contain letters, numbers, underscores and dashes.');
-class IconRegistry extends Disposable {
+class IconRegistry {
     constructor() {
-        super();
-        this._onDidChange = this._register(new Emitter());
+        this._onDidChange = new Emitter();
         this.onDidChange = this._onDidChange.event;
         this.iconSchema = {
             definitions: {
                 icons: {
                     type: 'object',
                     properties: {
-                        fontId: { type: 'string', description: localize(2025, 'The id of the font to use. If not set, the font that is defined first is used.'), pattern: fontIdRegex.source, patternErrorMessage: fontIdErrorMessage },
-                        fontCharacter: { type: 'string', description: localize(2026, 'The font character associated with the icon definition.') }
+                        fontId: { type: 'string', description: localize('iconDefinition.fontId', 'The id of the font to use. If not set, the font that is defined first is used.') },
+                        fontCharacter: { type: 'string', description: localize('iconDefinition.fontCharacter', 'The font character associated with the icon definition.') }
                     },
                     additionalProperties: false,
                     defaultSnippets: [{ body: { fontCharacter: '\\\\e030' } }]
@@ -148,11 +141,11 @@ class IconRegistry extends Disposable {
     }
 }
 const iconRegistry = new IconRegistry();
-Registry.add(Extensions.IconContribution, iconRegistry);
-function registerIcon(id, defaults, description, deprecationMessage) {
+platform.Registry.add(Extensions.IconContribution, iconRegistry);
+export function registerIcon(id, defaults, description, deprecationMessage) {
     return iconRegistry.registerIcon(id, defaults, description, deprecationMessage);
 }
-function getIconRegistry() {
+export function getIconRegistry() {
     return iconRegistry;
 }
 function initialize() {
@@ -163,8 +156,8 @@ function initialize() {
     }
 }
 initialize();
-const iconsSchemaId = 'vscode://schemas/icons';
-const schemaRegistry = Registry.as(Extensions$1.JSONContribution);
+export const iconsSchemaId = 'vscode://schemas/icons';
+const schemaRegistry = platform.Registry.as(JSONExtensions.JSONContribution);
 schemaRegistry.registerSchema(iconsSchemaId, iconRegistry.getIconSchema());
 const delayer = new RunOnceScheduler(() => schemaRegistry.notifySchemaChanged(iconsSchemaId), 200);
 iconRegistry.onDidChange(() => {
@@ -174,10 +167,8 @@ iconRegistry.onDidChange(() => {
 });
 //setTimeout(_ => console.log(iconRegistry.toString()), 5000);
 // common icons
-const widgetClose = registerIcon('widget-close', Codicon.close, localize(2027, 'Icon for the close action in widgets.'));
-registerIcon('goto-previous-location', Codicon.arrowUp, localize(2028, 'Icon for goto previous editor location.'));
-registerIcon('goto-next-location', Codicon.arrowDown, localize(2029, 'Icon for goto next editor location.'));
-ThemeIcon.modify(Codicon.sync, 'spin');
-ThemeIcon.modify(Codicon.loading, 'spin');
-
-export { Extensions, IconContribution, IconFontDefinition, fontIdErrorMessage, fontIdRegex, getIconRegistry, iconsSchemaId, registerIcon, widgetClose };
+export const widgetClose = registerIcon('widget-close', Codicon.close, localize('widgetClose', 'Icon for the close action in widgets.'));
+export const gotoPreviousLocation = registerIcon('goto-previous-location', Codicon.arrowUp, localize('previousChangeIcon', 'Icon for goto previous editor location.'));
+export const gotoNextLocation = registerIcon('goto-next-location', Codicon.arrowDown, localize('nextChangeIcon', 'Icon for goto next editor location.'));
+export const syncing = ThemeIcon.modify(Codicon.sync, 'spin');
+export const spinningLoading = ThemeIcon.modify(Codicon.loading, 'spin');

@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ColorZone {
+export class ColorZone {
     constructor(from, to, colorId) {
         this._colorZoneBrand = undefined;
         this.from = from | 0;
@@ -22,7 +22,7 @@ class ColorZone {
 /**
  * A zone in the overview ruler
  */
-class OverviewRulerZone {
+export class OverviewRulerZone {
     constructor(startLineNumber, endLineNumber, heightInLines, color) {
         this._overviewRulerZoneBrand = undefined;
         this.startLineNumber = startLineNumber;
@@ -50,7 +50,7 @@ class OverviewRulerZone {
         return this._colorZone;
     }
 }
-class OverviewZoneManager {
+export class OverviewZoneManager {
     constructor(getVerticalOffsetForLine) {
         this._getVerticalOffsetForLine = getVerticalOffsetForLine;
         this._zones = [];
@@ -172,5 +172,3 @@ class OverviewZoneManager {
         return allColorZones;
     }
 }
-
-export { ColorZone, OverviewRulerZone, OverviewZoneManager };

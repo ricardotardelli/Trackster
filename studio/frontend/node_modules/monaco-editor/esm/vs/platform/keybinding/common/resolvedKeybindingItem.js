@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ResolvedKeybindingItem {
+export class ResolvedKeybindingItem {
     constructor(resolvedKeybinding, command, commandArgs, when, isDefault, extensionId, isBuiltinExtension) {
         this._resolvedKeybindingItemBrand = undefined;
         this.resolvedKeybinding = resolvedKeybinding;
@@ -20,7 +20,7 @@ class ResolvedKeybindingItem {
         this.isBuiltinExtension = isBuiltinExtension;
     }
 }
-function toEmptyArrayIfContainsNull(arr) {
+export function toEmptyArrayIfContainsNull(arr) {
     const result = [];
     for (let i = 0, len = arr.length; i < len; i++) {
         const element = arr[i];
@@ -31,5 +31,3 @@ function toEmptyArrayIfContainsNull(arr) {
     }
     return result;
 }
-
-export { ResolvedKeybindingItem, toEmptyArrayIfContainsNull };

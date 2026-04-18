@@ -1,36 +1,34 @@
-import { isWebKit, isFirefox, isSafari, isWebkitWebView } from '../../../base/browser/browser.js';
-import { equals } from '../../../base/common/arrays.js';
-import { Emitter } from '../../../base/common/event.js';
-import { Disposable } from '../../../base/common/lifecycle.js';
-import { deepClone } from '../../../base/common/objects.js';
-import { isMacintosh } from '../../../base/common/platform.js';
-import { ElementSizeObserver } from './elementSizeObserver.js';
-import { FontMeasurements } from './fontMeasurements.js';
-import { migrateOptions } from './migrateOptions.js';
-import { TabFocus } from './tabFocus.js';
-import { ComputeOptionsMemory, editorOptionsRegistry, ConfigurationChangedEvent } from '../../common/config/editorOptions.js';
-import { EditorZoom } from '../../common/config/editorZoom.js';
-import { createBareFontInfoFromValidatedSettings } from '../../common/config/fontInfoFromSettings.js';
-import { IAccessibilityService } from '../../../platform/accessibility/common/accessibility.js';
-import { getWindow, getWindowById } from '../../../base/browser/dom.js';
-import { PixelRatio } from '../../../base/browser/pixelRatio.js';
-import { InputMode } from '../../common/inputMode.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+import * as browser from '../../../base/browser/browser.js';
+import * as arrays from '../../../base/common/arrays.js';
+import { Emitter } from '../../../base/common/event.js';
+import { Disposable } from '../../../base/common/lifecycle.js';
+import * as objects from '../../../base/common/objects.js';
+import * as platform from '../../../base/common/platform.js';
+import { ElementSizeObserver } from './elementSizeObserver.js';
+import { FontMeasurements } from './fontMeasurements.js';
+import { migrateOptions } from './migrateOptions.js';
+import { TabFocus } from './tabFocus.js';
+import { ComputeOptionsMemory, ConfigurationChangedEvent, editorOptionsRegistry } from '../../common/config/editorOptions.js';
+import { EditorZoom } from '../../common/config/editorZoom.js';
+import { BareFontInfo } from '../../common/config/fontInfo.js';
+import { IAccessibilityService } from '../../../platform/accessibility/common/accessibility.js';
+import { getWindow, getWindowById } from '../../../base/browser/dom.js';
+import { PixelRatio } from '../../../base/browser/pixelRatio.js';
 let EditorConfiguration = class EditorConfiguration extends Disposable {
-    constructor(isSimpleWidget, contextMenuId, options, container, _accessibilityService) {
+    constructor(isSimpleWidget, options, container, _accessibilityService) {
         super();
         this._accessibilityService = _accessibilityService;
         this._onDidChange = this._register(new Emitter());
@@ -44,13 +42,12 @@ let EditorConfiguration = class EditorConfiguration extends Disposable {
         this._glyphMarginDecorationLaneCount = 1;
         this._computeOptionsMemory = new ComputeOptionsMemory();
         this.isSimpleWidget = isSimpleWidget;
-        this.contextMenuId = contextMenuId;
         this._containerObserver = this._register(new ElementSizeObserver(container, options.dimension));
         this._targetWindowId = getWindow(container).vscodeWindowId;
         this._rawOptions = deepCloneAndMigrateOptions(options);
         this._validatedOptions = EditorOptionsUtil.validateOptions(this._rawOptions);
         this.options = this._computeOptions();
-        if (this.options.get(19 /* EditorOption.automaticLayout */)) {
+        if (this.options.get(13 /* EditorOption.automaticLayout */)) {
             this._containerObserver.startObserving();
         }
         this._register(EditorZoom.onDidChangeZoomLevel(() => this._recomputeOptions()));
@@ -59,7 +56,6 @@ let EditorConfiguration = class EditorConfiguration extends Disposable {
         this._register(FontMeasurements.onDidChange(() => this._recomputeOptions()));
         this._register(PixelRatio.getInstance(getWindow(container)).onDidChange(() => this._recomputeOptions()));
         this._register(this._accessibilityService.onDidChangeScreenReaderOptimized(() => this._recomputeOptions()));
-        this._register(InputMode.onDidChangeInputMode(() => this._recomputeOptions()));
     }
     _recomputeOptions() {
         const newOptions = this._computeOptions();
@@ -74,7 +70,7 @@ let EditorConfiguration = class EditorConfiguration extends Disposable {
     }
     _computeOptions() {
         const partialEnv = this._readEnvConfiguration();
-        const bareFontInfo = createBareFontInfoFromValidatedSettings(this._validatedOptions, partialEnv.pixelRatio, this.isSimpleWidget);
+        const bareFontInfo = BareFontInfo.createFromValidatedSettings(this._validatedOptions, partialEnv.pixelRatio, this.isSimpleWidget);
         const fontInfo = this._readFontInfo(bareFontInfo);
         const env = {
             memory: this._computeOptionsMemory,
@@ -87,11 +83,9 @@ let EditorConfiguration = class EditorConfiguration extends Disposable {
             lineNumbersDigitCount: this._lineNumbersDigitCount,
             emptySelectionClipboard: partialEnv.emptySelectionClipboard,
             pixelRatio: partialEnv.pixelRatio,
-            tabFocusMode: this._validatedOptions.get(164 /* EditorOption.tabFocusMode */) || TabFocus.getTabFocusMode(),
-            inputMode: InputMode.getInputMode(),
+            tabFocusMode: TabFocus.getTabFocusMode(),
             accessibilitySupport: partialEnv.accessibilitySupport,
-            glyphMarginDecorationLaneCount: this._glyphMarginDecorationLaneCount,
-            editContextSupported: partialEnv.editContextSupported
+            glyphMarginDecorationLaneCount: this._glyphMarginDecorationLaneCount
         };
         return EditorOptionsUtil.computeOptions(this._validatedOptions, env);
     }
@@ -100,10 +94,8 @@ let EditorConfiguration = class EditorConfiguration extends Disposable {
             extraEditorClassName: getExtraEditorClassName(),
             outerWidth: this._containerObserver.getWidth(),
             outerHeight: this._containerObserver.getHeight(),
-            emptySelectionClipboard: isWebKit || isFirefox,
+            emptySelectionClipboard: browser.isWebKit || browser.isFirefox,
             pixelRatio: PixelRatio.getInstance(getWindowById(this._targetWindowId, true).window).value,
-            // eslint-disable-next-line local/code-no-any-casts, @typescript-eslint/no-explicit-any
-            editContextSupported: typeof globalThis.EditContext === 'function',
             accessibilitySupport: (this._accessibilityService.isScreenReaderOptimized()
                 ? 2 /* AccessibilitySupport.Enabled */
                 : this._accessibilityService.getAccessibilitySupport())
@@ -165,8 +157,9 @@ let EditorConfiguration = class EditorConfiguration extends Disposable {
     }
 };
 EditorConfiguration = __decorate([
-    __param(4, IAccessibilityService)
+    __param(3, IAccessibilityService)
 ], EditorConfiguration);
+export { EditorConfiguration };
 function digitCount(n) {
     let r = 0;
     while (n) {
@@ -177,16 +170,16 @@ function digitCount(n) {
 }
 function getExtraEditorClassName() {
     let extra = '';
-    if (isSafari || isWebkitWebView) {
+    if (!browser.isSafari && !browser.isWebkitWebView) {
+        // Use user-select: none in all browsers except Safari and native macOS WebView
+        extra += 'no-user-select ';
+    }
+    if (browser.isSafari) {
         // See https://github.com/microsoft/vscode/issues/108822
         extra += 'no-minimap-shadow ';
         extra += 'enable-user-select ';
     }
-    else {
-        // Use user-select: none in all browsers except Safari and native macOS WebView
-        extra += 'no-user-select ';
-    }
-    if (isMacintosh) {
+    if (platform.isMacintosh) {
         extra += 'mac ';
     }
     return extra;
@@ -205,7 +198,7 @@ class ValidatedEditorOptions {
         this._values[option] = value;
     }
 }
-class ComputedEditorOptions {
+export class ComputedEditorOptions {
     constructor() {
         this._values = [];
     }
@@ -243,7 +236,7 @@ class EditorOptionsUtil {
             return a === b;
         }
         if (Array.isArray(a) || Array.isArray(b)) {
-            return (Array.isArray(a) && Array.isArray(b) ? equals(a, b) : false);
+            return (Array.isArray(a) && Array.isArray(b) ? arrays.equals(a, b) : false);
         }
         if (Object.keys(a).length !== Object.keys(b).length) {
             return false;
@@ -284,9 +277,7 @@ class EditorOptionsUtil {
     }
 }
 function deepCloneAndMigrateOptions(_options) {
-    const options = deepClone(_options);
+    const options = objects.deepClone(_options);
     migrateOptions(options);
     return options;
 }
-
-export { ComputedEditorOptions, EditorConfiguration };

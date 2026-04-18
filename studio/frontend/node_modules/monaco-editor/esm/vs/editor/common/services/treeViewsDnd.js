@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class TreeViewsDnDService {
+export class TreeViewsDnDService {
     constructor() {
         this._dragOperations = new Map();
     }
@@ -15,10 +15,8 @@ class TreeViewsDnDService {
         return undefined;
     }
 }
-class DraggedTreeItemsIdentifier {
+export class DraggedTreeItemsIdentifier {
     constructor(identifier) {
         this.identifier = identifier;
     }
 }
-
-export { DraggedTreeItemsIdentifier, TreeViewsDnDService };

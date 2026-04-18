@@ -1,37 +1,35 @@
-import { safeIntl } from './date.js';
-import { Lazy } from './lazy.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Lazy } from './lazy.js';
 // When comparing large numbers of strings it's better for performance to create an
 // Intl.Collator object and use the function provided by its compare property
 // than it is to use String.prototype.localeCompare()
 // A collator with numeric sorting enabled, and no sensitivity to case, accents or diacritics.
 const intlFileNameCollatorBaseNumeric = new Lazy(() => {
-    const collator = safeIntl.Collator(undefined, { numeric: true, sensitivity: 'base' }).value;
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     return {
         collator,
         collatorIsNumeric: collator.resolvedOptions().numeric
     };
 });
 // A collator with numeric sorting enabled.
-new Lazy(() => {
-    const collator = safeIntl.Collator(undefined, { numeric: true }).value;
+const intlFileNameCollatorNumeric = new Lazy(() => {
+    const collator = new Intl.Collator(undefined, { numeric: true });
     return {
         collator
     };
 });
 // A collator with numeric sorting enabled, and sensitivity to accents and diacritics but not case.
-new Lazy(() => {
-    const collator = safeIntl.Collator(undefined, { numeric: true, sensitivity: 'accent' }).value;
+const intlFileNameCollatorNumericCaseInsensitive = new Lazy(() => {
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'accent' });
     return {
         collator
     };
 });
 /** Compares filenames without distinguishing the name from the extension. Disambiguates by unicode comparison. */
-function compareFileNames(one, other, caseSensitive = false) {
+export function compareFileNames(one, other, caseSensitive = false) {
     const a = one || '';
     const b = other || '';
     const result = intlFileNameCollatorBaseNumeric.value.collator.compare(a, b);
@@ -41,7 +39,7 @@ function compareFileNames(one, other, caseSensitive = false) {
     }
     return result;
 }
-function compareAnything(one, other, lookFor) {
+export function compareAnything(one, other, lookFor) {
     const elementAName = one.toLowerCase();
     const elementBName = other.toLowerCase();
     // Sort prefix matches over non prefix matches
@@ -63,7 +61,7 @@ function compareAnything(one, other, lookFor) {
     // Compare by name
     return elementAName.localeCompare(elementBName);
 }
-function compareByPrefix(one, other, lookFor) {
+export function compareByPrefix(one, other, lookFor) {
     const elementAName = one.toLowerCase();
     const elementBName = other.toLowerCase();
     // Sort prefix matches over non prefix matches
@@ -83,5 +81,3 @@ function compareByPrefix(one, other, lookFor) {
     }
     return 0;
 }
-
-export { compareAnything, compareByPrefix, compareFileNames };

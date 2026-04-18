@@ -1,22 +1,21 @@
-import { isFirefox } from '../../browser.js';
-import { DataTransfers } from '../../dnd.js';
-import { addDisposableListener, EventType, EventHelper } from '../../dom.js';
-import { Gesture, EventType as EventType$1 } from '../../touch.js';
-import { getDefaultHoverDelegate } from '../hover/hoverDelegateFactory.js';
-import { SelectBox } from '../selectBox/selectBox.js';
-import { Action, ActionRunner, Separator } from '../../../common/actions.js';
-import { Disposable } from '../../../common/lifecycle.js';
-import { isMacintosh } from '../../../common/platform.js';
-import { isUndefinedOrNull, assertType } from '../../../common/types.js';
-import './actionbar.css';
-import { localize } from '../../../../nls.js';
-import { getBaseLayerHoverDelegate } from '../hover/hoverDelegate2.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class BaseActionViewItem extends Disposable {
+import { isFirefox } from '../../browser.js';
+import { DataTransfers } from '../../dnd.js';
+import { addDisposableListener, EventHelper, EventType } from '../../dom.js';
+import { EventType as TouchEventType, Gesture } from '../../touch.js';
+import { getDefaultHoverDelegate } from '../hover/hoverDelegate.js';
+import { setupCustomHover } from '../iconLabel/iconLabelHover.js';
+import { SelectBox } from '../selectBox/selectBox.js';
+import { Action, ActionRunner, Separator } from '../../../common/actions.js';
+import { Disposable } from '../../../common/lifecycle.js';
+import * as platform from '../../../common/platform.js';
+import * as types from '../../../common/types.js';
+import './actionbar.css';
+import * as nls from '../../../../nls.js';
+export class BaseActionViewItem extends Disposable {
     get action() {
         return this._action;
     }
@@ -77,10 +76,10 @@ class BaseActionViewItem extends Disposable {
             container.draggable = true;
             if (isFirefox) {
                 // Firefox: requires to set a text data transfer to get going
-                this._register(addDisposableListener(container, EventType.DRAG_START, e => e.dataTransfer?.setData(DataTransfers.TEXT, this._action.label)));
+                this._register(addDisposableListener(container, EventType.DRAG_START, e => { var _a; return (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.setData(DataTransfers.TEXT, this._action.label); }));
             }
         }
-        this._register(addDisposableListener(element, EventType$1.Tap, e => this.onClick(e, true))); // Preserve focus on tap #125470
+        this._register(addDisposableListener(element, TouchEventType.Tap, e => this.onClick(e, true))); // Preserve focus on tap #125470
         this._register(addDisposableListener(element, EventType.MOUSE_DOWN, e => {
             if (!enableDragging) {
                 EventHelper.stop(e, true); // do not run when dragging is on because that would disable it
@@ -89,7 +88,7 @@ class BaseActionViewItem extends Disposable {
                 element.classList.add('active');
             }
         }));
-        if (isMacintosh) {
+        if (platform.isMacintosh) {
             // macOS: allow to trigger the button when holding Ctrl+key and pressing the
             // main mouse button. This is for scenarios where e.g. some interaction forces
             // the Ctrl+key to be pressed and hold but the user still wants to interact
@@ -118,8 +117,9 @@ class BaseActionViewItem extends Disposable {
         });
     }
     onClick(event, preserveFocus = false) {
+        var _a;
         EventHelper.stop(event, true);
-        const context = isUndefinedOrNull(this._context) ? this.options?.useEventAsContext ? event : { preserveFocus } : this._context;
+        const context = types.isUndefinedOrNull(this._context) ? ((_a = this.options) === null || _a === void 0 ? void 0 : _a.useEventAsContext) ? event : { preserveFocus } : this._context;
         this.actionRunner.run(this._action, context);
     }
     // Only set the tabIndex on the element once it is about to get focused
@@ -158,26 +158,32 @@ class BaseActionViewItem extends Disposable {
     getTooltip() {
         return this.action.tooltip;
     }
-    getHoverContents() {
-        return this.getTooltip();
-    }
     updateTooltip() {
+        var _a, _b, _c;
         if (!this.element) {
             return;
         }
-        const title = this.getHoverContents() ?? '';
+        const title = (_a = this.getTooltip()) !== null && _a !== void 0 ? _a : '';
         this.updateAriaLabel();
-        if (!this.customHover && title !== '') {
-            const hoverDelegate = this.options.hoverDelegate ?? getDefaultHoverDelegate('element');
-            this.customHover = this._store.add(getBaseLayerHoverDelegate().setupManagedHover(hoverDelegate, this.element, title));
+        if ((_b = this.options.hoverDelegate) === null || _b === void 0 ? void 0 : _b.showNativeHover) {
+            /* While custom hover is not supported with context view */
+            this.element.title = title;
         }
-        else if (this.customHover) {
-            this.customHover.update(title);
+        else {
+            if (!this.customHover) {
+                const hoverDelegate = (_c = this.options.hoverDelegate) !== null && _c !== void 0 ? _c : getDefaultHoverDelegate('element');
+                this.customHover = setupCustomHover(hoverDelegate, this.element, title);
+                this._store.add(this.customHover);
+            }
+            else {
+                this.customHover.update(title);
+            }
         }
     }
     updateAriaLabel() {
+        var _a;
         if (this.element) {
-            const title = this.getTooltip() ?? '';
+            const title = (_a = this.getTooltip()) !== null && _a !== void 0 ? _a : '';
             this.element.setAttribute('aria-label', title);
         }
     }
@@ -196,26 +202,23 @@ class BaseActionViewItem extends Disposable {
         super.dispose();
     }
 }
-class ActionViewItem extends BaseActionViewItem {
+export class ActionViewItem extends BaseActionViewItem {
     constructor(context, action, options) {
-        options = {
-            ...options,
-            icon: options.icon !== undefined ? options.icon : false,
-            label: options.label !== undefined ? options.label : true,
-        };
         super(context, action, options);
         this.options = options;
+        this.options.icon = options.icon !== undefined ? options.icon : false;
+        this.options.label = options.label !== undefined ? options.label : true;
         this.cssClass = '';
     }
     render(container) {
         super.render(container);
-        assertType(this.element);
+        types.assertType(this.element);
         const label = document.createElement('a');
         label.classList.add('action-label');
         label.setAttribute('role', this.getDefaultAriaRole());
         this.label = label;
         this.element.appendChild(label);
-        if (this.options.label && this.options.keybinding && !this.options.keybindingNotRenderedWithLabel) {
+        if (this.options.label && this.options.keybinding) {
             const kbLabel = document.createElement('span');
             kbLabel.classList.add('keybinding');
             kbLabel.textContent = this.options.keybinding;
@@ -234,9 +237,6 @@ class ActionViewItem extends BaseActionViewItem {
         else {
             if (this.options.isMenu) {
                 return 'menuitem';
-            }
-            else if (this.options.isTabList) {
-                return 'tab';
             }
             else {
                 return 'button';
@@ -271,15 +271,16 @@ class ActionViewItem extends BaseActionViewItem {
         if (this.action.tooltip) {
             title = this.action.tooltip;
         }
-        else if (this.action.label) {
+        else if (!this.options.label && this.action.label && this.options.icon) {
             title = this.action.label;
             if (this.options.keybinding) {
-                title = localize(0, "{0} ({1})", title, this.options.keybinding);
+                title = nls.localize({ key: 'titleLabel', comment: ['action title', 'action keybinding'] }, "{0} ({1})", title, this.options.keybinding);
             }
         }
-        return title ?? undefined;
+        return title !== null && title !== void 0 ? title : undefined;
     }
     updateClass() {
+        var _a;
         if (this.cssClass && this.label) {
             this.label.classList.remove(...this.cssClass.split(' '));
         }
@@ -294,28 +295,30 @@ class ActionViewItem extends BaseActionViewItem {
             this.updateEnabled();
         }
         else {
-            this.label?.classList.remove('codicon');
+            (_a = this.label) === null || _a === void 0 ? void 0 : _a.classList.remove('codicon');
         }
     }
     updateEnabled() {
+        var _a, _b;
         if (this.action.enabled) {
             if (this.label) {
                 this.label.removeAttribute('aria-disabled');
                 this.label.classList.remove('disabled');
             }
-            this.element?.classList.remove('disabled');
+            (_a = this.element) === null || _a === void 0 ? void 0 : _a.classList.remove('disabled');
         }
         else {
             if (this.label) {
                 this.label.setAttribute('aria-disabled', 'true');
                 this.label.classList.add('disabled');
             }
-            this.element?.classList.add('disabled');
+            (_b = this.element) === null || _b === void 0 ? void 0 : _b.classList.add('disabled');
         }
     }
     updateAriaLabel() {
+        var _a;
         if (this.label) {
-            const title = this.getTooltip() ?? '';
+            const title = (_a = this.getTooltip()) !== null && _a !== void 0 ? _a : '';
             this.label.setAttribute('aria-label', title);
         }
     }
@@ -323,23 +326,18 @@ class ActionViewItem extends BaseActionViewItem {
         if (this.label) {
             if (this.action.checked !== undefined) {
                 this.label.classList.toggle('checked', this.action.checked);
-                if (this.options.isTabList) {
-                    this.label.setAttribute('aria-selected', this.action.checked ? 'true' : 'false');
-                }
-                else {
-                    this.label.setAttribute('aria-checked', this.action.checked ? 'true' : 'false');
-                    this.label.setAttribute('role', 'checkbox');
-                }
+                this.label.setAttribute('aria-checked', this.action.checked ? 'true' : 'false');
+                this.label.setAttribute('role', 'checkbox');
             }
             else {
                 this.label.classList.remove('checked');
-                this.label.removeAttribute(this.options.isTabList ? 'aria-selected' : 'aria-checked');
+                this.label.removeAttribute('aria-checked');
                 this.label.setAttribute('role', this.getDefaultAriaRole());
             }
         }
     }
 }
-class SelectActionViewItem extends BaseActionViewItem {
+export class SelectActionViewItem extends BaseActionViewItem {
     constructor(ctx, action, options, selected, contextViewProvider, styles, selectBoxOptions) {
         super(ctx, action);
         this.selectBox = new SelectBox(options, selected, contextViewProvider, styles, selectBoxOptions);
@@ -363,14 +361,14 @@ class SelectActionViewItem extends BaseActionViewItem {
         this.selectBox.setFocusable(focusable);
     }
     focus() {
-        this.selectBox?.focus();
+        var _a;
+        (_a = this.selectBox) === null || _a === void 0 ? void 0 : _a.focus();
     }
     blur() {
-        this.selectBox?.blur();
+        var _a;
+        (_a = this.selectBox) === null || _a === void 0 ? void 0 : _a.blur();
     }
     render(container) {
         this.selectBox.render(container);
     }
 }
-
-export { ActionViewItem, BaseActionViewItem, SelectActionViewItem };

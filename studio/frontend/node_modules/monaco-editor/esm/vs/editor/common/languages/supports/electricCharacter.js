@@ -1,12 +1,11 @@
-import { distinct } from '../../../../base/common/arrays.js';
-import { ignoreBracketsInToken } from '../supports.js';
-import { BracketsUtils } from './richEditBrackets.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class BracketElectricCharacterSupport {
+import { distinct } from '../../../../base/common/arrays.js';
+import { ignoreBracketsInToken } from '../supports.js';
+import { BracketsUtils } from './richEditBrackets.js';
+export class BracketElectricCharacterSupport {
     constructor(richEditBrackets) {
         this._richEditBrackets = richEditBrackets;
     }
@@ -51,5 +50,3 @@ class BracketElectricCharacterSupport {
         };
     }
 }
-
-export { BracketElectricCharacterSupport };

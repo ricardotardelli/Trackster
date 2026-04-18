@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class LineSequence {
+export class LineSequence {
     constructor(trimmedHash, lines) {
         this.trimmedHash = trimmedHash;
         this.lines = lines;
@@ -32,5 +32,3 @@ function getIndentation(str) {
     }
     return i;
 }
-
-export { LineSequence };

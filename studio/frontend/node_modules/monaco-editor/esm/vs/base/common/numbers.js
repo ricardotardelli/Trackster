@@ -1,7 +1,11 @@
-function clamp(value, min, max) {
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+export function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
-class MovingAverage {
+export class MovingAverage {
     constructor() {
         this._n = 1;
         this._val = 0;
@@ -15,7 +19,7 @@ class MovingAverage {
         return this._val;
     }
 }
-class SlidingWindowAverage {
+export class SlidingWindowAverage {
     constructor(size) {
         this._n = 0;
         this._val = 0;
@@ -41,5 +45,3 @@ class SlidingWindowAverage {
         return this._val;
     }
 }
-
-export { MovingAverage, SlidingWindowAverage, clamp };

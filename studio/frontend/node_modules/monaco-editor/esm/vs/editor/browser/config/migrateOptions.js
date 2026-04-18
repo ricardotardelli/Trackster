@@ -2,8 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class EditorSettingMigration {
-    static { this.items = []; }
+export class EditorSettingMigration {
     constructor(key, migrate) {
         this.key = key;
         this.migrate = migrate;
@@ -15,7 +14,7 @@ class EditorSettingMigration {
         this.migrate(value, read, write);
     }
     static _read(source, key) {
-        if (typeof source === 'undefined' || source === null) {
+        if (typeof source === 'undefined') {
             return undefined;
         }
         const firstDotIndex = key.indexOf('.');
@@ -36,6 +35,7 @@ class EditorSettingMigration {
         target[key] = value;
     }
 }
+EditorSettingMigration.items = [];
 function registerEditorSettingMigration(key, migrate) {
     EditorSettingMigration.items.push(new EditorSettingMigration(key, migrate));
 }
@@ -54,7 +54,7 @@ function registerSimpleEditorSettingMigration(key, values) {
 /**
  * Compatibility with old options
  */
-function migrateOptions(options) {
+export function migrateOptions(options) {
     EditorSettingMigration.items.forEach(migration => migration.apply(options));
 }
 registerSimpleEditorSettingMigration('wordWrap', [[true, 'on'], [false, 'off']]);
@@ -72,8 +72,6 @@ registerSimpleEditorSettingMigration('renderFinalNewline', [[true, 'on'], [false
 registerSimpleEditorSettingMigration('cursorSmoothCaretAnimation', [[true, 'on'], [false, 'off']]);
 registerSimpleEditorSettingMigration('occurrencesHighlight', [[true, 'singleFile'], [false, 'off']]);
 registerSimpleEditorSettingMigration('wordBasedSuggestions', [[true, 'matchingDocuments'], [false, 'off']]);
-registerSimpleEditorSettingMigration('defaultColorDecorators', [[true, 'auto'], [false, 'never']]);
-registerSimpleEditorSettingMigration('minimap.autohide', [[true, 'mouseover'], [false, 'none']]);
 registerEditorSettingMigration('autoClosingBrackets', (value, read, write) => {
     if (value === false) {
         write('autoClosingBrackets', 'never');
@@ -166,15 +164,6 @@ registerEditorSettingMigration('experimental.stickyScroll.maxLineCount', (value,
         }
     }
 });
-// Edit Context
-registerEditorSettingMigration('editor.experimentalEditContextEnabled', (value, read, write) => {
-    if (typeof value === 'boolean') {
-        write('editor.experimentalEditContextEnabled', undefined);
-        if (typeof read('editor.editContext') === 'undefined') {
-            write('editor.editContext', value);
-        }
-    }
-});
 // Code Actions on Save
 registerEditorSettingMigration('codeActionsOnSave', (value, read, write) => {
     if (value && typeof value === 'object') {
@@ -209,12 +198,3 @@ registerEditorSettingMigration('lightbulb.enabled', (value, read, write) => {
         write('lightbulb.enabled', value ? undefined : 'off');
     }
 });
-// NES Code Shifting
-registerEditorSettingMigration('inlineSuggest.edits.codeShifting', (value, read, write) => {
-    if (typeof value === 'boolean') {
-        write('inlineSuggest.edits.codeShifting', undefined);
-        write('inlineSuggest.edits.allowCodeShifting', value ? 'always' : 'never');
-    }
-});
-
-export { EditorSettingMigration, migrateOptions };

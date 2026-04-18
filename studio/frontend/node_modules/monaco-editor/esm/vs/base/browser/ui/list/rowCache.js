@@ -1,10 +1,18 @@
-import { $ } from '../../dom.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class RowCache {
+import { $ } from '../../dom.js';
+function removeFromParent(element) {
+    var _a;
+    try {
+        (_a = element.parentElement) === null || _a === void 0 ? void 0 : _a.removeChild(element);
+    }
+    catch (e) {
+        // this will throw if this happens due to a blur event, nasty business
+    }
+}
+export class RowCache {
     constructor(renderers) {
         this.renderers = renderers;
         this.cache = new Map();
@@ -77,7 +85,7 @@ class RowCache {
     }
     doRemoveNode(domNode) {
         domNode.classList.remove('scrolling');
-        domNode.remove();
+        removeFromParent(domNode);
     }
     getTemplateCache(templateId) {
         let result = this.cache.get(templateId);
@@ -106,5 +114,3 @@ class RowCache {
         return renderer;
     }
 }
-
-export { RowCache };

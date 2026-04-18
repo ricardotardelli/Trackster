@@ -1,4 +1,18 @@
-import { TimeoutTimer, createCancelablePromise } from '../../../../base/common/async.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var ColorDetector_1;
+import { createCancelablePromise, TimeoutTimer } from '../../../../base/common/async.js';
 import { RGBA } from '../../../../base/common/color.js';
 import { onUnexpectedError } from '../../../../base/common/errors.js';
 import { Emitter } from '../../../../base/common/event.js';
@@ -6,32 +20,15 @@ import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.j
 import { StopWatch } from '../../../../base/common/stopwatch.js';
 import { noBreakWhitespace } from '../../../../base/common/strings.js';
 import { DynamicCssRules } from '../../../browser/editorDom.js';
+import { registerEditorContribution } from '../../../browser/editorExtensions.js';
 import { Range } from '../../../common/core/range.js';
 import { ModelDecorationOptions } from '../../../common/model/textModel.js';
 import { ILanguageFeatureDebounceService } from '../../../common/services/languageFeatureDebounce.js';
 import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
 import { getColors } from './color.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-var ColorDetector_1;
-const ColorDecorationInjectedTextMarker = Object.create({});
-let ColorDetector = class ColorDetector extends Disposable {
-    static { ColorDetector_1 = this; }
-    static { this.ID = 'editor.contrib.colorDetector'; }
-    static { this.RECOMPUTE_TIME = 1000; } // ms
+export const ColorDecorationInjectedTextMarker = Object.create({});
+let ColorDetector = ColorDetector_1 = class ColorDetector extends Disposable {
     constructor(_editor, _configurationService, _languageFeaturesService, languageFeatureDebounceService) {
         super();
         this._editor = _editor;
@@ -40,10 +37,10 @@ let ColorDetector = class ColorDetector extends Disposable {
         this._localToDispose = this._register(new DisposableStore());
         this._decorationsIds = [];
         this._colorDatas = new Map();
-        this._decoratorLimitReporter = this._register(new DecoratorLimitReporter());
-        this._colorDecorationClassRefs = this._register(new DisposableStore());
         this._colorDecoratorIds = this._editor.createDecorationsCollection();
-        this._ruleFactory = this._register(new DynamicCssRules(this._editor));
+        this._ruleFactory = new DynamicCssRules(this._editor);
+        this._decoratorLimitReporter = new DecoratorLimitReporter();
+        this._colorDecorationClassRefs = this._register(new DisposableStore());
         this._debounceInformation = languageFeatureDebounceService.for(_languageFeaturesService.colorProvider, 'Document Colors', { min: ColorDetector_1.RECOMPUTE_TIME });
         this._register(_editor.onDidChangeModel(() => {
             this._isColorDecoratorsEnabled = this.isEnabled();
@@ -54,9 +51,9 @@ let ColorDetector = class ColorDetector extends Disposable {
         this._register(_editor.onDidChangeConfiguration((e) => {
             const prevIsEnabled = this._isColorDecoratorsEnabled;
             this._isColorDecoratorsEnabled = this.isEnabled();
-            this._defaultColorDecoratorsEnablement = this._editor.getOption(167 /* EditorOption.defaultColorDecorators */);
-            const updatedColorDecoratorsSetting = prevIsEnabled !== this._isColorDecoratorsEnabled || e.hasChanged(27 /* EditorOption.colorDecoratorsLimit */);
-            const updatedDefaultColorDecoratorsSetting = e.hasChanged(167 /* EditorOption.defaultColorDecorators */);
+            this._isDefaultColorDecoratorsEnabled = this._editor.getOption(146 /* EditorOption.defaultColorDecorators */);
+            const updatedColorDecoratorsSetting = prevIsEnabled !== this._isColorDecoratorsEnabled || e.hasChanged(21 /* EditorOption.colorDecoratorsLimit */);
+            const updatedDefaultColorDecoratorsSetting = e.hasChanged(146 /* EditorOption.defaultColorDecorators */);
             if (updatedColorDecoratorsSetting || updatedDefaultColorDecoratorsSetting) {
                 if (this._isColorDecoratorsEnabled) {
                     this.updateColors();
@@ -69,7 +66,7 @@ let ColorDetector = class ColorDetector extends Disposable {
         this._timeoutTimer = null;
         this._computePromise = null;
         this._isColorDecoratorsEnabled = this.isEnabled();
-        this._defaultColorDecoratorsEnablement = this._editor.getOption(167 /* EditorOption.defaultColorDecorators */);
+        this._isDefaultColorDecoratorsEnabled = this._editor.getOption(146 /* EditorOption.defaultColorDecorators */);
         this.updateColors();
     }
     isEnabled() {
@@ -81,13 +78,12 @@ let ColorDetector = class ColorDetector extends Disposable {
         // handle deprecated settings. [languageId].colorDecorators.enable
         const deprecatedConfig = this._configurationService.getValue(languageId);
         if (deprecatedConfig && typeof deprecatedConfig === 'object') {
-            // eslint-disable-next-line local/code-no-any-casts
             const colorDecorators = deprecatedConfig['colorDecorators']; // deprecatedConfig.valueOf('.colorDecorators.enable');
             if (colorDecorators && colorDecorators['enable'] !== undefined && !colorDecorators['enable']) {
                 return colorDecorators['enable'];
             }
         }
-        return this._editor.getOption(26 /* EditorOption.colorDecorators */);
+        return this._editor.getOption(20 /* EditorOption.colorDecorators */);
     }
     static get(editor) {
         return editor.getContribution(this.ID);
@@ -124,7 +120,7 @@ let ColorDetector = class ColorDetector extends Disposable {
                 return [];
             }
             const sw = new StopWatch(false);
-            const colors = await getColors(this._languageFeaturesService.colorProvider, model, token, this._defaultColorDecoratorsEnablement);
+            const colors = await getColors(this._languageFeaturesService.colorProvider, model, token, this._isDefaultColorDecoratorsEnabled);
             this._debounceInformation.update(model, sw.elapsed());
             return colors;
         });
@@ -168,7 +164,7 @@ let ColorDetector = class ColorDetector extends Disposable {
     updateColorDecorators(colorData) {
         this._colorDecorationClassRefs.clear();
         const decorations = [];
-        const limit = this._editor.getOption(27 /* EditorOption.colorDecoratorsLimit */);
+        const limit = this._editor.getOption(21 /* EditorOption.colorDecoratorsLimit */);
         for (let i = 0; i < colorData.length && decorations.length < limit; i++) {
             const { red, green, blue, alpha } = colorData[i].colorInfo.color;
             const rgba = new RGBA(Math.round(red * 255), Math.round(green * 255), Math.round(blue * 255), alpha);
@@ -221,15 +217,17 @@ let ColorDetector = class ColorDetector extends Disposable {
         return this._colorDecoratorIds.has(decoration);
     }
 };
+ColorDetector.ID = 'editor.contrib.colorDetector';
+ColorDetector.RECOMPUTE_TIME = 1000; // ms
 ColorDetector = ColorDetector_1 = __decorate([
     __param(1, IConfigurationService),
     __param(2, ILanguageFeaturesService),
     __param(3, ILanguageFeatureDebounceService)
 ], ColorDetector);
-class DecoratorLimitReporter extends Disposable {
+export { ColorDetector };
+export class DecoratorLimitReporter {
     constructor() {
-        super(...arguments);
-        this._onDidChange = this._register(new Emitter());
+        this._onDidChange = new Emitter();
         this._computed = 0;
         this._limited = false;
     }
@@ -241,5 +239,4 @@ class DecoratorLimitReporter extends Disposable {
         }
     }
 }
-
-export { ColorDecorationInjectedTextMarker, ColorDetector, DecoratorLimitReporter };
+registerEditorContribution(ColorDetector.ID, ColorDetector, 1 /* EditorContributionInstantiation.AfterFirstRender */);

@@ -1,8 +1,12 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 /**
  * An event describing that a model has been reset to a new value.
  * @internal
  */
-class ModelRawFlush {
+export class ModelRawFlush {
     constructor() {
         this.changeType = 1 /* RawContentChangedType.Flush */;
     }
@@ -11,7 +15,7 @@ class ModelRawFlush {
  * Represents text injected on a line
  * @internal
  */
-class LineInjectedText {
+export class LineInjectedText {
     static applyInjectedText(lineText, injectedTexts) {
         if (!injectedTexts || injectedTexts.length === 0) {
             return lineText;
@@ -59,7 +63,7 @@ class LineInjectedText {
  * An event describing that a line has changed in a model.
  * @internal
  */
-class ModelRawLineChanged {
+export class ModelRawLineChanged {
     constructor(lineNumber, detail, injectedText) {
         this.changeType = 2 /* RawContentChangedType.LineChanged */;
         this.lineNumber = lineNumber;
@@ -68,32 +72,10 @@ class ModelRawLineChanged {
     }
 }
 /**
- * An event describing that a line height has changed in the model.
- * @internal
- */
-class ModelLineHeightChanged {
-    constructor(ownerId, decorationId, lineNumber, lineHeight) {
-        this.ownerId = ownerId;
-        this.decorationId = decorationId;
-        this.lineNumber = lineNumber;
-        this.lineHeight = lineHeight;
-    }
-}
-/**
- * An event describing that a line height has changed in the model.
- * @internal
- */
-class ModelFontChanged {
-    constructor(ownerId, lineNumber) {
-        this.ownerId = ownerId;
-        this.lineNumber = lineNumber;
-    }
-}
-/**
  * An event describing that line(s) have been deleted in a model.
  * @internal
  */
-class ModelRawLinesDeleted {
+export class ModelRawLinesDeleted {
     constructor(fromLineNumber, toLineNumber) {
         this.changeType = 3 /* RawContentChangedType.LinesDeleted */;
         this.fromLineNumber = fromLineNumber;
@@ -104,7 +86,7 @@ class ModelRawLinesDeleted {
  * An event describing that line(s) have been inserted in a model.
  * @internal
  */
-class ModelRawLinesInserted {
+export class ModelRawLinesInserted {
     constructor(fromLineNumber, toLineNumber, detail, injectedTexts) {
         this.changeType = 4 /* RawContentChangedType.LinesInserted */;
         this.injectedTexts = injectedTexts;
@@ -117,7 +99,7 @@ class ModelRawLinesInserted {
  * An event describing that a model has had its EOL changed.
  * @internal
  */
-class ModelRawEOLChanged {
+export class ModelRawEOLChanged {
     constructor() {
         this.changeType = 5 /* RawContentChangedType.EOLChanged */;
     }
@@ -126,7 +108,7 @@ class ModelRawEOLChanged {
  * An event describing a change in the text of a model.
  * @internal
  */
-class ModelRawContentChangedEvent {
+export class ModelRawContentChangedEvent {
     constructor(changes, versionId, isUndoing, isRedoing) {
         this.changes = changes;
         this.versionId = versionId;
@@ -155,25 +137,7 @@ class ModelRawContentChangedEvent {
  * An event describing a change in injected text.
  * @internal
  */
-class ModelInjectedTextChangedEvent {
-    constructor(changes) {
-        this.changes = changes;
-    }
-}
-/**
- * An event describing a change of a line height.
- * @internal
- */
-class ModelLineHeightChangedEvent {
-    constructor(changes) {
-        this.changes = changes;
-    }
-}
-/**
- * An event describing a change in fonts.
- * @internal
- */
-class ModelFontChangedEvent {
+export class ModelInjectedTextChangedEvent {
     constructor(changes) {
         this.changes = changes;
     }
@@ -181,7 +145,7 @@ class ModelFontChangedEvent {
 /**
  * @internal
  */
-class InternalModelContentChangeEvent {
+export class InternalModelContentChangeEvent {
     constructor(rawContentChangedEvent, contentChangedEvent) {
         this.rawContentChangedEvent = rawContentChangedEvent;
         this.contentChangedEvent = contentChangedEvent;
@@ -207,10 +171,6 @@ class InternalModelContentChangeEvent {
             isUndoing: isUndoing,
             isRedoing: isRedoing,
             isFlush: isFlush,
-            detailedReasons: a.detailedReasons.concat(b.detailedReasons),
-            detailedReasonsChangeLengths: a.detailedReasonsChangeLengths.concat(b.detailedReasonsChangeLengths),
         };
     }
 }
-
-export { InternalModelContentChangeEvent, LineInjectedText, ModelFontChanged, ModelFontChangedEvent, ModelInjectedTextChangedEvent, ModelLineHeightChanged, ModelLineHeightChangedEvent, ModelRawContentChangedEvent, ModelRawEOLChanged, ModelRawFlush, ModelRawLineChanged, ModelRawLinesDeleted, ModelRawLinesInserted };

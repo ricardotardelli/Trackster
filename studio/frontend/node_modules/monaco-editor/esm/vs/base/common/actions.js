@@ -1,21 +1,15 @@
-import { Emitter } from './event.js';
-import { Disposable } from './lifecycle.js';
-import { localize } from '../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/**
- * A concrete implementation of {@link IAction}.
- *
- * Note that in most cases you should use the lighter-weight {@linkcode toAction} function instead.
- */
-class Action extends Disposable {
-    get onDidChange() { return this._onDidChange.event; }
+import { Emitter } from './event.js';
+import { Disposable } from './lifecycle.js';
+import * as nls from '../../nls.js';
+export class Action extends Disposable {
     constructor(id, label = '', cssClass = '', enabled = true, actionCallback) {
         super();
         this._onDidChange = this._register(new Emitter());
+        this.onDidChange = this._onDidChange.event;
         this._enabled = true;
         this._id = id;
         this._label = label;
@@ -92,14 +86,14 @@ class Action extends Disposable {
         }
     }
 }
-class ActionRunner extends Disposable {
+export class ActionRunner extends Disposable {
     constructor() {
         super(...arguments);
         this._onWillRun = this._register(new Emitter());
+        this.onWillRun = this._onWillRun.event;
         this._onDidRun = this._register(new Emitter());
+        this.onDidRun = this._onDidRun.event;
     }
-    get onWillRun() { return this._onWillRun.event; }
-    get onDidRun() { return this._onDidRun.event; }
     async run(action, context) {
         if (!action.enabled) {
             return;
@@ -118,7 +112,7 @@ class ActionRunner extends Disposable {
         await action.run(context);
     }
 }
-class Separator {
+export class Separator {
     constructor() {
         this.id = Separator.ID;
         this.label = '';
@@ -133,7 +127,9 @@ class Separator {
     static join(...actionLists) {
         let out = [];
         for (const list of actionLists) {
-            if (!list.length) ;
+            if (!list.length) {
+                // skip
+            }
             else if (out.length) {
                 out = [...out, new Separator(), ...list];
             }
@@ -143,10 +139,10 @@ class Separator {
         }
         return out;
     }
-    static { this.ID = 'vs.actions.separator'; }
     async run() { }
 }
-class SubmenuAction {
+Separator.ID = 'vs.actions.separator';
+export class SubmenuAction {
     get actions() { return this._actions; }
     constructor(id, label, actions, cssClass) {
         this.tooltip = '';
@@ -159,22 +155,21 @@ class SubmenuAction {
     }
     async run() { }
 }
-class EmptySubmenuAction extends Action {
-    static { this.ID = 'vs.actions.empty'; }
+export class EmptySubmenuAction extends Action {
     constructor() {
-        super(EmptySubmenuAction.ID, localize(28, '(empty)'), undefined, false);
+        super(EmptySubmenuAction.ID, nls.localize('submenu.empty', '(empty)'), undefined, false);
     }
 }
-function toAction(props) {
+EmptySubmenuAction.ID = 'vs.actions.empty';
+export function toAction(props) {
+    var _a;
     return {
         id: props.id,
         label: props.label,
-        tooltip: props.tooltip ?? props.label,
         class: props.class,
-        enabled: props.enabled ?? true,
+        enabled: (_a = props.enabled) !== null && _a !== void 0 ? _a : true,
         checked: props.checked,
         run: async (...args) => props.run(...args),
+        tooltip: props.label
     };
 }
-
-export { Action, ActionRunner, EmptySubmenuAction, Separator, SubmenuAction, toAction };

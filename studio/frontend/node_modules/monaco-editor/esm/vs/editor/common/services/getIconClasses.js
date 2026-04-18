@@ -1,21 +1,15 @@
-import { Schemas } from '../../../base/common/network.js';
-import { DataUri } from '../../../base/common/resources.js';
-import { URI } from '../../../base/common/uri.js';
-import { PLAINTEXT_LANGUAGE_ID } from '../languages/modesRegistry.js';
-import { FileKind } from '../../../platform/files/common/files.js';
-import { ThemeIcon } from '../../../base/common/themables.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Schemas } from '../../../base/common/network.js';
+import { DataUri } from '../../../base/common/resources.js';
+import { PLAINTEXT_LANGUAGE_ID } from '../languages/modesRegistry.js';
+import { FileKind } from '../../../platform/files/common/files.js';
 const fileIconDirectoryRegex = /(?:\/|^)(?:([^\/]+)\/)?([^\/]+)$/;
-function getIconClasses(modelService, languageService, resource, fileKind, icon) {
-    if (ThemeIcon.isThemeIcon(icon)) {
+export function getIconClasses(modelService, languageService, resource, fileKind, icon) {
+    if (icon) {
         return [`codicon-${icon.id}`, 'predefined-file-icon'];
-    }
-    if (URI.isUri(icon)) {
-        return [];
     }
     // we always set these base classes even if we do not have a path
     const classes = fileKind === FileKind.ROOT_FOLDER ? ['rootfolder-icon'] : fileKind === FileKind.FOLDER ? ['folder-icon'] : ['file-icon'];
@@ -29,13 +23,13 @@ function getIconClasses(modelService, languageService, resource, fileKind, icon)
         else {
             const match = resource.path.match(fileIconDirectoryRegex);
             if (match) {
-                name = fileIconSelectorEscape(match[2].toLowerCase());
+                name = cssEscape(match[2].toLowerCase());
                 if (match[1]) {
-                    classes.push(`${fileIconSelectorEscape(match[1].toLowerCase())}-name-dir-icon`); // parent directory
+                    classes.push(`${cssEscape(match[1].toLowerCase())}-name-dir-icon`); // parent directory
                 }
             }
             else {
-                name = fileIconSelectorEscape(resource.authority.toLowerCase());
+                name = cssEscape(resource.authority.toLowerCase());
             }
         }
         // Root Folders
@@ -66,7 +60,7 @@ function getIconClasses(modelService, languageService, resource, fileKind, icon)
             // Detected Mode
             const detectedLanguageId = detectLanguageId(modelService, languageService, resource);
             if (detectedLanguageId) {
-                classes.push(`${fileIconSelectorEscape(detectedLanguageId)}-lang-file-icon`);
+                classes.push(`${cssEscape(detectedLanguageId)}-lang-file-icon`);
             }
         }
     }
@@ -99,8 +93,6 @@ function detectLanguageId(modelService, languageService, resource) {
     // otherwise fallback to path based detection
     return languageService.guessLanguageIdByFilepathOrFirstLine(resource);
 }
-function fileIconSelectorEscape(str) {
-    return str.replace(/[\s]/g, '/'); // HTML class names can not contain certain whitespace characters (https://dom.spec.whatwg.org/#interface-domtokenlist), use / instead, which doesn't exist in file names.
+function cssEscape(str) {
+    return str.replace(/[\11\12\14\15\40]/g, '/'); // HTML class names can not contain certain whitespace characters, use / instead, which doesn't exist in file names.
 }
-
-export { fileIconSelectorEscape, getIconClasses };

@@ -1,16 +1,15 @@
-import { KeyCodeUtils, IMMUTABLE_CODE_TO_KEY_CODE } from '../../../base/common/keyCodes.js';
-import { KeyCodeChord } from '../../../base/common/keybindings.js';
-import { BaseResolvedKeybinding } from './baseResolvedKeybinding.js';
-import { toEmptyArrayIfContainsNull } from './resolvedKeybindingItem.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { KeyCodeUtils, IMMUTABLE_CODE_TO_KEY_CODE } from '../../../base/common/keyCodes.js';
+import { KeyCodeChord } from '../../../base/common/keybindings.js';
+import { BaseResolvedKeybinding } from './baseResolvedKeybinding.js';
+import { toEmptyArrayIfContainsNull } from './resolvedKeybindingItem.js';
 /**
  * Do not instantiate. Use KeybindingService to get a ResolvedKeybinding seeded with information about the current kb layout.
  */
-class USLayoutResolvedKeybinding extends BaseResolvedKeybinding {
+export class USLayoutResolvedKeybinding extends BaseResolvedKeybinding {
     constructor(chords, os) {
         super(os, chords);
     }
@@ -171,5 +170,3 @@ class USLayoutResolvedKeybinding extends BaseResolvedKeybinding {
         return [];
     }
 }
-
-export { USLayoutResolvedKeybinding };

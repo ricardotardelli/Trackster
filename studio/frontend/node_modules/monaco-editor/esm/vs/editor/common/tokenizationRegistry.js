@@ -1,11 +1,10 @@
-import { Emitter } from '../../base/common/event.js';
-import { toDisposable, Disposable } from '../../base/common/lifecycle.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class TokenizationRegistry {
+import { Emitter } from '../../base/common/event.js';
+import { Disposable, toDisposable } from '../../base/common/lifecycle.js';
+export class TokenizationRegistry {
     constructor() {
         this._tokenizationSupports = new Map();
         this._factories = new Map();
@@ -34,7 +33,8 @@ class TokenizationRegistry {
         return this._tokenizationSupports.get(languageId) || null;
     }
     registerFactory(languageId, factory) {
-        this._factories.get(languageId)?.dispose();
+        var _a;
+        (_a = this._factories.get(languageId)) === null || _a === void 0 ? void 0 : _a.dispose();
         const myData = new TokenizationSupportFactoryData(this, languageId, factory);
         this._factories.set(languageId, myData);
         return toDisposable(() => {
@@ -119,5 +119,3 @@ class TokenizationSupportFactoryData extends Disposable {
         }
     }
 }
-
-export { TokenizationRegistry };

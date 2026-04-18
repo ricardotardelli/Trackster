@@ -1,3 +1,16 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 import { Event } from '../../../../base/common/event.js';
 import { LRUCache } from '../../../../base/common/map.js';
 import { Range } from '../../../common/core/range.js';
@@ -7,21 +20,7 @@ import { createDecorator } from '../../../../platform/instantiation/common/insta
 import { IStorageService, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
 import { mainWindow } from '../../../../base/browser/window.js';
 import { runWhenWindowIdle } from '../../../../base/browser/dom.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-const ICodeLensCache = createDecorator('ICodeLensCache');
+export const ICodeLensCache = createDecorator('ICodeLensCache');
 class CacheItem {
     constructor(lineCount, data) {
         this.lineCount = lineCount;
@@ -44,22 +43,24 @@ let CodeLensCache = class CodeLensCache {
         const raw = storageService.get(key, 1 /* StorageScope.WORKSPACE */, '{}');
         this._deserialize(raw);
         // store lens data on shutdown
-        const onWillSaveStateBecauseOfShutdown = Event.filter(storageService.onWillSaveState, e => e.reason === WillSaveStateReason.SHUTDOWN);
-        Event.once(onWillSaveStateBecauseOfShutdown)(e => {
-            storageService.store(key, this._serialize(), 1 /* StorageScope.WORKSPACE */, 1 /* StorageTarget.MACHINE */);
+        Event.once(storageService.onWillSaveState)(e => {
+            if (e.reason === WillSaveStateReason.SHUTDOWN) {
+                storageService.store(key, this._serialize(), 1 /* StorageScope.WORKSPACE */, 1 /* StorageTarget.MACHINE */);
+            }
         });
     }
     put(model, data) {
         // create a copy of the model that is without command-ids
         // but with comand-labels
-        const copyItems = data.lenses.map((item) => {
+        const copyItems = data.lenses.map(item => {
+            var _a;
             return {
                 range: item.symbol.range,
-                command: item.symbol.command && { id: '', title: item.symbol.command?.title },
+                command: item.symbol.command && { id: '', title: (_a = item.symbol.command) === null || _a === void 0 ? void 0 : _a.title },
             };
         });
         const copyModel = new CodeLensModel();
-        copyModel.add({ lenses: copyItems }, this._fakeProvider);
+        copyModel.add({ lenses: copyItems, dispose: () => { } }, this._fakeProvider);
         const item = new CacheItem(model.getLineCount(), copyModel);
         this._cache.set(model.uri.toString(), item);
     }
@@ -95,11 +96,11 @@ let CodeLensCache = class CodeLensCache {
                     lenses.push({ range: new Range(line, 1, line, 11) });
                 }
                 const model = new CodeLensModel();
-                model.add({ lenses }, this._fakeProvider);
+                model.add({ lenses, dispose() { } }, this._fakeProvider);
                 this._cache.set(key, new CacheItem(element.lineCount, model));
             }
         }
-        catch {
+        catch (_a) {
             // ignore...
         }
     }
@@ -107,6 +108,5 @@ let CodeLensCache = class CodeLensCache {
 CodeLensCache = __decorate([
     __param(0, IStorageService)
 ], CodeLensCache);
+export { CodeLensCache };
 registerSingleton(ICodeLensCache, CodeLensCache, 1 /* InstantiationType.Delayed */);
-
-export { CodeLensCache, ICodeLensCache };

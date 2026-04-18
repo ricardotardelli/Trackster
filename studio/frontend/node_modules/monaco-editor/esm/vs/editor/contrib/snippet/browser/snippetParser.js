@@ -2,24 +2,11 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class Scanner {
+export class Scanner {
     constructor() {
         this.value = '';
         this.pos = 0;
     }
-    static { this._table = {
-        [36 /* CharCode.DollarSign */]: 0 /* TokenType.Dollar */,
-        [58 /* CharCode.Colon */]: 1 /* TokenType.Colon */,
-        [44 /* CharCode.Comma */]: 2 /* TokenType.Comma */,
-        [123 /* CharCode.OpenCurlyBrace */]: 3 /* TokenType.CurlyOpen */,
-        [125 /* CharCode.CloseCurlyBrace */]: 4 /* TokenType.CurlyClose */,
-        [92 /* CharCode.Backslash */]: 5 /* TokenType.Backslash */,
-        [47 /* CharCode.Slash */]: 6 /* TokenType.Forwardslash */,
-        [124 /* CharCode.Pipe */]: 7 /* TokenType.Pipe */,
-        [43 /* CharCode.Plus */]: 11 /* TokenType.Plus */,
-        [45 /* CharCode.Dash */]: 12 /* TokenType.Dash */,
-        [63 /* CharCode.QuestionMark */]: 13 /* TokenType.QuestionMark */,
-    }; }
     static isDigitCharacter(ch) {
         return ch >= 48 /* CharCode.Digit0 */ && ch <= 57 /* CharCode.Digit9 */;
     }
@@ -82,7 +69,20 @@ class Scanner {
         return { type, pos, len };
     }
 }
-class Marker {
+Scanner._table = {
+    [36 /* CharCode.DollarSign */]: 0 /* TokenType.Dollar */,
+    [58 /* CharCode.Colon */]: 1 /* TokenType.Colon */,
+    [44 /* CharCode.Comma */]: 2 /* TokenType.Comma */,
+    [123 /* CharCode.OpenCurlyBrace */]: 3 /* TokenType.CurlyOpen */,
+    [125 /* CharCode.CloseCurlyBrace */]: 4 /* TokenType.CurlyClose */,
+    [92 /* CharCode.Backslash */]: 5 /* TokenType.Backslash */,
+    [47 /* CharCode.Slash */]: 6 /* TokenType.Forwardslash */,
+    [124 /* CharCode.Pipe */]: 7 /* TokenType.Pipe */,
+    [43 /* CharCode.Plus */]: 11 /* TokenType.Plus */,
+    [45 /* CharCode.Dash */]: 12 /* TokenType.Dash */,
+    [63 /* CharCode.QuestionMark */]: 13 /* TokenType.QuestionMark */,
+};
+export class Marker {
     constructor() {
         this._children = [];
     }
@@ -139,7 +139,7 @@ class Marker {
         return 0;
     }
 }
-class Text extends Marker {
+export class Text extends Marker {
     constructor(value) {
         super();
         this.value = value;
@@ -154,9 +154,9 @@ class Text extends Marker {
         return new Text(this.value);
     }
 }
-class TransformableMarker extends Marker {
+export class TransformableMarker extends Marker {
 }
-class Placeholder extends TransformableMarker {
+export class Placeholder extends TransformableMarker {
     static compareByIndex(a, b) {
         if (a.index === b.index) {
             return 0;
@@ -198,7 +198,7 @@ class Placeholder extends TransformableMarker {
         return ret;
     }
 }
-class Choice extends Marker {
+export class Choice extends Marker {
     constructor() {
         super(...arguments);
         this.options = [];
@@ -222,7 +222,7 @@ class Choice extends Marker {
         return ret;
     }
 }
-class Transform extends Marker {
+export class Transform extends Marker {
     constructor() {
         super(...arguments);
         this.regexp = new RegExp('');
@@ -265,7 +265,7 @@ class Transform extends Marker {
         return ret;
     }
 }
-class FormatString extends Marker {
+export class FormatString extends Marker {
     constructor(index, shorthandName, ifValue, elseValue) {
         super();
         this.index = index;
@@ -327,7 +327,7 @@ class FormatString extends Marker {
         return ret;
     }
 }
-class Variable extends TransformableMarker {
+export class Variable extends TransformableMarker {
     constructor(name) {
         super();
         this.name = name;
@@ -363,7 +363,7 @@ function walk(marker, visitor) {
         stack.unshift(...marker.children);
     }
 }
-class TextmateSnippet extends Marker {
+export class TextmateSnippet extends Marker {
     get placeholderInfo() {
         if (!this._placeholders) {
             // fill in placeholders
@@ -447,7 +447,7 @@ class TextmateSnippet extends Marker {
         walk(this.children, visitor);
     }
 }
-class SnippetParser {
+export class SnippetParser {
     constructor() {
         this._scanner = new Scanner();
         this._token = { type: 14 /* TokenType.EOF */, pos: 0, len: 0 };
@@ -461,7 +461,7 @@ class SnippetParser {
     parse(value, insertFinalTabstop, enforceFinalTabstop) {
         const snippet = new TextmateSnippet();
         this.parseFragment(value, snippet);
-        this.ensureFinalTabstop(snippet, enforceFinalTabstop ?? false, insertFinalTabstop ?? false);
+        this.ensureFinalTabstop(snippet, enforceFinalTabstop !== null && enforceFinalTabstop !== void 0 ? enforceFinalTabstop : false, insertFinalTabstop !== null && insertFinalTabstop !== void 0 ? insertFinalTabstop : false);
         return snippet;
     }
     parseFragment(value, snippet) {
@@ -886,5 +886,3 @@ class SnippetParser {
         return false;
     }
 }
-
-export { Choice, FormatString, Marker, Placeholder, Scanner, SnippetParser, Text, TextmateSnippet, Transform, TransformableMarker, Variable };

@@ -1,43 +1,44 @@
-<div class="dbc-editor-root">
-  <!-- HEADER -->
-  <div class="dbc-editor-header">
-    <div class="dbc-editor-titles">
-      <h2 class="dbc-editor-title">{{ data.title }}</h2>
-      <p class="dbc-editor-subtitle">{{ data.subtitle }}</p>
+<app-dialogshell [title]="data.title" [subtitle]="data.subtitle" [showFooter]="true" contentClass="dialog-shell__body--no-scroll" (closeClicked)="cancel()">
+  <div class="dbc-editor-layout">
+    <div class="dbc-editor-toolbar">
+      <div class="dbc-editor-toolbar__left">
+
+        <div class="dbc-toolbar-group dbc-toolbar-group--primary">
+          <button class="dbc-tool-btn" (click)="validate()">
+            <mat-icon>check_circle</mat-icon>
+            <span>Validate</span>
+          </button>
+        </div>
+        <div class="dbc-toolbar-group">
+          <button class="dbc-tool-btn" (click)="format()">
+            <mat-icon>code</mat-icon>
+            <span>Format</span>
+          </button>
+          <button class="dbc-tool-btn" (click)="find()">
+            <mat-icon>search</mat-icon>
+            <span>Find</span>
+          </button>
+          <button class="dbc-tool-btn" (click)="goToLine()">
+            <mat-icon>format_list_numbered</mat-icon>
+            <span>Line</span>
+          </button>
+          <button class="dbc-tool-btn" (click)="toggleWrap()">
+            <mat-icon>wrap_text</mat-icon>
+            <span>Wrap</span>
+          </button>
+        </div>
+      </div>
+      <div class="dbc-editor-toolbar__right">
+        <span class="dbc-problems-pill">Problems: {{ problemsCount || 0 }}</span>
+      </div>
     </div>
-
-    <button
-      type="button"
-      class="dbc-editor-close"
-      (click)="cancel()">
-      ✕
-    </button>
+    <div class="dbc-editor-surface">
+      <ngx-monaco-editor [(ngModel)]="dbcText" [options]="editorOptions" [editorStyle]="{ width: '100%', height: '100%' }" (editorInitialized)="onEditorInit($event)"></ngx-monaco-editor>
+    </div>
   </div>
-
-  <!-- BODY -->
-  <div class="dbc-editor-body">
-    <ngx-monaco-editor
-      [(ngModel)]="dbcText"
-      [options]="editorOptions"
-      [editorStyle]="{ width: '100%', height: '100%' }"
-      (editorInitialized)="onEditorInit($event)">
-    </ngx-monaco-editor>
+  <div dialog-actions>
+    <button type="button" class="trackster-button trackster-button--secondary" (click)="cancel()">Cancel</button>
+    <button type="button" class="trackster-button trackster-button--secondary" (click)="revert()">Revert</button>
+    <button type="button" class="trackster-button trackster-button--primary" (click)="save()">Save</button>
   </div>
-
-  <!-- FOOTER -->
-  <div class="dbc-editor-footer">
-    <button
-      type="button"
-      class="trackster-button trackster-button--secondary"
-      (click)="cancel()">
-      Cancel
-    </button>
-
-    <button
-      type="button"
-      class="trackster-button trackster-button--primary"
-      (click)="save()">
-      Save
-    </button>
-  </div>
-</div>
+</app-dialogshell>

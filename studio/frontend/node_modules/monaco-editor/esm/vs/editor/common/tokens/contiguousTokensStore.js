@@ -1,17 +1,16 @@
-import { arrayInsert } from '../../../base/common/arrays.js';
-import { Position } from '../core/position.js';
-import { EMPTY_LINE_TOKENS, toUint32Array, ContiguousTokensEditing } from './contiguousTokensEditing.js';
-import { LineTokens } from './lineTokens.js';
-import { TokenMetadata } from '../encodedTokenAttributes.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as arrays from '../../../base/common/arrays.js';
+import { Position } from '../core/position.js';
+import { ContiguousTokensEditing, EMPTY_LINE_TOKENS, toUint32Array } from './contiguousTokensEditing.js';
+import { LineTokens } from './lineTokens.js';
+import { TokenMetadata } from '../encodedTokenAttributes.js';
 /**
  * Represents contiguous tokens in a text model.
  */
-class ContiguousTokensStore {
+export class ContiguousTokensStore {
     constructor(languageIdCodec) {
         this._lineTokens = [];
         this._len = 0;
@@ -86,7 +85,7 @@ class ContiguousTokensStore {
         for (let i = 0; i < insertCount; i++) {
             lineTokens[i] = null;
         }
-        this._lineTokens = arrayInsert(this._lineTokens, insertIndex, lineTokens);
+        this._lineTokens = arrays.arrayInsert(this._lineTokens, insertIndex, lineTokens);
         this._len += insertCount;
     }
     setTokens(topLevelLanguageId, lineIndex, lineTextLength, _tokens, checkEquality) {
@@ -203,5 +202,3 @@ function getDefaultMetadata(topLevelLanguageId) {
         // If there is no grammar, we just take a guess and try to match brackets.
         | (1024 /* MetadataConsts.BALANCED_BRACKETS_MASK */)) >>> 0;
 }
-
-export { ContiguousTokensStore };

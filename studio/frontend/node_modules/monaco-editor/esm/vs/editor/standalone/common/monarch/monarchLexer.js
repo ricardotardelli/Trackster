@@ -1,29 +1,31 @@
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { TokenizationRegistry, Token, TokenizationResult, EncodedTokenizationResult } from '../../../common/languages.js';
-import { nullTokenize, nullTokenizeEncoded, NullState } from '../../../common/languages/nullTokenize.js';
-import { findRules, createError, isIAction, isFuzzyAction, substituteMatches, log, isString, sanitize, fixCase } from './monarchCommon.js';
-import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 var MonarchTokenizer_1;
+/**
+ * Create a syntax highighter with a fully declarative JSON style lexer description
+ * using regular expressions.
+ */
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import * as languages from '../../../common/languages.js';
+import { NullState, nullTokenizeEncoded, nullTokenize } from '../../../common/languages/nullTokenize.js';
+import * as monarchCommon from './monarchCommon.js';
+import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 const CACHE_STACK_DEPTH = 5;
 /**
  * Reuse the same stack elements up to a certain depth.
  */
 class MonarchStackElementFactory {
-    static { this._INSTANCE = new MonarchStackElementFactory(CACHE_STACK_DEPTH); }
     static create(parent, state) {
         return this._INSTANCE.create(parent, state);
     }
@@ -50,6 +52,7 @@ class MonarchStackElementFactory {
         return result;
     }
 }
+MonarchStackElementFactory._INSTANCE = new MonarchStackElementFactory(CACHE_STACK_DEPTH);
 class MonarchStackElement {
     constructor(parent, state) {
         this.parent = parent;
@@ -125,7 +128,6 @@ class EmbeddedLanguageData {
  * Reuse the same line states up to a certain depth.
  */
 class MonarchLineStateFactory {
-    static { this._INSTANCE = new MonarchLineStateFactory(CACHE_STACK_DEPTH); }
     static create(stack, embeddedLanguageData) {
         return this._INSTANCE.create(stack, embeddedLanguageData);
     }
@@ -152,6 +154,7 @@ class MonarchLineStateFactory {
         return result;
     }
 }
+MonarchLineStateFactory._INSTANCE = new MonarchLineStateFactory(CACHE_STACK_DEPTH);
 class MonarchLineState {
     constructor(stack, embeddedLanguageData) {
         this.stack = stack;
@@ -197,12 +200,12 @@ class MonarchClassicTokensCollector {
         }
         this._lastTokenType = type;
         this._lastTokenLanguage = this._languageId;
-        this._tokens.push(new Token(startOffset, type, this._languageId));
+        this._tokens.push(new languages.Token(startOffset, type, this._languageId));
     }
     nestedLanguageTokenize(embeddedLanguageLine, hasEOL, embeddedLanguageData, offsetDelta) {
         const nestedLanguageId = embeddedLanguageData.languageId;
         const embeddedModeState = embeddedLanguageData.state;
-        const nestedLanguageTokenizationSupport = TokenizationRegistry.get(nestedLanguageId);
+        const nestedLanguageTokenizationSupport = languages.TokenizationRegistry.get(nestedLanguageId);
         if (!nestedLanguageTokenizationSupport) {
             this.enterLanguage(nestedLanguageId);
             this.emit(offsetDelta, '');
@@ -211,7 +214,7 @@ class MonarchClassicTokensCollector {
         const nestedResult = nestedLanguageTokenizationSupport.tokenize(embeddedLanguageLine, hasEOL, embeddedModeState);
         if (offsetDelta !== 0) {
             for (const token of nestedResult.tokens) {
-                this._tokens.push(new Token(token.offset + offsetDelta, token.type, token.language));
+                this._tokens.push(new languages.Token(token.offset + offsetDelta, token.type, token.language));
             }
         }
         else {
@@ -223,7 +226,7 @@ class MonarchClassicTokensCollector {
         return nestedResult.endState;
     }
     finalize(endState) {
-        return new TokenizationResult(this._tokens, endState);
+        return new languages.TokenizationResult(this._tokens, endState);
     }
 }
 class MonarchModernTokensCollector {
@@ -275,7 +278,7 @@ class MonarchModernTokensCollector {
     nestedLanguageTokenize(embeddedLanguageLine, hasEOL, embeddedLanguageData, offsetDelta) {
         const nestedLanguageId = embeddedLanguageData.languageId;
         const embeddedModeState = embeddedLanguageData.state;
-        const nestedLanguageTokenizationSupport = TokenizationRegistry.get(nestedLanguageId);
+        const nestedLanguageTokenizationSupport = languages.TokenizationRegistry.get(nestedLanguageId);
         if (!nestedLanguageTokenizationSupport) {
             this.enterLanguage(nestedLanguageId);
             this.emit(offsetDelta, '');
@@ -294,7 +297,7 @@ class MonarchModernTokensCollector {
         return nestedResult.endState;
     }
     finalize(endState) {
-        return new EncodedTokenizationResult(MonarchModernTokensCollector._merge(this._prependTokens, this._tokens, null), endState);
+        return new languages.EncodedTokenizationResult(MonarchModernTokensCollector._merge(this._prependTokens, this._tokens, null), endState);
     }
 }
 let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Disposable {
@@ -309,7 +312,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
         this.embeddedLoaded = Promise.resolve(undefined);
         // Set up listening for embedded modes
         let emitting = false;
-        this._register(TokenizationRegistry.onDidChange((e) => {
+        this._register(languages.TokenizationRegistry.onDidChange((e) => {
             if (emitting) {
                 return;
             }
@@ -323,7 +326,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
             }
             if (isOneOfMyEmbeddedModes) {
                 emitting = true;
-                TokenizationRegistry.handleChange([this._languageId]);
+                languages.TokenizationRegistry.handleChange([this._languageId]);
                 emitting = false;
             }
         }));
@@ -341,7 +344,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
     getLoadStatus() {
         const promises = [];
         for (const nestedLanguageId in this._embeddedLanguages) {
-            const tokenizationSupport = TokenizationRegistry.get(nestedLanguageId);
+            const tokenizationSupport = languages.TokenizationRegistry.get(nestedLanguageId);
             if (tokenizationSupport) {
                 // The nested language is already loaded
                 if (tokenizationSupport instanceof MonarchTokenizer_1) {
@@ -352,9 +355,9 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                 }
                 continue;
             }
-            if (!TokenizationRegistry.isResolved(nestedLanguageId)) {
+            if (!languages.TokenizationRegistry.isResolved(nestedLanguageId)) {
                 // The nested language is in the process of being loaded
-                promises.push(TokenizationRegistry.getOrCreate(nestedLanguageId));
+                promises.push(languages.TokenizationRegistry.getOrCreate(nestedLanguageId));
             }
         }
         if (promises.length === 0) {
@@ -398,20 +401,20 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
     _findLeavingNestedLanguageOffset(line, state) {
         let rules = this._lexer.tokenizer[state.stack.state];
         if (!rules) {
-            rules = findRules(this._lexer, state.stack.state); // do parent matching
+            rules = monarchCommon.findRules(this._lexer, state.stack.state); // do parent matching
             if (!rules) {
-                throw createError(this._lexer, 'tokenizer state is not defined: ' + state.stack.state);
+                throw monarchCommon.createError(this._lexer, 'tokenizer state is not defined: ' + state.stack.state);
             }
         }
         let popOffset = -1;
         let hasEmbeddedPopRule = false;
         for (const rule of rules) {
-            if (!isIAction(rule.action) || !(rule.action.nextEmbedded === '@pop' || rule.action.hasEmbeddedEndInCases)) {
+            if (!monarchCommon.isIAction(rule.action) || rule.action.nextEmbedded !== '@pop') {
                 continue;
             }
             hasEmbeddedPopRule = true;
-            let regex = rule.resolveRegex(state.stack.state);
-            const regexSource = regex.source;
+            let regex = rule.regex;
+            const regexSource = rule.regex.source;
             if (regexSource.substr(0, 4) === '^(?:' && regexSource.substr(regexSource.length - 1, 1) === ')') {
                 const flags = (regex.ignoreCase ? 'i' : '') + (regex.unicode ? 'u' : '');
                 regex = new RegExp(regexSource.substr(4, regexSource.length - 5), flags);
@@ -425,7 +428,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
             }
         }
         if (!hasEmbeddedPopRule) {
-            throw createError(this._lexer, 'no rule containing nextEmbedded: "@pop" in tokenizer embedded state: ' + state.stack.state);
+            throw monarchCommon.createError(this._lexer, 'no rule containing nextEmbedded: "@pop" in tokenizer embedded state: ' + state.stack.state);
         }
         return popOffset;
     }
@@ -494,16 +497,16 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                 // get the rules for this state
                 let rules = this._lexer.tokenizer[state];
                 if (!rules) {
-                    rules = findRules(this._lexer, state); // do parent matching
+                    rules = monarchCommon.findRules(this._lexer, state); // do parent matching
                     if (!rules) {
-                        throw createError(this._lexer, 'tokenizer state is not defined: ' + state);
+                        throw monarchCommon.createError(this._lexer, 'tokenizer state is not defined: ' + state);
                     }
                 }
                 // try each rule until we match
                 const restOfLine = line.substr(pos);
                 for (const rule of rules) {
                     if (pos === 0 || !rule.matchOnlyAtLineStart) {
-                        matches = restOfLine.match(rule.resolveRegex(state));
+                        matches = restOfLine.match(rule.regex);
                         if (matches) {
                             matched = matches[0];
                             action = rule.action;
@@ -533,7 +536,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
             // advance stream
             pos += matched.length;
             // maybe call action function (used for 'cases')
-            while (isFuzzyAction(action) && isIAction(action) && action.test) {
+            while (monarchCommon.isFuzzyAction(action) && monarchCommon.isIAction(action) && action.test) {
                 action = action.test(matched, matches, state, pos === lineLength);
             }
             let result = null;
@@ -547,7 +550,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
             else if (action.token !== null && action.token !== undefined) {
                 // do $n replacements?
                 if (action.tokenSubst) {
-                    result = substituteMatches(this._lexer, action.token, matched, matches, state);
+                    result = monarchCommon.substituteMatches(this._lexer, action.token, matched, matches, state);
                 }
                 else {
                     result = action.token;
@@ -556,15 +559,15 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                 if (action.nextEmbedded) {
                     if (action.nextEmbedded === '@pop') {
                         if (!embeddedLanguageData) {
-                            throw createError(this._lexer, 'cannot pop embedded language if not inside one');
+                            throw monarchCommon.createError(this._lexer, 'cannot pop embedded language if not inside one');
                         }
                         embeddedLanguageData = null;
                     }
                     else if (embeddedLanguageData) {
-                        throw createError(this._lexer, 'cannot enter embedded language from within an embedded language');
+                        throw monarchCommon.createError(this._lexer, 'cannot enter embedded language from within an embedded language');
                     }
                     else {
-                        enteringEmbeddedLanguage = substituteMatches(this._lexer, action.nextEmbedded, matched, matches, state);
+                        enteringEmbeddedLanguage = monarchCommon.substituteMatches(this._lexer, action.nextEmbedded, matched, matches, state);
                     }
                 }
                 // state transformations
@@ -572,24 +575,24 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                     pos = Math.max(0, pos - action.goBack);
                 }
                 if (action.switchTo && typeof action.switchTo === 'string') {
-                    let nextState = substituteMatches(this._lexer, action.switchTo, matched, matches, state); // switch state without a push...
+                    let nextState = monarchCommon.substituteMatches(this._lexer, action.switchTo, matched, matches, state); // switch state without a push...
                     if (nextState[0] === '@') {
                         nextState = nextState.substr(1); // peel off starting '@'
                     }
-                    if (!findRules(this._lexer, nextState)) {
-                        throw createError(this._lexer, 'trying to switch to a state \'' + nextState + '\' that is undefined in rule: ' + this._safeRuleName(rule));
+                    if (!monarchCommon.findRules(this._lexer, nextState)) {
+                        throw monarchCommon.createError(this._lexer, 'trying to switch to a state \'' + nextState + '\' that is undefined in rule: ' + this._safeRuleName(rule));
                     }
                     else {
                         stack = stack.switchTo(nextState);
                     }
                 }
                 else if (action.transform && typeof action.transform === 'function') {
-                    throw createError(this._lexer, 'action.transform not supported');
+                    throw monarchCommon.createError(this._lexer, 'action.transform not supported');
                 }
                 else if (action.next) {
                     if (action.next === '@push') {
                         if (stack.depth >= this._lexer.maxStack) {
-                            throw createError(this._lexer, 'maximum tokenizer stack size reached: [' +
+                            throw monarchCommon.createError(this._lexer, 'maximum tokenizer stack size reached: [' +
                                 stack.state + ',' + stack.parent.state + ',...]');
                         }
                         else {
@@ -598,7 +601,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                     }
                     else if (action.next === '@pop') {
                         if (stack.depth <= 1) {
-                            throw createError(this._lexer, 'trying to pop an empty stack in rule: ' + this._safeRuleName(rule));
+                            throw monarchCommon.createError(this._lexer, 'trying to pop an empty stack in rule: ' + this._safeRuleName(rule));
                         }
                         else {
                             stack = stack.pop();
@@ -608,12 +611,12 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                         stack = stack.popall();
                     }
                     else {
-                        let nextState = substituteMatches(this._lexer, action.next, matched, matches, state);
+                        let nextState = monarchCommon.substituteMatches(this._lexer, action.next, matched, matches, state);
                         if (nextState[0] === '@') {
                             nextState = nextState.substr(1); // peel off starting '@'
                         }
-                        if (!findRules(this._lexer, nextState)) {
-                            throw createError(this._lexer, 'trying to set a next state \'' + nextState + '\' that is undefined in rule: ' + this._safeRuleName(rule));
+                        if (!monarchCommon.findRules(this._lexer, nextState)) {
+                            throw monarchCommon.createError(this._lexer, 'trying to set a next state \'' + nextState + '\' that is undefined in rule: ' + this._safeRuleName(rule));
                         }
                         else {
                             stack = stack.push(nextState);
@@ -621,12 +624,12 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                     }
                 }
                 if (action.log && typeof (action.log) === 'string') {
-                    log(this._lexer, this._lexer.languageId + ': ' + substituteMatches(this._lexer, action.log, matched, matches, state));
+                    monarchCommon.log(this._lexer, this._lexer.languageId + ': ' + monarchCommon.substituteMatches(this._lexer, action.log, matched, matches, state));
                 }
             }
             // check result
             if (result === null) {
-                throw createError(this._lexer, 'lexer rule has no well-defined action in rule: ' + this._safeRuleName(rule));
+                throw monarchCommon.createError(this._lexer, 'lexer rule has no well-defined action in rule: ' + this._safeRuleName(rule));
             }
             const computeNewStateForEmbeddedLanguage = (enteringEmbeddedLanguage) => {
                 // support language names, mime types, and language ids
@@ -646,17 +649,17 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
             // is the result a group match?
             if (Array.isArray(result)) {
                 if (groupMatching && groupMatching.groups.length > 0) {
-                    throw createError(this._lexer, 'groups cannot be nested: ' + this._safeRuleName(rule));
+                    throw monarchCommon.createError(this._lexer, 'groups cannot be nested: ' + this._safeRuleName(rule));
                 }
                 if (matches.length !== result.length + 1) {
-                    throw createError(this._lexer, 'matched number of groups does not match the number of actions in rule: ' + this._safeRuleName(rule));
+                    throw monarchCommon.createError(this._lexer, 'matched number of groups does not match the number of actions in rule: ' + this._safeRuleName(rule));
                 }
                 let totalLen = 0;
                 for (let i = 1; i < matches.length; i++) {
                     totalLen += matches[i].length;
                 }
                 if (totalLen !== matched.length) {
-                    throw createError(this._lexer, 'with groups, all characters should be matched in consecutive groups in rule: ' + this._safeRuleName(rule));
+                    throw monarchCommon.createError(this._lexer, 'with groups, all characters should be matched in consecutive groups in rule: ' + this._safeRuleName(rule));
                 }
                 groupMatching = {
                     rule: rule,
@@ -693,23 +696,23 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
                         continue;
                     }
                     else {
-                        throw createError(this._lexer, 'no progress in tokenizer in rule: ' + this._safeRuleName(rule));
+                        throw monarchCommon.createError(this._lexer, 'no progress in tokenizer in rule: ' + this._safeRuleName(rule));
                     }
                 }
                 // return the result (and check for brace matching)
                 // todo: for efficiency we could pre-sanitize tokenPostfix and substitutions
                 let tokenType = null;
-                if (isString(result) && result.indexOf('@brackets') === 0) {
+                if (monarchCommon.isString(result) && result.indexOf('@brackets') === 0) {
                     const rest = result.substr('@brackets'.length);
                     const bracket = findBracket(this._lexer, matched);
                     if (!bracket) {
-                        throw createError(this._lexer, '@brackets token returned but no bracket defined as: ' + matched);
+                        throw monarchCommon.createError(this._lexer, '@brackets token returned but no bracket defined as: ' + matched);
                     }
-                    tokenType = sanitize(bracket.token + rest);
+                    tokenType = monarchCommon.sanitize(bracket.token + rest);
                 }
                 else {
                     const token = (result === '' ? '' : result + this._lexer.tokenPostfix);
-                    tokenType = sanitize(token);
+                    tokenType = monarchCommon.sanitize(token);
                 }
                 if (pos0 < lineWithoutLFLength) {
                     tokensCollector.emit(pos0 + offsetDelta, tokenType);
@@ -728,10 +731,10 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
         if (languageId !== this._languageId) {
             // Fire language loading event
             this._languageService.requestBasicLanguageFeatures(languageId);
-            TokenizationRegistry.getOrCreate(languageId);
+            languages.TokenizationRegistry.getOrCreate(languageId);
             this._embeddedLanguages[languageId] = true;
         }
-        const tokenizationSupport = TokenizationRegistry.get(languageId);
+        const tokenizationSupport = languages.TokenizationRegistry.get(languageId);
         if (tokenizationSupport) {
             return new EmbeddedLanguageData(languageId, tokenizationSupport.getInitialState());
         }
@@ -741,6 +744,7 @@ let MonarchTokenizer = MonarchTokenizer_1 = class MonarchTokenizer extends Dispo
 MonarchTokenizer = MonarchTokenizer_1 = __decorate([
     __param(4, IConfigurationService)
 ], MonarchTokenizer);
+export { MonarchTokenizer };
 /**
  * Searches for a bracket in the 'brackets' attribute that matches the input.
  */
@@ -748,7 +752,7 @@ function findBracket(lexer, matched) {
     if (!matched) {
         return null;
     }
-    matched = fixCase(lexer, matched);
+    matched = monarchCommon.fixCase(lexer, matched);
     const brackets = lexer.brackets;
     for (const bracket of brackets) {
         if (bracket.open === matched) {
@@ -760,5 +764,3 @@ function findBracket(lexer, matched) {
     }
     return null;
 }
-
-export { MonarchTokenizer };

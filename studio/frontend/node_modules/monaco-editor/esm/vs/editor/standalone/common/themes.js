@@ -1,22 +1,11 @@
-import { editorActiveIndentGuide1, editorIndentGuide1 } from '../../common/core/editorColorRegistry.js';
-import '../../../platform/theme/common/colorUtils.js';
-import '../../../platform/theme/common/colors/baseColors.js';
-import '../../../platform/theme/common/colors/chartsColors.js';
-import { editorForeground, editorBackground, editorSelectionHighlight, editorInactiveSelection } from '../../../platform/theme/common/colors/editorColors.js';
-import '../../../platform/theme/common/colors/inputColors.js';
-import '../../../platform/theme/common/colors/listColors.js';
-import '../../../platform/theme/common/colors/menuColors.js';
-import '../../../platform/theme/common/colors/minimapColors.js';
-import '../../../platform/theme/common/colors/miscColors.js';
-import '../../../platform/theme/common/colors/quickpickColors.js';
-import '../../../platform/theme/common/colors/searchColors.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { editorActiveIndentGuide1, editorIndentGuide1 } from '../../common/core/editorColorRegistry.js';
+import { editorBackground, editorForeground, editorInactiveSelection, editorSelectionHighlight } from '../../../platform/theme/common/colorRegistry.js';
 /* -------------------------------- Begin vs theme -------------------------------- */
-const vs = {
+export const vs = {
     base: 'vs',
     inherit: false,
     rules: [
@@ -78,7 +67,7 @@ const vs = {
 };
 /* -------------------------------- End vs theme -------------------------------- */
 /* -------------------------------- Begin vs-dark theme -------------------------------- */
-const vs_dark = {
+export const vs_dark = {
     base: 'vs-dark',
     inherit: false,
     rules: [
@@ -139,7 +128,7 @@ const vs_dark = {
 };
 /* -------------------------------- End vs-dark theme -------------------------------- */
 /* -------------------------------- Begin hc-black theme -------------------------------- */
-const hc_black = {
+export const hc_black = {
     base: 'hc-black',
     inherit: false,
     rules: [
@@ -189,7 +178,7 @@ const hc_black = {
 };
 /* -------------------------------- End hc-black theme -------------------------------- */
 /* -------------------------------- Begin hc-light theme -------------------------------- */
-const hc_light = {
+export const hc_light = {
     base: 'hc-light',
     inherit: false,
     rules: [
@@ -238,5 +227,3 @@ const hc_light = {
     }
 };
 /* -------------------------------- End hc-light theme -------------------------------- */
-
-export { hc_black, hc_light, vs, vs_dark };

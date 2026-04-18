@@ -1,9 +1,8 @@
-import { isFullWidthCharacter, isEmojiImprecise, GraphemeIterator, getNextCodePoint } from '../../../base/common/strings.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as strings from '../../../base/common/strings.js';
 /**
  * A column in a position is the gap between two adjacent characters. The methods here
  * work with a concept called "visible column". A visible column is a very rough approximation
@@ -20,12 +19,12 @@ import { isFullWidthCharacter, isEmojiImprecise, GraphemeIterator, getNextCodePo
  *
  * **NOTE**: These methods work and make sense both on the model and on the view model.
  */
-class CursorColumns {
+export class CursorColumns {
     static _nextVisibleColumn(codePoint, visibleColumn, tabSize) {
         if (codePoint === 9 /* CharCode.Tab */) {
             return CursorColumns.nextRenderTabStop(visibleColumn, tabSize);
         }
-        if (isFullWidthCharacter(codePoint) || isEmojiImprecise(codePoint)) {
+        if (strings.isFullWidthCharacter(codePoint) || strings.isEmojiImprecise(codePoint)) {
             return visibleColumn + 2;
         }
         return visibleColumn + 1;
@@ -37,10 +36,10 @@ class CursorColumns {
     static visibleColumnFromColumn(lineContent, column, tabSize) {
         const textLen = Math.min(column - 1, lineContent.length);
         const text = lineContent.substring(0, textLen);
-        const iterator = new GraphemeIterator(text);
+        const iterator = new strings.GraphemeIterator(text);
         let result = 0;
         while (!iterator.eol()) {
-            const codePoint = getNextCodePoint(text, textLen, iterator.offset);
+            const codePoint = strings.getNextCodePoint(text, textLen, iterator.offset);
             iterator.nextGraphemeLength();
             result = this._nextVisibleColumn(codePoint, result, tabSize);
         }
@@ -55,11 +54,11 @@ class CursorColumns {
             return 1;
         }
         const lineContentLength = lineContent.length;
-        const iterator = new GraphemeIterator(lineContent);
+        const iterator = new strings.GraphemeIterator(lineContent);
         let beforeVisibleColumn = 0;
         let beforeColumn = 1;
         while (!iterator.eol()) {
-            const codePoint = getNextCodePoint(lineContent, lineContentLength, iterator.offset);
+            const codePoint = strings.getNextCodePoint(lineContent, lineContentLength, iterator.offset);
             iterator.nextGraphemeLength();
             const afterVisibleColumn = this._nextVisibleColumn(codePoint, beforeVisibleColumn, tabSize);
             const afterColumn = iterator.offset + 1;
@@ -91,7 +90,7 @@ class CursorColumns {
      * @see {@link CursorColumns}
      */
     static nextIndentTabStop(visibleColumn, indentSize) {
-        return CursorColumns.nextRenderTabStop(visibleColumn, indentSize);
+        return visibleColumn + indentSize - visibleColumn % indentSize;
     }
     /**
      * ATTENTION: This works with 0-based columns (as opposed to the regular 1-based columns)
@@ -105,8 +104,6 @@ class CursorColumns {
      * @see {@link CursorColumns}
      */
     static prevIndentTabStop(column, indentSize) {
-        return CursorColumns.prevRenderTabStop(column, indentSize);
+        return Math.max(0, column - 1 - (column - 1) % indentSize);
     }
 }
-
-export { CursorColumns };

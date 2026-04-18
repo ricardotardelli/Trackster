@@ -1,38 +1,35 @@
-import { append, $ as $$1, clearNode } from '../../dom.js';
-import { getBaseLayerHoverDelegate } from '../hover/hoverDelegate2.js';
-import { getDefaultHoverDelegate } from '../hover/hoverDelegateFactory.js';
-import { UILabelProvider } from '../../../common/keybindingLabels.js';
-import { Disposable } from '../../../common/lifecycle.js';
-import { equals } from '../../../common/objects.js';
-import './keybindingLabel.css';
-import { localize } from '../../../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-const $ = $$1;
-const unthemedKeybindingLabelOptions = {
+import * as dom from '../../dom.js';
+import { UILabelProvider } from '../../../common/keybindingLabels.js';
+import { equals } from '../../../common/objects.js';
+import './keybindingLabel.css';
+import { localize } from '../../../../nls.js';
+const $ = dom.$;
+export const unthemedKeybindingLabelOptions = {
     keybindingLabelBackground: undefined,
     keybindingLabelForeground: undefined,
     keybindingLabelBorder: undefined,
     keybindingLabelBottomBorder: undefined,
     keybindingLabelShadow: undefined
 };
-class KeybindingLabel extends Disposable {
+export class KeybindingLabel {
     constructor(container, os, options) {
-        super();
         this.os = os;
         this.keyElements = new Set();
         this.options = options || Object.create(null);
         const labelForeground = this.options.keybindingLabelForeground;
-        this.domNode = append(container, $('.monaco-keybinding'));
+        this.domNode = dom.append(container, $('.monaco-keybinding'));
         if (labelForeground) {
             this.domNode.style.color = labelForeground;
         }
-        this.hover = this._register(getBaseLayerHoverDelegate().setupManagedHover(getDefaultHoverDelegate('mouse'), this.domNode, ''));
         this.didEverRender = false;
         container.appendChild(this.domNode);
+    }
+    get element() {
+        return this.domNode;
     }
     set(keybinding, matches) {
         if (this.didEverRender && this.keybinding === keybinding && KeybindingLabel.areSame(this.matches, matches)) {
@@ -43,6 +40,7 @@ class KeybindingLabel extends Disposable {
         this.render();
     }
     render() {
+        var _a;
         this.clear();
         if (this.keybinding) {
             const chords = this.keybinding.getChords();
@@ -50,12 +48,16 @@ class KeybindingLabel extends Disposable {
                 this.renderChord(this.domNode, chords[0], this.matches ? this.matches.firstPart : null);
             }
             for (let i = 1; i < chords.length; i++) {
-                append(this.domNode, $('span.monaco-keybinding-key-chord-separator', undefined, ' '));
+                dom.append(this.domNode, $('span.monaco-keybinding-key-chord-separator', undefined, ' '));
                 this.renderChord(this.domNode, chords[i], this.matches ? this.matches.chordPart : null);
             }
-            const title = (this.options.disableTitle ?? false) ? undefined : this.keybinding.getAriaLabel() || undefined;
-            this.hover.update(title);
-            this.domNode.setAttribute('aria-label', title || '');
+            const title = ((_a = this.options.disableTitle) !== null && _a !== void 0 ? _a : false) ? undefined : this.keybinding.getAriaLabel() || undefined;
+            if (title !== undefined) {
+                this.domNode.title = title;
+            }
+            else {
+                this.domNode.removeAttribute('title');
+            }
         }
         else if (this.options && this.options.renderUnboundKeybindings) {
             this.renderUnbound(this.domNode);
@@ -63,36 +65,36 @@ class KeybindingLabel extends Disposable {
         this.didEverRender = true;
     }
     clear() {
-        clearNode(this.domNode);
+        dom.clearNode(this.domNode);
         this.keyElements.clear();
     }
     renderChord(parent, chord, match) {
         const modifierLabels = UILabelProvider.modifierLabels[this.os];
         if (chord.ctrlKey) {
-            this.renderKey(parent, modifierLabels.ctrlKey, Boolean(match?.ctrlKey), modifierLabels.separator);
+            this.renderKey(parent, modifierLabels.ctrlKey, Boolean(match === null || match === void 0 ? void 0 : match.ctrlKey), modifierLabels.separator);
         }
         if (chord.shiftKey) {
-            this.renderKey(parent, modifierLabels.shiftKey, Boolean(match?.shiftKey), modifierLabels.separator);
+            this.renderKey(parent, modifierLabels.shiftKey, Boolean(match === null || match === void 0 ? void 0 : match.shiftKey), modifierLabels.separator);
         }
         if (chord.altKey) {
-            this.renderKey(parent, modifierLabels.altKey, Boolean(match?.altKey), modifierLabels.separator);
+            this.renderKey(parent, modifierLabels.altKey, Boolean(match === null || match === void 0 ? void 0 : match.altKey), modifierLabels.separator);
         }
         if (chord.metaKey) {
-            this.renderKey(parent, modifierLabels.metaKey, Boolean(match?.metaKey), modifierLabels.separator);
+            this.renderKey(parent, modifierLabels.metaKey, Boolean(match === null || match === void 0 ? void 0 : match.metaKey), modifierLabels.separator);
         }
         const keyLabel = chord.keyLabel;
         if (keyLabel) {
-            this.renderKey(parent, keyLabel, Boolean(match?.keyCode), '');
+            this.renderKey(parent, keyLabel, Boolean(match === null || match === void 0 ? void 0 : match.keyCode), '');
         }
     }
     renderKey(parent, label, highlight, separator) {
-        append(parent, this.createKeyElement(label, highlight ? '.highlight' : ''));
+        dom.append(parent, this.createKeyElement(label, highlight ? '.highlight' : ''));
         if (separator) {
-            append(parent, $('span.monaco-keybinding-key-separator', undefined, separator));
+            dom.append(parent, $('span.monaco-keybinding-key-separator', undefined, separator));
         }
     }
     renderUnbound(parent) {
-        append(parent, this.createKeyElement(localize(15, "Unbound")));
+        dom.append(parent, this.createKeyElement(localize('unbound', "Unbound")));
     }
     createKeyElement(label, extraClass = '') {
         const keyElement = $('span.monaco-keybinding-key' + extraClass, undefined, label);
@@ -118,5 +120,3 @@ class KeybindingLabel extends Disposable {
         return !!a && !!b && equals(a.firstPart, b.firstPart) && equals(a.chordPart, b.chordPart);
     }
 }
-
-export { KeybindingLabel, unthemedKeybindingLabelOptions };

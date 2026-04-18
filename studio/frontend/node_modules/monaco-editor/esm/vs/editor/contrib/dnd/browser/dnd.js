@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { isMacintosh } from '../../../../base/common/platform.js';
 import './dnd.css';
@@ -7,11 +11,6 @@ import { Range } from '../../../common/core/range.js';
 import { Selection } from '../../../common/core/selection.js';
 import { ModelDecorationOptions } from '../../../common/model/textModel.js';
 import { DragAndDropCommand } from './dragAndDropCommand.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
 function hasTriggerModifier(e) {
     if (isMacintosh) {
         return e.altKey;
@@ -20,9 +19,7 @@ function hasTriggerModifier(e) {
         return e.ctrlKey;
     }
 }
-class DragAndDropController extends Disposable {
-    static { this.ID = 'editor.contrib.dragAndDrop'; }
-    static { this.TRIGGER_KEY_VALUE = isMacintosh ? 6 /* KeyCode.Alt */ : 5 /* KeyCode.Ctrl */; }
+export class DragAndDropController extends Disposable {
     constructor(editor) {
         super();
         this._editor = editor;
@@ -47,7 +44,7 @@ class DragAndDropController extends Disposable {
         this._modifierPressed = false;
     }
     onEditorKeyDown(e) {
-        if (!this._editor.getOption(42 /* EditorOption.dragAndDrop */) || this._editor.getOption(28 /* EditorOption.columnSelection */)) {
+        if (!this._editor.getOption(35 /* EditorOption.dragAndDrop */) || this._editor.getOption(22 /* EditorOption.columnSelection */)) {
             return;
         }
         if (hasTriggerModifier(e)) {
@@ -60,7 +57,7 @@ class DragAndDropController extends Disposable {
         }
     }
     onEditorKeyUp(e) {
-        if (!this._editor.getOption(42 /* EditorOption.dragAndDrop */) || this._editor.getOption(28 /* EditorOption.columnSelection */)) {
+        if (!this._editor.getOption(35 /* EditorOption.dragAndDrop */) || this._editor.getOption(22 /* EditorOption.columnSelection */)) {
             return;
         }
         if (hasTriggerModifier(e)) {
@@ -162,10 +159,6 @@ class DragAndDropController extends Disposable {
         this._dragSelection = null;
         this._mouseDown = false;
     }
-    static { this._DECORATION_OPTIONS = ModelDecorationOptions.register({
-        description: 'dnd-target',
-        className: 'dnd-target'
-    }); }
     showAt(position) {
         this._dndDecorationIds.set([{
                 range: new Range(position.lineNumber, position.column, position.lineNumber, position.column),
@@ -193,6 +186,10 @@ class DragAndDropController extends Disposable {
         super.dispose();
     }
 }
+DragAndDropController.ID = 'editor.contrib.dragAndDrop';
+DragAndDropController.TRIGGER_KEY_VALUE = isMacintosh ? 6 /* KeyCode.Alt */ : 5 /* KeyCode.Ctrl */;
+DragAndDropController._DECORATION_OPTIONS = ModelDecorationOptions.register({
+    description: 'dnd-target',
+    className: 'dnd-target'
+});
 registerEditorContribution(DragAndDropController.ID, DragAndDropController, 2 /* EditorContributionInstantiation.BeforeFirstInteraction */);
-
-export { DragAndDropController };

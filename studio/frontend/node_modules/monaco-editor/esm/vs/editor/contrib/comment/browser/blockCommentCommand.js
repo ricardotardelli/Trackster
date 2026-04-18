@@ -1,13 +1,12 @@
-import { EditOperation } from '../../../common/core/editOperation.js';
-import { Position } from '../../../common/core/position.js';
-import { Range } from '../../../common/core/range.js';
-import { Selection } from '../../../common/core/selection.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class BlockCommentCommand {
+import { EditOperation } from '../../../common/core/editOperation.js';
+import { Position } from '../../../common/core/position.js';
+import { Range } from '../../../common/core/range.js';
+import { Selection } from '../../../common/core/selection.js';
+export class BlockCommentCommand {
     constructor(selection, insertSpace, languageConfigurationService) {
         this.languageConfigurationService = languageConfigurationService;
         this._selection = selection;
@@ -145,5 +144,3 @@ class BlockCommentCommand {
         }
     }
 }
-
-export { BlockCommentCommand };

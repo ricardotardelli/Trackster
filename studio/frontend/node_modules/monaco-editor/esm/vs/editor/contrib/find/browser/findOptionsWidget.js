@@ -1,27 +1,15 @@
-import { addDisposableListener, EventType } from '../../../../base/browser/dom.js';
-import './findOptionsWidget.css';
-import { CaseSensitiveToggle, WholeWordsToggle, RegexToggle } from '../../../../base/browser/ui/findinput/findInputToggles.js';
-import { Widget } from '../../../../base/browser/ui/widget.js';
-import { RunOnceScheduler } from '../../../../base/common/async.js';
-import { FIND_IDS } from './findModel.js';
-import { asCssVariable } from '../../../../platform/theme/common/colorUtils.js';
-import '../../../../platform/theme/common/colors/baseColors.js';
-import '../../../../platform/theme/common/colors/chartsColors.js';
-import '../../../../platform/theme/common/colors/editorColors.js';
-import { inputActiveOptionBackground, inputActiveOptionForeground, inputActiveOptionBorder } from '../../../../platform/theme/common/colors/inputColors.js';
-import '../../../../platform/theme/common/colors/listColors.js';
-import '../../../../platform/theme/common/colors/menuColors.js';
-import '../../../../platform/theme/common/colors/minimapColors.js';
-import '../../../../platform/theme/common/colors/miscColors.js';
-import '../../../../platform/theme/common/colors/quickpickColors.js';
-import '../../../../platform/theme/common/colors/searchColors.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class FindOptionsWidget extends Widget {
-    static { this.ID = 'editor.contrib.findOptionsWidget'; }
+import * as dom from '../../../../base/browser/dom.js';
+import './findOptionsWidget.css';
+import { CaseSensitiveToggle, RegexToggle, WholeWordsToggle } from '../../../../base/browser/ui/findinput/findInputToggles.js';
+import { Widget } from '../../../../base/browser/ui/widget.js';
+import { RunOnceScheduler } from '../../../../base/common/async.js';
+import { FIND_IDS } from './findModel.js';
+import { asCssVariable, inputActiveOptionBackground, inputActiveOptionBorder, inputActiveOptionForeground } from '../../../../platform/theme/common/colorRegistry.js';
+export class FindOptionsWidget extends Widget {
     constructor(editor, state, keybindingService) {
         super();
         this._hideSoon = this._register(new RunOnceScheduler(() => this._hide(), 2000));
@@ -41,11 +29,9 @@ class FindOptionsWidget extends Widget {
             inputActiveOptionForeground: asCssVariable(inputActiveOptionForeground),
             inputActiveOptionBackground: asCssVariable(inputActiveOptionBackground),
         };
-        const hoverLifecycleOptions = { groupId: 'find-options-widget' };
         this.caseSensitive = this._register(new CaseSensitiveToggle({
             appendTitle: this._keybindingLabelFor(FIND_IDS.ToggleCaseSensitiveCommand),
             isChecked: this._state.matchCase,
-            hoverLifecycleOptions,
             ...toggleStyles
         }));
         this._domNode.appendChild(this.caseSensitive.domNode);
@@ -57,7 +43,6 @@ class FindOptionsWidget extends Widget {
         this.wholeWords = this._register(new WholeWordsToggle({
             appendTitle: this._keybindingLabelFor(FIND_IDS.ToggleWholeWordCommand),
             isChecked: this._state.wholeWord,
-            hoverLifecycleOptions,
             ...toggleStyles
         }));
         this._domNode.appendChild(this.wholeWords.domNode);
@@ -69,7 +54,6 @@ class FindOptionsWidget extends Widget {
         this.regex = this._register(new RegexToggle({
             appendTitle: this._keybindingLabelFor(FIND_IDS.ToggleRegexCommand),
             isChecked: this._state.isRegex,
-            hoverLifecycleOptions,
             ...toggleStyles
         }));
         this._domNode.appendChild(this.regex.domNode);
@@ -97,8 +81,8 @@ class FindOptionsWidget extends Widget {
                 this._revealTemporarily();
             }
         }));
-        this._register(addDisposableListener(this._domNode, EventType.MOUSE_LEAVE, (e) => this._onMouseLeave()));
-        this._register(addDisposableListener(this._domNode, 'mouseover', (e) => this._onMouseOver()));
+        this._register(dom.addDisposableListener(this._domNode, dom.EventType.MOUSE_LEAVE, (e) => this._onMouseLeave()));
+        this._register(dom.addDisposableListener(this._domNode, 'mouseover', (e) => this._onMouseOver()));
     }
     _keybindingLabelFor(actionId) {
         const kb = this._keybindingService.lookupKeybinding(actionId);
@@ -151,5 +135,4 @@ class FindOptionsWidget extends Widget {
         this._domNode.style.display = 'none';
     }
 }
-
-export { FindOptionsWidget };
+FindOptionsWidget.ID = 'editor.contrib.findOptionsWidget';

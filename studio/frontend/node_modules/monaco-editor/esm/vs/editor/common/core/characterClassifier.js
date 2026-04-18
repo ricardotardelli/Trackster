@@ -1,13 +1,12 @@
-import { toUint8 } from '../../../base/common/uint.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { toUint8 } from '../../../base/common/uint.js';
 /**
  * A fast character classifier that uses a compact array for ASCII values.
  */
-class CharacterClassifier {
+export class CharacterClassifier {
     constructor(_defaultValue) {
         const defaultValue = toUint8(_defaultValue);
         this._defaultValue = defaultValue;
@@ -41,7 +40,7 @@ class CharacterClassifier {
         this._map.clear();
     }
 }
-class CharacterSet {
+export class CharacterSet {
     constructor() {
         this._actual = new CharacterClassifier(0 /* Boolean.False */);
     }
@@ -55,5 +54,3 @@ class CharacterSet {
         return this._actual.clear();
     }
 }
-
-export { CharacterClassifier, CharacterSet };

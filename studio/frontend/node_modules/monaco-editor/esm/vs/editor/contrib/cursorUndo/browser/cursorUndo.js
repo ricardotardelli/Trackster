@@ -1,12 +1,11 @@
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { registerEditorContribution, registerEditorAction, EditorAction } from '../../../browser/editorExtensions.js';
-import { EditorContextKeys } from '../../../common/editorContextKeys.js';
-import { localize2 } from '../../../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { EditorAction, registerEditorAction, registerEditorContribution } from '../../../browser/editorExtensions.js';
+import { EditorContextKeys } from '../../../common/editorContextKeys.js';
+import * as nls from '../../../../nls.js';
 class CursorState {
     constructor(selections) {
         this.selections = selections;
@@ -32,8 +31,7 @@ class StackElement {
         this.scrollLeft = scrollLeft;
     }
 }
-class CursorUndoRedoController extends Disposable {
-    static { this.ID = 'editor.contrib.cursorUndoRedoController'; }
+export class CursorUndoRedoController extends Disposable {
     static get(editor) {
         return editor.getContribution(CursorUndoRedoController.ID);
     }
@@ -97,11 +95,13 @@ class CursorUndoRedoController extends Disposable {
         this._isCursorUndoRedo = false;
     }
 }
-class CursorUndo extends EditorAction {
+CursorUndoRedoController.ID = 'editor.contrib.cursorUndoRedoController';
+export class CursorUndo extends EditorAction {
     constructor() {
         super({
             id: 'cursorUndo',
-            label: localize2(911, "Cursor Undo"),
+            label: nls.localize('cursor.undo', "Cursor Undo"),
+            alias: 'Cursor Undo',
             precondition: undefined,
             kbOpts: {
                 kbExpr: EditorContextKeys.textInputFocus,
@@ -111,23 +111,24 @@ class CursorUndo extends EditorAction {
         });
     }
     run(accessor, editor, args) {
-        CursorUndoRedoController.get(editor)?.cursorUndo();
+        var _a;
+        (_a = CursorUndoRedoController.get(editor)) === null || _a === void 0 ? void 0 : _a.cursorUndo();
     }
 }
-class CursorRedo extends EditorAction {
+export class CursorRedo extends EditorAction {
     constructor() {
         super({
             id: 'cursorRedo',
-            label: localize2(912, "Cursor Redo"),
+            label: nls.localize('cursor.redo', "Cursor Redo"),
+            alias: 'Cursor Redo',
             precondition: undefined
         });
     }
     run(accessor, editor, args) {
-        CursorUndoRedoController.get(editor)?.cursorRedo();
+        var _a;
+        (_a = CursorUndoRedoController.get(editor)) === null || _a === void 0 ? void 0 : _a.cursorRedo();
     }
 }
 registerEditorContribution(CursorUndoRedoController.ID, CursorUndoRedoController, 0 /* EditorContributionInstantiation.Eager */); // eager because it needs to listen to record cursor state ASAP
 registerEditorAction(CursorUndo);
 registerEditorAction(CursorRedo);
-
-export { CursorRedo, CursorUndo, CursorUndoRedoController };

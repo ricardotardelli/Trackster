@@ -3,9 +3,10 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 function countMapFrom(values) {
+    var _a;
     const map = new Map();
     for (const value of values) {
-        map.set(value, (map.get(value) ?? 0) + 1);
+        map.set(value, ((_a = map.get(value)) !== null && _a !== void 0 ? _a : 0) + 1);
     }
     return map;
 }
@@ -15,7 +16,7 @@ function countMapFrom(values) {
  * Each document is identified by a key, and the score for each document is computed
  * by taking the max score over all the chunks in the document.
  */
-class TfIdfCalculator {
+export class TfIdfCalculator {
     constructor() {
         /**
          * Total number of chunks
@@ -68,6 +69,7 @@ class TfIdfCalculator {
         }
     }
     updateDocuments(documents) {
+        var _a;
         for (const { key } of documents) {
             this.deleteDocument(key);
         }
@@ -81,7 +83,7 @@ class TfIdfCalculator {
                 const tf = TfIdfCalculator.termFrequencies(text);
                 // Update occurrences list
                 for (const term of tf.keys()) {
-                    this.chunkOccurrences.set(term, (this.chunkOccurrences.get(term) ?? 0) + 1);
+                    this.chunkOccurrences.set(term, ((_a = this.chunkOccurrences.get(term)) !== null && _a !== void 0 ? _a : 0) + 1);
                 }
                 chunks.push({ text, tf });
             }
@@ -140,7 +142,8 @@ class TfIdfCalculator {
         return this.computeTfidf(tf);
     }
     computeIdf(term) {
-        const chunkOccurrences = this.chunkOccurrences.get(term) ?? 0;
+        var _a;
+        const chunkOccurrences = (_a = this.chunkOccurrences.get(term)) !== null && _a !== void 0 ? _a : 0;
         return chunkOccurrences > 0
             ? Math.log((this.chunkCount + 1) / chunkOccurrences)
             : 0;
@@ -161,13 +164,14 @@ class TfIdfCalculator {
  * @param scores array of scores from {@link TfIdfCalculator.calculateScores}
  * @returns normalized scores
  */
-function normalizeTfIdfScores(scores) {
+export function normalizeTfIdfScores(scores) {
+    var _a, _b;
     // copy of scores
     const result = scores.slice(0);
     // sort descending
     result.sort((a, b) => b.score - a.score);
     // normalize
-    const max = result[0]?.score ?? 0;
+    const max = (_b = (_a = result[0]) === null || _a === void 0 ? void 0 : _a.score) !== null && _b !== void 0 ? _b : 0;
     if (max > 0) {
         for (const score of result) {
             score.score /= max;
@@ -175,5 +179,3 @@ function normalizeTfIdfScores(scores) {
     }
     return result;
 }
-
-export { TfIdfCalculator, normalizeTfIdfScores };

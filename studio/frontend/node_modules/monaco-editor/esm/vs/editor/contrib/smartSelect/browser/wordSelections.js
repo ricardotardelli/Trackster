@@ -1,11 +1,10 @@
-import { isLowerAsciiLetter, isUpperAsciiLetter } from '../../../../base/common/strings.js';
-import { Range } from '../../../common/core/range.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class WordSelectionRangeProvider {
+import { isLowerAsciiLetter, isUpperAsciiLetter } from '../../../../base/common/strings.js';
+import { Range } from '../../../common/core/range.js';
+export class WordSelectionRangeProvider {
     constructor(selectSubwords = true) {
         this.selectSubwords = selectSubwords;
     }
@@ -78,5 +77,3 @@ class WordSelectionRangeProvider {
         }
     }
 }
-
-export { WordSelectionRangeProvider };

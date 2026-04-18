@@ -8,7 +8,7 @@ function resetGlobalRegex(reg) {
     }
     return true;
 }
-class IndentRulesSupport {
+export class IndentRulesSupport {
     constructor(indentationRules) {
         this._indentationRules = indentationRules;
     }
@@ -59,5 +59,3 @@ class IndentRulesSupport {
         return ret;
     }
 }
-
-export { IndentRulesSupport };

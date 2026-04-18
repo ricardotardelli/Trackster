@@ -1,19 +1,18 @@
-import { firstNonWhitespaceIndex } from '../../../../base/common/strings.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+import * as strings from '../../../../base/common/strings.js';
 import { EditOperation } from '../../../common/core/editOperation.js';
 import { Position } from '../../../common/core/position.js';
 import { Range } from '../../../common/core/range.js';
 import { Selection } from '../../../common/core/selection.js';
 import { BlockCommentCommand } from './blockCommentCommand.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class LineCommentCommand {
-    constructor(languageConfigurationService, selection, indentSize, type, insertSpace, ignoreEmptyLines, ignoreFirstLine) {
+export class LineCommentCommand {
+    constructor(languageConfigurationService, selection, tabSize, type, insertSpace, ignoreEmptyLines, ignoreFirstLine) {
         this.languageConfigurationService = languageConfigurationService;
         this._selection = selection;
-        this._indentSize = indentSize;
+        this._tabSize = tabSize;
         this._type = type;
         this._insertSpace = insertSpace;
         this._selectionId = null;
@@ -50,10 +49,8 @@ class LineCommentCommand {
      * Analyze lines and decide which lines are relevant and what the toggle should do.
      * Also, build up several offsets and lengths useful in the generation of editor operations.
      */
-    static _analyzeLines(type, insertSpace, model, lines, startLineNumber, ignoreEmptyLines, ignoreFirstLine, languageConfigurationService, languageId) {
+    static _analyzeLines(type, insertSpace, model, lines, startLineNumber, ignoreEmptyLines, ignoreFirstLine, languageConfigurationService) {
         let onlyWhitespaceLines = true;
-        const config = languageConfigurationService.getLanguageConfiguration(languageId).comments;
-        const lineCommentNoIndent = config?.lineCommentNoIndent ?? false;
         let shouldRemoveComments;
         if (type === 0 /* Type.Toggle */) {
             shouldRemoveComments = true;
@@ -73,23 +70,24 @@ class LineCommentCommand {
                 continue;
             }
             const lineContent = model.getLineContent(lineNumber);
-            const lineContentStartOffset = firstNonWhitespaceIndex(lineContent);
+            const lineContentStartOffset = strings.firstNonWhitespaceIndex(lineContent);
             if (lineContentStartOffset === -1) {
                 // Empty or whitespace only line
                 lineData.ignore = ignoreEmptyLines;
-                lineData.commentStrOffset = lineCommentNoIndent ? 0 : lineContent.length;
+                lineData.commentStrOffset = lineContent.length;
                 continue;
             }
             onlyWhitespaceLines = false;
-            const offset = lineCommentNoIndent ? 0 : lineContentStartOffset;
             lineData.ignore = false;
-            lineData.commentStrOffset = offset;
-            if (shouldRemoveComments && !BlockCommentCommand._haystackHasNeedleAtOffset(lineContent, lineData.commentStr, offset)) {
+            lineData.commentStrOffset = lineContentStartOffset;
+            if (shouldRemoveComments && !BlockCommentCommand._haystackHasNeedleAtOffset(lineContent, lineData.commentStr, lineContentStartOffset)) {
                 if (type === 0 /* Type.Toggle */) {
                     // Every line so far has been a line comment, but this one is not
                     shouldRemoveComments = false;
                 }
-                else if (type === 1 /* Type.ForceAdd */) ;
+                else if (type === 1 /* Type.ForceAdd */) {
+                    // Will not happen
+                }
                 else {
                     lineData.ignore = true;
                 }
@@ -121,13 +119,12 @@ class LineCommentCommand {
      */
     static _gatherPreflightData(type, insertSpace, model, startLineNumber, endLineNumber, ignoreEmptyLines, ignoreFirstLine, languageConfigurationService) {
         const lines = LineCommentCommand._gatherPreflightCommentStrings(model, startLineNumber, endLineNumber, languageConfigurationService);
-        const languageId = model.getLanguageIdAtPosition(startLineNumber, 1);
         if (lines === null) {
             return {
                 supported: false
             };
         }
-        return LineCommentCommand._analyzeLines(type, insertSpace, model, lines, startLineNumber, ignoreEmptyLines, ignoreFirstLine, languageConfigurationService, languageId);
+        return LineCommentCommand._analyzeLines(type, insertSpace, model, lines, startLineNumber, ignoreEmptyLines, ignoreFirstLine, languageConfigurationService);
     }
     /**
      * Given a successful analysis, execute either insert line comments, either remove line comments
@@ -138,7 +135,7 @@ class LineCommentCommand {
             ops = LineCommentCommand._createRemoveLineCommentsOperations(data.lines, s.startLineNumber);
         }
         else {
-            LineCommentCommand._normalizeInsertionPoint(model, data.lines, s.startLineNumber, this._indentSize);
+            LineCommentCommand._normalizeInsertionPoint(model, data.lines, s.startLineNumber, this._tabSize);
             ops = this._createAddLineCommentsOperations(data.lines, s.startLineNumber);
         }
         const cursorPosition = new Position(s.positionLineNumber, s.positionColumn);
@@ -205,12 +202,12 @@ class LineCommentCommand {
         if (!ops) {
             if (s.isEmpty()) {
                 const lineContent = model.getLineContent(s.startLineNumber);
-                let firstNonWhitespaceIndex$1 = firstNonWhitespaceIndex(lineContent);
-                if (firstNonWhitespaceIndex$1 === -1) {
+                let firstNonWhitespaceIndex = strings.firstNonWhitespaceIndex(lineContent);
+                if (firstNonWhitespaceIndex === -1) {
                     // Line is empty or contains only whitespace
-                    firstNonWhitespaceIndex$1 = lineContent.length;
+                    firstNonWhitespaceIndex = lineContent.length;
                 }
-                ops = BlockCommentCommand._createAddBlockCommentOperations(new Range(s.startLineNumber, firstNonWhitespaceIndex$1 + 1, s.startLineNumber, lineContent.length + 1), startToken, endToken, this._insertSpace);
+                ops = BlockCommentCommand._createAddBlockCommentOperations(new Range(s.startLineNumber, firstNonWhitespaceIndex + 1, s.startLineNumber, lineContent.length + 1), startToken, endToken, this._insertSpace);
             }
             else {
                 ops = BlockCommentCommand._createAddBlockCommentOperations(new Range(s.startLineNumber, model.getLineFirstNonWhitespaceColumn(s.startLineNumber), s.endLineNumber, model.getLineMaxColumn(s.endLineNumber)), startToken, endToken, this._insertSpace);
@@ -279,16 +276,16 @@ class LineCommentCommand {
         }
         return res;
     }
-    static nextVisibleColumn(currentVisibleColumn, indentSize, isTab, columnSize) {
+    static nextVisibleColumn(currentVisibleColumn, tabSize, isTab, columnSize) {
         if (isTab) {
-            return currentVisibleColumn + (indentSize - (currentVisibleColumn % indentSize));
+            return currentVisibleColumn + (tabSize - (currentVisibleColumn % tabSize));
         }
         return currentVisibleColumn + columnSize;
     }
     /**
      * Adjust insertion points to have them vertically aligned in the add line comment case
      */
-    static _normalizeInsertionPoint(model, lines, startLineNumber, indentSize) {
+    static _normalizeInsertionPoint(model, lines, startLineNumber, tabSize) {
         let minVisibleColumn = 1073741824 /* Constants.MAX_SAFE_SMALL_INTEGER */;
         let j;
         let lenJ;
@@ -299,13 +296,13 @@ class LineCommentCommand {
             const lineContent = model.getLineContent(startLineNumber + i);
             let currentVisibleColumn = 0;
             for (let j = 0, lenJ = lines[i].commentStrOffset; currentVisibleColumn < minVisibleColumn && j < lenJ; j++) {
-                currentVisibleColumn = LineCommentCommand.nextVisibleColumn(currentVisibleColumn, indentSize, lineContent.charCodeAt(j) === 9 /* CharCode.Tab */, 1);
+                currentVisibleColumn = LineCommentCommand.nextVisibleColumn(currentVisibleColumn, tabSize, lineContent.charCodeAt(j) === 9 /* CharCode.Tab */, 1);
             }
             if (currentVisibleColumn < minVisibleColumn) {
                 minVisibleColumn = currentVisibleColumn;
             }
         }
-        minVisibleColumn = Math.floor(minVisibleColumn / indentSize) * indentSize;
+        minVisibleColumn = Math.floor(minVisibleColumn / tabSize) * tabSize;
         for (let i = 0, len = lines.length; i < len; i++) {
             if (lines[i].ignore) {
                 continue;
@@ -313,7 +310,7 @@ class LineCommentCommand {
             const lineContent = model.getLineContent(startLineNumber + i);
             let currentVisibleColumn = 0;
             for (j = 0, lenJ = lines[i].commentStrOffset; currentVisibleColumn < minVisibleColumn && j < lenJ; j++) {
-                currentVisibleColumn = LineCommentCommand.nextVisibleColumn(currentVisibleColumn, indentSize, lineContent.charCodeAt(j) === 9 /* CharCode.Tab */, 1);
+                currentVisibleColumn = LineCommentCommand.nextVisibleColumn(currentVisibleColumn, tabSize, lineContent.charCodeAt(j) === 9 /* CharCode.Tab */, 1);
             }
             if (currentVisibleColumn > minVisibleColumn) {
                 lines[i].commentStrOffset = j - 1;
@@ -324,5 +321,3 @@ class LineCommentCommand {
         }
     }
 }
-
-export { LineCommentCommand };

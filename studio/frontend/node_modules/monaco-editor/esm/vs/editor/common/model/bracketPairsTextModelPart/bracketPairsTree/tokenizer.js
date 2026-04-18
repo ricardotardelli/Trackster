@@ -1,14 +1,13 @@
-import { NotSupportedError } from '../../../../../base/common/errors.js';
-import { TokenMetadata } from '../../../encodedTokenAttributes.js';
-import { TextAstNode } from './ast.js';
-import { lengthZero, toLength, lengthAdd, lengthToObj, lengthGetColumnCountIfZeroLineCount, lengthDiff } from './length.js';
-import { SmallImmutableSet } from './smallImmutableSet.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class Token {
+import { NotSupportedError } from '../../../../../base/common/errors.js';
+import { TokenMetadata } from '../../../encodedTokenAttributes.js';
+import { TextAstNode } from './ast.js';
+import { lengthAdd, lengthDiff, lengthGetColumnCountIfZeroLineCount, lengthToObj, lengthZero, toLength } from './length.js';
+import { SmallImmutableSet } from './smallImmutableSet.js';
+export class Token {
     constructor(length, kind, 
     /**
      * If this token is an opening bracket, this is the id of the opening bracket.
@@ -29,7 +28,7 @@ class Token {
         this.astNode = astNode;
     }
 }
-class TextBufferTokenizer {
+export class TextBufferTokenizer {
     constructor(textModel, bracketTokens) {
         this.textModel = textModel;
         this.bracketTokens = bracketTokens;
@@ -210,7 +209,7 @@ class NonPeekableTextBufferTokenizer {
         return new Token(length, 0 /* TokenKind.Text */, -1, SmallImmutableSet.getEmpty(), new TextAstNode(length));
     }
 }
-class FastTokenizer {
+export class FastTokenizer {
     constructor(text, brackets) {
         this.text = text;
         this._offset = lengthZero;
@@ -297,5 +296,3 @@ class FastTokenizer {
         throw new NotSupportedError();
     }
 }
-
-export { FastTokenizer, TextBufferTokenizer, Token };

@@ -1,29 +1,28 @@
-import { BrowserFeatures } from '../../../base/browser/canIUse.js';
-import { addDisposableListener } from '../../../base/browser/dom.js';
-import { Gesture, EventType } from '../../../base/browser/touch.js';
-import { mainWindow } from '../../../base/browser/window.js';
-import { Disposable } from '../../../base/common/lifecycle.js';
-import { isIOS, isAndroid, isMobile } from '../../../base/common/platform.js';
-import { MouseHandler } from './mouseHandler.js';
-import { EditorMouseEvent, EditorPointerEventFactory } from '../editorDom.js';
-import { TextAreaSyntethicEvents } from './editContext/textArea/textAreaEditContextInput.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { BrowserFeatures } from '../../../base/browser/canIUse.js';
+import * as dom from '../../../base/browser/dom.js';
+import { EventType, Gesture } from '../../../base/browser/touch.js';
+import { mainWindow } from '../../../base/browser/window.js';
+import { Disposable } from '../../../base/common/lifecycle.js';
+import * as platform from '../../../base/common/platform.js';
+import { MouseHandler } from './mouseHandler.js';
+import { TextAreaSyntethicEvents } from './textAreaInput.js';
+import { EditorMouseEvent, EditorPointerEventFactory } from '../editorDom.js';
 /**
  * Currently only tested on iOS 13/ iPadOS.
  */
-class PointerEventHandler extends MouseHandler {
+export class PointerEventHandler extends MouseHandler {
     constructor(context, viewController, viewHelper) {
         super(context, viewController, viewHelper);
         this._register(Gesture.addTarget(this.viewHelper.linesContentDomNode));
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Tap, (e) => this.onTap(e)));
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Change, (e) => this.onChange(e)));
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Contextmenu, (e) => this._onContextMenu(new EditorMouseEvent(e, false, this.viewHelper.viewDomNode), false)));
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Tap, (e) => this.onTap(e)));
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Change, (e) => this.onChange(e)));
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Contextmenu, (e) => this._onContextMenu(new EditorMouseEvent(e, false, this.viewHelper.viewDomNode), false)));
         this._lastPointerType = 'mouse';
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, 'pointerdown', (e) => {
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, 'pointerdown', (e) => {
             const pointerType = e.pointerType;
             if (pointerType === 'mouse') {
                 this._lastPointerType = 'mouse';
@@ -90,9 +89,9 @@ class TouchHandler extends MouseHandler {
     constructor(context, viewController, viewHelper) {
         super(context, viewController, viewHelper);
         this._register(Gesture.addTarget(this.viewHelper.linesContentDomNode));
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Tap, (e) => this.onTap(e)));
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Change, (e) => this.onChange(e)));
-        this._register(addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Contextmenu, (e) => this._onContextMenu(new EditorMouseEvent(e, false, this.viewHelper.viewDomNode), false)));
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Tap, (e) => this.onTap(e)));
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Change, (e) => this.onChange(e)));
+        this._register(dom.addDisposableListener(this.viewHelper.linesContentDomNode, EventType.Contextmenu, (e) => this._onContextMenu(new EditorMouseEvent(e, false, this.viewHelper.viewDomNode), false)));
     }
     onTap(event) {
         event.preventDefault();
@@ -110,10 +109,10 @@ class TouchHandler extends MouseHandler {
         this._context.viewModel.viewLayout.deltaScrollNow(-e.translationX, -e.translationY);
     }
 }
-class PointerHandler extends Disposable {
+export class PointerHandler extends Disposable {
     constructor(context, viewController, viewHelper) {
         super();
-        const isPhone = isIOS || (isAndroid && isMobile);
+        const isPhone = platform.isIOS || (platform.isAndroid && platform.isMobile);
         if (isPhone && BrowserFeatures.pointerEvents) {
             this.handler = this._register(new PointerEventHandler(context, viewController, viewHelper));
         }
@@ -128,5 +127,3 @@ class PointerHandler extends Disposable {
         return this.handler.getTargetAtClientPoint(clientX, clientY);
     }
 }
-
-export { PointerEventHandler, PointerHandler };

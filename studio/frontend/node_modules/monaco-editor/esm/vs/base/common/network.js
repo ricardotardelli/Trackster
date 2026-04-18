@@ -1,14 +1,12 @@
-import { onUnexpectedError } from './errors.js';
-import { isWeb, isNative, webWorkerOrigin } from './platform.js';
-import { equalsIgnoreCase, startsWithIgnoreCase } from './strings.js';
-import { URI } from './uri.js';
-import { posix } from './path.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var Schemas;
+import * as errors from './errors.js';
+import * as platform from './platform.js';
+import { equalsIgnoreCase, startsWithIgnoreCase } from './strings.js';
+import { URI } from './uri.js';
+export var Schemas;
 (function (Schemas) {
     /**
      * A schema that is used for models that exist in memory
@@ -45,24 +43,15 @@ var Schemas;
     Schemas.vscodeCustomEditor = 'vscode-custom-editor';
     Schemas.vscodeNotebookCell = 'vscode-notebook-cell';
     Schemas.vscodeNotebookCellMetadata = 'vscode-notebook-cell-metadata';
-    Schemas.vscodeNotebookCellMetadataDiff = 'vscode-notebook-cell-metadata-diff';
     Schemas.vscodeNotebookCellOutput = 'vscode-notebook-cell-output';
-    Schemas.vscodeNotebookCellOutputDiff = 'vscode-notebook-cell-output-diff';
-    Schemas.vscodeNotebookMetadata = 'vscode-notebook-metadata';
     Schemas.vscodeInteractiveInput = 'vscode-interactive-input';
     Schemas.vscodeSettings = 'vscode-settings';
     Schemas.vscodeWorkspaceTrust = 'vscode-workspace-trust';
     Schemas.vscodeTerminal = 'vscode-terminal';
     /** Scheme used for code blocks in chat. */
     Schemas.vscodeChatCodeBlock = 'vscode-chat-code-block';
-    /** Scheme used for LHS of code compare (aka diff) blocks in chat. */
-    Schemas.vscodeChatCodeCompareBlock = 'vscode-chat-code-compare-block';
     /** Scheme used for the chat input editor. */
-    Schemas.vscodeChatEditor = 'vscode-chat-editor';
-    /** Scheme used for the chat input part */
-    Schemas.vscodeChatInput = 'chatSessionInput';
-    /** Scheme used for local chat session content */
-    Schemas.vscodeLocalChatSession = 'vscode-chat-session';
+    Schemas.vscodeChatSesssion = 'vscode-chat-editor';
     /**
      * Scheme used internally for webviews that aren't linked to a resource (i.e. not custom editors)
      */
@@ -93,32 +82,15 @@ var Schemas;
      */
     Schemas.vscodeSourceControl = 'vscode-scm';
     /**
-     * Scheme used for input box for creating comments.
-     */
-    Schemas.commentsInput = 'comment';
-    /**
      * Scheme used for special rendering of settings in the release notes
      */
     Schemas.codeSetting = 'code-setting';
     /**
-     * Scheme used for output panel resources
+     * Scheme used for special rendering of features in the release notes
      */
-    Schemas.outputChannel = 'output';
-    /**
-     * Scheme used for the accessible view
-     */
-    Schemas.accessibleView = 'accessible-view';
-    /**
-     * Used for snapshots of chat edits
-     */
-    Schemas.chatEditingSnapshotScheme = 'chat-editing-snapshot-text-model';
-    Schemas.chatEditingModel = 'chat-editing-text-model';
-    /**
-     * Used for rendering multidiffs in copilot agent sessions
-     */
-    Schemas.copilotPr = 'copilot-pr';
+    Schemas.codeFeature = 'code-feature';
 })(Schemas || (Schemas = {}));
-function matchesScheme(target, scheme) {
+export function matchesScheme(target, scheme) {
     if (URI.isUri(target)) {
         return equalsIgnoreCase(target.scheme, scheme);
     }
@@ -126,10 +98,10 @@ function matchesScheme(target, scheme) {
         return startsWithIgnoreCase(target, scheme + ':');
     }
 }
-function matchesSomeScheme(target, ...schemes) {
+export function matchesSomeScheme(target, ...schemes) {
     return schemes.some(scheme => matchesScheme(target, scheme));
 }
-const connectionTokenQueryName = 'tkn';
+export const connectionTokenQueryName = 'tkn';
 class RemoteAuthoritiesImpl {
     constructor() {
         this._hosts = Object.create(null);
@@ -137,13 +109,10 @@ class RemoteAuthoritiesImpl {
         this._connectionTokens = Object.create(null);
         this._preferredWebSchema = 'http';
         this._delegate = null;
-        this._serverRootPath = '/';
+        this._remoteResourcesPath = `/${Schemas.vscodeRemoteResource}`;
     }
     setPreferredWebSchema(schema) {
         this._preferredWebSchema = schema;
-    }
-    get _remoteResourcesPath() {
-        return posix.join(this._serverRootPath, Schemas.vscodeRemoteResource);
     }
     rewrite(uri) {
         if (this._delegate) {
@@ -151,7 +120,7 @@ class RemoteAuthoritiesImpl {
                 return this._delegate(uri);
             }
             catch (err) {
-                onUnexpectedError(err);
+                errors.onUnexpectedError(err);
                 return uri;
             }
         }
@@ -167,17 +136,16 @@ class RemoteAuthoritiesImpl {
             query += `&${connectionTokenQueryName}=${encodeURIComponent(connectionToken)}`;
         }
         return URI.from({
-            scheme: isWeb ? this._preferredWebSchema : Schemas.vscodeRemoteResource,
+            scheme: platform.isWeb ? this._preferredWebSchema : Schemas.vscodeRemoteResource,
             authority: `${host}:${port}`,
             path: this._remoteResourcesPath,
             query
         });
     }
 }
-const RemoteAuthorities = new RemoteAuthoritiesImpl();
-const VSCODE_AUTHORITY = 'vscode-app';
+export const RemoteAuthorities = new RemoteAuthoritiesImpl();
+export const VSCODE_AUTHORITY = 'vscode-app';
 class FileAccessImpl {
-    static { this.FALLBACK_AUTHORITY = VSCODE_AUTHORITY; }
     /**
      * Returns a URI to use in contexts where the browser is responsible
      * for loading (e.g. fetch()) or when used within the DOM.
@@ -195,9 +163,9 @@ class FileAccessImpl {
         uri.scheme === Schemas.file &&
             (
             // ...and we run in native environments
-            isNative ||
+            platform.isNative ||
                 // ...or web worker extensions on desktop
-                (webWorkerOrigin === `${Schemas.vscodeFileResource}://${FileAccessImpl.FALLBACK_AUTHORITY}`))) {
+                (platform.webWorkerOrigin === `${Schemas.vscodeFileResource}://${FileAccessImpl.FALLBACK_AUTHORITY}`))) {
             return uri.with({
                 scheme: Schemas.vscodeFileResource,
                 // We need to provide an authority here so that it can serve
@@ -212,8 +180,9 @@ class FileAccessImpl {
         return uri;
     }
 }
-const FileAccess = new FileAccessImpl();
-var COI;
+FileAccessImpl.FALLBACK_AUTHORITY = VSCODE_AUTHORITY;
+export const FileAccess = new FileAccessImpl();
+export var COI;
 (function (COI) {
     const coiHeaders = new Map([
         ['1', { 'Cross-Origin-Opener-Policy': 'same-origin' }],
@@ -236,7 +205,7 @@ var COI;
         else if (URI.isUri(url)) {
             params = new URL(url.toString(true)).searchParams;
         }
-        const value = params?.get(coiSearchParamName);
+        const value = params === null || params === void 0 ? void 0 : params.get(coiSearchParamName);
         if (!value) {
             return undefined;
         }
@@ -248,7 +217,6 @@ var COI;
      * isn't enabled the current context
      */
     function addSearchParam(urlOrSearch, coop, coep) {
-        // eslint-disable-next-line local/code-no-any-casts
         if (!globalThis.crossOriginIsolated) {
             // depends on the current context being COI
             return;
@@ -263,5 +231,3 @@ var COI;
     }
     COI.addSearchParam = addSearchParam;
 })(COI || (COI = {}));
-
-export { COI, FileAccess, RemoteAuthorities, Schemas, VSCODE_AUTHORITY, connectionTokenQueryName, matchesScheme, matchesSomeScheme };

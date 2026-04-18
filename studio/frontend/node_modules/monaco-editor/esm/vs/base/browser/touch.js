@@ -1,21 +1,21 @@
-import { onDidRegisterWindow, addDisposableListener, scheduleAtNextAnimationFrame } from './dom.js';
-import { mainWindow } from './window.js';
-import { memoize } from '../common/decorators.js';
-import { Event } from '../common/event.js';
-import { Disposable, markAsSingleton, toDisposable } from '../common/lifecycle.js';
-import { LinkedList } from '../common/linkedList.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var EventType;
+import * as DomUtils from './dom.js';
+import { mainWindow } from './window.js';
+import * as arrays from '../common/arrays.js';
+import { memoize } from '../common/decorators.js';
+import { Event as EventUtils } from '../common/event.js';
+import { Disposable, markAsSingleton, toDisposable } from '../common/lifecycle.js';
+import { LinkedList } from '../common/linkedList.js';
+export var EventType;
 (function (EventType) {
     EventType.Tap = '-monaco-gesturetap';
     EventType.Change = '-monaco-gesturechange';
@@ -23,10 +23,7 @@ var EventType;
     EventType.End = '-monaco-gesturesend';
     EventType.Contextmenu = '-monaco-gesturecontextmenu';
 })(EventType || (EventType = {}));
-class Gesture extends Disposable {
-    static { this.SCROLL_FRICTION = -5e-3; }
-    static { this.HOLD_DELAY = 700; }
-    static { this.CLEAR_TAP_COUNT_TIME = 400; } // ms
+export class Gesture extends Disposable {
     constructor() {
         super();
         this.dispatched = false;
@@ -35,10 +32,10 @@ class Gesture extends Disposable {
         this.activeTouches = {};
         this.handle = null;
         this._lastSetTapCountTime = 0;
-        this._register(Event.runAndSubscribe(onDidRegisterWindow, ({ window, disposables }) => {
-            disposables.add(addDisposableListener(window.document, 'touchstart', (e) => this.onTouchStart(e), { passive: false }));
-            disposables.add(addDisposableListener(window.document, 'touchend', (e) => this.onTouchEnd(window, e)));
-            disposables.add(addDisposableListener(window.document, 'touchmove', (e) => this.onTouchMove(e), { passive: false }));
+        this._register(EventUtils.runAndSubscribe(DomUtils.onDidRegisterWindow, ({ window, disposables }) => {
+            disposables.add(DomUtils.addDisposableListener(window.document, 'touchstart', (e) => this.onTouchStart(e), { passive: false }));
+            disposables.add(DomUtils.addDisposableListener(window.document, 'touchend', (e) => this.onTouchEnd(window, e)));
+            disposables.add(DomUtils.addDisposableListener(window.document, 'touchmove', (e) => this.onTouchMove(e), { passive: false }));
         }, { window: mainWindow, disposables: this._store }));
     }
     static addTarget(element) {
@@ -113,25 +110,25 @@ class Gesture extends Disposable {
             }
             const data = this.activeTouches[touch.identifier], holdTime = Date.now() - data.initialTimeStamp;
             if (holdTime < Gesture.HOLD_DELAY
-                && Math.abs(data.initialPageX - data.rollingPageX.at(-1)) < 30
-                && Math.abs(data.initialPageY - data.rollingPageY.at(-1)) < 30) {
+                && Math.abs(data.initialPageX - arrays.tail(data.rollingPageX)) < 30
+                && Math.abs(data.initialPageY - arrays.tail(data.rollingPageY)) < 30) {
                 const evt = this.newGestureEvent(EventType.Tap, data.initialTarget);
-                evt.pageX = data.rollingPageX.at(-1);
-                evt.pageY = data.rollingPageY.at(-1);
+                evt.pageX = arrays.tail(data.rollingPageX);
+                evt.pageY = arrays.tail(data.rollingPageY);
                 this.dispatchEvent(evt);
             }
             else if (holdTime >= Gesture.HOLD_DELAY
-                && Math.abs(data.initialPageX - data.rollingPageX.at(-1)) < 30
-                && Math.abs(data.initialPageY - data.rollingPageY.at(-1)) < 30) {
+                && Math.abs(data.initialPageX - arrays.tail(data.rollingPageX)) < 30
+                && Math.abs(data.initialPageY - arrays.tail(data.rollingPageY)) < 30) {
                 const evt = this.newGestureEvent(EventType.Contextmenu, data.initialTarget);
-                evt.pageX = data.rollingPageX.at(-1);
-                evt.pageY = data.rollingPageY.at(-1);
+                evt.pageX = arrays.tail(data.rollingPageX);
+                evt.pageY = arrays.tail(data.rollingPageY);
                 this.dispatchEvent(evt);
             }
             else if (activeTouchCount === 1) {
-                const finalX = data.rollingPageX.at(-1);
-                const finalY = data.rollingPageY.at(-1);
-                const deltaT = data.rollingTimestamps.at(-1) - data.rollingTimestamps[0];
+                const finalX = arrays.tail(data.rollingPageX);
+                const finalY = arrays.tail(data.rollingPageY);
+                const deltaT = arrays.tail(data.rollingTimestamps) - data.rollingTimestamps[0];
                 const deltaX = finalX - data.rollingPageX[0];
                 const deltaY = finalY - data.rollingPageY[0];
                 // We need to get all the dispatch targets on the start of the inertia event
@@ -185,27 +182,16 @@ class Gesture extends Disposable {
                     return;
                 }
             }
-            const targets = [];
             for (const target of this.targets) {
                 if (target.contains(event.initialTarget)) {
-                    let depth = 0;
-                    let now = event.initialTarget;
-                    while (now && now !== target) {
-                        depth++;
-                        now = now.parentElement;
-                    }
-                    targets.push([depth, target]);
+                    target.dispatchEvent(event);
+                    this.dispatched = true;
                 }
-            }
-            targets.sort((a, b) => a[0] - b[0]);
-            for (const [_, target] of targets) {
-                target.dispatchEvent(event);
-                this.dispatched = true;
             }
         }
     }
     inertia(targetWindow, dispatchTo, t1, vX, dirX, x, vY, dirY, y) {
-        this.handle = scheduleAtNextAnimationFrame(targetWindow, () => {
+        this.handle = DomUtils.scheduleAtNextAnimationFrame(targetWindow, () => {
             const now = Date.now();
             // velocity: old speed + accel_over_time
             const deltaT = now - t1;
@@ -241,8 +227,8 @@ class Gesture extends Disposable {
             }
             const data = this.activeTouches[touch.identifier];
             const evt = this.newGestureEvent(EventType.Change, data.initialTarget);
-            evt.translationX = touch.pageX - data.rollingPageX.at(-1);
-            evt.translationY = touch.pageY - data.rollingPageY.at(-1);
+            evt.translationX = touch.pageX - arrays.tail(data.rollingPageX);
+            evt.translationY = touch.pageY - arrays.tail(data.rollingPageY);
             evt.pageX = touch.pageX;
             evt.pageY = touch.pageY;
             this.dispatchEvent(evt);
@@ -263,8 +249,9 @@ class Gesture extends Disposable {
         }
     }
 }
+Gesture.SCROLL_FRICTION = -0.005;
+Gesture.HOLD_DELAY = 700;
+Gesture.CLEAR_TAP_COUNT_TIME = 400; // ms
 __decorate([
     memoize
 ], Gesture, "isTouchDevice", null);
-
-export { EventType, Gesture };

@@ -1,13 +1,12 @@
-import { isMacintosh, isLinux, isWindows, isWeb, isEdge, isFirefox, isChrome, isSafari } from '../../../base/common/platform.js';
-import { isFalsyOrWhitespace } from '../../../base/common/strings.js';
-import { Scanner } from './scanner.js';
-import { createDecorator } from '../../instantiation/common/instantiation.js';
-import { localize } from '../../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { isChrome, isEdge, isFirefox, isLinux, isMacintosh, isSafari, isWeb, isWindows } from '../../../base/common/platform.js';
+import { isFalsyOrWhitespace } from '../../../base/common/strings.js';
+import { Scanner } from './scanner.js';
+import { createDecorator } from '../../instantiation/common/instantiation.js';
+import { localize } from '../../../nls.js';
 const CONSTANT_VALUES = new Map();
 CONSTANT_VALUES.set('false', false);
 CONSTANT_VALUES.set('true', true);
@@ -24,14 +23,14 @@ const hasOwnProperty = Object.prototype.hasOwnProperty;
 const defaultConfig = {
     regexParsingWithErrorRecovery: true
 };
-const errorEmptyString = localize(1675, "Empty context key expression");
-const hintEmptyString = localize(1676, "Did you forget to write an expression? You can also put 'false' or 'true' to always evaluate to false or true, respectively.");
-const errorNoInAfterNot = localize(1677, "'in' after 'not'.");
-const errorClosingParenthesis = localize(1678, "closing parenthesis ')'");
-const errorUnexpectedToken = localize(1679, "Unexpected token");
-const hintUnexpectedToken = localize(1680, "Did you forget to put && or || before the token?");
-const errorUnexpectedEOF = localize(1681, "Unexpected end of expression");
-const hintUnexpectedEOF = localize(1682, "Did you forget to put a context key?");
+const errorEmptyString = localize('contextkey.parser.error.emptyString', "Empty context key expression");
+const hintEmptyString = localize('contextkey.parser.error.emptyString.hint', "Did you forget to write an expression? You can also put 'false' or 'true' to always evaluate to false or true, respectively.");
+const errorNoInAfterNot = localize('contextkey.parser.error.noInAfterNot', "'in' after 'not'.");
+const errorClosingParenthesis = localize('contextkey.parser.error.closingParenthesis', "closing parenthesis ')'");
+const errorUnexpectedToken = localize('contextkey.parser.error.unexpectedToken', "Unexpected token");
+const hintUnexpectedToken = localize('contextkey.parser.error.unexpectedToken.hint', "Did you forget to put && or || before the token?");
+const errorUnexpectedEOF = localize('contextkey.parser.error.unexpectedEOF', "Unexpected end of expression");
+const hintUnexpectedEOF = localize('contextkey.parser.error.unexpectedEOF.hint', "Did you forget to put a context key?");
 /**
  * A parser for context key expressions.
  *
@@ -49,10 +48,7 @@ const hintUnexpectedEOF = localize(1682, "Did you forget to put a context key?")
  * }
  * ```
  */
-class Parser {
-    // Note: this doesn't produce an exact syntax tree but a normalized one
-    // ContextKeyExpression's that we use as AST nodes do not expose constructors that do not normalize
-    static { this._parseError = new Error(); }
+export class Parser {
     constructor(_config = defaultConfig) {
         this._config = _config;
         // lifetime note: `_scanner` lives as long as the parser does, i.e., is not reset between calls to `parse`
@@ -128,7 +124,7 @@ class Parser {
                     this._advance();
                     const expr = this._expr();
                     this._consume(1 /* TokenType.RParen */, errorClosingParenthesis);
-                    return expr?.negate();
+                    return expr === null || expr === void 0 ? void 0 : expr.negate();
                 }
                 case 17 /* TokenType.Str */:
                     this._advance();
@@ -376,7 +372,7 @@ class Parser {
         throw this._errExpectedButGot(message, this._peek());
     }
     _errExpectedButGot(expected, got, additionalInfo) {
-        const message = localize(1683, "Expected: {0}\nReceived: '{1}'.", expected, Scanner.getLexeme(got));
+        const message = localize('contextkey.parser.error.expectedButGot', "Expected: {0}\nReceived: '{1}'.", expected, Scanner.getLexeme(got));
         const offset = got.offset;
         const lexeme = Scanner.getLexeme(got);
         this._parsingErrors.push({ message, offset, lexeme, additionalInfo });
@@ -392,7 +388,10 @@ class Parser {
         return this._peek().type === 20 /* TokenType.EOF */;
     }
 }
-class ContextKeyExpr {
+// Note: this doesn't produce an exact syntax tree but a normalized one
+// ContextKeyExpression's that we use as AST nodes do not expose constructors that do not normalize
+Parser._parseError = new Error();
+export class ContextKeyExpr {
     static false() {
         return ContextKeyFalseExpr.INSTANCE;
     }
@@ -426,7 +425,6 @@ class ContextKeyExpr {
     static or(...expr) {
         return ContextKeyOrExpr.create(expr, null, true);
     }
-    static { this._parser = new Parser({ regexParsingWithErrorRecovery: false }); }
     static deserialize(serialized) {
         if (serialized === undefined || serialized === null) { // an empty string needs to be handled by the parser to get a corresponding parsing error reported
             return undefined;
@@ -435,7 +433,8 @@ class ContextKeyExpr {
         return expr;
     }
 }
-function expressionsAreEqualWithConstantSubstitution(a, b) {
+ContextKeyExpr._parser = new Parser({ regexParsingWithErrorRecovery: false });
+export function expressionsAreEqualWithConstantSubstitution(a, b) {
     const aExpr = a ? a.substituteConstants() : undefined;
     const bExpr = b ? b.substituteConstants() : undefined;
     if (!aExpr && !bExpr) {
@@ -449,8 +448,7 @@ function expressionsAreEqualWithConstantSubstitution(a, b) {
 function cmp(a, b) {
     return a.cmp(b);
 }
-class ContextKeyFalseExpr {
-    static { this.INSTANCE = new ContextKeyFalseExpr(); }
+export class ContextKeyFalseExpr {
     constructor() {
         this.type = 0 /* ContextKeyExprType.False */;
     }
@@ -476,8 +474,8 @@ class ContextKeyFalseExpr {
         return ContextKeyTrueExpr.INSTANCE;
     }
 }
-class ContextKeyTrueExpr {
-    static { this.INSTANCE = new ContextKeyTrueExpr(); }
+ContextKeyFalseExpr.INSTANCE = new ContextKeyFalseExpr();
+export class ContextKeyTrueExpr {
     constructor() {
         this.type = 1 /* ContextKeyExprType.True */;
     }
@@ -503,7 +501,8 @@ class ContextKeyTrueExpr {
         return ContextKeyFalseExpr.INSTANCE;
     }
 }
-class ContextKeyDefinedExpr {
+ContextKeyTrueExpr.INSTANCE = new ContextKeyTrueExpr();
+export class ContextKeyDefinedExpr {
     static create(key, negated = null) {
         const constantValue = CONSTANT_VALUES.get(key);
         if (typeof constantValue === 'boolean') {
@@ -551,7 +550,7 @@ class ContextKeyDefinedExpr {
         return this.negated;
     }
 }
-class ContextKeyEqualsExpr {
+export class ContextKeyEqualsExpr {
     static create(key, value, negated = null) {
         if (typeof value === 'boolean') {
             return (value ? ContextKeyDefinedExpr.create(key, negated) : ContextKeyNotExpr.create(key, negated));
@@ -607,7 +606,7 @@ class ContextKeyEqualsExpr {
         return this.negated;
     }
 }
-class ContextKeyInExpr {
+export class ContextKeyInExpr {
     static create(key, valueKey) {
         return new ContextKeyInExpr(key, valueKey);
     }
@@ -636,7 +635,6 @@ class ContextKeyInExpr {
         const source = context.getValue(this.valueKey);
         const item = context.getValue(this.key);
         if (Array.isArray(source)) {
-            // eslint-disable-next-line local/code-no-any-casts
             return source.includes(item);
         }
         if (typeof item === 'string' && typeof source === 'object' && source !== null) {
@@ -657,7 +655,7 @@ class ContextKeyInExpr {
         return this.negated;
     }
 }
-class ContextKeyNotInExpr {
+export class ContextKeyNotInExpr {
     static create(key, valueKey) {
         return new ContextKeyNotInExpr(key, valueKey);
     }
@@ -695,7 +693,7 @@ class ContextKeyNotInExpr {
         return this._negated;
     }
 }
-class ContextKeyNotEqualsExpr {
+export class ContextKeyNotEqualsExpr {
     static create(key, value, negated = null) {
         if (typeof value === 'boolean') {
             if (value) {
@@ -754,7 +752,7 @@ class ContextKeyNotEqualsExpr {
         return this.negated;
     }
 }
-class ContextKeyNotExpr {
+export class ContextKeyNotExpr {
     static create(key, negated = null) {
         const constantValue = CONSTANT_VALUES.get(key);
         if (typeof constantValue === 'boolean') {
@@ -814,7 +812,7 @@ function withFloatOrStr(value, callback) {
     }
     return ContextKeyFalseExpr.INSTANCE;
 }
-class ContextKeyGreaterExpr {
+export class ContextKeyGreaterExpr {
     static create(key, _value, negated = null) {
         return withFloatOrStr(_value, (value) => new ContextKeyGreaterExpr(key, value, negated));
     }
@@ -858,7 +856,7 @@ class ContextKeyGreaterExpr {
         return this.negated;
     }
 }
-class ContextKeyGreaterEqualsExpr {
+export class ContextKeyGreaterEqualsExpr {
     static create(key, _value, negated = null) {
         return withFloatOrStr(_value, (value) => new ContextKeyGreaterEqualsExpr(key, value, negated));
     }
@@ -902,7 +900,7 @@ class ContextKeyGreaterEqualsExpr {
         return this.negated;
     }
 }
-class ContextKeySmallerExpr {
+export class ContextKeySmallerExpr {
     static create(key, _value, negated = null) {
         return withFloatOrStr(_value, (value) => new ContextKeySmallerExpr(key, value, negated));
     }
@@ -946,7 +944,7 @@ class ContextKeySmallerExpr {
         return this.negated;
     }
 }
-class ContextKeySmallerEqualsExpr {
+export class ContextKeySmallerEqualsExpr {
     static create(key, _value, negated = null) {
         return withFloatOrStr(_value, (value) => new ContextKeySmallerEqualsExpr(key, value, negated));
     }
@@ -990,7 +988,7 @@ class ContextKeySmallerEqualsExpr {
         return this.negated;
     }
 }
-class ContextKeyRegexExpr {
+export class ContextKeyRegexExpr {
     static create(key, regexp) {
         return new ContextKeyRegexExpr(key, regexp);
     }
@@ -1052,7 +1050,7 @@ class ContextKeyRegexExpr {
         return this.negated;
     }
 }
-class ContextKeyNotRegexExpr {
+export class ContextKeyNotRegexExpr {
     static create(actual) {
         return new ContextKeyNotRegexExpr(actual);
     }
@@ -1116,7 +1114,7 @@ function eliminateConstantsInArray(arr) {
     }
     return newArr;
 }
-class ContextKeyAndExpr {
+export class ContextKeyAndExpr {
     static create(_expr, negated, extraRedundantCheck) {
         return ContextKeyAndExpr._normalizeArr(_expr, negated, extraRedundantCheck);
     }
@@ -1274,7 +1272,7 @@ class ContextKeyAndExpr {
         return this.negated;
     }
 }
-class ContextKeyOrExpr {
+export class ContextKeyOrExpr {
     static create(_expr, negated, extraRedundantCheck) {
         return ContextKeyOrExpr._normalizeArr(_expr, negated, extraRedundantCheck);
     }
@@ -1426,8 +1424,7 @@ class ContextKeyOrExpr {
         return this.negated;
     }
 }
-class RawContextKey extends ContextKeyDefinedExpr {
-    static { this._info = []; }
+export class RawContextKey extends ContextKeyDefinedExpr {
     static all() {
         return RawContextKey._info.values();
     }
@@ -1455,7 +1452,8 @@ class RawContextKey extends ContextKeyDefinedExpr {
         return ContextKeyEqualsExpr.create(this.key, value);
     }
 }
-const IContextKeyService = createDecorator('contextKeyService');
+RawContextKey._info = [];
+export const IContextKeyService = createDecorator('contextKeyService');
 function cmp1(key1, key2) {
     if (key1 < key2) {
         return -1;
@@ -1483,7 +1481,7 @@ function cmp2(key1, value1, key2, value2) {
 /**
  * Returns true if it is provable `p` implies `q`.
  */
-function implies(p, q) {
+export function implies(p, q) {
     if (p.type === 0 /* ContextKeyExprType.False */ || q.type === 1 /* ContextKeyExprType.True */) {
         // false implies anything
         // anything implies true
@@ -1547,5 +1545,3 @@ function getTerminals(node) {
     }
     return [node];
 }
-
-export { ContextKeyAndExpr, ContextKeyDefinedExpr, ContextKeyEqualsExpr, ContextKeyExpr, ContextKeyFalseExpr, ContextKeyGreaterEqualsExpr, ContextKeyGreaterExpr, ContextKeyInExpr, ContextKeyNotEqualsExpr, ContextKeyNotExpr, ContextKeyNotInExpr, ContextKeyNotRegexExpr, ContextKeyOrExpr, ContextKeyRegexExpr, ContextKeySmallerEqualsExpr, ContextKeySmallerExpr, ContextKeyTrueExpr, IContextKeyService, Parser, RawContextKey, expressionsAreEqualWithConstantSubstitution, implies };

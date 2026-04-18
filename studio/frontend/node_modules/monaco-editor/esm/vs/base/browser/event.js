@@ -1,10 +1,9 @@
-import { Emitter } from '../common/event.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class DomEmitter {
+import { Emitter } from '../common/event.js';
+export class DomEmitter {
     get event() {
         return this.emitter.event;
     }
@@ -19,5 +18,3 @@ class DomEmitter {
         this.emitter.dispose();
     }
 }
-
-export { DomEmitter };

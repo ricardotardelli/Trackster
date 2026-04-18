@@ -1,10 +1,9 @@
-import { win32, posix } from './path.js';
-import { isWindows } from './platform.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as paths from './path.js';
+import { isWindows } from './platform.js';
 const _schemePattern = /^\w[\w\d+.-]*$/;
 const _singleSlashStart = /^\//;
 const _doubleSlashStart = /^\/\//;
@@ -85,12 +84,12 @@ const _regexp = /^(([^:/?#]+?):)?(\/\/([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?/;
  *       urn:example:animal:ferret:nose
  * ```
  */
-class URI {
+export class URI {
     static isUri(thing) {
         if (thing instanceof URI) {
             return true;
         }
-        if (!thing || typeof thing !== 'object') {
+        if (!thing) {
             return false;
         }
         return typeof thing.authority === 'string'
@@ -283,10 +282,10 @@ class URI {
         }
         let newPath;
         if (isWindows && uri.scheme === 'file') {
-            newPath = URI.file(win32.join(uriToFsPath(uri, true), ...pathFragment)).path;
+            newPath = URI.file(paths.win32.join(uriToFsPath(uri, true), ...pathFragment)).path;
         }
         else {
-            newPath = posix.join(uri.path, ...pathFragment);
+            newPath = paths.posix.join(uri.path, ...pathFragment);
         }
         return uri.with({ path: newPath });
     }
@@ -309,6 +308,7 @@ class URI {
         return this;
     }
     static revive(data) {
+        var _a, _b;
         if (!data) {
             return data;
         }
@@ -317,8 +317,8 @@ class URI {
         }
         else {
             const result = new Uri(data);
-            result._formatted = data.external ?? null;
-            result._fsPath = data._sep === _pathSepMarker ? data.fsPath ?? null : null;
+            result._formatted = (_a = data.external) !== null && _a !== void 0 ? _a : null;
+            result._fsPath = data._sep === _pathSepMarker ? (_b = data.fsPath) !== null && _b !== void 0 ? _b : null : null;
             return result;
         }
     }
@@ -350,7 +350,6 @@ class Uri extends URI {
         }
     }
     toJSON() {
-        // eslint-disable-next-line local/code-no-dangerous-type-assertions
         const res = {
             $mid: 1 /* MarshalledId.Uri */
         };
@@ -482,7 +481,7 @@ function encodeURIComponentMinimal(path) {
 /**
  * Compute `fsPath` for the given uri
  */
-function uriToFsPath(uri, keepDriveLetterCasing) {
+export function uriToFsPath(uri, keepDriveLetterCasing) {
     let value;
     if (uri.authority && uri.path.length > 1 && uri.scheme === 'file') {
         // unc path: file://shares/c$/far/boo
@@ -586,7 +585,7 @@ function decodeURIComponentGraceful(str) {
     try {
         return decodeURIComponent(str);
     }
-    catch {
+    catch (_a) {
         if (str.length > 3) {
             return str.substr(0, 3) + decodeURIComponentGraceful(str.substr(3));
         }
@@ -602,5 +601,3 @@ function percentDecode(str) {
     }
     return str.replace(_rEncodedAsHex, (match) => decodeURIComponentGraceful(match));
 }
-
-export { URI, uriToFsPath };

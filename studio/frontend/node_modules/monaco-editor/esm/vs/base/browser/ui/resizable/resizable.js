@@ -1,18 +1,17 @@
-import { Dimension } from '../../dom.js';
-import { Sash, OrthogonalEdge } from '../sash/sash.js';
-import { Emitter, Event } from '../../../common/event.js';
-import { DisposableStore } from '../../../common/lifecycle.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ResizableHTMLElement {
-    get onDidWillResize() { return this._onDidWillResize.event; }
-    get onDidResize() { return this._onDidResize.event; }
+import { Dimension } from '../../dom.js';
+import { OrthogonalEdge, Sash } from '../sash/sash.js';
+import { Emitter, Event } from '../../../common/event.js';
+import { DisposableStore } from '../../../common/lifecycle.js';
+export class ResizableHTMLElement {
     constructor() {
         this._onDidWillResize = new Emitter();
+        this.onDidWillResize = this._onDidWillResize.event;
         this._onDidResize = new Emitter();
+        this.onDidResize = this._onDidResize.event;
         this._sashListener = new DisposableStore();
         this._size = new Dimension(0, 0);
         this._minSize = new Dimension(0, 0);
@@ -146,5 +145,3 @@ class ResizableHTMLElement {
         return this._preferredSize;
     }
 }
-
-export { ResizableHTMLElement };

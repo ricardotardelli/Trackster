@@ -1,19 +1,18 @@
-import { matchesFuzzy } from './filters.js';
-import { ltrim } from './strings.js';
-import { ThemeIcon } from './themables.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { matchesFuzzy } from './filters.js';
+import { ltrim } from './strings.js';
+import { ThemeIcon } from './themables.js';
 const iconStartMarker = '$(';
 const iconsRegex = new RegExp(`\\$\\(${ThemeIcon.iconNameExpression}(?:${ThemeIcon.iconModifierExpression})?\\)`, 'g'); // no capturing groups
 const escapeIconsRegex = new RegExp(`(\\\\)?${iconsRegex.source}`, 'g');
-function escapeIcons(text) {
+export function escapeIcons(text) {
     return text.replace(escapeIconsRegex, (match, escaped) => escaped ? match : `\\${match}`);
 }
 const markdownEscapedIconsRegex = new RegExp(`\\\\${iconsRegex.source}`, 'g');
-function markdownEscapeEscapedIcons(text) {
+export function markdownEscapeEscapedIcons(text) {
     // Need to add an extra \ for escaping in markdown
     return text.replace(markdownEscapedIconsRegex, match => `\\${match}`);
 }
@@ -21,7 +20,7 @@ const stripIconsRegex = new RegExp(`(\\s)?(\\\\)?${iconsRegex.source}(\\s)?`, 'g
 /**
  * Takes a label with icons (`$(iconId)xyz`)  and strips the icons out (`xyz`)
  */
-function stripIcons(text) {
+export function stripIcons(text) {
     if (text.indexOf(iconStartMarker) === -1) {
         return text;
     }
@@ -30,7 +29,7 @@ function stripIcons(text) {
 /**
  * Takes a label with icons (`$(iconId)xyz`), removes the icon syntax adds whitespace so that screen readers can read the text better.
  */
-function getCodiconAriaLabel(text) {
+export function getCodiconAriaLabel(text) {
     if (!text) {
         return '';
     }
@@ -40,7 +39,7 @@ const _parseIconsRegex = new RegExp(`\\$\\(${ThemeIcon.iconNameCharacter}+\\)`, 
 /**
  * Takes a label with icons (`abc $(iconId)xyz`) and returns the text (`abc xyz`) and the offsets of the icons (`[3]`)
  */
-function parseLabelWithIcons(input) {
+export function parseLabelWithIcons(input) {
     _parseIconsRegex.lastIndex = 0;
     let text = '';
     const iconOffsets = [];
@@ -48,7 +47,7 @@ function parseLabelWithIcons(input) {
     while (true) {
         const pos = _parseIconsRegex.lastIndex;
         const match = _parseIconsRegex.exec(input);
-        const chars = input.substring(pos, match?.index);
+        const chars = input.substring(pos, match === null || match === void 0 ? void 0 : match.index);
         if (chars.length > 0) {
             text += chars;
             for (let i = 0; i < chars.length; i++) {
@@ -62,7 +61,7 @@ function parseLabelWithIcons(input) {
     }
     return { text, iconOffsets };
 }
-function matchesFuzzyIconAware(query, target, enableSeparateSubstringMatching = false) {
+export function matchesFuzzyIconAware(query, target, enableSeparateSubstringMatching = false) {
     const { text, iconOffsets } = target;
     // Return early if there are no icon markers in the word to match against
     if (!iconOffsets || iconOffsets.length === 0) {
@@ -84,5 +83,3 @@ function matchesFuzzyIconAware(query, target, enableSeparateSubstringMatching = 
     }
     return matches;
 }
-
-export { escapeIcons, getCodiconAriaLabel, markdownEscapeEscapedIcons, matchesFuzzyIconAware, parseLabelWithIcons, stripIcons };

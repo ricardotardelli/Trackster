@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class LinesDiff {
+export class LinesDiff {
     constructor(changes, 
     /**
      * Sorted by original line ranges.
@@ -19,11 +19,9 @@ class LinesDiff {
         this.hitTimeout = hitTimeout;
     }
 }
-class MovedText {
+export class MovedText {
     constructor(lineRangeMapping, changes) {
         this.lineRangeMapping = lineRangeMapping;
         this.changes = changes;
     }
 }
-
-export { LinesDiff, MovedText };

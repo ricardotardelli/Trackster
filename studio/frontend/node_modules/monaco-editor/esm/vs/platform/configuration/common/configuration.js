@@ -1,14 +1,17 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { createDecorator } from '../../instantiation/common/instantiation.js';
-
-const IConfigurationService = createDecorator('configurationService');
-function toValuesTree(properties, conflictReporter) {
+export const IConfigurationService = createDecorator('configurationService');
+export function toValuesTree(properties, conflictReporter) {
     const root = Object.create(null);
     for (const key in properties) {
         addToValueTree(root, key, properties[key], conflictReporter);
     }
     return root;
 }
-function addToValueTree(settingsTreeRoot, key, value, conflictReporter) {
+export function addToValueTree(settingsTreeRoot, key, value, conflictReporter) {
     const segments = key.split('.');
     const last = segments.pop();
     let curr = settingsTreeRoot;
@@ -20,10 +23,6 @@ function addToValueTree(settingsTreeRoot, key, value, conflictReporter) {
                 obj = curr[s] = Object.create(null);
                 break;
             case 'object':
-                if (obj === null) {
-                    conflictReporter(`Ignoring ${key} as ${segments.slice(0, i + 1).join('.')} is null`);
-                    return;
-                }
                 break;
             default:
                 conflictReporter(`Ignoring ${key} as ${segments.slice(0, i + 1).join('.')} is ${JSON.stringify(obj)}`);
@@ -43,14 +42,11 @@ function addToValueTree(settingsTreeRoot, key, value, conflictReporter) {
         conflictReporter(`Ignoring ${key} as ${segments.join('.')} is ${JSON.stringify(curr)}`);
     }
 }
-function removeFromValueTree(valueTree, key) {
+export function removeFromValueTree(valueTree, key) {
     const segments = key.split('.');
     doRemoveFromValueTree(valueTree, segments);
 }
 function doRemoveFromValueTree(valueTree, segments) {
-    if (!valueTree) {
-        return;
-    }
     const first = segments.shift();
     if (segments.length === 0) {
         // Reached last segment
@@ -67,7 +63,10 @@ function doRemoveFromValueTree(valueTree, segments) {
         }
     }
 }
-function getConfigurationValue(config, settingPath, defaultValue) {
+/**
+ * A helper function to get the configuration value with a specific settings path (e.g. config.some.setting)
+ */
+export function getConfigurationValue(config, settingPath, defaultValue) {
     function accessSetting(config, path) {
         let current = config;
         for (const component of path) {
@@ -82,11 +81,6 @@ function getConfigurationValue(config, settingPath, defaultValue) {
     const result = accessSetting(config, path);
     return typeof result === 'undefined' ? defaultValue : result;
 }
-function getLanguageTagSettingPlainKey(settingKey) {
-    return settingKey
-        .replace(/^\[/, '')
-        .replace(/]$/g, '')
-        .replace(/\]\[/g, ', ');
+export function getLanguageTagSettingPlainKey(settingKey) {
+    return settingKey.replace(/[\[\]]/g, '');
 }
-
-export { IConfigurationService, addToValueTree, getConfigurationValue, getLanguageTagSettingPlainKey, removeFromValueTree, toValuesTree };

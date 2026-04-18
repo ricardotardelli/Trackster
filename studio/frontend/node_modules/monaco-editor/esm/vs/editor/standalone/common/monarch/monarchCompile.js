@@ -1,6 +1,3 @@
-import { isString } from '../../../../base/common/types.js';
-import { createError, fixCase, empty, substituteMatchesRe, stateExists, substituteMatches } from './monarchCommon.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -9,6 +6,7 @@ import { createError, fixCase, empty, substituteMatchesRe, stateExists, substitu
  * This module only exports 'compile' which compiles a JSON language definition
  * into a typed and checked ILexer definition.
  */
+import * as monarchCommon from './monarchCommon.js';
 /*
  * Type helpers
  *
@@ -66,7 +64,15 @@ function createKeywordMatcher(arr, caseInsensitive = false) {
         };
     }
 }
-function compileRegExp(lexer, str, handleSn) {
+// Lexer helpers
+/**
+ * Compiles a regular expression string, adding the 'i' flag if 'ignoreCase' is set, and the 'u' flag if 'unicode' is set.
+ * Also replaces @\w+ or sequences with the content of the specified attribute
+ * @\w+ replacement can be avoided by escaping `@` signs with another `@` sign.
+ * @example /@attr/ will be replaced with the value of lexer[attr]
+ * @example /@@text/ will not be replaced and will become /@text/.
+ */
+function compileRegExp(lexer, str) {
     // @@ must be interpreted as a literal @, so we replace all occurences of @@ with a placeholder character
     str = str.replace(/@@/g, `\x01`);
     let n = 0;
@@ -84,35 +90,19 @@ function compileRegExp(lexer, str, handleSn) {
             }
             else {
                 if (lexer[attr] === undefined) {
-                    throw createError(lexer, 'language definition does not contain attribute \'' + attr + '\', used at: ' + str);
+                    throw monarchCommon.createError(lexer, 'language definition does not contain attribute \'' + attr + '\', used at: ' + str);
                 }
                 else {
-                    throw createError(lexer, 'attribute reference \'' + attr + '\' must be a string, used at: ' + str);
+                    throw monarchCommon.createError(lexer, 'attribute reference \'' + attr + '\' must be a string, used at: ' + str);
                 }
             }
-            return (empty(sub) ? '' : '(?:' + sub + ')');
+            return (monarchCommon.empty(sub) ? '' : '(?:' + sub + ')');
         });
         n++;
     } while (hadExpansion && n < 5);
     // handle escaped @@
     str = str.replace(/\x01/g, '@');
     const flags = (lexer.ignoreCase ? 'i' : '') + (lexer.unicode ? 'u' : '');
-    // handle $Sn
-    if (handleSn) {
-        const match = str.match(/\$[sS](\d\d?)/g);
-        if (match) {
-            let lastState = null;
-            let lastRegEx = null;
-            return (state) => {
-                if (lastRegEx && lastState === state) {
-                    return lastRegEx;
-                }
-                lastState = state;
-                lastRegEx = new RegExp(substituteMatchesRe(lexer, str, state), flags);
-                return lastRegEx;
-            };
-        }
-    }
     return new RegExp(str, flags);
 }
 /**
@@ -178,10 +168,10 @@ function createGuard(lexer, ruleName, tkey, val) {
     else if (op === '@' || op === '!@') {
         const words = lexer[pat];
         if (!words) {
-            throw createError(lexer, 'the @ match target \'' + pat + '\' is not defined, in rule: ' + ruleName);
+            throw monarchCommon.createError(lexer, 'the @ match target \'' + pat + '\' is not defined, in rule: ' + ruleName);
         }
         if (!(isArrayOf(function (elem) { return (typeof (elem) === 'string'); }, words))) {
-            throw createError(lexer, 'the @ match target \'' + pat + '\' must be an array of strings, in rule: ' + ruleName);
+            throw monarchCommon.createError(lexer, 'the @ match target \'' + pat + '\' must be an array of strings, in rule: ' + ruleName);
         }
         const inWords = createKeywordMatcher(words, lexer.ignoreCase);
         tester = function (s) { return (op === '@' ? inWords(s) : !inWords(s)); };
@@ -189,25 +179,25 @@ function createGuard(lexer, ruleName, tkey, val) {
     else if (op === '~' || op === '!~') {
         if (pat.indexOf('$') < 0) {
             // precompile regular expression
-            const re = compileRegExp(lexer, '^' + pat + '$', false);
+            const re = compileRegExp(lexer, '^' + pat + '$');
             tester = function (s) { return (op === '~' ? re.test(s) : !re.test(s)); };
         }
         else {
             tester = function (s, id, matches, state) {
-                const re = compileRegExp(lexer, '^' + substituteMatches(lexer, pat, id, matches, state) + '$', false);
+                const re = compileRegExp(lexer, '^' + monarchCommon.substituteMatches(lexer, pat, id, matches, state) + '$');
                 return re.test(s);
             };
         }
     }
     else { // if (op==='==' || op==='!=') {
         if (pat.indexOf('$') < 0) {
-            const patx = fixCase(lexer, pat);
+            const patx = monarchCommon.fixCase(lexer, pat);
             tester = function (s) { return (op === '==' ? s === patx : s !== patx); };
         }
         else {
-            const patx = fixCase(lexer, pat);
+            const patx = monarchCommon.fixCase(lexer, pat);
             tester = function (s, id, matches, state, eos) {
-                const patexp = substituteMatches(lexer, patx, id, matches, state);
+                const patexp = monarchCommon.substituteMatches(lexer, patx, id, matches, state);
                 return (op === '==' ? s === patexp : s !== patexp);
             };
         }
@@ -246,7 +236,7 @@ function compileAction(lexer, ruleName, action) {
     }
     else if (action.token || action.token === '') {
         if (typeof (action.token) !== 'string') {
-            throw createError(lexer, 'a \'token\' attribute must be of type string, in rule: ' + ruleName);
+            throw monarchCommon.createError(lexer, 'a \'token\' attribute must be of type string, in rule: ' + ruleName);
         }
         else {
             // only copy specific typed fields (only happens once during compile Lexer)
@@ -262,12 +252,12 @@ function compileAction(lexer, ruleName, action) {
                     newAction.bracket = -1 /* monarchCommon.MonarchBracket.Close */;
                 }
                 else {
-                    throw createError(lexer, 'a \'bracket\' attribute must be either \'@open\' or \'@close\', in rule: ' + ruleName);
+                    throw monarchCommon.createError(lexer, 'a \'bracket\' attribute must be either \'@open\' or \'@close\', in rule: ' + ruleName);
                 }
             }
             if (action.next) {
                 if (typeof (action.next) !== 'string') {
-                    throw createError(lexer, 'the next state must be a string value in rule: ' + ruleName);
+                    throw monarchCommon.createError(lexer, 'the next state must be a string value in rule: ' + ruleName);
                 }
                 else {
                     let next = action.next;
@@ -276,8 +266,8 @@ function compileAction(lexer, ruleName, action) {
                             next = next.substr(1); // peel off starting @ sign
                         }
                         if (next.indexOf('$') < 0) { // no dollar substitution, we can check if the state exists
-                            if (!stateExists(lexer, substituteMatches(lexer, next, '', [], ''))) {
-                                throw createError(lexer, 'the next state \'' + action.next + '\' is not defined in rule: ' + ruleName);
+                            if (!monarchCommon.stateExists(lexer, monarchCommon.substituteMatches(lexer, next, '', [], ''))) {
+                                throw monarchCommon.createError(lexer, 'the next state \'' + action.next + '\' is not defined in rule: ' + ruleName);
                             }
                         }
                     }
@@ -310,7 +300,6 @@ function compileAction(lexer, ruleName, action) {
     else if (action.cases) {
         // build an array of test cases
         const cases = [];
-        let hasEmbeddedEndInCases = false;
         // for each case, push a test function and result value
         for (const tkey in action.cases) {
             if (action.cases.hasOwnProperty(tkey)) {
@@ -325,15 +314,11 @@ function compileAction(lexer, ruleName, action) {
                 else {
                     cases.push(createGuard(lexer, ruleName, tkey, val)); // call separate function to avoid local variable capture
                 }
-                if (!hasEmbeddedEndInCases) {
-                    hasEmbeddedEndInCases = !isString(val) && (val.hasEmbeddedEndInCases || ['@pop', '@popall'].includes(val.nextEmbedded || ''));
-                }
             }
         }
         // create a matching function
         const def = lexer.defaultToken;
         return {
-            hasEmbeddedEndInCases,
             test: function (id, matches, state, eos) {
                 for (const _case of cases) {
                     const didmatch = (!_case.test || _case.test(id, matches, state, eos));
@@ -346,7 +331,7 @@ function compileAction(lexer, ruleName, action) {
         };
     }
     else {
-        throw createError(lexer, 'an action must be a string, an object with a \'token\' or \'cases\' attribute, or an array of actions; in rule: ' + ruleName);
+        throw monarchCommon.createError(lexer, 'an action must be a string, an object with a \'token\' or \'cases\' attribute, or an array of actions; in rule: ' + ruleName);
     }
 }
 /**
@@ -369,22 +354,14 @@ class Rule {
             sregex = re.source;
         }
         else {
-            throw createError(lexer, 'rules must start with a match string or regular expression: ' + this.name);
+            throw monarchCommon.createError(lexer, 'rules must start with a match string or regular expression: ' + this.name);
         }
         this.matchOnlyAtLineStart = (sregex.length > 0 && sregex[0] === '^');
         this.name = this.name + ': ' + sregex;
-        this.regex = compileRegExp(lexer, '^(?:' + (this.matchOnlyAtLineStart ? sregex.substr(1) : sregex) + ')', true);
+        this.regex = compileRegExp(lexer, '^(?:' + (this.matchOnlyAtLineStart ? sregex.substr(1) : sregex) + ')');
     }
     setAction(lexer, act) {
         this.action = compileAction(lexer, this.name, act);
-    }
-    resolveRegex(state) {
-        if (this.regex instanceof RegExp) {
-            return this.regex;
-        }
-        else {
-            return this.regex(state);
-        }
     }
 }
 /**
@@ -396,28 +373,24 @@ class Rule {
  * (Currently we have no samples that need this so perhaps we should always have
  * jsonStrict to true).
  */
-function compile(languageId, json) {
+export function compile(languageId, json) {
     if (!json || typeof (json) !== 'object') {
         throw new Error('Monarch: expecting a language definition object');
     }
     // Create our lexer
-    const lexer = {
-        languageId: languageId,
-        includeLF: bool(json.includeLF, false),
-        noThrow: false, // raise exceptions during compilation
-        maxStack: 100,
-        start: (typeof json.start === 'string' ? json.start : null),
-        ignoreCase: bool(json.ignoreCase, false),
-        unicode: bool(json.unicode, false),
-        tokenPostfix: string(json.tokenPostfix, '.' + languageId),
-        defaultToken: string(json.defaultToken, 'source'),
-        usesEmbedded: false, // becomes true if we find a nextEmbedded action
-        stateNames: {},
-        tokenizer: {},
-        brackets: []
-    };
+    const lexer = {};
+    lexer.languageId = languageId;
+    lexer.includeLF = bool(json.includeLF, false);
+    lexer.noThrow = false; // raise exceptions during compilation
+    lexer.maxStack = 100;
+    // Set standard fields: be defensive about types
+    lexer.start = (typeof json.start === 'string' ? json.start : null);
+    lexer.ignoreCase = bool(json.ignoreCase, false);
+    lexer.unicode = bool(json.unicode, false);
+    lexer.tokenPostfix = string(json.tokenPostfix, '.' + lexer.languageId);
+    lexer.defaultToken = string(json.defaultToken, 'source');
+    lexer.usesEmbedded = false; // becomes true if we find a nextEmbedded action
     // For calling compileAction later on
-    // eslint-disable-next-line local/code-no-any-casts
     const lexerMin = json;
     lexerMin.languageId = languageId;
     lexerMin.includeLF = lexer.includeLF;
@@ -433,13 +406,13 @@ function compile(languageId, json) {
             let include = rule.include;
             if (include) {
                 if (typeof (include) !== 'string') {
-                    throw createError(lexer, 'an \'include\' attribute must be a string at: ' + state);
+                    throw monarchCommon.createError(lexer, 'an \'include\' attribute must be a string at: ' + state);
                 }
                 if (include[0] === '@') {
                     include = include.substr(1); // peel off starting @
                 }
                 if (!json.tokenizer[include]) {
-                    throw createError(lexer, 'include target \'' + include + '\' is not defined at: ' + state);
+                    throw monarchCommon.createError(lexer, 'include target \'' + include + '\' is not defined at: ' + state);
                 }
                 addRules(state + '.' + include, newrules, json.tokenizer[include]);
             }
@@ -458,7 +431,7 @@ function compile(languageId, json) {
                             newrule.setAction(lexerMin, rule1);
                         }
                         else {
-                            throw createError(lexer, 'a next state as the last element of a rule can only be given if the action is either an object or a string, at: ' + state);
+                            throw monarchCommon.createError(lexer, 'a next state as the last element of a rule can only be given if the action is either an object or a string, at: ' + state);
                         }
                     }
                     else {
@@ -467,7 +440,7 @@ function compile(languageId, json) {
                 }
                 else {
                     if (!rule.regex) {
-                        throw createError(lexer, 'a rule must either be an array, or an object with a \'regex\' or \'include\' field at: ' + state);
+                        throw monarchCommon.createError(lexer, 'a rule must either be an array, or an object with a \'regex\' or \'include\' field at: ' + state);
                     }
                     if (rule.name) {
                         if (typeof rule.name === 'string') {
@@ -486,9 +459,8 @@ function compile(languageId, json) {
     }
     // compile the tokenizer rules
     if (!json.tokenizer || typeof (json.tokenizer) !== 'object') {
-        throw createError(lexer, 'a language definition must define the \'tokenizer\' attribute as an object');
+        throw monarchCommon.createError(lexer, 'a language definition must define the \'tokenizer\' attribute as an object');
     }
-    // eslint-disable-next-line local/code-no-any-casts
     lexer.tokenizer = [];
     for (const key in json.tokenizer) {
         if (json.tokenizer.hasOwnProperty(key)) {
@@ -503,9 +475,8 @@ function compile(languageId, json) {
     lexer.usesEmbedded = lexerMin.usesEmbedded; // can be set during compileAction
     // Set simple brackets
     if (json.brackets) {
-        // eslint-disable-next-line local/code-no-any-casts
         if (!(Array.isArray(json.brackets))) {
-            throw createError(lexer, 'the \'brackets\' attribute must be defined as an array');
+            throw monarchCommon.createError(lexer, 'the \'brackets\' attribute must be defined as an array');
         }
     }
     else {
@@ -523,18 +494,18 @@ function compile(languageId, json) {
             desc = { token: desc[2], open: desc[0], close: desc[1] };
         }
         if (desc.open === desc.close) {
-            throw createError(lexer, 'open and close brackets in a \'brackets\' attribute must be different: ' + desc.open +
+            throw monarchCommon.createError(lexer, 'open and close brackets in a \'brackets\' attribute must be different: ' + desc.open +
                 '\n hint: use the \'bracket\' attribute if matching on equal brackets is required.');
         }
         if (typeof desc.open === 'string' && typeof desc.token === 'string' && typeof desc.close === 'string') {
             brackets.push({
                 token: desc.token + lexer.tokenPostfix,
-                open: fixCase(lexer, desc.open),
-                close: fixCase(lexer, desc.close)
+                open: monarchCommon.fixCase(lexer, desc.open),
+                close: monarchCommon.fixCase(lexer, desc.close)
             });
         }
         else {
-            throw createError(lexer, 'every element in the \'brackets\' array must be a \'{open,close,token}\' object or array');
+            throw monarchCommon.createError(lexer, 'every element in the \'brackets\' array must be a \'{open,close,token}\' object or array');
         }
     }
     lexer.brackets = brackets;
@@ -542,5 +513,3 @@ function compile(languageId, json) {
     lexer.noThrow = true;
     return lexer;
 }
-
-export { compile };

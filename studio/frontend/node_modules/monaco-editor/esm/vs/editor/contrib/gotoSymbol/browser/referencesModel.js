@@ -1,18 +1,17 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { onUnexpectedError } from '../../../../base/common/errors.js';
 import { Emitter } from '../../../../base/common/event.js';
 import { defaultGenerator } from '../../../../base/common/idGenerator.js';
 import { dispose } from '../../../../base/common/lifecycle.js';
 import { ResourceMap } from '../../../../base/common/map.js';
-import { extUri, basename } from '../../../../base/common/resources.js';
-import { commonPrefixLength } from '../../../../base/common/strings.js';
+import { basename, extUri } from '../../../../base/common/resources.js';
+import * as strings from '../../../../base/common/strings.js';
 import { Range } from '../../../common/core/range.js';
 import { localize } from '../../../../nls.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class OneReference {
+export class OneReference {
     constructor(isProviderFirst, parent, link, _rangeCallback) {
         this.isProviderFirst = isProviderFirst;
         this.parent = parent;
@@ -24,23 +23,25 @@ class OneReference {
         return this.link.uri;
     }
     get range() {
-        return this._range ?? this.link.targetSelectionRange ?? this.link.range;
+        var _a, _b;
+        return (_b = (_a = this._range) !== null && _a !== void 0 ? _a : this.link.targetSelectionRange) !== null && _b !== void 0 ? _b : this.link.range;
     }
     set range(value) {
         this._range = value;
         this._rangeCallback(this);
     }
     get ariaMessage() {
-        const preview = this.parent.getPreview(this)?.preview(this.range);
+        var _a;
+        const preview = (_a = this.parent.getPreview(this)) === null || _a === void 0 ? void 0 : _a.preview(this.range);
         if (!preview) {
-            return localize(1087, "in {0} on line {1} at column {2}", basename(this.uri), this.range.startLineNumber, this.range.startColumn);
+            return localize('aria.oneReference', "in {0} on line {1} at column {2}", basename(this.uri), this.range.startLineNumber, this.range.startColumn);
         }
         else {
-            return localize(1088, "{0} in {1} on line {2} at column {3}", preview.value, basename(this.uri), this.range.startLineNumber, this.range.startColumn);
+            return localize({ key: 'aria.oneReference.preview', comment: ['Placeholders are: 0: filename, 1:line number, 2: column number, 3: preview snippet of source code'] }, "{0} in {1} on line {2} at column {3}", preview.value, basename(this.uri), this.range.startLineNumber, this.range.startColumn);
         }
     }
 }
-class FilePreview {
+export class FilePreview {
     constructor(_modelReference) {
         this._modelReference = _modelReference;
     }
@@ -65,7 +66,7 @@ class FilePreview {
         };
     }
 }
-class FileReferences {
+export class FileReferences {
     constructor(parent, uri) {
         this.parent = parent;
         this.uri = uri;
@@ -82,10 +83,10 @@ class FileReferences {
     get ariaMessage() {
         const len = this.children.length;
         if (len === 1) {
-            return localize(1089, "1 symbol in {0}, full path {1}", basename(this.uri), this.uri.fsPath);
+            return localize('aria.fileReferences.1', "1 symbol in {0}, full path {1}", basename(this.uri), this.uri.fsPath);
         }
         else {
-            return localize(1090, "{0} symbols in {1}, full path {2}", len, basename(this.uri), this.uri.fsPath);
+            return localize('aria.fileReferences.N', "{0} symbols in {1}, full path {2}", len, basename(this.uri), this.uri.fsPath);
         }
     }
     async resolve(textModelResolverService) {
@@ -107,7 +108,7 @@ class FileReferences {
         return this;
     }
 }
-class ReferencesModel {
+export class ReferencesModel {
     constructor(links, title) {
         this.groups = [];
         this.references = [];
@@ -149,16 +150,16 @@ class ReferencesModel {
     }
     get ariaMessage() {
         if (this.isEmpty) {
-            return localize(1091, "No results found");
+            return localize('aria.result.0', "No results found");
         }
         else if (this.references.length === 1) {
-            return localize(1092, "Found 1 symbol in {0}", this.references[0].uri.fsPath);
+            return localize('aria.result.1', "Found 1 symbol in {0}", this.references[0].uri.fsPath);
         }
         else if (this.groups.length === 1) {
-            return localize(1093, "Found {0} symbols in {1}", this.references.length, this.groups[0].uri.fsPath);
+            return localize('aria.result.n1', "Found {0} symbols in {1}", this.references.length, this.groups[0].uri.fsPath);
         }
         else {
-            return localize(1094, "Found {0} symbols in {1} files", this.references.length, this.groups.length);
+            return localize('aria.result.nm', "Found {0} symbols in {1} files", this.references.length, this.groups.length);
         }
     }
     nextOrPreviousReference(reference, next) {
@@ -190,7 +191,7 @@ class ReferencesModel {
         const nearest = this.references.map((ref, idx) => {
             return {
                 idx,
-                prefixLen: commonPrefixLength(ref.uri.toString(), resource.toString()),
+                prefixLen: strings.commonPrefixLength(ref.uri.toString(), resource.toString()),
                 offsetDist: Math.abs(ref.range.startLineNumber - position.lineNumber) * 100 + Math.abs(ref.range.startColumn - position.column)
             };
         }).sort((a, b) => {
@@ -237,5 +238,3 @@ class ReferencesModel {
         return extUri.compare(a.uri, b.uri) || Range.compareRangesUsingStarts(a.range, b.range);
     }
 }
-
-export { FilePreview, FileReferences, OneReference, ReferencesModel };

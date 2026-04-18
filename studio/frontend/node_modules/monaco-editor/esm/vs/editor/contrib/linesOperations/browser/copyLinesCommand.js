@@ -1,11 +1,10 @@
-import { Range } from '../../../common/core/range.js';
-import { Selection } from '../../../common/core/selection.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class CopyLinesCommand {
+import { Range } from '../../../common/core/range.js';
+import { Selection } from '../../../common/core/selection.js';
+export class CopyLinesCommand {
     constructor(selection, isCopyingDown, noop) {
         this._selection = selection;
         this._isCopyingDown = isCopyingDown;
@@ -69,5 +68,3 @@ class CopyLinesCommand {
         return result;
     }
 }
-
-export { CopyLinesCommand };

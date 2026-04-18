@@ -1,16 +1,5 @@
-import { asCssVariable, asCssVariableWithDefault } from '../common/colorUtils.js';
-import { activeContrastBorder, textLinkForeground, contrastBorder, focusBorder } from '../common/colors/baseColors.js';
-import '../common/colors/chartsColors.js';
-import { widgetShadow, problemsInfoIconForeground, problemsWarningIconForeground, problemsErrorIconForeground, widgetBorder, editorWidgetForeground, editorWidgetBackground, breadcrumbsActiveSelectionForeground, breadcrumbsFocusForeground, breadcrumbsForeground, breadcrumbsBackground, editorWidgetBorder } from '../common/colors/editorColors.js';
-import { keybindingLabelBottomBorder, keybindingLabelBorder, keybindingLabelForeground, keybindingLabelBackground, buttonBorder, buttonSecondaryHoverBackground, buttonSecondaryBackground, buttonSecondaryForeground, buttonHoverBackground, buttonBackground, buttonSeparator, buttonForeground, inputActiveOptionBackground, inputActiveOptionForeground, inputActiveOptionBorder, radioInactiveHoverBackground, radioInactiveBorder, radioInactiveBackground, radioInactiveForeground, radioActiveBorder, radioActiveBackground, radioActiveForeground, checkboxDisabledForeground, checkboxDisabledBackground, checkboxForeground, checkboxBorder, checkboxBackground, inputValidationErrorForeground, inputValidationErrorBackground, inputValidationErrorBorder, inputValidationWarningForeground, inputValidationWarningBackground, inputValidationWarningBorder, inputValidationInfoForeground, inputValidationInfoBackground, inputValidationInfoBorder, inputBorder, inputForeground, inputBackground, selectBorder, selectForeground, selectListBackground, selectBackground } from '../common/colors/inputColors.js';
-import { listFilterWidgetShadow, listFilterWidgetNoMatchesOutline, listFilterWidgetOutline, listFilterWidgetBackground, tableOddRowsBackgroundColor, tableColumnsBorder, treeInactiveIndentGuidesStroke, treeIndentGuidesStroke, listDropBetweenBackground, listDropOverBackground, listHoverForeground, listHoverBackground, listInactiveFocusOutline, listInactiveFocusBackground, listInactiveSelectionForeground, listInactiveSelectionIconForeground, listInactiveSelectionBackground, listActiveSelectionForeground, listActiveSelectionBackground, listFocusAndSelectionOutline, listActiveSelectionIconForeground, listFocusOutline, listFocusForeground, listFocusBackground } from '../common/colors/listColors.js';
-import { menuSeparatorBackground, menuSelectionBorder, menuSelectionBackground, menuSelectionForeground, menuBackground, menuForeground, menuBorder } from '../common/colors/menuColors.js';
-import '../common/colors/minimapColors.js';
-import { progressBarBackground, badgeForeground, badgeBackground, scrollbarShadow, scrollbarSliderActiveBackground, scrollbarSliderHoverBackground, scrollbarSliderBackground } from '../common/colors/miscColors.js';
-import { quickInputListFocusForeground, quickInputListFocusIconForeground, quickInputListFocusBackground, pickerGroupForeground } from '../common/colors/quickpickColors.js';
-import '../common/colors/searchColors.js';
+import { keybindingLabelBackground, keybindingLabelBorder, keybindingLabelBottomBorder, keybindingLabelForeground, asCssVariable, widgetShadow, buttonForeground, buttonSeparator, buttonBackground, buttonHoverBackground, buttonSecondaryForeground, buttonSecondaryBackground, buttonSecondaryHoverBackground, buttonBorder, progressBarBackground, inputActiveOptionBorder, inputActiveOptionForeground, inputActiveOptionBackground, editorWidgetBackground, editorWidgetForeground, contrastBorder, checkboxBorder, checkboxBackground, checkboxForeground, problemsErrorIconForeground, problemsWarningIconForeground, problemsInfoIconForeground, inputBackground, inputForeground, inputBorder, textLinkForeground, inputValidationInfoBorder, inputValidationInfoBackground, inputValidationInfoForeground, inputValidationWarningBorder, inputValidationWarningBackground, inputValidationWarningForeground, inputValidationErrorBorder, inputValidationErrorBackground, inputValidationErrorForeground, listFilterWidgetBackground, listFilterWidgetNoMatchesOutline, listFilterWidgetOutline, listFilterWidgetShadow, badgeBackground, badgeForeground, breadcrumbsBackground, breadcrumbsForeground, breadcrumbsFocusForeground, breadcrumbsActiveSelectionForeground, activeContrastBorder, listActiveSelectionBackground, listActiveSelectionForeground, listActiveSelectionIconForeground, listDropOverBackground, listFocusAndSelectionOutline, listFocusBackground, listFocusForeground, listFocusOutline, listHoverBackground, listHoverForeground, listInactiveFocusBackground, listInactiveFocusOutline, listInactiveSelectionBackground, listInactiveSelectionForeground, listInactiveSelectionIconForeground, tableColumnsBorder, tableOddRowsBackgroundColor, treeIndentGuidesStroke, asCssVariableWithDefault, editorWidgetBorder, focusBorder, pickerGroupForeground, quickInputListFocusBackground, quickInputListFocusForeground, quickInputListFocusIconForeground, selectBackground, selectBorder, selectForeground, selectListBackground, treeInactiveIndentGuidesStroke, menuBorder, menuForeground, menuBackground, menuSelectionForeground, menuSelectionBackground, menuSelectionBorder, menuSeparatorBackground, scrollbarShadow, scrollbarSliderActiveBackground, scrollbarSliderBackground, scrollbarSliderHoverBackground, listDropBetweenBackground } from '../common/colorRegistry.js';
 import { Color } from '../../../base/common/color.js';
-
 function overrideStyles(override, styles) {
     const result = { ...styles };
     for (const key in override) {
@@ -19,14 +8,14 @@ function overrideStyles(override, styles) {
     }
     return result;
 }
-const defaultKeybindingLabelStyles = {
+export const defaultKeybindingLabelStyles = {
     keybindingLabelBackground: asCssVariable(keybindingLabelBackground),
     keybindingLabelForeground: asCssVariable(keybindingLabelForeground),
     keybindingLabelBorder: asCssVariable(keybindingLabelBorder),
     keybindingLabelBottomBorder: asCssVariable(keybindingLabelBottomBorder),
     keybindingLabelShadow: asCssVariable(widgetShadow)
 };
-const defaultButtonStyles = {
+export const defaultButtonStyles = {
     buttonForeground: asCssVariable(buttonForeground),
     buttonSeparator: asCssVariable(buttonSeparator),
     buttonBackground: asCssVariable(buttonBackground),
@@ -36,41 +25,30 @@ const defaultButtonStyles = {
     buttonSecondaryHoverBackground: asCssVariable(buttonSecondaryHoverBackground),
     buttonBorder: asCssVariable(buttonBorder),
 };
-const defaultProgressBarStyles = {
+export const defaultProgressBarStyles = {
     progressBarBackground: asCssVariable(progressBarBackground)
 };
-const defaultToggleStyles = {
+export const defaultToggleStyles = {
     inputActiveOptionBorder: asCssVariable(inputActiveOptionBorder),
     inputActiveOptionForeground: asCssVariable(inputActiveOptionForeground),
     inputActiveOptionBackground: asCssVariable(inputActiveOptionBackground)
 };
-({
-    activeForeground: asCssVariable(radioActiveForeground),
-    activeBackground: asCssVariable(radioActiveBackground),
-    activeBorder: asCssVariable(radioActiveBorder),
-    inactiveForeground: asCssVariable(radioInactiveForeground),
-    inactiveBackground: asCssVariable(radioInactiveBackground),
-    inactiveBorder: asCssVariable(radioInactiveBorder),
-    inactiveHoverBackground: asCssVariable(radioInactiveHoverBackground),
-});
-const defaultCheckboxStyles = {
+export const defaultCheckboxStyles = {
     checkboxBackground: asCssVariable(checkboxBackground),
     checkboxBorder: asCssVariable(checkboxBorder),
-    checkboxForeground: asCssVariable(checkboxForeground),
-    checkboxDisabledBackground: asCssVariable(checkboxDisabledBackground),
-    checkboxDisabledForeground: asCssVariable(checkboxDisabledForeground),
+    checkboxForeground: asCssVariable(checkboxForeground)
 };
-({
+export const defaultDialogStyles = {
     dialogBackground: asCssVariable(editorWidgetBackground),
     dialogForeground: asCssVariable(editorWidgetForeground),
     dialogShadow: asCssVariable(widgetShadow),
-    dialogBorder: asCssVariable(widgetBorder),
+    dialogBorder: asCssVariable(contrastBorder),
     errorIconForeground: asCssVariable(problemsErrorIconForeground),
     warningIconForeground: asCssVariable(problemsWarningIconForeground),
     infoIconForeground: asCssVariable(problemsInfoIconForeground),
     textLinkForeground: asCssVariable(textLinkForeground)
-});
-const defaultInputBoxStyles = {
+};
+export const defaultInputBoxStyles = {
     inputBackground: asCssVariable(inputBackground),
     inputForeground: asCssVariable(inputForeground),
     inputBorder: asCssVariable(inputBorder),
@@ -84,7 +62,7 @@ const defaultInputBoxStyles = {
     inputValidationErrorBackground: asCssVariable(inputValidationErrorBackground),
     inputValidationErrorForeground: asCssVariable(inputValidationErrorForeground)
 };
-const defaultFindWidgetStyles = {
+export const defaultFindWidgetStyles = {
     listFilterWidgetBackground: asCssVariable(listFilterWidgetBackground),
     listFilterWidgetOutline: asCssVariable(listFilterWidgetOutline),
     listFilterWidgetNoMatchesOutline: asCssVariable(listFilterWidgetNoMatchesOutline),
@@ -92,19 +70,19 @@ const defaultFindWidgetStyles = {
     inputBoxStyles: defaultInputBoxStyles,
     toggleStyles: defaultToggleStyles
 };
-const defaultCountBadgeStyles = {
+export const defaultCountBadgeStyles = {
     badgeBackground: asCssVariable(badgeBackground),
     badgeForeground: asCssVariable(badgeForeground),
     badgeBorder: asCssVariable(contrastBorder)
 };
-({
+export const defaultBreadcrumbsWidgetStyles = {
     breadcrumbsBackground: asCssVariable(breadcrumbsBackground),
     breadcrumbsForeground: asCssVariable(breadcrumbsForeground),
     breadcrumbsHoverForeground: asCssVariable(breadcrumbsFocusForeground),
     breadcrumbsFocusForeground: asCssVariable(breadcrumbsFocusForeground),
     breadcrumbsFocusAndSelectionForeground: asCssVariable(breadcrumbsActiveSelectionForeground)
-});
-const defaultListStyles = {
+};
+export const defaultListStyles = {
     listBackground: undefined,
     listInactiveFocusForeground: undefined,
     listFocusBackground: asCssVariable(listFocusBackground),
@@ -129,16 +107,13 @@ const defaultListStyles = {
     listHoverOutline: asCssVariable(activeContrastBorder),
     treeIndentGuidesStroke: asCssVariable(treeIndentGuidesStroke),
     treeInactiveIndentGuidesStroke: asCssVariable(treeInactiveIndentGuidesStroke),
-    treeStickyScrollBackground: undefined,
-    treeStickyScrollBorder: undefined,
-    treeStickyScrollShadow: asCssVariable(scrollbarShadow),
     tableColumnsBorder: asCssVariable(tableColumnsBorder),
     tableOddRowsBackgroundColor: asCssVariable(tableOddRowsBackgroundColor),
 };
-function getListStyles(override) {
+export function getListStyles(override) {
     return overrideStyles(override, defaultListStyles);
 }
-const defaultSelectBoxStyles = {
+export const defaultSelectBoxStyles = {
     selectBackground: asCssVariable(selectBackground),
     selectListBackground: asCssVariable(selectListBackground),
     selectForeground: asCssVariable(selectForeground),
@@ -172,11 +147,8 @@ const defaultSelectBoxStyles = {
     tableOddRowsBackgroundColor: undefined,
     treeIndentGuidesStroke: undefined,
     treeInactiveIndentGuidesStroke: undefined,
-    treeStickyScrollBackground: undefined,
-    treeStickyScrollBorder: undefined,
-    treeStickyScrollShadow: undefined
 };
-const defaultMenuStyles = {
+export const defaultMenuStyles = {
     shadowColor: asCssVariable(widgetShadow),
     borderColor: asCssVariable(menuBorder),
     foregroundColor: asCssVariable(menuForeground),
@@ -190,5 +162,3 @@ const defaultMenuStyles = {
     scrollbarSliderHoverBackground: asCssVariable(scrollbarSliderHoverBackground),
     scrollbarSliderActiveBackground: asCssVariable(scrollbarSliderActiveBackground)
 };
-
-export { defaultButtonStyles, defaultCheckboxStyles, defaultCountBadgeStyles, defaultFindWidgetStyles, defaultInputBoxStyles, defaultKeybindingLabelStyles, defaultListStyles, defaultMenuStyles, defaultProgressBarStyles, defaultSelectBoxStyles, defaultToggleStyles, getListStyles };

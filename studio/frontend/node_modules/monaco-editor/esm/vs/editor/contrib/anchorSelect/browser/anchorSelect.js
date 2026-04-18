@@ -1,31 +1,28 @@
-import { alert } from '../../../../base/browser/ui/aria/aria.js';
-import { MarkdownString } from '../../../../base/common/htmlContent.js';
-import { KeyChord } from '../../../../base/common/keyCodes.js';
-import './anchorSelect.css';
-import { registerEditorContribution, registerEditorAction, EditorAction } from '../../../browser/editorExtensions.js';
-import { Selection } from '../../../common/core/selection.js';
-import { EditorContextKeys } from '../../../common/editorContextKeys.js';
-import { localize, localize2 } from '../../../../nls.js';
-import { RawContextKey, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 var SelectionAnchorController_1;
-const SelectionAnchorSet = new RawContextKey('selectionAnchorSet', false);
-let SelectionAnchorController = class SelectionAnchorController {
-    static { SelectionAnchorController_1 = this; }
-    static { this.ID = 'editor.contrib.selectionAnchorController'; }
+import { alert } from '../../../../base/browser/ui/aria/aria.js';
+import { MarkdownString } from '../../../../base/common/htmlContent.js';
+import { KeyChord } from '../../../../base/common/keyCodes.js';
+import './anchorSelect.css';
+import { EditorAction, registerEditorAction, registerEditorContribution } from '../../../browser/editorExtensions.js';
+import { Selection } from '../../../common/core/selection.js';
+import { EditorContextKeys } from '../../../common/editorContextKeys.js';
+import { localize } from '../../../../nls.js';
+import { IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
+export const SelectionAnchorSet = new RawContextKey('selectionAnchorSet', false);
+let SelectionAnchorController = SelectionAnchorController_1 = class SelectionAnchorController {
     static get(editor) {
         return editor.getContribution(SelectionAnchorController_1.ID);
     }
@@ -44,12 +41,12 @@ let SelectionAnchorController = class SelectionAnchorController {
                 this.decorationId = accessor.addDecoration(Selection.fromPositions(position, position), {
                     description: 'selection-anchor',
                     stickiness: 1 /* TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges */,
-                    hoverMessage: new MarkdownString().appendText(localize(798, "Selection Anchor")),
+                    hoverMessage: new MarkdownString().appendText(localize('selectionAnchor', "Selection Anchor")),
                     className: 'selection-anchor'
                 });
             });
             this.selectionAnchorSetContextKey.set(!!this.decorationId);
-            alert(localize(799, "Anchor set at {0}:{1}", position.lineNumber, position.column));
+            alert(localize('anchorSet', "Anchor set at {0}:{1}", position.lineNumber, position.column));
         }
     }
     goToSelectionAnchor() {
@@ -85,6 +82,7 @@ let SelectionAnchorController = class SelectionAnchorController {
         this.modelChangeListener.dispose();
     }
 };
+SelectionAnchorController.ID = 'editor.contrib.selectionAnchorController';
 SelectionAnchorController = SelectionAnchorController_1 = __decorate([
     __param(1, IContextKeyService)
 ], SelectionAnchorController);
@@ -92,7 +90,8 @@ class SetSelectionAnchor extends EditorAction {
     constructor() {
         super({
             id: 'editor.action.setSelectionAnchor',
-            label: localize2(800, "Set Selection Anchor"),
+            label: localize('setSelectionAnchor', "Set Selection Anchor"),
+            alias: 'Set Selection Anchor',
             precondition: undefined,
             kbOpts: {
                 kbExpr: EditorContextKeys.editorTextFocus,
@@ -102,26 +101,30 @@ class SetSelectionAnchor extends EditorAction {
         });
     }
     async run(_accessor, editor) {
-        SelectionAnchorController.get(editor)?.setSelectionAnchor();
+        var _a;
+        (_a = SelectionAnchorController.get(editor)) === null || _a === void 0 ? void 0 : _a.setSelectionAnchor();
     }
 }
 class GoToSelectionAnchor extends EditorAction {
     constructor() {
         super({
             id: 'editor.action.goToSelectionAnchor',
-            label: localize2(801, "Go to Selection Anchor"),
+            label: localize('goToSelectionAnchor', "Go to Selection Anchor"),
+            alias: 'Go to Selection Anchor',
             precondition: SelectionAnchorSet,
         });
     }
     async run(_accessor, editor) {
-        SelectionAnchorController.get(editor)?.goToSelectionAnchor();
+        var _a;
+        (_a = SelectionAnchorController.get(editor)) === null || _a === void 0 ? void 0 : _a.goToSelectionAnchor();
     }
 }
 class SelectFromAnchorToCursor extends EditorAction {
     constructor() {
         super({
             id: 'editor.action.selectFromAnchorToCursor',
-            label: localize2(802, "Select from Anchor to Cursor"),
+            label: localize('selectFromAnchorToCursor', "Select from Anchor to Cursor"),
+            alias: 'Select from Anchor to Cursor',
             precondition: SelectionAnchorSet,
             kbOpts: {
                 kbExpr: EditorContextKeys.editorTextFocus,
@@ -131,14 +134,16 @@ class SelectFromAnchorToCursor extends EditorAction {
         });
     }
     async run(_accessor, editor) {
-        SelectionAnchorController.get(editor)?.selectFromAnchorToCursor();
+        var _a;
+        (_a = SelectionAnchorController.get(editor)) === null || _a === void 0 ? void 0 : _a.selectFromAnchorToCursor();
     }
 }
 class CancelSelectionAnchor extends EditorAction {
     constructor() {
         super({
             id: 'editor.action.cancelSelectionAnchor',
-            label: localize2(803, "Cancel Selection Anchor"),
+            label: localize('cancelSelectionAnchor', "Cancel Selection Anchor"),
+            alias: 'Cancel Selection Anchor',
             precondition: SelectionAnchorSet,
             kbOpts: {
                 kbExpr: EditorContextKeys.editorTextFocus,
@@ -148,7 +153,8 @@ class CancelSelectionAnchor extends EditorAction {
         });
     }
     async run(_accessor, editor) {
-        SelectionAnchorController.get(editor)?.cancelSelectionAnchor();
+        var _a;
+        (_a = SelectionAnchorController.get(editor)) === null || _a === void 0 ? void 0 : _a.cancelSelectionAnchor();
     }
 }
 registerEditorContribution(SelectionAnchorController.ID, SelectionAnchorController, 4 /* EditorContributionInstantiation.Lazy */);
@@ -156,5 +162,3 @@ registerEditorAction(SetSelectionAnchor);
 registerEditorAction(GoToSelectionAnchor);
 registerEditorAction(SelectFromAnchorToCursor);
 registerEditorAction(CancelSelectionAnchor);
-
-export { SelectionAnchorSet };

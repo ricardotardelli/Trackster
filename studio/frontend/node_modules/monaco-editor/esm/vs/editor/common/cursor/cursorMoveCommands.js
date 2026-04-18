@@ -1,16 +1,14 @@
-import { isObject, isString, isUndefined, isBoolean, isNumber } from '../../../base/common/types.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+import * as types from '../../../base/common/types.js';
 import { CursorState, SingleCursorState } from '../cursorCommon.js';
 import { MoveOperations } from './cursorMoveOperations.js';
 import { WordOperations } from './cursorWordOperations.js';
 import { Position } from '../core/position.js';
 import { Range } from '../core/range.js';
-import { TextDirection } from '../model.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class CursorMoveCommands {
+export class CursorMoveCommands {
     static addCursorDown(viewModel, cursors, useLogicalLine) {
         const result = [];
         let resultLen = 0;
@@ -361,13 +359,7 @@ class CursorMoveCommands {
         return Math.max(startLineNumber, range.endLineNumber - count + 1);
     }
     static _moveLeft(viewModel, cursors, inSelectionMode, noOfColumns) {
-        return cursors.map(cursor => {
-            const direction = viewModel.getTextDirection(cursor.viewState.position.lineNumber);
-            const isRtl = direction === TextDirection.RTL;
-            return CursorState.fromViewState(isRtl
-                ? MoveOperations.moveRight(viewModel.cursorConfig, viewModel, cursor.viewState, inSelectionMode, noOfColumns)
-                : MoveOperations.moveLeft(viewModel.cursorConfig, viewModel, cursor.viewState, inSelectionMode, noOfColumns));
-        });
+        return cursors.map(cursor => CursorState.fromViewState(MoveOperations.moveLeft(viewModel.cursorConfig, viewModel, cursor.viewState, inSelectionMode, noOfColumns)));
     }
     static _moveHalfLineLeft(viewModel, cursors, inSelectionMode) {
         const result = [];
@@ -380,13 +372,7 @@ class CursorMoveCommands {
         return result;
     }
     static _moveRight(viewModel, cursors, inSelectionMode, noOfColumns) {
-        return cursors.map(cursor => {
-            const direction = viewModel.getTextDirection(cursor.viewState.position.lineNumber);
-            const isRtl = direction === TextDirection.RTL;
-            return CursorState.fromViewState(isRtl
-                ? MoveOperations.moveLeft(viewModel.cursorConfig, viewModel, cursor.viewState, inSelectionMode, noOfColumns)
-                : MoveOperations.moveRight(viewModel.cursorConfig, viewModel, cursor.viewState, inSelectionMode, noOfColumns));
-        });
+        return cursors.map(cursor => CursorState.fromViewState(MoveOperations.moveRight(viewModel.cursorConfig, viewModel, cursor.viewState, inSelectionMode, noOfColumns)));
     }
     static _moveHalfLineRight(viewModel, cursors, inSelectionMode) {
         const result = [];
@@ -487,26 +473,23 @@ class CursorMoveCommands {
         return result;
     }
 }
-var CursorMove;
+export var CursorMove;
 (function (CursorMove) {
     const isCursorMoveArgs = function (arg) {
-        if (!isObject(arg)) {
+        if (!types.isObject(arg)) {
             return false;
         }
         const cursorMoveArg = arg;
-        if (!isString(cursorMoveArg.to)) {
+        if (!types.isString(cursorMoveArg.to)) {
             return false;
         }
-        if (!isUndefined(cursorMoveArg.select) && !isBoolean(cursorMoveArg.select)) {
+        if (!types.isUndefined(cursorMoveArg.select) && !types.isBoolean(cursorMoveArg.select)) {
             return false;
         }
-        if (!isUndefined(cursorMoveArg.by) && !isString(cursorMoveArg.by)) {
+        if (!types.isUndefined(cursorMoveArg.by) && !types.isString(cursorMoveArg.by)) {
             return false;
         }
-        if (!isUndefined(cursorMoveArg.value) && !isNumber(cursorMoveArg.value)) {
-            return false;
-        }
-        if (!isUndefined(cursorMoveArg.noHistory) && !isBoolean(cursorMoveArg.noHistory)) {
+        if (!types.isUndefined(cursorMoveArg.value) && !types.isNumber(cursorMoveArg.value)) {
             return false;
         }
         return true;
@@ -530,7 +513,6 @@ var CursorMove;
 						\`\`\`
 					* 'value': Number of units to move. Default is '1'.
 					* 'select': If 'true' makes the selection. Default is 'false'.
-					* 'noHistory': If 'true' does not add the movement to navigation history. Default is 'false'.
 				`,
                 constraint: isCursorMoveArgs,
                 schema: {
@@ -550,10 +532,6 @@ var CursorMove;
                             'default': 1
                         },
                         'select': {
-                            'type': 'boolean',
-                            'default': false
-                        },
-                        'noHistory': {
                             'type': 'boolean',
                             'default': false
                         }
@@ -666,11 +644,8 @@ var CursorMove;
             direction: direction,
             unit: unit,
             select: (!!args.select),
-            value: (args.value || 1),
-            noHistory: (!!args.noHistory)
+            value: (args.value || 1)
         };
     }
     CursorMove.parse = parse;
 })(CursorMove || (CursorMove = {}));
-
-export { CursorMove, CursorMoveCommands };

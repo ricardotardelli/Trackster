@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function getNodeColor(node) {
+export function getNodeColor(node) {
     return ((node.metadata & 1 /* Constants.ColorMask */) >>> 0 /* Constants.ColorOffset */);
 }
 function setNodeColor(node, color) {
@@ -26,12 +26,6 @@ function getNodeIsInGlyphMargin(node) {
 function setNodeIsInGlyphMargin(node, value) {
     node.metadata = ((node.metadata & 191 /* Constants.IsMarginMaskInverse */) | ((value ? 1 : 0) << 6 /* Constants.IsMarginOffset */));
 }
-function getNodeAffectsFont(node) {
-    return ((node.metadata & 128 /* Constants.AffectsFontMask */) >>> 7 /* Constants.AffectsFontOffset */) === 1;
-}
-function setNodeAffectsFont(node, value) {
-    node.metadata = ((node.metadata & 127 /* Constants.AffectsFontMaskInverse */) | ((value ? 1 : 0) << 7 /* Constants.AffectsFontOffset */));
-}
 function getNodeStickiness(node) {
     return ((node.metadata & 24 /* Constants.StickinessMask */) >>> 3 /* Constants.StickinessOffset */);
 }
@@ -44,7 +38,7 @@ function getCollapseOnReplaceEdit(node) {
 function setCollapseOnReplaceEdit(node, value) {
     node.metadata = ((node.metadata & 223 /* Constants.CollapseOnReplaceEditMaskInverse */) | ((value ? 1 : 0) << 5 /* Constants.CollapseOnReplaceEditOffset */));
 }
-class IntervalNode {
+export class IntervalNode {
     constructor(id, start, end) {
         this.metadata = 0;
         this.parent = this;
@@ -63,7 +57,6 @@ class IntervalNode {
         setNodeIsInGlyphMargin(this, false);
         _setNodeStickiness(this, 1 /* TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges */);
         setCollapseOnReplaceEdit(this, false);
-        setNodeAffectsFont(this, false);
         this.cachedVersionId = 0;
         this.cachedAbsoluteStart = start;
         this.cachedAbsoluteEnd = end;
@@ -88,7 +81,6 @@ class IntervalNode {
         setNodeIsInGlyphMargin(this, this.options.glyphMarginClassName !== null);
         _setNodeStickiness(this, this.options.stickiness);
         setCollapseOnReplaceEdit(this, this.options.collapseOnReplaceEdit);
-        setNodeAffectsFont(this, this.options.affectsFont ?? false);
     }
     setCachedOffsets(absoluteStart, absoluteEnd, cachedVersionId) {
         if (this.cachedVersionId !== cachedVersionId) {
@@ -104,27 +96,27 @@ class IntervalNode {
         this.right = null;
     }
 }
-const SENTINEL = new IntervalNode(null, 0, 0);
+export const SENTINEL = new IntervalNode(null, 0, 0);
 SENTINEL.parent = SENTINEL;
 SENTINEL.left = SENTINEL;
 SENTINEL.right = SENTINEL;
 setNodeColor(SENTINEL, 0 /* NodeColor.Black */);
-class IntervalTree {
+export class IntervalTree {
     constructor() {
         this.root = SENTINEL;
         this.requestNormalizeDelta = false;
     }
-    intervalSearch(start, end, filterOwnerId, filterOutValidation, filterFontDecorations, cachedVersionId, onlyMarginDecorations) {
+    intervalSearch(start, end, filterOwnerId, filterOutValidation, cachedVersionId, onlyMarginDecorations) {
         if (this.root === SENTINEL) {
             return [];
         }
-        return intervalSearch(this, start, end, filterOwnerId, filterOutValidation, filterFontDecorations, cachedVersionId, onlyMarginDecorations);
+        return intervalSearch(this, start, end, filterOwnerId, filterOutValidation, cachedVersionId, onlyMarginDecorations);
     }
-    search(filterOwnerId, filterOutValidation, filterFontDecorations, cachedVersionId, onlyMarginDecorations) {
+    search(filterOwnerId, filterOutValidation, cachedVersionId, onlyMarginDecorations) {
         if (this.root === SENTINEL) {
             return [];
         }
-        return search(this, filterOwnerId, filterOutValidation, filterFontDecorations, cachedVersionId, onlyMarginDecorations);
+        return search(this, filterOwnerId, filterOutValidation, cachedVersionId, onlyMarginDecorations);
     }
     /**
      * Will not set `cachedAbsoluteStart` nor `cachedAbsoluteEnd` on the returned nodes!
@@ -242,7 +234,7 @@ function adjustMarkerBeforeColumn(markerOffset, markerStickToPreviousCharacter, 
  * This is a lot more complicated than strictly necessary to maintain the same behaviour
  * as when decorations were implemented using two markers.
  */
-function nodeAcceptEdit(node, start, end, textLength, forceMoveMarkers) {
+export function nodeAcceptEdit(node, start, end, textLength, forceMoveMarkers) {
     const nodeStickiness = getNodeStickiness(node);
     const startStickToPreviousCharacter = (nodeStickiness === 0 /* TrackedRangeStickiness.AlwaysGrowsWhenTypingAtEdges */
         || nodeStickiness === 2 /* TrackedRangeStickiness.GrowsOnlyWhenTypingBefore */);
@@ -493,7 +485,7 @@ function collectNodesPostOrder(T) {
     setNodeIsVisited(T.root, false);
     return result;
 }
-function search(T, filterOwnerId, filterOutValidation, filterFontDecorations, cachedVersionId, onlyMarginDecorations) {
+function search(T, filterOwnerId, filterOutValidation, cachedVersionId, onlyMarginDecorations) {
     let node = T.root;
     let delta = 0;
     let nodeStart = 0;
@@ -527,9 +519,6 @@ function search(T, filterOwnerId, filterOutValidation, filterFontDecorations, ca
         if (filterOutValidation && getNodeIsForValidation(node)) {
             include = false;
         }
-        if (filterFontDecorations && getNodeAffectsFont(node)) {
-            include = false;
-        }
         if (onlyMarginDecorations && !getNodeIsInGlyphMargin(node)) {
             include = false;
         }
@@ -547,7 +536,7 @@ function search(T, filterOwnerId, filterOutValidation, filterFontDecorations, ca
     setNodeIsVisited(T.root, false);
     return result;
 }
-function intervalSearch(T, intervalStart, intervalEnd, filterOwnerId, filterOutValidation, filterFontDecorations, cachedVersionId, onlyMarginDecorations) {
+function intervalSearch(T, intervalStart, intervalEnd, filterOwnerId, filterOutValidation, cachedVersionId, onlyMarginDecorations) {
     // https://en.wikipedia.org/wiki/Interval_tree#Augmented_tree
     // Now, it is known that two intervals A and B overlap only when both
     // A.low <= B.high and A.high >= B.low. When searching the trees for
@@ -604,9 +593,6 @@ function intervalSearch(T, intervalStart, intervalEnd, filterOwnerId, filterOutV
                 include = false;
             }
             if (filterOutValidation && getNodeIsForValidation(node)) {
-                include = false;
-            }
-            if (filterFontDecorations && getNodeAffectsFont(node)) {
                 include = false;
             }
             if (onlyMarginDecorations && !getNodeIsInGlyphMargin(node)) {
@@ -975,7 +961,7 @@ function computeMaxEnd(node) {
     }
     return maxEnd;
 }
-function recomputeMaxEnd(node) {
+export function recomputeMaxEnd(node) {
     node.maxEnd = computeMaxEnd(node);
 }
 function recomputeMaxEndWalkToRoot(node) {
@@ -991,12 +977,10 @@ function recomputeMaxEndWalkToRoot(node) {
 }
 //#endregion
 //#region utils
-function intervalCompare(aStart, aEnd, bStart, bEnd) {
+export function intervalCompare(aStart, aEnd, bStart, bEnd) {
     if (aStart === bStart) {
         return aEnd - bEnd;
     }
     return aStart - bStart;
 }
 //#endregion
-
-export { IntervalNode, IntervalTree, SENTINEL, getNodeColor, intervalCompare, nodeAcceptEdit, recomputeMaxEnd };

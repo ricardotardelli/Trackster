@@ -1,24 +1,16 @@
-import './margin.css';
-import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
-import { ViewPart } from '../../view/viewPart.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/**
- * Margin is a vertical strip located on the left of the editor's content area.
- * It is used for various features such as line numbers, folding markers, and
- * decorations that provide additional information about the lines of code.
- */
-class Margin extends ViewPart {
-    static { this.CLASS_NAME = 'glyph-margin'; }
-    static { this.OUTER_CLASS_NAME = 'margin'; }
+import './margin.css';
+import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
+import { ViewPart } from '../../view/viewPart.js';
+export class Margin extends ViewPart {
     constructor(context) {
         super(context);
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
-        this._canUseLayerHinting = !options.get(39 /* EditorOption.disableLayerHinting */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
+        this._canUseLayerHinting = !options.get(32 /* EditorOption.disableLayerHinting */);
         this._contentLeft = layoutInfo.contentLeft;
         this._glyphMarginLeft = layoutInfo.glyphMarginLeft;
         this._glyphMarginWidth = layoutInfo.glyphMarginWidth;
@@ -40,8 +32,8 @@ class Margin extends ViewPart {
     // --- begin event handlers
     onConfigurationChanged(e) {
         const options = this._context.configuration.options;
-        const layoutInfo = options.get(165 /* EditorOption.layoutInfo */);
-        this._canUseLayerHinting = !options.get(39 /* EditorOption.disableLayerHinting */);
+        const layoutInfo = options.get(144 /* EditorOption.layoutInfo */);
+        this._canUseLayerHinting = !options.get(32 /* EditorOption.disableLayerHinting */);
         this._contentLeft = layoutInfo.contentLeft;
         this._glyphMarginLeft = layoutInfo.glyphMarginLeft;
         this._glyphMarginWidth = layoutInfo.glyphMarginWidth;
@@ -67,5 +59,5 @@ class Margin extends ViewPart {
         this._glyphMarginBackgroundDomNode.setHeight(height);
     }
 }
-
-export { Margin };
+Margin.CLASS_NAME = 'glyph-margin';
+Margin.OUTER_CLASS_NAME = 'margin';

@@ -1,15 +1,14 @@
-import { EditorType } from '../common/editorCommon.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as editorCommon from '../common/editorCommon.js';
 /**
  *@internal
  */
-function isCodeEditor(thing) {
+export function isCodeEditor(thing) {
     if (thing && typeof thing.getEditorType === 'function') {
-        return thing.getEditorType() === EditorType.ICodeEditor;
+        return thing.getEditorType() === editorCommon.EditorType.ICodeEditor;
     }
     else {
         return false;
@@ -18,9 +17,9 @@ function isCodeEditor(thing) {
 /**
  *@internal
  */
-function isDiffEditor(thing) {
+export function isDiffEditor(thing) {
     if (thing && typeof thing.getEditorType === 'function') {
-        return thing.getEditorType() === EditorType.IDiffEditor;
+        return thing.getEditorType() === editorCommon.EditorType.IDiffEditor;
     }
     else {
         return false;
@@ -29,7 +28,7 @@ function isDiffEditor(thing) {
 /**
  *@internal
  */
-function isCompositeEditor(thing) {
+export function isCompositeEditor(thing) {
     return !!thing
         && typeof thing === 'object'
         && typeof thing.onDidChangeActiveEditor === 'function';
@@ -37,7 +36,7 @@ function isCompositeEditor(thing) {
 /**
  *@internal
  */
-function getCodeEditor(thing) {
+export function getCodeEditor(thing) {
     if (isCodeEditor(thing)) {
         return thing;
     }
@@ -49,5 +48,3 @@ function getCodeEditor(thing) {
     }
     return null;
 }
-
-export { getCodeEditor, isCodeEditor, isCompositeEditor, isDiffEditor };

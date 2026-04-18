@@ -1,40 +1,28 @@
-import { isInShadowDOM } from '../../../base/browser/dom.js';
-import { createStyleSheet } from '../../../base/browser/domStylesheets.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+import * as dom from '../../../base/browser/dom.js';
 import { addMatchMediaChangeListener } from '../../../base/browser/browser.js';
 import { Color } from '../../../base/common/color.js';
 import { Emitter } from '../../../base/common/event.js';
 import { TokenizationRegistry } from '../../common/languages.js';
 import { TokenMetadata } from '../../common/encodedTokenAttributes.js';
-import { generateTokensCSSForColorMap, TokenTheme } from '../../common/languages/supports/tokenization.js';
-import { hc_light, hc_black, vs_dark, vs } from '../common/themes.js';
+import { TokenTheme, generateTokensCSSForColorMap } from '../../common/languages/supports/tokenization.js';
+import { hc_black, hc_light, vs, vs_dark } from '../common/themes.js';
 import { Registry } from '../../../platform/registry/common/platform.js';
-import { Extensions, asCssVariableName } from '../../../platform/theme/common/colorUtils.js';
-import '../../../platform/theme/common/colors/baseColors.js';
-import '../../../platform/theme/common/colors/chartsColors.js';
-import '../../../platform/theme/common/colors/editorColors.js';
-import '../../../platform/theme/common/colors/inputColors.js';
-import '../../../platform/theme/common/colors/listColors.js';
-import '../../../platform/theme/common/colors/menuColors.js';
-import '../../../platform/theme/common/colors/minimapColors.js';
-import '../../../platform/theme/common/colors/miscColors.js';
-import '../../../platform/theme/common/colors/quickpickColors.js';
-import '../../../platform/theme/common/colors/searchColors.js';
-import { Extensions as Extensions$1 } from '../../../platform/theme/common/themeService.js';
+import { asCssVariableName, Extensions } from '../../../platform/theme/common/colorRegistry.js';
+import { Extensions as ThemingExtensions } from '../../../platform/theme/common/themeService.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
-import { isHighContrast, isDark, ColorScheme } from '../../../platform/theme/common/theme.js';
-import { UnthemedProductIconTheme, getIconsStyleSheet } from '../../../platform/theme/browser/iconsStyleSheet.js';
+import { ColorScheme, isDark, isHighContrast } from '../../../platform/theme/common/theme.js';
+import { getIconsStyleSheet, UnthemedProductIconTheme } from '../../../platform/theme/browser/iconsStyleSheet.js';
 import { mainWindow } from '../../../base/browser/window.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-const VS_LIGHT_THEME_NAME = 'vs';
-const VS_DARK_THEME_NAME = 'vs-dark';
-const HC_BLACK_THEME_NAME = 'hc-black';
-const HC_LIGHT_THEME_NAME = 'hc-light';
+export const VS_LIGHT_THEME_NAME = 'vs';
+export const VS_DARK_THEME_NAME = 'vs-dark';
+export const HC_BLACK_THEME_NAME = 'hc-black';
+export const HC_LIGHT_THEME_NAME = 'hc-light';
 const colorRegistry = Registry.as(Extensions.ColorContribution);
-const themingRegistry = Registry.as(Extensions$1.ThemingContribution);
+const themingRegistry = Registry.as(ThemingExtensions.ThemingContribution);
 class StandaloneTheme {
     constructor(name, standaloneThemeData) {
         this.semanticHighlighting = false;
@@ -160,9 +148,6 @@ class StandaloneTheme {
             strikethrough: Boolean(fontStyle & 8 /* FontStyle.Strikethrough */)
         };
     }
-    get tokenColorMap() {
-        return [];
-    }
 }
 function isBuiltinTheme(themeName) {
     return (themeName === VS_LIGHT_THEME_NAME
@@ -186,7 +171,7 @@ function newBuiltInTheme(builtinTheme) {
     const themeData = getBuiltinRules(builtinTheme);
     return new StandaloneTheme(builtinTheme, themeData);
 }
-class StandaloneThemeService extends Disposable {
+export class StandaloneThemeService extends Disposable {
     constructor() {
         super();
         this._onColorThemeChange = this._register(new Emitter());
@@ -215,19 +200,18 @@ class StandaloneThemeService extends Disposable {
             this._updateCSS();
         }));
         addMatchMediaChangeListener(mainWindow, '(forced-colors: active)', () => {
-            // Update theme selection for auto-detecting high contrast
             this._onOSSchemeChanged();
         });
     }
     registerEditorContainer(domNode) {
-        if (isInShadowDOM(domNode)) {
+        if (dom.isInShadowDOM(domNode)) {
             return this._registerShadowDomContainer(domNode);
         }
         return this._registerRegularEditorContainer();
     }
     _registerRegularEditorContainer() {
         if (!this._globalStyleElement) {
-            this._globalStyleElement = createStyleSheet(undefined, style => {
+            this._globalStyleElement = dom.createStyleSheet(undefined, style => {
                 style.className = 'monaco-colors';
                 style.textContent = this._allCSS;
             });
@@ -236,7 +220,7 @@ class StandaloneThemeService extends Disposable {
         return Disposable.None;
     }
     _registerShadowDomContainer(domNode) {
-        const styleElement = createStyleSheet(domNode, style => {
+        const styleElement = dom.createStyleSheet(domNode, style => {
             style.className = 'monaco-colors';
             style.textContent = this._allCSS;
         });
@@ -339,10 +323,6 @@ class StandaloneThemeService extends Disposable {
         ruleCollector.addRule(`.monaco-editor, .monaco-diff-editor, .monaco-component { ${colorVariables.join('\n')} }`);
         const colorMap = this._colorMapOverride || this._theme.tokenTheme.getColorMap();
         ruleCollector.addRule(generateTokensCSSForColorMap(colorMap));
-        // If the OS has forced-colors active, disable forced color adjustment for
-        // Monaco editor elements so that VS Code's built-in high contrast themes
-        // (hc-black / hc-light) are used instead of the OS forcing system colors.
-        ruleCollector.addRule(`.monaco-editor, .monaco-diff-editor, .monaco-component { forced-color-adjust: none; }`);
         this._themeCSS = cssRules.join('\n');
         this._updateCSS();
         TokenizationRegistry.setColorMap(colorMap);
@@ -363,5 +343,3 @@ class StandaloneThemeService extends Disposable {
         return this._builtInProductIconTheme;
     }
 }
-
-export { HC_BLACK_THEME_NAME, HC_LIGHT_THEME_NAME, StandaloneThemeService, VS_DARK_THEME_NAME, VS_LIGHT_THEME_NAME };

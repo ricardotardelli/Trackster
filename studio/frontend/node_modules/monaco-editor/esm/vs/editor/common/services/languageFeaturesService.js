@@ -1,12 +1,11 @@
-import { LanguageFeatureRegistry } from '../languageFeatureRegistry.js';
-import { ILanguageFeaturesService } from './languageFeatures.js';
-import { registerSingleton } from '../../../platform/instantiation/common/extensions.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class LanguageFeaturesService {
+import { LanguageFeatureRegistry } from '../languageFeatureRegistry.js';
+import { ILanguageFeaturesService } from './languageFeatures.js';
+import { registerSingleton } from '../../../platform/instantiation/common/extensions.js';
+export class LanguageFeaturesService {
     constructor() {
         this.referenceProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.renameProvider = new LanguageFeatureRegistry(this._score.bind(this));
@@ -31,17 +30,17 @@ class LanguageFeaturesService {
         this.foldingRangeProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.linkProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.inlineCompletionsProvider = new LanguageFeatureRegistry(this._score.bind(this));
+        this.inlineEditProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.completionProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.linkedEditingRangeProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.documentRangeSemanticTokensProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.documentSemanticTokensProvider = new LanguageFeatureRegistry(this._score.bind(this));
-        this.documentDropEditProvider = new LanguageFeatureRegistry(this._score.bind(this));
+        this.documentOnDropEditProvider = new LanguageFeatureRegistry(this._score.bind(this));
         this.documentPasteEditProvider = new LanguageFeatureRegistry(this._score.bind(this));
     }
     _score(uri) {
-        return this._notebookTypeResolver?.(uri);
+        var _a;
+        return (_a = this._notebookTypeResolver) === null || _a === void 0 ? void 0 : _a.call(this, uri);
     }
 }
 registerSingleton(ILanguageFeaturesService, LanguageFeaturesService, 1 /* InstantiationType.Delayed */);
-
-export { LanguageFeaturesService };

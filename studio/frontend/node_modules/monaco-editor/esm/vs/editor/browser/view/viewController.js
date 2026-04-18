@@ -1,12 +1,11 @@
-import { CoreNavigationCommands } from '../coreCommands.js';
-import { Position } from '../../common/core/position.js';
-import { isLinux } from '../../../base/common/platform.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ViewController {
+import { CoreNavigationCommands } from '../coreCommands.js';
+import { Position } from '../../common/core/position.js';
+import * as platform from '../../../base/common/platform.js';
+export class ViewController {
     constructor(configuration, viewModel, userInputEvents, commandDelegate) {
         this.configuration = configuration;
         this.viewModel = viewModel;
@@ -45,7 +44,7 @@ class ViewController {
         return viewPosition;
     }
     _hasMulticursorModifier(data) {
-        switch (this.configuration.options.get(86 /* EditorOption.multiCursorModifier */)) {
+        switch (this.configuration.options.get(78 /* EditorOption.multiCursorModifier */)) {
             case 'altKey':
                 return data.altKey;
             case 'ctrlKey':
@@ -57,7 +56,7 @@ class ViewController {
         }
     }
     _hasNonMulticursorModifier(data) {
-        switch (this.configuration.options.get(86 /* EditorOption.multiCursorModifier */)) {
+        switch (this.configuration.options.get(78 /* EditorOption.multiCursorModifier */)) {
             case 'altKey':
                 return data.ctrlKey || data.metaKey;
             case 'ctrlKey':
@@ -70,14 +69,10 @@ class ViewController {
     }
     dispatchMouse(data) {
         const options = this.configuration.options;
-        const selectionClipboardIsOn = (isLinux && options.get(121 /* EditorOption.selectionClipboard */));
-        const columnSelection = options.get(28 /* EditorOption.columnSelection */);
-        const scrollOnMiddleClick = options.get(171 /* EditorOption.scrollOnMiddleClick */);
+        const selectionClipboardIsOn = (platform.isLinux && options.get(107 /* EditorOption.selectionClipboard */));
+        const columnSelection = options.get(22 /* EditorOption.columnSelection */);
         if (data.middleButton && !selectionClipboardIsOn) {
-            if (scrollOnMiddleClick) ;
-            else {
-                this._columnSelect(data.position, data.mouseColumn, data.inSelectionMode);
-            }
+            this._columnSelect(data.position, data.mouseColumn, data.inSelectionMode);
         }
         else if (data.startedOnLineNumbers) {
             // If the dragging started on the gutter, then have operations work on the entire line
@@ -270,5 +265,3 @@ class ViewController {
         this.userInputEvents.emitMouseWheel(e);
     }
 }
-
-export { ViewController };

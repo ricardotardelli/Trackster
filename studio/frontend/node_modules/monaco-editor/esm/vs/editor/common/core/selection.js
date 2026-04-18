@@ -1,15 +1,14 @@
-import { Position } from './position.js';
-import { Range } from './range.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { Position } from './position.js';
+import { Range } from './range.js';
 /**
  * A selection in the editor.
  * The selection is a range that has an orientation.
  */
-class Selection extends Range {
+export class Selection extends Range {
     constructor(selectionStartLineNumber, selectionStartColumn, positionLineNumber, positionColumn) {
         super(selectionStartLineNumber, selectionStartColumn, positionLineNumber, positionColumn);
         this.selectionStartLineNumber = selectionStartLineNumber;
@@ -125,7 +124,7 @@ class Selection extends Range {
      * Test if `obj` is an `ISelection`.
      */
     static isISelection(obj) {
-        return (!!obj
+        return (obj
             && (typeof obj.selectionStartLineNumber === 'number')
             && (typeof obj.selectionStartColumn === 'number')
             && (typeof obj.positionLineNumber === 'number')
@@ -141,5 +140,3 @@ class Selection extends Range {
         return new Selection(endLineNumber, endColumn, startLineNumber, startColumn);
     }
 }
-
-export { Selection };

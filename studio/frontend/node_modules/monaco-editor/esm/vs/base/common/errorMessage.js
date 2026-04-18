@@ -1,14 +1,13 @@
-import { coalesce } from './arrays.js';
-import { isString } from './types.js';
-import { localize } from '../../nls.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import * as arrays from './arrays.js';
+import * as types from './types.js';
+import * as nls from '../../nls.js';
 function exceptionToErrorMessage(exception, verbose) {
     if (verbose && (exception.stack || exception.stacktrace)) {
-        return localize(29, "{0}: {1}", detectSystemErrorMessage(exception), stackToString(exception.stack) || stackToString(exception.stacktrace));
+        return nls.localize('stackTrace.format', "{0}: {1}", detectSystemErrorMessage(exception), stackToString(exception.stack) || stackToString(exception.stacktrace));
     }
     return detectSystemErrorMessage(exception);
 }
@@ -25,9 +24,9 @@ function detectSystemErrorMessage(exception) {
     }
     // See https://nodejs.org/api/errors.html#errors_class_system_error
     if (typeof exception.code === 'string' && typeof exception.errno === 'number' && typeof exception.syscall === 'string') {
-        return localize(30, "A system error occurred ({0})", exception.message);
+        return nls.localize('nodeExceptionMessage', "A system error occurred ({0})", exception.message);
     }
-    return exception.message || localize(31, "An unknown error occurred. Please consult the log for more details.");
+    return exception.message || nls.localize('error.defaultMessage', "An unknown error occurred. Please consult the log for more details.");
 }
 /**
  * Tries to generate a human readable error message out of the error. If the verbose parameter
@@ -35,19 +34,19 @@ function detectSystemErrorMessage(exception) {
  *
  * @returns A string containing the error message.
  */
-function toErrorMessage(error = null, verbose = false) {
+export function toErrorMessage(error = null, verbose = false) {
     if (!error) {
-        return localize(32, "An unknown error occurred. Please consult the log for more details.");
+        return nls.localize('error.defaultMessage', "An unknown error occurred. Please consult the log for more details.");
     }
     if (Array.isArray(error)) {
-        const errors = coalesce(error);
+        const errors = arrays.coalesce(error);
         const msg = toErrorMessage(errors[0], verbose);
         if (errors.length > 1) {
-            return localize(33, "{0} ({1} errors in total)", msg, errors.length);
+            return nls.localize('error.moreErrors', "{0} ({1} errors in total)", msg, errors.length);
         }
         return msg;
     }
-    if (isString(error)) {
+    if (types.isString(error)) {
         return error;
     }
     if (error.detail) {
@@ -65,7 +64,5 @@ function toErrorMessage(error = null, verbose = false) {
     if (error.message) {
         return error.message;
     }
-    return localize(34, "An unknown error occurred. Please consult the log for more details.");
+    return nls.localize('error.defaultMessage', "An unknown error occurred. Please consult the log for more details.");
 }
-
-export { toErrorMessage };

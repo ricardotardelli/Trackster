@@ -1,12 +1,11 @@
-import { Emitter } from '../../../../base/common/event.js';
-import { FoldingRegions } from './foldingRanges.js';
-import { hash } from '../../../../base/common/hash.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class FoldingModel {
+import { Emitter } from '../../../../base/common/event.js';
+import { FoldingRegions } from './foldingRanges.js';
+import { hash } from '../../../../base/common/hash.js';
+export class FoldingModel {
     get regions() { return this._regions; }
     get textModel() { return this._textModel; }
     constructor(textModel, decorationProvider) {
@@ -74,9 +73,9 @@ class FoldingModel {
         }
         this.updatePost(FoldingRegions.fromFoldRanges(newFoldingRanges));
     }
-    update(newRegions, selection) {
-        const foldedOrManualRanges = this._currentFoldedOrManualRanges(selection);
-        const newRanges = FoldingRegions.sanitizeAndMerge(newRegions, foldedOrManualRanges, this._textModel.getLineCount(), selection);
+    update(newRegions, blockedLineNumers = []) {
+        const foldedOrManualRanges = this._currentFoldedOrManualRanges(blockedLineNumers);
+        const newRanges = FoldingRegions.sanitizeAndMerge(newRegions, foldedOrManualRanges, this._textModel.getLineCount());
         this.updatePost(FoldingRegions.fromFoldRanges(newRanges));
     }
     updatePost(newRegions) {
@@ -102,7 +101,15 @@ class FoldingModel {
         this._regions = newRegions;
         this._updateEventEmitter.fire({ model: this });
     }
-    _currentFoldedOrManualRanges(selection) {
+    _currentFoldedOrManualRanges(blockedLineNumers = []) {
+        const isBlocked = (startLineNumber, endLineNumber) => {
+            for (const blockedLineNumber of blockedLineNumers) {
+                if (startLineNumber < blockedLineNumber && blockedLineNumber <= endLineNumber) { // first line is visible
+                    return true;
+                }
+            }
+            return false;
+        };
         const foldedRanges = [];
         for (let i = 0, limit = this._regions.length; i < limit; i++) {
             let isCollapsed = this.regions.isCollapsed(i);
@@ -111,7 +118,7 @@ class FoldingModel {
                 const foldRange = this._regions.toFoldRange(i);
                 const decRange = this._textModel.getDecorationRange(this._editorDecorationIds[i]);
                 if (decRange) {
-                    if (isCollapsed && selection?.startsInside(decRange.startLineNumber + 1, decRange.endLineNumber)) {
+                    if (isCollapsed && isBlocked(decRange.startLineNumber, decRange.endLineNumber)) {
                         isCollapsed = false; // uncollapse is the range is blocked
                     }
                     foldedRanges.push({
@@ -153,6 +160,7 @@ class FoldingModel {
      * Apply persisted state, for persistence only
      */
     applyMemento(state) {
+        var _a, _b;
         if (!Array.isArray(state)) {
             return;
         }
@@ -168,8 +176,8 @@ class FoldingModel {
                     startLineNumber: range.startLineNumber,
                     endLineNumber: range.endLineNumber,
                     type: undefined,
-                    isCollapsed: range.isCollapsed ?? true,
-                    source: range.source ?? 0 /* FoldSource.provider */
+                    isCollapsed: (_a = range.isCollapsed) !== null && _a !== void 0 ? _a : true,
+                    source: (_b = range.source) !== null && _b !== void 0 ? _b : 0 /* FoldSource.provider */
                 });
             }
         }
@@ -252,7 +260,7 @@ class FoldingModel {
  * @param levels The number of levels. Use 1 to only impact the regions at the location, use Number.MAX_VALUE for all levels.
  * @param lineNumbers the location of the regions to collapse or expand, or if not set, all regions in the model.
  */
-function toggleCollapseState(foldingModel, levels, lineNumbers) {
+export function toggleCollapseState(foldingModel, levels, lineNumbers) {
     const toToggle = [];
     for (const lineNumber of lineNumbers) {
         const region = foldingModel.getRegionAtLine(lineNumber);
@@ -273,7 +281,7 @@ function toggleCollapseState(foldingModel, levels, lineNumbers) {
  * @param levels The number of levels. Use 1 to only impact the regions at the location, use Number.MAX_VALUE for all levels.
  * @param lineNumbers the location of the regions to collapse or expand, or if not set, all regions in the model.
  */
-function setCollapseStateLevelsDown(foldingModel, doCollapse, levels = Number.MAX_VALUE, lineNumbers) {
+export function setCollapseStateLevelsDown(foldingModel, doCollapse, levels = Number.MAX_VALUE, lineNumbers) {
     const toToggle = [];
     if (lineNumbers && lineNumbers.length > 0) {
         for (const lineNumber of lineNumbers) {
@@ -301,7 +309,7 @@ function setCollapseStateLevelsDown(foldingModel, doCollapse, levels = Number.MA
  * @param levels The number of levels. Use 1 to only impact the regions at the location, use Number.MAX_VALUE for all levels.
  * @param lineNumbers the location of the regions to collapse or expand.
  */
-function setCollapseStateLevelsUp(foldingModel, doCollapse, levels, lineNumbers) {
+export function setCollapseStateLevelsUp(foldingModel, doCollapse, levels, lineNumbers) {
     const toToggle = [];
     for (const lineNumber of lineNumbers) {
         const regions = foldingModel.getAllRegionsAtLine(lineNumber, (region, level) => region.isCollapsed !== doCollapse && level <= levels);
@@ -314,7 +322,7 @@ function setCollapseStateLevelsUp(foldingModel, doCollapse, levels, lineNumbers)
  * @param doCollapse Whether to collapse or expand
  * @param lineNumbers the location of the regions to collapse or expand.
  */
-function setCollapseStateUp(foldingModel, doCollapse, lineNumbers) {
+export function setCollapseStateUp(foldingModel, doCollapse, lineNumbers) {
     const toToggle = [];
     for (const lineNumber of lineNumbers) {
         const regions = foldingModel.getAllRegionsAtLine(lineNumber, (region) => region.isCollapsed !== doCollapse);
@@ -329,7 +337,7 @@ function setCollapseStateUp(foldingModel, doCollapse, lineNumbers) {
  * @param foldLevel level. Level == 1 is the top level
  * @param doCollapse Whether to collapse or expand
 */
-function setCollapseStateAtLevel(foldingModel, foldLevel, doCollapse, blockedLineNumbers) {
+export function setCollapseStateAtLevel(foldingModel, foldLevel, doCollapse, blockedLineNumbers) {
     const filter = (region, level) => level === foldLevel && region.isCollapsed !== doCollapse && !blockedLineNumbers.some(line => region.containsLine(line));
     const toToggle = foldingModel.getRegionsInside(null, filter);
     foldingModel.toggleCollapseState(toToggle);
@@ -339,7 +347,7 @@ function setCollapseStateAtLevel(foldingModel, foldLevel, doCollapse, blockedLin
  * @param doCollapse Whether to collapse or expand
  * @param blockedLineNumbers the location of regions to not collapse or expand
  */
-function setCollapseStateForRest(foldingModel, doCollapse, blockedLineNumbers) {
+export function setCollapseStateForRest(foldingModel, doCollapse, blockedLineNumbers) {
     const filteredRegions = [];
     for (const lineNumber of blockedLineNumbers) {
         const regions = foldingModel.getAllRegionsAtLine(lineNumber, undefined);
@@ -355,7 +363,7 @@ function setCollapseStateForRest(foldingModel, doCollapse, blockedLineNumbers) {
  * Folds all regions for which the lines start with a given regex
  * @param foldingModel the folding model
  */
-function setCollapseStateForMatchingLines(foldingModel, regExp, doCollapse) {
+export function setCollapseStateForMatchingLines(foldingModel, regExp, doCollapse) {
     const editorModel = foldingModel.textModel;
     const regions = foldingModel.regions;
     const toToggle = [];
@@ -373,7 +381,7 @@ function setCollapseStateForMatchingLines(foldingModel, regExp, doCollapse) {
  * Folds all regions of the given type
  * @param foldingModel the folding model
  */
-function setCollapseStateForType(foldingModel, type, doCollapse) {
+export function setCollapseStateForType(foldingModel, type, doCollapse) {
     const regions = foldingModel.regions;
     const toToggle = [];
     for (let i = regions.length - 1; i >= 0; i--) {
@@ -390,7 +398,7 @@ function setCollapseStateForType(foldingModel, type, doCollapse) {
  *
  * @return Parent fold start line
  */
-function getParentFoldLine(lineNumber, foldingModel) {
+export function getParentFoldLine(lineNumber, foldingModel) {
     let startLineNumber = null;
     const foldingRegion = foldingModel.getRegionAtLine(lineNumber);
     if (foldingRegion !== null) {
@@ -415,7 +423,7 @@ function getParentFoldLine(lineNumber, foldingModel) {
  *
  * @return Previous fold start line
  */
-function getPreviousFoldLine(lineNumber, foldingModel) {
+export function getPreviousFoldLine(lineNumber, foldingModel) {
     let foldingRegion = foldingModel.getRegionAtLine(lineNumber);
     // If on the folding range start line, go to previous sibling.
     if (foldingRegion !== null && foldingRegion.startLineNumber === lineNumber) {
@@ -475,7 +483,7 @@ function getPreviousFoldLine(lineNumber, foldingModel) {
  *
  * @return Next fold start line
  */
-function getNextFoldLine(lineNumber, foldingModel) {
+export function getNextFoldLine(lineNumber, foldingModel) {
     let foldingRegion = foldingModel.getRegionAtLine(lineNumber);
     // If on the folding range start line, go to next sibling.
     if (foldingRegion !== null && foldingRegion.startLineNumber === lineNumber) {
@@ -528,5 +536,3 @@ function getNextFoldLine(lineNumber, foldingModel) {
     }
     return null;
 }
-
-export { FoldingModel, getNextFoldLine, getParentFoldLine, getPreviousFoldLine, setCollapseStateAtLevel, setCollapseStateForMatchingLines, setCollapseStateForRest, setCollapseStateForType, setCollapseStateLevelsDown, setCollapseStateLevelsUp, setCollapseStateUp, toggleCollapseState };

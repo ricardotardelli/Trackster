@@ -1,19 +1,16 @@
-import { append, $, clearNode } from '../../dom.js';
-import { createStyleSheet } from '../../domStylesheets.js';
-import { getBaseLayerHoverDelegate } from '../hover/hoverDelegate2.js';
-import { getDefaultHoverDelegate } from '../hover/hoverDelegateFactory.js';
-import { List, unthemedListStyles } from '../list/listWidget.js';
-import { SplitView } from '../splitview/splitview.js';
-import { Event, Emitter } from '../../../common/event.js';
-import { DisposableStore, Disposable } from '../../../common/lifecycle.js';
-import './table.css';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { $, append, clearNode, createStyleSheet } from '../../dom.js';
+import { getDefaultHoverDelegate } from '../hover/hoverDelegate.js';
+import { setupCustomHover } from '../iconLabel/iconLabelHover.js';
+import { List, unthemedListStyles } from '../list/listWidget.js';
+import { SplitView } from '../splitview/splitview.js';
+import { Emitter, Event } from '../../../common/event.js';
+import { Disposable, DisposableStore } from '../../../common/lifecycle.js';
+import './table.css';
 class TableListRenderer {
-    static { this.TemplateId = 'row'; }
     constructor(columns, renderers, getColumnSize) {
         this.columns = columns;
         this.getColumnSize = getColumnSize;
@@ -44,21 +41,21 @@ class TableListRenderer {
         this.renderedTemplates.add(result);
         return result;
     }
-    renderElement(element, index, templateData, renderDetails) {
+    renderElement(element, index, templateData, height) {
         for (let i = 0; i < this.columns.length; i++) {
             const column = this.columns[i];
             const cell = column.project(element);
             const renderer = this.renderers[i];
-            renderer.renderElement(cell, index, templateData.cellTemplateData[i], renderDetails);
+            renderer.renderElement(cell, index, templateData.cellTemplateData[i], height);
         }
     }
-    disposeElement(element, index, templateData, renderDetails) {
+    disposeElement(element, index, templateData, height) {
         for (let i = 0; i < this.columns.length; i++) {
             const renderer = this.renderers[i];
             if (renderer.disposeElement) {
                 const column = this.columns[i];
                 const cell = column.project(element);
-                renderer.disposeElement(cell, index, templateData.cellTemplateData[i], renderDetails);
+                renderer.disposeElement(cell, index, templateData.cellTemplateData[i], height);
             }
         }
     }
@@ -76,6 +73,7 @@ class TableListRenderer {
         }
     }
 }
+TableListRenderer.TemplateId = 'row';
 function asListVirtualDelegate(delegate) {
     return {
         getHeight(row) { return delegate.getHeight(row); },
@@ -83,9 +81,9 @@ function asListVirtualDelegate(delegate) {
     };
 }
 class ColumnHeader extends Disposable {
-    get minimumSize() { return this.column.minimumWidth ?? 120; }
-    get maximumSize() { return this.column.maximumWidth ?? Number.POSITIVE_INFINITY; }
-    get onDidChange() { return this.column.onDidChangeWidthConstraints ?? Event.None; }
+    get minimumSize() { var _a; return (_a = this.column.minimumWidth) !== null && _a !== void 0 ? _a : 120; }
+    get maximumSize() { var _a; return (_a = this.column.maximumWidth) !== null && _a !== void 0 ? _a : Number.POSITIVE_INFINITY; }
+    get onDidChange() { var _a; return (_a = this.column.onDidChangeWidthConstraints) !== null && _a !== void 0 ? _a : Event.None; }
     constructor(column, index) {
         super();
         this.column = column;
@@ -93,16 +91,13 @@ class ColumnHeader extends Disposable {
         this._onDidLayout = new Emitter();
         this.onDidLayout = this._onDidLayout.event;
         this.element = $('.monaco-table-th', { 'data-col-index': index }, column.label);
-        if (column.tooltip) {
-            this._register(getBaseLayerHoverDelegate().setupManagedHover(getDefaultHoverDelegate('mouse'), this.element, column.tooltip));
-        }
+        this._register(setupCustomHover(getDefaultHoverDelegate('mouse'), this.element, column.tooltip));
     }
     layout(size) {
         this._onDidLayout.fire([this.index, size]);
     }
 }
-class Table {
-    static { this.InstanceCount = 0; }
+export class Table {
     get onDidChangeFocus() { return this.list.onDidChangeFocus; }
     get onDidChangeSelection() { return this.list.onDidChangeSelection; }
     get onDidScroll() { return this.list.onDidScroll; }
@@ -116,7 +111,6 @@ class Table {
     get onDidDispose() { return this.list.onDidDispose; }
     constructor(user, container, virtualDelegate, columns, renderers, _options) {
         this.virtualDelegate = virtualDelegate;
-        this.columns = columns;
         this.domId = `table_id_${++Table.InstanceCount}`;
         this.disposables = new DisposableStore();
         this.cachedWidth = 0;
@@ -177,5 +171,4 @@ class Table {
         this.disposables.dispose();
     }
 }
-
-export { Table };
+Table.InstanceCount = 0;

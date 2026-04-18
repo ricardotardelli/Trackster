@@ -1,11 +1,10 @@
-import { Range } from '../../../common/core/range.js';
-import { Selection } from '../../../common/core/selection.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class MoveCaretCommand {
+import { Range } from '../../../common/core/range.js';
+import { Selection } from '../../../common/core/selection.js';
+export class MoveCaretCommand {
     constructor(selection, isMovingLeft) {
         this._selection = selection;
         this._isMovingLeft = isMovingLeft;
@@ -45,5 +44,3 @@ class MoveCaretCommand {
         }
     }
 }
-
-export { MoveCaretCommand };

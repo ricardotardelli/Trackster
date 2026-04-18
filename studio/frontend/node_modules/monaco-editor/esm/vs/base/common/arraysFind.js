@@ -2,17 +2,17 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function findLast(array, predicate, fromIndex = array.length - 1) {
-    const idx = findLastIdx(array, predicate, fromIndex);
+export function findLast(array, predicate, fromIdx) {
+    const idx = findLastIdx(array, predicate);
     if (idx === -1) {
         return undefined;
     }
     return array[idx];
 }
-function findLastIdx(array, predicate, fromIndex = array.length - 1) {
+export function findLastIdx(array, predicate, fromIndex = array.length - 1) {
     for (let i = fromIndex; i >= 0; i--) {
         const element = array[i];
-        if (predicate(element, i)) {
+        if (predicate(element)) {
             return i;
         }
     }
@@ -24,7 +24,7 @@ function findLastIdx(array, predicate, fromIndex = array.length - 1) {
  *
  * @returns `undefined` if no item matches, otherwise the last item that matches the predicate.
  */
-function findLastMonotonous(array, predicate) {
+export function findLastMonotonous(array, predicate) {
     const idx = findLastIdxMonotonous(array, predicate);
     return idx === -1 ? undefined : array[idx];
 }
@@ -34,7 +34,7 @@ function findLastMonotonous(array, predicate) {
  *
  * @returns `startIdx - 1` if predicate is false for all items, otherwise the index of the last item that matches the predicate.
  */
-function findLastIdxMonotonous(array, predicate, startIdx = 0, endIdxEx = array.length) {
+export function findLastIdxMonotonous(array, predicate, startIdx = 0, endIdxEx = array.length) {
     let i = startIdx;
     let j = endIdxEx;
     while (i < j) {
@@ -54,7 +54,7 @@ function findLastIdxMonotonous(array, predicate, startIdx = 0, endIdxEx = array.
  *
  * @returns `undefined` if no item matches, otherwise the first item that matches the predicate.
  */
-function findFirstMonotonous(array, predicate) {
+export function findFirstMonotonous(array, predicate) {
     const idx = findFirstIdxMonotonousOrArrLen(array, predicate);
     return idx === array.length ? undefined : array[idx];
 }
@@ -64,7 +64,7 @@ function findFirstMonotonous(array, predicate) {
  *
  * @returns `endIdxEx` if predicate is false for all items, otherwise the index of the first item that matches the predicate.
  */
-function findFirstIdxMonotonousOrArrLen(array, predicate, startIdx = 0, endIdxEx = array.length) {
+export function findFirstIdxMonotonousOrArrLen(array, predicate, startIdx = 0, endIdxEx = array.length) {
     let i = startIdx;
     let j = endIdxEx;
     while (i < j) {
@@ -84,8 +84,7 @@ function findFirstIdxMonotonousOrArrLen(array, predicate, startIdx = 0, endIdxEx
  * * You query this array with a monotonous predicate to find the last item that has a certain property.
  * * You query this array multiple times with monotonous predicates that get weaker and weaker.
  */
-class MonotonousArray {
-    static { this.assertInvariants = false; }
+export class MonotonousArray {
     constructor(_array) {
         this._array = _array;
         this._findLastMonotonousLastIdx = 0;
@@ -110,10 +109,11 @@ class MonotonousArray {
         return idx === -1 ? undefined : this._array[idx];
     }
 }
+MonotonousArray.assertInvariants = false;
 /**
  * Returns the first item that is equal to or greater than every other item.
 */
-function findFirstMax(array, comparator) {
+export function findFirstMaxBy(array, comparator) {
     if (array.length === 0) {
         return undefined;
     }
@@ -129,7 +129,7 @@ function findFirstMax(array, comparator) {
 /**
  * Returns the last item that is equal to or greater than every other item.
 */
-function findLastMax(array, comparator) {
+export function findLastMaxBy(array, comparator) {
     if (array.length === 0) {
         return undefined;
     }
@@ -145,10 +145,10 @@ function findLastMax(array, comparator) {
 /**
  * Returns the first item that is equal to or less than every other item.
 */
-function findFirstMin(array, comparator) {
-    return findFirstMax(array, (a, b) => -comparator(a, b));
+export function findFirstMinBy(array, comparator) {
+    return findFirstMaxBy(array, (a, b) => -comparator(a, b));
 }
-function findMaxIdx(array, comparator) {
+export function findMaxIdxBy(array, comparator) {
     if (array.length === 0) {
         return -1;
     }
@@ -164,7 +164,7 @@ function findMaxIdx(array, comparator) {
 /**
  * Returns the first mapped value of the array which is not undefined.
  */
-function mapFindFirst(items, mapFn) {
+export function mapFindFirst(items, mapFn) {
     for (const value of items) {
         const mapped = mapFn(value);
         if (mapped !== undefined) {
@@ -173,5 +173,3 @@ function mapFindFirst(items, mapFn) {
     }
     return undefined;
 }
-
-export { MonotonousArray, findFirstIdxMonotonousOrArrLen, findFirstMax, findFirstMin, findFirstMonotonous, findLast, findLastIdx, findLastIdxMonotonous, findLastMax, findLastMonotonous, findMaxIdx, mapFindFirst };

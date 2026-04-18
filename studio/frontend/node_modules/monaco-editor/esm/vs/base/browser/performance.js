@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var inputLatency;
+export var inputLatency;
 (function (inputLatency) {
     const totalKeydownTime = { total: 0, min: Number.MAX_VALUE, max: 0 };
     const totalInputTime = { ...totalKeydownTime };
@@ -218,5 +218,3 @@ var inputLatency;
         cumulative.max = 0;
     }
 })(inputLatency || (inputLatency = {}));
-
-export { inputLatency };

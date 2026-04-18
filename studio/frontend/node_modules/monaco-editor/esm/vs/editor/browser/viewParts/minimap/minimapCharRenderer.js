@@ -1,11 +1,10 @@
-import { getCharIndex } from './minimapCharSheet.js';
-import { toUint8 } from '../../../../base/common/uint.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class MinimapCharRenderer {
+import { getCharIndex } from './minimapCharSheet.js';
+import { toUint8 } from '../../../../base/common/uint.js';
+export class MinimapCharRenderer {
     constructor(charData, scale) {
         this.scale = scale;
         this._minimapCharRendererBrand = undefined;
@@ -86,5 +85,3 @@ class MinimapCharRenderer {
         }
     }
 }
-
-export { MinimapCharRenderer };

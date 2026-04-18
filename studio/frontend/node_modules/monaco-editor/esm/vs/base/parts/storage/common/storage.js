@@ -1,14 +1,13 @@
-import { ThrottledDelayer } from '../../../common/async.js';
-import { PauseableEmitter, Event } from '../../../common/event.js';
-import { Disposable } from '../../../common/lifecycle.js';
-import { stringify } from '../../../common/marshalling.js';
-import { isUndefinedOrNull, isObject } from '../../../common/types.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var StorageHint;
+import { ThrottledDelayer } from '../../../common/async.js';
+import { Event, PauseableEmitter } from '../../../common/event.js';
+import { Disposable } from '../../../common/lifecycle.js';
+import { stringify } from '../../../common/marshalling.js';
+import { isObject, isUndefinedOrNull } from '../../../common/types.js';
+export var StorageHint;
 (function (StorageHint) {
     // A hint to the storage that the storage
     // does not exist on disk yet. This allows
@@ -19,14 +18,13 @@ var StorageHint;
     // is backed by an in-memory storage.
     StorageHint[StorageHint["STORAGE_IN_MEMORY"] = 1] = "STORAGE_IN_MEMORY";
 })(StorageHint || (StorageHint = {}));
-var StorageState;
+export var StorageState;
 (function (StorageState) {
     StorageState[StorageState["None"] = 0] = "None";
     StorageState[StorageState["Initialized"] = 1] = "Initialized";
     StorageState[StorageState["Closed"] = 2] = "Closed";
 })(StorageState || (StorageState = {}));
-class Storage extends Disposable {
-    static { this.DEFAULT_FLUSH_DELAY = 100; }
+export class Storage extends Disposable {
     constructor(database, options = Object.create(null)) {
         super();
         this.database = database;
@@ -38,7 +36,6 @@ class Storage extends Disposable {
         this.flushDelayer = this._register(new ThrottledDelayer(Storage.DEFAULT_FLUSH_DELAY));
         this.pendingDeletes = new Set();
         this.pendingInserts = new Map();
-        this.pendingClose = undefined;
         this.whenFlushedCallbacks = [];
         this.registerListeners();
     }
@@ -46,13 +43,14 @@ class Storage extends Disposable {
         this._register(this.database.onDidChangeItemsExternal(e => this.onDidChangeItemsExternal(e)));
     }
     onDidChangeItemsExternal(e) {
+        var _a, _b;
         this._onDidChangeStorage.pause();
         try {
             // items that change external require us to update our
             // caches with the values. we just accept the value and
             // emit an event if there is a change.
-            e.changed?.forEach((value, key) => this.acceptExternal(key, value));
-            e.deleted?.forEach(key => this.acceptExternal(key, undefined));
+            (_a = e.changed) === null || _a === void 0 ? void 0 : _a.forEach((value, key) => this.acceptExternal(key, value));
+            (_b = e.deleted) === null || _b === void 0 ? void 0 : _b.forEach(key => this.acceptExternal(key, undefined));
         }
         finally {
             this._onDidChangeStorage.resume();
@@ -158,20 +156,13 @@ class Storage extends Disposable {
         // Update in storage and release any
         // waiters we have once done
         return this.database.updateItems(updateRequest).finally(() => {
+            var _a;
             if (!this.hasPending) {
                 while (this.whenFlushedCallbacks.length) {
-                    this.whenFlushedCallbacks.pop()?.();
+                    (_a = this.whenFlushedCallbacks.pop()) === null || _a === void 0 ? void 0 : _a();
                 }
             }
         });
-    }
-    async flush(delay) {
-        if (this.state === StorageState.Closed || // Return early if we are already closed
-            this.pendingClose // return early if nothing to do
-        ) {
-            return;
-        }
-        return this.doFlush(delay);
     }
     async doFlush(delay) {
         if (this.options.hint === StorageHint.STORAGE_IN_MEMORY) {
@@ -179,22 +170,16 @@ class Storage extends Disposable {
         }
         return this.flushDelayer.trigger(() => this.flushPending(), delay);
     }
-    async whenFlushed() {
-        if (!this.hasPending) {
-            return; // return early if nothing to do
-        }
-        return new Promise(resolve => this.whenFlushedCallbacks.push(resolve));
-    }
 }
-class InMemoryStorageDatabase {
+Storage.DEFAULT_FLUSH_DELAY = 100;
+export class InMemoryStorageDatabase {
     constructor() {
         this.onDidChangeItemsExternal = Event.None;
         this.items = new Map();
     }
     async updateItems(request) {
-        request.insert?.forEach((value, key) => this.items.set(key, value));
-        request.delete?.forEach(key => this.items.delete(key));
+        var _a, _b;
+        (_a = request.insert) === null || _a === void 0 ? void 0 : _a.forEach((value, key) => this.items.set(key, value));
+        (_b = request.delete) === null || _b === void 0 ? void 0 : _b.forEach(key => this.items.delete(key));
     }
 }
-
-export { InMemoryStorageDatabase, Storage, StorageHint, StorageState };

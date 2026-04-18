@@ -1,14 +1,13 @@
-import { onUnexpectedExternalError } from '../../../../base/common/errors.js';
-import { DisposableStore } from '../../../../base/common/lifecycle.js';
-import { MAX_LINE_NUMBER, FoldingRegions } from './foldingRanges.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { onUnexpectedExternalError } from '../../../../base/common/errors.js';
+import { DisposableStore } from '../../../../base/common/lifecycle.js';
+import { FoldingRegions, MAX_LINE_NUMBER } from './foldingRanges.js';
 const foldingContext = {};
 const ID_SYNTAX_PROVIDER = 'syntax';
-class SyntaxRangeProvider {
+export class SyntaxRangeProvider {
     constructor(editorModel, providers, handleFoldingRangesChange, foldingRangesLimit, fallbackRangeProvider // used when all providers return null
     ) {
         this.editorModel = editorModel;
@@ -29,14 +28,12 @@ class SyntaxRangeProvider {
     }
     compute(cancellationToken) {
         return collectSyntaxRanges(this.providers, this.editorModel, cancellationToken).then(ranges => {
-            if (this.editorModel.isDisposed()) {
-                return null;
-            }
+            var _a, _b;
             if (ranges) {
                 const res = sanitizeRanges(ranges, this.foldingRangesLimit);
                 return res;
             }
-            return this.fallbackRangeProvider?.compute(cancellationToken) ?? null;
+            return (_b = (_a = this.fallbackRangeProvider) === null || _a === void 0 ? void 0 : _a.compute(cancellationToken)) !== null && _b !== void 0 ? _b : null;
         });
     }
     dispose() {
@@ -133,7 +130,7 @@ class RangesCollector {
         }
     }
 }
-function sanitizeRanges(rangeData, foldingRangesLimit) {
+export function sanitizeRanges(rangeData, foldingRangesLimit) {
     const sorted = rangeData.sort((d1, d2) => {
         let diff = d1.start - d2.start;
         if (diff === 0) {
@@ -173,5 +170,3 @@ function sanitizeRanges(rangeData, foldingRangesLimit) {
     }
     return collector.toIndentRanges();
 }
-
-export { SyntaxRangeProvider, sanitizeRanges };

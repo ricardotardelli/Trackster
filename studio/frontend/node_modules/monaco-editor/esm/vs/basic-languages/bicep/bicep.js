@@ -1,8 +1,17 @@
-const bounded = (text) => `\\b${text}\\b`;
-const identifierStart = "[_a-zA-Z]";
-const identifierContinue = "[_a-zA-Z0-9]";
-const identifier = bounded(`${identifierStart}${identifierContinue}*`);
-const keywords = [
+/*!-----------------------------------------------------------------------------
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Version: 0.47.0(69991d66135e4a1fc1cf0b1ac4ad25d429866a0d)
+ * Released under the MIT license
+ * https://github.com/microsoft/monaco-editor/blob/main/LICENSE.txt
+ *-----------------------------------------------------------------------------*/
+
+
+// src/basic-languages/bicep/bicep.ts
+var bounded = (text) => `\\b${text}\\b`;
+var identifierStart = "[_a-zA-Z]";
+var identifierContinue = "[_a-zA-Z0-9]";
+var identifier = bounded(`${identifierStart}${identifierContinue}*`);
+var keywords = [
   "targetScope",
   "resource",
   "module",
@@ -14,10 +23,10 @@ const keywords = [
   "if",
   "existing"
 ];
-const namedLiterals = ["true", "false", "null"];
-const nonCommentWs = `[ \\t\\r\\n]`;
-const numericLiteral = `[0-9]+`;
-const conf = {
+var namedLiterals = ["true", "false", "null"];
+var nonCommentWs = `[ \\t\\r\\n]`;
+var numericLiteral = `[0-9]+`;
+var conf = {
   comments: {
     lineComment: "//",
     blockComment: ["/*", "*/"]
@@ -47,7 +56,7 @@ const conf = {
     decreaseIndentPattern: new RegExp("^((?!.*?\\/\\*).*\\*/)?\\s*[\\}\\]].*$")
   }
 };
-const language = {
+var language = {
   defaultToken: "",
   tokenPostfix: ".bicep",
   brackets: [
@@ -104,5 +113,7 @@ const language = {
     ]
   }
 };
-
-export { conf, language };
+export {
+  conf,
+  language
+};

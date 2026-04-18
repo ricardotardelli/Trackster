@@ -1,17 +1,16 @@
-import { Emitter } from '../../../../base/common/event.js';
-import { isHighSurrogate, firstNonWhitespaceIndex, lastNonWhitespaceIndex, isBasicASCII, containsRTL, containsUnusualLineTerminators } from '../../../../base/common/strings.js';
-import { Range } from '../../core/range.js';
-import { ApplyEditsResult } from '../../model.js';
-import { PieceTreeBase } from './pieceTreeBase.js';
-import { countEOL } from '../../core/misc/eolCounter.js';
-import { TextChange } from '../../core/textChange.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class PieceTreeTextBuffer extends Disposable {
+import { Emitter } from '../../../../base/common/event.js';
+import * as strings from '../../../../base/common/strings.js';
+import { Range } from '../../core/range.js';
+import { ApplyEditsResult } from '../../model.js';
+import { PieceTreeBase } from './pieceTreeBase.js';
+import { countEOL } from '../../core/eolCounter.js';
+import { TextChange } from '../../core/textChange.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+export class PieceTreeTextBuffer extends Disposable {
     constructor(chunks, BOM, eol, containsRTL, containsUnusualLineTerminators, isBasicASCII, eolNormalized) {
         super();
         this._onDidChangeContent = this._register(new Emitter());
@@ -93,7 +92,7 @@ class PieceTreeTextBuffer extends Disposable {
                 const fromOffset = (lineNumber === fromLineNumber ? range.startColumn - 1 : 0);
                 const toOffset = (lineNumber === toLineNumber ? range.endColumn - 1 : lineContent.length);
                 for (let offset = fromOffset; offset < toOffset; offset++) {
-                    if (isHighSurrogate(lineContent.charCodeAt(offset))) {
+                    if (strings.isHighSurrogate(lineContent.charCodeAt(offset))) {
                         result = result + 1;
                         offset = offset + 1;
                     }
@@ -106,9 +105,6 @@ class PieceTreeTextBuffer extends Disposable {
             return result;
         }
         return this.getValueLengthInRange(range, eol);
-    }
-    getNearestChunk(offset) {
-        return this._pieceTree.getNearestChunk(offset);
     }
     getLength() {
         return this._pieceTree.getLength();
@@ -129,14 +125,14 @@ class PieceTreeTextBuffer extends Disposable {
         return this._pieceTree.getLineLength(lineNumber);
     }
     getLineFirstNonWhitespaceColumn(lineNumber) {
-        const result = firstNonWhitespaceIndex(this.getLineContent(lineNumber));
+        const result = strings.firstNonWhitespaceIndex(this.getLineContent(lineNumber));
         if (result === -1) {
             return 0;
         }
         return result + 1;
     }
     getLineLastNonWhitespaceColumn(lineNumber) {
-        const result = lastNonWhitespaceIndex(this.getLineContent(lineNumber));
+        const result = strings.lastNonWhitespaceIndex(this.getLineContent(lineNumber));
         if (result === -1) {
             return 0;
         }
@@ -172,16 +168,16 @@ class PieceTreeTextBuffer extends Disposable {
             if (op.text) {
                 let textMightContainNonBasicASCII = true;
                 if (!mightContainNonBasicASCII) {
-                    textMightContainNonBasicASCII = !isBasicASCII(op.text);
+                    textMightContainNonBasicASCII = !strings.isBasicASCII(op.text);
                     mightContainNonBasicASCII = textMightContainNonBasicASCII;
                 }
                 if (!mightContainRTL && textMightContainNonBasicASCII) {
                     // check if the new inserted text contains RTL
-                    mightContainRTL = containsRTL(op.text);
+                    mightContainRTL = strings.containsRTL(op.text);
                 }
                 if (!mightContainUnusualLineTerminators && textMightContainNonBasicASCII) {
                     // check if the new inserted text contains unusual line terminators
-                    mightContainUnusualLineTerminators = containsUnusualLineTerminators(op.text);
+                    mightContainUnusualLineTerminators = strings.containsUnusualLineTerminators(op.text);
                 }
             }
             let validText = '';
@@ -244,7 +240,7 @@ class PieceTreeTextBuffer extends Disposable {
                         let currentLineContent = '';
                         if (lineNumber === reverseRange.startLineNumber) {
                             currentLineContent = this.getLineContent(op.range.startLineNumber);
-                            if (firstNonWhitespaceIndex(currentLineContent) !== -1) {
+                            if (strings.firstNonWhitespaceIndex(currentLineContent) !== -1) {
                                 continue;
                             }
                         }
@@ -293,7 +289,7 @@ class PieceTreeTextBuffer extends Disposable {
                 }
                 const prevContent = newTrimAutoWhitespaceCandidates[i].oldContent;
                 const lineContent = this.getLineContent(lineNumber);
-                if (lineContent.length === 0 || lineContent === prevContent || firstNonWhitespaceIndex(lineContent) !== -1) {
+                if (lineContent.length === 0 || lineContent === prevContent || strings.firstNonWhitespaceIndex(lineContent) !== -1) {
                     continue;
                 }
                 trimAutoWhitespaceLineNumbers.push(lineNumber);
@@ -457,5 +453,3 @@ class PieceTreeTextBuffer extends Disposable {
         return -r;
     }
 }
-
-export { PieceTreeTextBuffer };

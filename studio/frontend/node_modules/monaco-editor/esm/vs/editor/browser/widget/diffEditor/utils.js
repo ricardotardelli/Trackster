@@ -1,20 +1,17 @@
-import { findLast } from '../../../../base/common/arraysFind.js';
-import { CancellationTokenSource } from '../../../../base/common/cancellation.js';
-import { DisposableStore, Disposable, toDisposable } from '../../../../base/common/lifecycle.js';
-import '../../../../base/common/observableInternal/index.js';
-import { ElementSizeObserver } from '../../config/elementSizeObserver.js';
-import { Position } from '../../../common/core/position.js';
-import { Range } from '../../../common/core/range.js';
-import { TextLength } from '../../../common/core/text/textLength.js';
-import { autorun, autorunHandleChanges, autorunWithStore, autorunOpts } from '../../../../base/common/observableInternal/reactions/autorun.js';
-import { observableValue } from '../../../../base/common/observableInternal/observables/observableValue.js';
-import { transaction } from '../../../../base/common/observableInternal/transaction.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function joinCombine(arr1, arr2, keySelector, combine) {
+import { findLast } from '../../../../base/common/arraysFind.js';
+import { CancellationTokenSource } from '../../../../base/common/cancellation.js';
+import { isHotReloadEnabled, registerHotReloadHandler } from '../../../../base/common/hotReload.js';
+import { Disposable, DisposableStore, toDisposable } from '../../../../base/common/lifecycle.js';
+import { autorun, autorunHandleChanges, autorunOpts, autorunWithStore, observableSignalFromEvent, observableValue, transaction } from '../../../../base/common/observable.js';
+import { ElementSizeObserver } from '../../config/elementSizeObserver.js';
+import { Position } from '../../../common/core/position.js';
+import { Range } from '../../../common/core/range.js';
+import { LengthObj } from '../../../common/model/bracketPairsTextModelPart/bracketPairsTree/length.js';
+export function joinCombine(arr1, arr2, keySelector, combine) {
     if (arr1.length === 0) {
         return arr2;
     }
@@ -54,7 +51,7 @@ function joinCombine(arr1, arr2, keySelector, combine) {
     return result;
 }
 // TODO make utility
-function applyObservableDecorations(editor, decorations) {
+export function applyObservableDecorations(editor, decorations) {
     const d = new DisposableStore();
     const decorationsCollection = editor.createDecorationsCollection();
     d.add(autorunOpts({ debugName: () => `Apply decorations from ${decorations.debugName}` }, reader => {
@@ -68,25 +65,17 @@ function applyObservableDecorations(editor, decorations) {
     });
     return d;
 }
-function appendRemoveOnDispose(parent, child) {
+export function appendRemoveOnDispose(parent, child) {
     parent.appendChild(child);
     return toDisposable(() => {
-        child.remove();
+        parent.removeChild(child);
     });
 }
-function prependRemoveOnDispose(parent, child) {
-    parent.prepend(child);
-    return toDisposable(() => {
-        child.remove();
-    });
-}
-class ObservableElementSizeObserver extends Disposable {
+export class ObservableElementSizeObserver extends Disposable {
     get width() { return this._width; }
     get height() { return this._height; }
-    get automaticLayout() { return this._automaticLayout; }
     constructor(element, dimension) {
         super();
-        this._automaticLayout = false;
         this.elementSizeObserver = this._register(new ElementSizeObserver(element, dimension));
         this._width = observableValue(this, this.elementSizeObserver.getWidth());
         this._height = observableValue(this, this.elementSizeObserver.getHeight());
@@ -100,7 +89,6 @@ class ObservableElementSizeObserver extends Disposable {
         this.elementSizeObserver.observe(dimension);
     }
     setAutomaticLayout(automaticLayout) {
-        this._automaticLayout = automaticLayout;
         if (automaticLayout) {
             this.elementSizeObserver.startObserving();
         }
@@ -109,7 +97,7 @@ class ObservableElementSizeObserver extends Disposable {
         }
     }
 }
-function animatedObservable(targetWindow, base, store) {
+export function animatedObservable(targetWindow, base, store) {
     let targetVal = base.get();
     let startVal = targetVal;
     let curVal = targetVal;
@@ -118,14 +106,12 @@ function animatedObservable(targetWindow, base, store) {
     const durationMs = 300;
     let animationFrame = undefined;
     store.add(autorunHandleChanges({
-        changeTracker: {
-            createChangeSummary: () => ({ animate: false }),
-            handleChange: (ctx, s) => {
-                if (ctx.didChange(base)) {
-                    s.animate = s.animate || ctx.change;
-                }
-                return true;
+        createEmptyChangeSummary: () => ({ animate: false }),
+        handleChange: (ctx, s) => {
+            if (ctx.didChange(base)) {
+                s.animate = s.animate || ctx.change;
             }
+            return true;
         }
     }, (reader, s) => {
         /** @description update value */
@@ -154,7 +140,7 @@ function animatedObservable(targetWindow, base, store) {
 function easeOutExpo(t, b, c, d) {
     return t === d ? b + c : c * (-Math.pow(2, -10 * t / d) + 1) + b;
 }
-class ViewZoneOverlayWidget extends Disposable {
+export class ViewZoneOverlayWidget extends Disposable {
     constructor(editor, viewZone, htmlElement) {
         super();
         this._register(new ManagedOverlayWidget(editor, htmlElement));
@@ -164,7 +150,7 @@ class ViewZoneOverlayWidget extends Disposable {
         }));
     }
 }
-class PlaceholderViewZone {
+export class PlaceholderViewZone {
     get afterLineNumber() { return this._afterLineNumber.get(); }
     constructor(_afterLineNumber, heightInPx) {
         this._afterLineNumber = _afterLineNumber;
@@ -184,8 +170,7 @@ class PlaceholderViewZone {
         };
     }
 }
-class ManagedOverlayWidget {
-    static { this._counter = 0; }
+export class ManagedOverlayWidget {
     constructor(_editor, _domElement) {
         this._editor = _editor;
         this._domElement = _domElement;
@@ -201,24 +186,41 @@ class ManagedOverlayWidget {
         this._editor.removeOverlayWidget(this._overlayWidget);
     }
 }
-function applyStyle(domNode, style) {
+ManagedOverlayWidget._counter = 0;
+export function applyStyle(domNode, style) {
     return autorun(reader => {
         /** @description applyStyle */
         for (let [key, val] of Object.entries(style)) {
             if (val && typeof val === 'object' && 'read' in val) {
-                // eslint-disable-next-line local/code-no-any-casts, @typescript-eslint/no-explicit-any
                 val = val.read(reader);
             }
             if (typeof val === 'number') {
                 val = `${val}px`;
             }
             key = key.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
-            // eslint-disable-next-line local/code-no-any-casts, @typescript-eslint/no-explicit-any
             domNode.style[key] = val;
         }
     });
 }
-function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
+export function readHotReloadableExport(value, reader) {
+    observeHotReloadableExports([value], reader);
+    return value;
+}
+export function observeHotReloadableExports(values, reader) {
+    if (isHotReloadEnabled()) {
+        const o = observableSignalFromEvent('reload', event => registerHotReloadHandler(({ oldExports }) => {
+            if (![...Object.values(oldExports)].some(v => values.includes(v))) {
+                return undefined;
+            }
+            return (_newExports) => {
+                event(undefined);
+                return true;
+            };
+        }));
+        o.read(reader);
+    }
+}
+export function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
     const store = new DisposableStore();
     const lastViewZoneIds = [];
     store.add(autorunWithStore((reader, store) => {
@@ -233,7 +235,7 @@ function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
         editor.changeViewZones(a => {
             for (const id of lastViewZoneIds) {
                 a.removeZone(id);
-                zoneIds?.delete(id);
+                zoneIds === null || zoneIds === void 0 ? void 0 : zoneIds.delete(id);
             }
             lastViewZoneIds.length = 0;
             for (const z of curViewZones) {
@@ -242,7 +244,7 @@ function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
                     z.setZoneId(id);
                 }
                 lastViewZoneIds.push(id);
-                zoneIds?.add(id);
+                zoneIds === null || zoneIds === void 0 ? void 0 : zoneIds.add(id);
                 viewZonIdsPerViewZone.set(z, id);
             }
         });
@@ -251,18 +253,16 @@ function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
         }
         // Layout zone on change
         store.add(autorunHandleChanges({
-            changeTracker: {
-                createChangeSummary() {
-                    return { zoneIds: [] };
-                },
-                handleChange(context, changeSummary) {
-                    const id = viewZoneIdPerOnChangeObservable.get(context.changedObservable);
-                    if (id !== undefined) {
-                        changeSummary.zoneIds.push(id);
-                    }
-                    return true;
-                },
-            }
+            createEmptyChangeSummary() {
+                return { zoneIds: [] };
+            },
+            handleChange(context, changeSummary) {
+                const id = viewZoneIdPerOnChangeObservable.get(context.changedObservable);
+                if (id !== undefined) {
+                    changeSummary.zoneIds.push(id);
+                }
+                return true;
+            },
         }, (reader, changeSummary) => {
             /** @description layoutZone on change */
             for (const vz of curViewZones) {
@@ -290,7 +290,7 @@ function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
             editor.changeViewZones(a => { for (const id of lastViewZoneIds) {
                 a.removeZone(id);
             } });
-            zoneIds?.clear();
+            zoneIds === null || zoneIds === void 0 ? void 0 : zoneIds.clear();
             if (setIsUpdating) {
                 setIsUpdating(false);
             }
@@ -298,12 +298,12 @@ function applyViewZones(editor, viewZones, setIsUpdating, zoneIds) {
     });
     return store;
 }
-class DisposableCancellationTokenSource extends CancellationTokenSource {
+export class DisposableCancellationTokenSource extends CancellationTokenSource {
     dispose() {
         super.dispose(true);
     }
 }
-function translatePosition(posInOriginal, mappings) {
+export function translatePosition(posInOriginal, mappings) {
     const mapping = findLast(mappings, m => m.original.startLineNumber <= posInOriginal.lineNumber);
     if (!mapping) {
         // No changes before the position
@@ -327,18 +327,32 @@ function translatePosition(posInOriginal, mappings) {
     }
     else {
         const l = lengthBetweenPositions(innerMapping.originalRange.getEndPosition(), posInOriginal);
-        return Range.fromPositions(l.addToPosition(innerMapping.modifiedRange.getEndPosition()));
+        return Range.fromPositions(addLength(innerMapping.modifiedRange.getEndPosition(), l));
     }
 }
 function lengthBetweenPositions(position1, position2) {
     if (position1.lineNumber === position2.lineNumber) {
-        return new TextLength(0, position2.column - position1.column);
+        return new LengthObj(0, position2.column - position1.column);
     }
     else {
-        return new TextLength(position2.lineNumber - position1.lineNumber, position2.column - 1);
+        return new LengthObj(position2.lineNumber - position1.lineNumber, position2.column - 1);
     }
 }
-function filterWithPrevious(arr, filter) {
+function addLength(position, length) {
+    if (length.lineCount === 0) {
+        return new Position(position.lineNumber, position.column + length.columnCount);
+    }
+    else {
+        return new Position(position.lineNumber + length.lineCount, length.columnCount + 1);
+    }
+}
+export function bindContextKey(key, service, computeValue) {
+    const boundKey = key.bindTo(service);
+    return autorunOpts({ debugName: () => `Set Context Key "${key.key}"` }, reader => {
+        boundKey.set(computeValue(reader));
+    });
+}
+export function filterWithPrevious(arr, filter) {
     let prev;
     return arr.filter(cur => {
         const result = filter(cur, prev);
@@ -346,80 +360,3 @@ function filterWithPrevious(arr, filter) {
         return result;
     });
 }
-class RefCounted {
-    static create(value, debugOwner = undefined) {
-        return new BaseRefCounted(value, value, debugOwner);
-    }
-    static createWithDisposable(value, disposable, debugOwner = undefined) {
-        const store = new DisposableStore();
-        store.add(disposable);
-        store.add(value);
-        return new BaseRefCounted(value, store, debugOwner);
-    }
-}
-class BaseRefCounted extends RefCounted {
-    constructor(object, _disposable, _debugOwner) {
-        super();
-        this.object = object;
-        this._disposable = _disposable;
-        this._debugOwner = _debugOwner;
-        this._refCount = 1;
-        this._isDisposed = false;
-        this._owners = [];
-        if (_debugOwner) {
-            this._addOwner(_debugOwner);
-        }
-    }
-    _addOwner(debugOwner) {
-        if (debugOwner) {
-            this._owners.push(debugOwner);
-        }
-    }
-    createNewRef(debugOwner) {
-        this._refCount++;
-        if (debugOwner) {
-            this._addOwner(debugOwner);
-        }
-        return new ClonedRefCounted(this, debugOwner);
-    }
-    dispose() {
-        if (this._isDisposed) {
-            return;
-        }
-        this._isDisposed = true;
-        this._decreaseRefCount(this._debugOwner);
-    }
-    _decreaseRefCount(debugOwner) {
-        this._refCount--;
-        if (this._refCount === 0) {
-            this._disposable.dispose();
-        }
-        if (debugOwner) {
-            const idx = this._owners.indexOf(debugOwner);
-            if (idx !== -1) {
-                this._owners.splice(idx, 1);
-            }
-        }
-    }
-}
-class ClonedRefCounted extends RefCounted {
-    constructor(_base, _debugOwner) {
-        super();
-        this._base = _base;
-        this._debugOwner = _debugOwner;
-        this._isDisposed = false;
-    }
-    get object() { return this._base.object; }
-    createNewRef(debugOwner) {
-        return this._base.createNewRef(debugOwner);
-    }
-    dispose() {
-        if (this._isDisposed) {
-            return;
-        }
-        this._isDisposed = true;
-        this._base._decreaseRefCount(this._debugOwner);
-    }
-}
-
-export { DisposableCancellationTokenSource, ManagedOverlayWidget, ObservableElementSizeObserver, PlaceholderViewZone, RefCounted, ViewZoneOverlayWidget, animatedObservable, appendRemoveOnDispose, applyObservableDecorations, applyStyle, applyViewZones, filterWithPrevious, joinCombine, prependRemoveOnDispose, translatePosition };

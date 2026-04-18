@@ -1,14 +1,13 @@
-import { Emitter } from '../../../../base/common/event.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { Range } from '../../core/range.js';
-import { editorBracketHighlightingUnexpectedBracketForeground, editorBracketHighlightingForeground1, editorBracketHighlightingForeground2, editorBracketHighlightingForeground3, editorBracketHighlightingForeground4, editorBracketHighlightingForeground5, editorBracketHighlightingForeground6 } from '../../core/editorColorRegistry.js';
-import { registerThemingParticipant } from '../../../../platform/theme/common/themeService.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ColorizedBracketPairsDecorationProvider extends Disposable {
+import { Emitter } from '../../../../base/common/event.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { Range } from '../../core/range.js';
+import { editorBracketHighlightingForeground1, editorBracketHighlightingForeground2, editorBracketHighlightingForeground3, editorBracketHighlightingForeground4, editorBracketHighlightingForeground5, editorBracketHighlightingForeground6, editorBracketHighlightingUnexpectedBracketForeground } from '../../core/editorColorRegistry.js';
+import { registerThemingParticipant } from '../../../../platform/theme/common/themeService.js';
+export class ColorizedBracketPairsDecorationProvider extends Disposable {
     constructor(textModel) {
         super();
         this.textModel = textModel;
@@ -93,5 +92,3 @@ registerThemingParticipant((theme, collector) => {
         collector.addRule(`.monaco-editor .${colorProvider.getInlineClassNameOfLevel(level)} { color: ${color}; }`);
     }
 });
-
-export { ColorizedBracketPairsDecorationProvider };

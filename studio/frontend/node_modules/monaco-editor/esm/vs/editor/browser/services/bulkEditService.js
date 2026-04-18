@@ -1,13 +1,12 @@
-import { createDecorator } from '../../../platform/instantiation/common/instantiation.js';
-import { URI } from '../../../base/common/uri.js';
-import { isObject } from '../../../base/common/types.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-const IBulkEditService = createDecorator('IWorkspaceEditService');
-class ResourceEdit {
+import { createDecorator } from '../../../platform/instantiation/common/instantiation.js';
+import { URI } from '../../../base/common/uri.js';
+import { isObject } from '../../../base/common/types.js';
+export const IBulkEditService = createDecorator('IWorkspaceEditService');
+export class ResourceEdit {
     constructor(metadata) {
         this.metadata = metadata;
     }
@@ -23,7 +22,7 @@ class ResourceEdit {
         });
     }
 }
-class ResourceTextEdit extends ResourceEdit {
+export class ResourceTextEdit extends ResourceEdit {
     static is(candidate) {
         if (candidate instanceof ResourceTextEdit) {
             return true;
@@ -47,7 +46,7 @@ class ResourceTextEdit extends ResourceEdit {
         this.versionId = versionId;
     }
 }
-class ResourceFileEdit extends ResourceEdit {
+export class ResourceFileEdit extends ResourceEdit {
     static is(candidate) {
         if (candidate instanceof ResourceFileEdit) {
             return true;
@@ -72,5 +71,3 @@ class ResourceFileEdit extends ResourceEdit {
         this.options = options;
     }
 }
-
-export { IBulkEditService, ResourceEdit, ResourceFileEdit, ResourceTextEdit };

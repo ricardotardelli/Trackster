@@ -1,16 +1,11 @@
-import './rulers.css';
-import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
-import { ViewPart } from '../../view/viewPart.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/**
- * Rulers are vertical lines that appear at certain columns in the editor. There can be >= 0 rulers
- * at a time.
- */
-class Rulers extends ViewPart {
+import './rulers.css';
+import { createFastDomNode } from '../../../../base/browser/fastDomNode.js';
+import { ViewPart } from '../../view/viewPart.js';
+export class Rulers extends ViewPart {
     constructor(context) {
         super(context);
         this.domNode = createFastDomNode(document.createElement('div'));
@@ -19,8 +14,8 @@ class Rulers extends ViewPart {
         this.domNode.setClassName('view-rulers');
         this._renderedRulers = [];
         const options = this._context.configuration.options;
-        this._rulers = options.get(116 /* EditorOption.rulers */);
-        this._typicalHalfwidthCharacterWidth = options.get(59 /* EditorOption.fontInfo */).typicalHalfwidthCharacterWidth;
+        this._rulers = options.get(102 /* EditorOption.rulers */);
+        this._typicalHalfwidthCharacterWidth = options.get(50 /* EditorOption.fontInfo */).typicalHalfwidthCharacterWidth;
     }
     dispose() {
         super.dispose();
@@ -28,8 +23,8 @@ class Rulers extends ViewPart {
     // --- begin event handlers
     onConfigurationChanged(e) {
         const options = this._context.configuration.options;
-        this._rulers = options.get(116 /* EditorOption.rulers */);
-        this._typicalHalfwidthCharacterWidth = options.get(59 /* EditorOption.fontInfo */).typicalHalfwidthCharacterWidth;
+        this._rulers = options.get(102 /* EditorOption.rulers */);
+        this._typicalHalfwidthCharacterWidth = options.get(50 /* EditorOption.fontInfo */).typicalHalfwidthCharacterWidth;
         return true;
     }
     onScrollChanged(e) {
@@ -78,5 +73,3 @@ class Rulers extends ViewPart {
         }
     }
 }
-
-export { Rulers };

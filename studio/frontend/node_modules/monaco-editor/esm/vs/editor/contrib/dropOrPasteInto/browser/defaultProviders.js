@@ -1,62 +1,41 @@
-import { coalesce } from '../../../../base/common/arrays.js';
-import { UriList } from '../../../../base/common/dataTransfer.js';
-import { HierarchicalKind } from '../../../../base/common/hierarchicalKind.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { Mimes } from '../../../../base/common/mime.js';
-import { Schemas } from '../../../../base/common/network.js';
-import { relativePath } from '../../../../base/common/resources.js';
-import { URI } from '../../../../base/common/uri.js';
-import { localize } from '../../../../nls.js';
-import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
-import { DocumentPasteTriggerKind } from '../../../common/languages.js';
-import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
+var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+import { coalesce } from '../../../../base/common/arrays.js';
+import { UriList } from '../../../../base/common/dataTransfer.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+import { Mimes } from '../../../../base/common/mime.js';
+import { Schemas } from '../../../../base/common/network.js';
+import { relativePath } from '../../../../base/common/resources.js';
+import { URI } from '../../../../base/common/uri.js';
+import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
+import { localize } from '../../../../nls.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+const builtInLabel = localize('builtIn', 'Built-in');
 class SimplePasteAndDropProvider {
-    constructor(kind) {
-        this.copyMimeTypes = [];
-        this.kind = kind;
-        this.providedDropEditKinds = [this.kind];
-        this.providedPasteEditKinds = [this.kind];
-    }
     async provideDocumentPasteEdits(_model, _ranges, dataTransfer, context, token) {
         const edit = await this.getEdit(dataTransfer, token);
-        if (!edit) {
-            return undefined;
-        }
-        return {
-            edits: [{ insertText: edit.insertText, title: edit.title, kind: edit.kind, handledMimeType: edit.handledMimeType, yieldTo: edit.yieldTo }],
-            dispose() { },
-        };
+        return edit ? { insertText: edit.insertText, label: edit.label, detail: edit.detail, handledMimeType: edit.handledMimeType, yieldTo: edit.yieldTo } : undefined;
     }
-    async provideDocumentDropEdits(_model, _position, dataTransfer, token) {
+    async provideDocumentOnDropEdits(_model, _position, dataTransfer, token) {
         const edit = await this.getEdit(dataTransfer, token);
-        if (!edit) {
-            return;
-        }
-        return {
-            edits: [{ insertText: edit.insertText, title: edit.title, kind: edit.kind, handledMimeType: edit.handledMimeType, yieldTo: edit.yieldTo }],
-            dispose() { },
-        };
+        return edit ? { insertText: edit.insertText, label: edit.label, handledMimeType: edit.handledMimeType, yieldTo: edit.yieldTo } : undefined;
     }
 }
-class DefaultTextPasteOrDropEditProvider extends SimplePasteAndDropProvider {
-    static { this.id = 'text'; }
+class DefaultTextProvider extends SimplePasteAndDropProvider {
     constructor() {
-        super(HierarchicalKind.Empty.append('text', 'plain'));
-        this.id = DefaultTextPasteOrDropEditProvider.id;
+        super(...arguments);
+        this.id = 'text';
         this.dropMimeTypes = [Mimes.text];
         this.pasteMimeTypes = [Mimes.text];
     }
@@ -73,15 +52,16 @@ class DefaultTextPasteOrDropEditProvider extends SimplePasteAndDropProvider {
         const insertText = await textEntry.asString();
         return {
             handledMimeType: Mimes.text,
-            title: localize(926, "Insert Plain Text"),
-            insertText,
-            kind: this.kind,
+            label: localize('text.label', "Insert Plain Text"),
+            detail: builtInLabel,
+            insertText
         };
     }
 }
 class PathProvider extends SimplePasteAndDropProvider {
     constructor() {
-        super(HierarchicalKind.Empty.append('uri', 'path', 'absolute'));
+        super(...arguments);
+        this.id = 'uri';
         this.dropMimeTypes = [Mimes.uriList];
         this.pasteMimeTypes = [Mimes.uriList];
     }
@@ -106,27 +86,28 @@ class PathProvider extends SimplePasteAndDropProvider {
         if (uriCount > 0) {
             // Dropping at least one generic uri (such as https) so use most generic label
             label = entries.length > 1
-                ? localize(927, "Insert Uris")
-                : localize(928, "Insert Uri");
+                ? localize('defaultDropProvider.uriList.uris', "Insert Uris")
+                : localize('defaultDropProvider.uriList.uri', "Insert Uri");
         }
         else {
             // All the paths are file paths
             label = entries.length > 1
-                ? localize(929, "Insert Paths")
-                : localize(930, "Insert Path");
+                ? localize('defaultDropProvider.uriList.paths', "Insert Paths")
+                : localize('defaultDropProvider.uriList.path', "Insert Path");
         }
         return {
             handledMimeType: Mimes.uriList,
             insertText,
-            title: label,
-            kind: this.kind,
+            label,
+            detail: builtInLabel,
         };
     }
 }
 let RelativePathProvider = class RelativePathProvider extends SimplePasteAndDropProvider {
     constructor(_workspaceContextService) {
-        super(HierarchicalKind.Empty.append('uri', 'path', 'relative'));
+        super();
         this._workspaceContextService = _workspaceContextService;
+        this.id = 'relativePath';
         this.dropMimeTypes = [Mimes.uriList];
         this.pasteMimeTypes = [Mimes.uriList];
     }
@@ -145,10 +126,10 @@ let RelativePathProvider = class RelativePathProvider extends SimplePasteAndDrop
         return {
             handledMimeType: Mimes.uriList,
             insertText: relativeUris.join(' '),
-            title: entries.length > 1
-                ? localize(931, "Insert Relative Paths")
-                : localize(932, "Insert Relative Path"),
-            kind: this.kind,
+            label: entries.length > 1
+                ? localize('defaultDropProvider.uriList.relativePaths', "Insert Relative Paths")
+                : localize('defaultDropProvider.uriList.relativePath', "Insert Relative Path"),
+            detail: builtInLabel,
         };
     }
 };
@@ -157,29 +138,24 @@ RelativePathProvider = __decorate([
 ], RelativePathProvider);
 class PasteHtmlProvider {
     constructor() {
-        this.kind = new HierarchicalKind('html');
-        this.providedPasteEditKinds = [this.kind];
-        this.copyMimeTypes = [];
+        this.id = 'html';
         this.pasteMimeTypes = ['text/html'];
         this._yieldTo = [{ mimeType: Mimes.text }];
     }
     async provideDocumentPasteEdits(_model, _ranges, dataTransfer, context, token) {
-        if (context.triggerKind !== DocumentPasteTriggerKind.PasteAs && !context.only?.contains(this.kind)) {
+        if (context.trigger !== 'explicit' && context.only !== this.id) {
             return;
         }
         const entry = dataTransfer.get('text/html');
-        const htmlText = await entry?.asString();
+        const htmlText = await (entry === null || entry === void 0 ? void 0 : entry.asString());
         if (!htmlText || token.isCancellationRequested) {
             return;
         }
         return {
-            dispose() { },
-            edits: [{
-                    insertText: htmlText,
-                    yieldTo: this._yieldTo,
-                    title: localize(933, 'Insert HTML'),
-                    kind: this.kind,
-                }],
+            insertText: htmlText,
+            yieldTo: this._yieldTo,
+            label: localize('pasteHtmlLabel', 'Insert HTML'),
+            detail: builtInLabel,
         };
     }
 }
@@ -194,37 +170,36 @@ async function extractUriList(dataTransfer) {
         try {
             entries.push({ uri: URI.parse(entry), originalText: entry });
         }
-        catch {
+        catch (_a) {
             // noop
         }
     }
     return entries;
 }
-const genericLanguageSelector = { scheme: '*', hasAccessToAllModels: true };
 let DefaultDropProvidersFeature = class DefaultDropProvidersFeature extends Disposable {
     constructor(languageFeaturesService, workspaceContextService) {
         super();
-        this._register(languageFeaturesService.documentDropEditProvider.register(genericLanguageSelector, new DefaultTextPasteOrDropEditProvider()));
-        this._register(languageFeaturesService.documentDropEditProvider.register(genericLanguageSelector, new PathProvider()));
-        this._register(languageFeaturesService.documentDropEditProvider.register(genericLanguageSelector, new RelativePathProvider(workspaceContextService)));
+        this._register(languageFeaturesService.documentOnDropEditProvider.register('*', new DefaultTextProvider()));
+        this._register(languageFeaturesService.documentOnDropEditProvider.register('*', new PathProvider()));
+        this._register(languageFeaturesService.documentOnDropEditProvider.register('*', new RelativePathProvider(workspaceContextService)));
     }
 };
 DefaultDropProvidersFeature = __decorate([
     __param(0, ILanguageFeaturesService),
     __param(1, IWorkspaceContextService)
 ], DefaultDropProvidersFeature);
+export { DefaultDropProvidersFeature };
 let DefaultPasteProvidersFeature = class DefaultPasteProvidersFeature extends Disposable {
     constructor(languageFeaturesService, workspaceContextService) {
         super();
-        this._register(languageFeaturesService.documentPasteEditProvider.register(genericLanguageSelector, new DefaultTextPasteOrDropEditProvider()));
-        this._register(languageFeaturesService.documentPasteEditProvider.register(genericLanguageSelector, new PathProvider()));
-        this._register(languageFeaturesService.documentPasteEditProvider.register(genericLanguageSelector, new RelativePathProvider(workspaceContextService)));
-        this._register(languageFeaturesService.documentPasteEditProvider.register(genericLanguageSelector, new PasteHtmlProvider()));
+        this._register(languageFeaturesService.documentPasteEditProvider.register('*', new DefaultTextProvider()));
+        this._register(languageFeaturesService.documentPasteEditProvider.register('*', new PathProvider()));
+        this._register(languageFeaturesService.documentPasteEditProvider.register('*', new RelativePathProvider(workspaceContextService)));
+        this._register(languageFeaturesService.documentPasteEditProvider.register('*', new PasteHtmlProvider()));
     }
 };
 DefaultPasteProvidersFeature = __decorate([
     __param(0, ILanguageFeaturesService),
     __param(1, IWorkspaceContextService)
 ], DefaultPasteProvidersFeature);
-
-export { DefaultDropProvidersFeature, DefaultPasteProvidersFeature, DefaultTextPasteOrDropEditProvider };
+export { DefaultPasteProvidersFeature };

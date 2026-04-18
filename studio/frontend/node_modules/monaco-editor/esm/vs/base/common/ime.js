@@ -1,10 +1,9 @@
-import { Emitter } from './event.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class IMEImpl {
+import { Emitter } from './event.js';
+export class IMEImpl {
     constructor() {
         this._onDidChange = new Emitter();
         this.onDidChange = this._onDidChange.event;
@@ -28,6 +27,4 @@ class IMEImpl {
         this._onDidChange.fire();
     }
 }
-const IME = new IMEImpl();
-
-export { IME, IMEImpl };
+export const IME = new IMEImpl();

@@ -1,11 +1,10 @@
-import { assertNever } from '../../base/common/assert.js';
-import { Position } from './core/position.js';
-import { InjectedTextCursorStops } from './model.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
+import { assertNever } from '../../base/common/assert.js';
+import { Position } from './core/position.js';
+import { InjectedTextCursorStops } from './model.js';
 /**
  * *input*:
  * ```
@@ -31,7 +30,7 @@ import { InjectedTextCursorStops } from './model.js';
  *    xxxxxx[ii]xxxx
  * ```
  */
-class ModelLineProjectionData {
+export class ModelLineProjectionData {
     constructor(injectionOffsets, 
     /**
      * `injectionOptions.length` must equal `injectionOffsets.length`
@@ -230,7 +229,7 @@ class ModelLineProjectionData {
             }
             return result;
         }
-        assertNever();
+        assertNever(affinity);
     }
     getInjectedText(outputLineIndex, outputOffset) {
         const offset = this.outputPositionToOffsetInInputWithInjections(outputLineIndex, outputOffset);
@@ -281,7 +280,12 @@ function hasLeftCursorStop(cursorStop) {
     }
     return cursorStop === InjectedTextCursorStops.Left || cursorStop === InjectedTextCursorStops.Both;
 }
-class OutputPosition {
+export class InjectedText {
+    constructor(options) {
+        this.options = options;
+    }
+}
+export class OutputPosition {
     constructor(outputLineIndex, outputOffset) {
         this.outputLineIndex = outputLineIndex;
         this.outputOffset = outputOffset;
@@ -293,5 +297,3 @@ class OutputPosition {
         return new Position(baseLineNumber + this.outputLineIndex, this.outputOffset + 1);
     }
 }
-
-export { ModelLineProjectionData, OutputPosition };

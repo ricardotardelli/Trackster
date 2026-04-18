@@ -1,38 +1,34 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { illegalArgument, onUnexpectedExternalError } from '../../../../base/common/errors.js';
-import { isDisposable, DisposableStore } from '../../../../base/common/lifecycle.js';
+import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { assertType } from '../../../../base/common/types.js';
 import { URI } from '../../../../base/common/uri.js';
 import { IModelService } from '../../../common/services/model.js';
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { ILanguageFeaturesService } from '../../../common/services/languageFeatures.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-class CodeLensModel {
+export class CodeLensModel {
     constructor() {
         this.lenses = [];
+        this._disposables = new DisposableStore();
     }
-    static { this.Empty = new CodeLensModel(); }
     dispose() {
-        this._store?.dispose();
+        this._disposables.dispose();
     }
     get isDisposed() {
-        return this._store?.isDisposed ?? false;
+        return this._disposables.isDisposed;
     }
     add(list, provider) {
-        if (isDisposable(list)) {
-            this._store ??= new DisposableStore();
-            this._store.add(list);
-        }
+        this._disposables.add(list);
         for (const symbol of list.lenses) {
             this.lenses.push({ symbol, provider });
         }
     }
 }
-async function getCodeLensModel(registry, model, token) {
+export async function getCodeLensModel(registry, model, token) {
     const provider = registry.ordered(model);
     const providerRanks = new Map();
     const result = new CodeLensModel();
@@ -49,10 +45,6 @@ async function getCodeLensModel(registry, model, token) {
         }
     });
     await Promise.all(promises);
-    if (token.isCancellationRequested) {
-        result.dispose();
-        return CodeLensModel.Empty;
-    }
     result.lenses = result.lenses.sort((a, b) => {
         // sort by lineNumber, provider-rank, and column
         if (a.symbol.range.startLineNumber < b.symbol.range.startLineNumber) {
@@ -110,5 +102,3 @@ CommandsRegistry.registerCommand('_executeCodeLensProvider', function (accessor,
         setTimeout(() => disposables.dispose(), 100);
     });
 });
-
-export { CodeLensModel, getCodeLensModel };

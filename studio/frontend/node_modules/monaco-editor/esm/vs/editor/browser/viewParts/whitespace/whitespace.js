@@ -1,19 +1,14 @@
-import './whitespace.css';
-import { DynamicViewOverlay } from '../../view/dynamicViewOverlay.js';
-import { firstNonWhitespaceIndex, lastNonWhitespaceIndex } from '../../../../base/common/strings.js';
-import { Position } from '../../../common/core/position.js';
-import { editorWhitespaces } from '../../../common/core/editorColorRegistry.js';
-import { OffsetRange } from '../../../common/core/ranges/offsetRange.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-/**
- * The whitespace overlay will visual certain whitespace depending on the
- * current editor configuration (boundary, selection, etc.).
- */
-class WhitespaceOverlay extends DynamicViewOverlay {
+import './whitespace.css';
+import { DynamicViewOverlay } from '../../view/dynamicViewOverlay.js';
+import * as strings from '../../../../base/common/strings.js';
+import { LineRange } from '../../../common/viewLayout/viewLineRenderer.js';
+import { Position } from '../../../common/core/position.js';
+import { editorWhitespaces } from '../../../common/core/editorColorRegistry.js';
+export class WhitespaceOverlay extends DynamicViewOverlay {
     constructor(context) {
         super();
         this._context = context;
@@ -31,7 +26,7 @@ class WhitespaceOverlay extends DynamicViewOverlay {
     onConfigurationChanged(e) {
         const newOptions = new WhitespaceOptions(this._context.configuration);
         if (this._options.equals(newOptions)) {
-            return e.hasChanged(165 /* EditorOption.layoutInfo */);
+            return e.hasChanged(144 /* EditorOption.layoutInfo */);
         }
         this._options = newOptions;
         return true;
@@ -77,10 +72,11 @@ class WhitespaceOverlay extends DynamicViewOverlay {
         for (let i = 0; i < lineCount; i++) {
             needed[i] = true;
         }
+        const viewportData = this._context.viewModel.getMinimapLinesRenderingData(ctx.viewportData.startLineNumber, ctx.viewportData.endLineNumber, needed);
         this._renderResult = [];
         for (let lineNumber = ctx.viewportData.startLineNumber; lineNumber <= ctx.viewportData.endLineNumber; lineNumber++) {
             const lineIndex = lineNumber - ctx.viewportData.startLineNumber;
-            const lineData = this._context.viewModel.getViewLineRenderingData(lineNumber);
+            const lineData = viewportData.data[lineIndex];
             let selectionsOnLine = null;
             if (this._options.renderWhitespace === 'selection') {
                 const selections = this._selection;
@@ -95,7 +91,7 @@ class WhitespaceOverlay extends DynamicViewOverlay {
                         if (!selectionsOnLine) {
                             selectionsOnLine = [];
                         }
-                        selectionsOnLine.push(new OffsetRange(startColumn - 1, endColumn - 1));
+                        selectionsOnLine.push(new LineRange(startColumn - 1, endColumn - 1));
                     }
                 }
             }
@@ -103,9 +99,6 @@ class WhitespaceOverlay extends DynamicViewOverlay {
         }
     }
     _applyRenderWhitespace(ctx, lineNumber, selections, lineData) {
-        if (lineData.hasVariableFonts) {
-            return '';
-        }
         if (this._options.renderWhitespace === 'selection' && !selections) {
             return '';
         }
@@ -120,7 +113,7 @@ class WhitespaceOverlay extends DynamicViewOverlay {
         const fauxIndentLength = lineData.minColumn - 1;
         const onlyBoundary = (this._options.renderWhitespace === 'boundary');
         const onlyTrailing = (this._options.renderWhitespace === 'trailing');
-        const lineHeight = ctx.getLineHeightForLineNumber(lineNumber);
+        const lineHeight = this._options.lineHeight;
         const middotWidth = this._options.middotWidth;
         const wsmiddotWidth = this._options.wsmiddotWidth;
         const spaceWidth = this._options.spaceWidth;
@@ -132,33 +125,33 @@ class WhitespaceOverlay extends DynamicViewOverlay {
         const canUseHalfwidthRightwardsArrow = this._options.canUseHalfwidthRightwardsArrow;
         let result = '';
         let lineIsEmptyOrWhitespace = false;
-        let firstNonWhitespaceIndex$1 = firstNonWhitespaceIndex(lineContent);
-        let lastNonWhitespaceIndex$1;
-        if (firstNonWhitespaceIndex$1 === -1) {
+        let firstNonWhitespaceIndex = strings.firstNonWhitespaceIndex(lineContent);
+        let lastNonWhitespaceIndex;
+        if (firstNonWhitespaceIndex === -1) {
             lineIsEmptyOrWhitespace = true;
-            firstNonWhitespaceIndex$1 = len;
-            lastNonWhitespaceIndex$1 = len;
+            firstNonWhitespaceIndex = len;
+            lastNonWhitespaceIndex = len;
         }
         else {
-            lastNonWhitespaceIndex$1 = lastNonWhitespaceIndex(lineContent);
+            lastNonWhitespaceIndex = strings.lastNonWhitespaceIndex(lineContent);
         }
         let currentSelectionIndex = 0;
         let currentSelection = selections && selections[currentSelectionIndex];
         let maxLeft = 0;
         for (let charIndex = fauxIndentLength; charIndex < len; charIndex++) {
             const chCode = lineContent.charCodeAt(charIndex);
-            if (currentSelection && currentSelection.endExclusive <= charIndex) {
+            if (currentSelection && charIndex >= currentSelection.endOffset) {
                 currentSelectionIndex++;
                 currentSelection = selections && selections[currentSelectionIndex];
             }
             if (chCode !== 9 /* CharCode.Tab */ && chCode !== 32 /* CharCode.Space */) {
                 continue;
             }
-            if (onlyTrailing && !lineIsEmptyOrWhitespace && charIndex <= lastNonWhitespaceIndex$1) {
+            if (onlyTrailing && !lineIsEmptyOrWhitespace && charIndex <= lastNonWhitespaceIndex) {
                 // If rendering only trailing whitespace, check that the charIndex points to trailing whitespace.
                 continue;
             }
-            if (onlyBoundary && charIndex >= firstNonWhitespaceIndex$1 && charIndex <= lastNonWhitespaceIndex$1 && chCode === 32 /* CharCode.Space */) {
+            if (onlyBoundary && charIndex >= firstNonWhitespaceIndex && charIndex <= lastNonWhitespaceIndex && chCode === 32 /* CharCode.Space */) {
                 // rendering only boundary whitespace
                 const prevChCode = (charIndex - 1 >= 0 ? lineContent.charCodeAt(charIndex - 1) : 0 /* CharCode.Null */);
                 const nextChCode = (charIndex + 1 < len ? lineContent.charCodeAt(charIndex + 1) : 0 /* CharCode.Null */);
@@ -173,7 +166,7 @@ class WhitespaceOverlay extends DynamicViewOverlay {
                     continue;
                 }
             }
-            if (selections && !(currentSelection && currentSelection.start <= charIndex && charIndex < currentSelection.endExclusive)) {
+            if (selections && (!currentSelection || currentSelection.startOffset > charIndex || currentSelection.endOffset <= charIndex)) {
                 // If rendering whitespace on selection, check that the charIndex falls within a selection
                 continue;
             }
@@ -201,7 +194,7 @@ class WhitespaceOverlay extends DynamicViewOverlay {
         }
         if (USE_SVG) {
             maxLeft = Math.round(maxLeft + spaceWidth);
-            return (`<svg style="bottom:0;position:absolute;width:${maxLeft}px;height:${lineHeight}px" viewBox="0 0 ${maxLeft} ${lineHeight}" xmlns="http://www.w3.org/2000/svg" fill="${color}">`
+            return (`<svg style="position:absolute;width:${maxLeft}px;height:${lineHeight}px" viewBox="0 0 ${maxLeft} ${lineHeight}" xmlns="http://www.w3.org/2000/svg" fill="${color}">`
                 + result
                 + `</svg>`);
         }
@@ -240,27 +233,27 @@ class WhitespaceOverlay extends DynamicViewOverlay {
 class WhitespaceOptions {
     constructor(config) {
         const options = config.options;
-        const fontInfo = options.get(59 /* EditorOption.fontInfo */);
-        const experimentalWhitespaceRendering = options.get(47 /* EditorOption.experimentalWhitespaceRendering */);
+        const fontInfo = options.get(50 /* EditorOption.fontInfo */);
+        const experimentalWhitespaceRendering = options.get(38 /* EditorOption.experimentalWhitespaceRendering */);
         if (experimentalWhitespaceRendering === 'off') {
             // whitespace is rendered in the view line
             this.renderWhitespace = 'none';
             this.renderWithSVG = false;
         }
         else if (experimentalWhitespaceRendering === 'svg') {
-            this.renderWhitespace = options.get(113 /* EditorOption.renderWhitespace */);
+            this.renderWhitespace = options.get(99 /* EditorOption.renderWhitespace */);
             this.renderWithSVG = true;
         }
         else {
-            this.renderWhitespace = options.get(113 /* EditorOption.renderWhitespace */);
+            this.renderWhitespace = options.get(99 /* EditorOption.renderWhitespace */);
             this.renderWithSVG = false;
         }
         this.spaceWidth = fontInfo.spaceWidth;
         this.middotWidth = fontInfo.middotWidth;
         this.wsmiddotWidth = fontInfo.wsmiddotWidth;
         this.canUseHalfwidthRightwardsArrow = fontInfo.canUseHalfwidthRightwardsArrow;
-        this.lineHeight = options.get(75 /* EditorOption.lineHeight */);
-        this.stopRenderingLineAfter = options.get(133 /* EditorOption.stopRenderingLineAfter */);
+        this.lineHeight = options.get(67 /* EditorOption.lineHeight */);
+        this.stopRenderingLineAfter = options.get(117 /* EditorOption.stopRenderingLineAfter */);
     }
     equals(other) {
         return (this.renderWhitespace === other.renderWhitespace
@@ -273,5 +266,3 @@ class WhitespaceOptions {
             && this.stopRenderingLineAfter === other.stopRenderingLineAfter);
     }
 }
-
-export { WhitespaceOverlay };

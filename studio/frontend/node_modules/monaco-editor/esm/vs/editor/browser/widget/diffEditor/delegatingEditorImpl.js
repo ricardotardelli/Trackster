@@ -1,11 +1,10 @@
-import { Emitter } from '../../../../base/common/event.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class DelegatingEditor extends Disposable {
+import { Emitter } from '../../../../base/common/event.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
+export class DelegatingEditor extends Disposable {
     constructor() {
         super(...arguments);
         this._id = ++DelegatingEditor.idCounter;
@@ -13,7 +12,6 @@ class DelegatingEditor extends Disposable {
         this.onDidDispose = this._onDidDispose.event;
         // #endregion
     }
-    static { this.idCounter = 0; }
     getId() { return this.getEditorType() + ':v2:' + this._id; }
     // #region editorBrowser.IDiffEditor: Delegating to modified Editor
     getVisibleColumnFromPosition(position) {
@@ -107,5 +105,4 @@ class DelegatingEditor extends Disposable {
         return this._targetEditor.changeDecorations(callback);
     }
 }
-
-export { DelegatingEditor };
+DelegatingEditor.idCounter = 0;

@@ -1,4 +1,18 @@
-import { append, $ } from '../../../../../base/browser/dom.js';
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var FileReferencesRenderer_1;
+import * as dom from '../../../../../base/browser/dom.js';
 import { CountBadge } from '../../../../../base/browser/ui/countBadge/countBadge.js';
 import { HighlightedLabel } from '../../../../../base/browser/ui/highlightedlabel/highlightedLabel.js';
 import { IconLabel } from '../../../../../base/browser/ui/iconLabel/iconLabel.js';
@@ -11,22 +25,7 @@ import { IInstantiationService } from '../../../../../platform/instantiation/com
 import { IKeybindingService } from '../../../../../platform/keybinding/common/keybinding.js';
 import { ILabelService } from '../../../../../platform/label/common/label.js';
 import { defaultCountBadgeStyles } from '../../../../../platform/theme/browser/defaultStyles.js';
-import { ReferencesModel, FileReferences, OneReference } from '../referencesModel.js';
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __param = (undefined && undefined.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
-var FileReferencesRenderer_1;
+import { FileReferences, OneReference, ReferencesModel } from '../referencesModel.js';
 let DataSource = class DataSource {
     constructor(_resolverService) {
         this._resolverService = _resolverService;
@@ -60,8 +59,9 @@ let DataSource = class DataSource {
 DataSource = __decorate([
     __param(0, ITextModelService)
 ], DataSource);
+export { DataSource };
 //#endregion
-class Delegate {
+export class Delegate {
     getHeight() {
         return 23;
     }
@@ -79,8 +79,9 @@ let StringRepresentationProvider = class StringRepresentationProvider {
         this._keybindingService = _keybindingService;
     }
     getKeyboardNavigationLabel(element) {
+        var _a;
         if (element instanceof OneReference) {
-            const parts = element.parent.getPreview(element)?.preview(element.range);
+            const parts = (_a = element.parent.getPreview(element)) === null || _a === void 0 ? void 0 : _a.preview(element.range);
             if (parts) {
                 return parts.value;
             }
@@ -92,7 +93,8 @@ let StringRepresentationProvider = class StringRepresentationProvider {
 StringRepresentationProvider = __decorate([
     __param(0, IKeybindingService)
 ], StringRepresentationProvider);
-class IdentityProvider {
+export { StringRepresentationProvider };
+export class IdentityProvider {
     getId(element) {
         return element instanceof OneReference ? element.id : element.uri;
     }
@@ -105,7 +107,7 @@ let FileReferencesTemplate = class FileReferencesTemplate extends Disposable {
         const parent = document.createElement('div');
         parent.classList.add('reference-file');
         this.file = this._register(new IconLabel(parent, { supportHighlights: true }));
-        this.badge = this._register(new CountBadge(append(parent, $('.count')), {}, defaultCountBadgeStyles));
+        this.badge = new CountBadge(dom.append(parent, dom.$('.count')), {}, defaultCountBadgeStyles);
         container.appendChild(parent);
     }
     set(element, matches) {
@@ -114,19 +116,17 @@ let FileReferencesTemplate = class FileReferencesTemplate extends Disposable {
         const len = element.children.length;
         this.badge.setCount(len);
         if (len > 1) {
-            this.badge.setTitleFormat(localize(1081, "{0} references", len));
+            this.badge.setTitleFormat(localize('referencesCount', "{0} references", len));
         }
         else {
-            this.badge.setTitleFormat(localize(1082, "{0} reference", len));
+            this.badge.setTitleFormat(localize('referenceCount', "{0} reference", len));
         }
     }
 };
 FileReferencesTemplate = __decorate([
     __param(1, ILabelService)
 ], FileReferencesTemplate);
-let FileReferencesRenderer = class FileReferencesRenderer {
-    static { FileReferencesRenderer_1 = this; }
-    static { this.id = 'FileReferencesRenderer'; }
+let FileReferencesRenderer = FileReferencesRenderer_1 = class FileReferencesRenderer {
     constructor(_instantiationService) {
         this._instantiationService = _instantiationService;
         this.templateId = FileReferencesRenderer_1.id;
@@ -141,18 +141,20 @@ let FileReferencesRenderer = class FileReferencesRenderer {
         templateData.dispose();
     }
 };
+FileReferencesRenderer.id = 'FileReferencesRenderer';
 FileReferencesRenderer = FileReferencesRenderer_1 = __decorate([
     __param(0, IInstantiationService)
 ], FileReferencesRenderer);
+export { FileReferencesRenderer };
 //#endregion
 //#region render: Reference
-class OneReferenceTemplate extends Disposable {
+class OneReferenceTemplate {
     constructor(container) {
-        super();
-        this.label = this._register(new HighlightedLabel(container));
+        this.label = new HighlightedLabel(container);
     }
     set(element, score) {
-        const preview = element.parent.getPreview(element)?.preview(element.range);
+        var _a;
+        const preview = (_a = element.parent.getPreview(element)) === null || _a === void 0 ? void 0 : _a.preview(element.range);
         if (!preview || !preview.value) {
             // this means we FAILED to resolve the document or the value is the empty string
             this.label.set(`${basename(element.uri)}:${element.range.startLineNumber + 1}:${element.range.startColumn + 1}`);
@@ -172,29 +174,26 @@ class OneReferenceTemplate extends Disposable {
         }
     }
 }
-class OneReferenceRenderer {
+export class OneReferenceRenderer {
     constructor() {
         this.templateId = OneReferenceRenderer.id;
     }
-    static { this.id = 'OneReferenceRenderer'; }
     renderTemplate(container) {
         return new OneReferenceTemplate(container);
     }
     renderElement(node, index, templateData) {
         templateData.set(node.element, node.filterData);
     }
-    disposeTemplate(templateData) {
-        templateData.dispose();
+    disposeTemplate() {
     }
 }
+OneReferenceRenderer.id = 'OneReferenceRenderer';
 //#endregion
-class AccessibilityProvider {
+export class AccessibilityProvider {
     getWidgetAriaLabel() {
-        return localize(1083, "References");
+        return localize('treeAriaLabel', "References");
     }
     getAriaLabel(element) {
         return element.ariaMessage;
     }
 }
-
-export { AccessibilityProvider, DataSource, Delegate, FileReferencesRenderer, IdentityProvider, OneReferenceRenderer, StringRepresentationProvider };

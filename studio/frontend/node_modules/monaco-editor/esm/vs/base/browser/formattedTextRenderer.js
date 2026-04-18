@@ -1,18 +1,24 @@
-import { addStandardDisposableListener } from './dom.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-function renderText(text, _options, target) {
-    const element = target ?? document.createElement('div');
+import * as DOM from './dom.js';
+export function renderText(text, options = {}) {
+    const element = createElement(options);
     element.textContent = text;
     return element;
 }
-function renderFormattedText(formattedText, options, target) {
-    const element = target ?? document.createElement('div');
-    element.textContent = '';
-    _renderFormattedText(element, parseFormattedText(formattedText), options?.actionHandler, options?.renderCodeSegments);
+export function renderFormattedText(formattedText, options = {}) {
+    const element = createElement(options);
+    _renderFormattedText(element, parseFormattedText(formattedText, !!options.renderCodeSegments), options.actionHandler, options.renderCodeSegments);
+    return element;
+}
+export function createElement(options) {
+    const tagName = options.inline ? 'span' : 'div';
+    const element = document.createElement(tagName);
+    if (options.className) {
+        element.className = options.className;
+    }
     return element;
 }
 class StringStream {
@@ -51,7 +57,7 @@ function _renderFormattedText(element, treeNode, actionHandler, renderCodeSegmen
     }
     else if (treeNode.type === 5 /* FormatType.Action */ && actionHandler) {
         const a = document.createElement('a');
-        actionHandler.disposables.add(addStandardDisposableListener(a, 'click', (event) => {
+        actionHandler.disposables.add(DOM.addStandardDisposableListener(a, 'click', (event) => {
             actionHandler.callback(String(treeNode.index), event);
         }));
         child = a;
@@ -82,16 +88,16 @@ function parseFormattedText(content, parseCodeSegments) {
     const stream = new StringStream(content);
     while (!stream.eos()) {
         let next = stream.next();
-        const isEscapedFormatType = (next === '\\' && formatTagType(stream.peek()) !== 0 /* FormatType.Invalid */);
+        const isEscapedFormatType = (next === '\\' && formatTagType(stream.peek(), parseCodeSegments) !== 0 /* FormatType.Invalid */);
         if (isEscapedFormatType) {
             next = stream.next(); // unread the backslash if it escapes a format tag type
         }
-        if (!isEscapedFormatType && isFormatTag(next) && next === stream.peek()) {
+        if (!isEscapedFormatType && isFormatTag(next, parseCodeSegments) && next === stream.peek()) {
             stream.advance();
             if (current.type === 2 /* FormatType.Text */) {
                 current = stack.pop();
             }
-            const type = formatTagType(next);
+            const type = formatTagType(next, parseCodeSegments);
             if (current.type === type || (current.type === 5 /* FormatType.Action */ && type === 6 /* FormatType.ActionClose */)) {
                 current = stack.pop();
             }
@@ -135,10 +141,13 @@ function parseFormattedText(content, parseCodeSegments) {
     if (current.type === 2 /* FormatType.Text */) {
         current = stack.pop();
     }
+    if (stack.length) {
+        // incorrectly formatted string literal
+    }
     return root;
 }
 function isFormatTag(char, supportCodeSegments) {
-    return formatTagType(char) !== 0 /* FormatType.Invalid */;
+    return formatTagType(char, supportCodeSegments) !== 0 /* FormatType.Invalid */;
 }
 function formatTagType(char, supportCodeSegments) {
     switch (char) {
@@ -151,10 +160,8 @@ function formatTagType(char, supportCodeSegments) {
         case ']':
             return 6 /* FormatType.ActionClose */;
         case '`':
-            return 0 /* FormatType.Invalid */;
+            return supportCodeSegments ? 7 /* FormatType.Code */ : 0 /* FormatType.Invalid */;
         default:
             return 0 /* FormatType.Invalid */;
     }
 }
-
-export { renderFormattedText, renderText };

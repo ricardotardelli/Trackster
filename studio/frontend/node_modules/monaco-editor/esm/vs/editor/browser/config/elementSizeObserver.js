@@ -1,12 +1,11 @@
-import { Disposable } from '../../../base/common/lifecycle.js';
-import { Emitter } from '../../../base/common/event.js';
-import { scheduleAtNextAnimationFrame, getWindow } from '../../../base/browser/dom.js';
-
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class ElementSizeObserver extends Disposable {
+import { Disposable } from '../../../base/common/lifecycle.js';
+import { Emitter } from '../../../base/common/event.js';
+import { getWindow, scheduleAtNextAnimationFrame } from '../../../base/browser/dom.js';
+export class ElementSizeObserver extends Disposable {
     constructor(referenceDomElement, dimension) {
         super();
         this._onDidChange = this._register(new Emitter());
@@ -103,5 +102,3 @@ class ElementSizeObserver extends Disposable {
         }
     }
 }
-
-export { ElementSizeObserver };

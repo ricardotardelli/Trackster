@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class Node {
+export class Node {
     constructor(key, data) {
         this.key = key;
         this.data = data;
@@ -10,7 +10,7 @@ class Node {
         this.outgoing = new Map();
     }
 }
-class Graph {
+export class Graph {
     constructor(_hashFn) {
         this._hashFn = _hashFn;
         this._nodes = new Map();
@@ -87,5 +87,3 @@ class Graph {
         return undefined;
     }
 }
-
-export { Graph, Node };

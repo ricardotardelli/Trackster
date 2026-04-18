@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-class TreeNode {
+export class TreeNode {
     constructor(piece, color) {
         this.piece = piece;
         this.color = color;
@@ -54,18 +54,18 @@ class TreeNode {
         this.right = null;
     }
 }
-const SENTINEL = new TreeNode(null, 0 /* NodeColor.Black */);
+export const SENTINEL = new TreeNode(null, 0 /* NodeColor.Black */);
 SENTINEL.parent = SENTINEL;
 SENTINEL.left = SENTINEL;
 SENTINEL.right = SENTINEL;
 SENTINEL.color = 0 /* NodeColor.Black */;
-function leftest(node) {
+export function leftest(node) {
     while (node.left !== SENTINEL) {
         node = node.left;
     }
     return node;
 }
-function righttest(node) {
+export function righttest(node) {
     while (node.right !== SENTINEL) {
         node = node.right;
     }
@@ -86,7 +86,7 @@ function calculateLF(node) {
 function resetSentinel() {
     SENTINEL.parent = SENTINEL;
 }
-function leftRotate(tree, x) {
+export function leftRotate(tree, x) {
     const y = x.right;
     // fix size_left
     y.size_left += x.size_left + (x.piece ? x.piece.length : 0);
@@ -108,7 +108,7 @@ function leftRotate(tree, x) {
     y.left = x;
     x.parent = y;
 }
-function rightRotate(tree, y) {
+export function rightRotate(tree, y) {
     const x = y.left;
     y.left = x.right;
     if (x.right !== SENTINEL) {
@@ -130,7 +130,7 @@ function rightRotate(tree, y) {
     x.right = y;
     y.parent = x;
 }
-function rbDelete(tree, z) {
+export function rbDelete(tree, z) {
     let x;
     let y;
     if (z.left === SENTINEL) {
@@ -277,7 +277,7 @@ function rbDelete(tree, z) {
     x.color = 0 /* NodeColor.Black */;
     resetSentinel();
 }
-function fixInsert(tree, x) {
+export function fixInsert(tree, x) {
     recomputeTreeMetadata(tree, x);
     while (x !== tree.root && x.parent.color === 1 /* NodeColor.Red */) {
         if (x.parent === x.parent.parent.left) {
@@ -319,7 +319,7 @@ function fixInsert(tree, x) {
     }
     tree.root.color = 0 /* NodeColor.Black */;
 }
-function updateTreeMetadata(tree, x, delta, lineFeedCntDelta) {
+export function updateTreeMetadata(tree, x, delta, lineFeedCntDelta) {
     // node length change or line feed count change
     while (x !== tree.root && x !== SENTINEL) {
         if (x.parent.left === x) {
@@ -329,7 +329,7 @@ function updateTreeMetadata(tree, x, delta, lineFeedCntDelta) {
         x = x.parent;
     }
 }
-function recomputeTreeMetadata(tree, x) {
+export function recomputeTreeMetadata(tree, x) {
     let delta = 0;
     let lf_delta = 0;
     if (x === tree.root) {
@@ -358,5 +358,3 @@ function recomputeTreeMetadata(tree, x) {
         x = x.parent;
     }
 }
-
-export { SENTINEL, TreeNode, fixInsert, leftRotate, leftest, rbDelete, recomputeTreeMetadata, rightRotate, righttest, updateTreeMetadata };

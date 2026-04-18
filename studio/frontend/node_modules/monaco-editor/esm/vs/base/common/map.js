@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var _a, _b, _c;
+var _a, _b;
 class ResourceMapEntry {
     constructor(uri, value) {
         this.uri = uri;
@@ -12,24 +12,23 @@ class ResourceMapEntry {
 function isEntries(arg) {
     return Array.isArray(arg);
 }
-class ResourceMap {
-    static { this.defaultToKey = (resource) => resource.toString(); }
+export class ResourceMap {
     constructor(arg, toKey) {
         this[_a] = 'ResourceMap';
         if (arg instanceof ResourceMap) {
             this.map = new Map(arg.map);
-            this.toKey = toKey ?? ResourceMap.defaultToKey;
+            this.toKey = toKey !== null && toKey !== void 0 ? toKey : ResourceMap.defaultToKey;
         }
         else if (isEntries(arg)) {
             this.map = new Map();
-            this.toKey = toKey ?? ResourceMap.defaultToKey;
+            this.toKey = toKey !== null && toKey !== void 0 ? toKey : ResourceMap.defaultToKey;
             for (const [resource, value] of arg) {
                 this.set(resource, value);
             }
         }
         else {
             this.map = new Map();
-            this.toKey = arg ?? ResourceMap.defaultToKey;
+            this.toKey = arg !== null && arg !== void 0 ? arg : ResourceMap.defaultToKey;
         }
     }
     set(resource, value) {
@@ -37,7 +36,8 @@ class ResourceMap {
         return this;
     }
     get(resource) {
-        return this.map.get(this.toKey(resource))?.value;
+        var _c;
+        return (_c = this.map.get(this.toKey(resource))) === null || _c === void 0 ? void 0 : _c.value;
     }
     has(resource) {
         return this.map.has(this.toKey(resource));
@@ -80,52 +80,10 @@ class ResourceMap {
         }
     }
 }
-class ResourceSet {
-    constructor(entriesOrKey, toKey) {
-        this[_b] = 'ResourceSet';
-        if (!entriesOrKey || typeof entriesOrKey === 'function') {
-            this._map = new ResourceMap(entriesOrKey);
-        }
-        else {
-            this._map = new ResourceMap(toKey);
-            entriesOrKey.forEach(this.add, this);
-        }
-    }
-    get size() {
-        return this._map.size;
-    }
-    add(value) {
-        this._map.set(value, value);
-        return this;
-    }
-    clear() {
-        this._map.clear();
-    }
-    delete(value) {
-        return this._map.delete(value);
-    }
-    forEach(callbackfn, thisArg) {
-        this._map.forEach((_value, key) => callbackfn.call(thisArg, key, key, this));
-    }
-    has(value) {
-        return this._map.has(value);
-    }
-    entries() {
-        return this._map.entries();
-    }
-    keys() {
-        return this._map.keys();
-    }
-    values() {
-        return this._map.keys();
-    }
-    [(_b = Symbol.toStringTag, Symbol.iterator)]() {
-        return this.keys();
-    }
-}
-class LinkedMap {
+ResourceMap.defaultToKey = (resource) => resource.toString();
+export class LinkedMap {
     constructor() {
-        this[_c] = 'LinkedMap';
+        this[_b] = 'LinkedMap';
         this._map = new Map();
         this._head = undefined;
         this._tail = undefined;
@@ -146,10 +104,12 @@ class LinkedMap {
         return this._size;
     }
     get first() {
-        return this._head?.value;
+        var _c;
+        return (_c = this._head) === null || _c === void 0 ? void 0 : _c.value;
     }
     get last() {
-        return this._tail?.value;
+        var _c;
+        return (_c = this._tail) === null || _c === void 0 ? void 0 : _c.value;
     }
     has(key) {
         return this._map.has(key);
@@ -307,7 +267,7 @@ class LinkedMap {
         };
         return iterator;
     }
-    [(_c = Symbol.toStringTag, Symbol.iterator)]() {
+    [(_b = Symbol.toStringTag, Symbol.iterator)]() {
         return this.entries();
     }
     trimOld(newSize) {
@@ -329,28 +289,6 @@ class LinkedMap {
         this._size = currentSize;
         if (current) {
             current.previous = undefined;
-        }
-        this._state++;
-    }
-    trimNew(newSize) {
-        if (newSize >= this.size) {
-            return;
-        }
-        if (newSize === 0) {
-            this.clear();
-            return;
-        }
-        let current = this._tail;
-        let currentSize = this.size;
-        while (current && currentSize > newSize) {
-            this._map.delete(current.key);
-            current = current.previous;
-            currentSize--;
-        }
-        this._tail = current;
-        this._size = currentSize;
-        if (current) {
-            current.next = undefined;
         }
         this._state++;
     }
@@ -491,7 +429,7 @@ class LinkedMap {
         }
     }
 }
-class Cache extends LinkedMap {
+export class LRUCache extends LinkedMap {
     constructor(limit, ratio = 1) {
         super();
         this._limit = limit;
@@ -512,32 +450,20 @@ class Cache extends LinkedMap {
     }
     set(key, value) {
         super.set(key, value, 2 /* Touch.AsNew */);
+        this.checkTrim();
         return this;
     }
     checkTrim() {
         if (this.size > this._limit) {
-            this.trim(Math.round(this._limit * this._ratio));
+            this.trimOld(Math.round(this._limit * this._ratio));
         }
-    }
-}
-class LRUCache extends Cache {
-    constructor(limit, ratio = 1) {
-        super(limit, ratio);
-    }
-    trim(newSize) {
-        this.trimOld(newSize);
-    }
-    set(key, value) {
-        super.set(key, value);
-        this.checkTrim();
-        return this;
     }
 }
 /**
  * A map that allows access both by keys and values.
  * **NOTE**: values need to be unique.
  */
-class BidirectionalMap {
+export class BidirectionalMap {
     constructor(entries) {
         this._m1 = new Map();
         this._m2 = new Map();
@@ -577,7 +503,7 @@ class BidirectionalMap {
         return this._m1.values();
     }
 }
-class SetMap {
+export class SetMap {
     constructor() {
         this.map = new Map();
     }
@@ -606,65 +532,11 @@ class SetMap {
         }
         values.forEach(fn);
     }
-}
-/**
- * A map that is addressable with an arbitrary number of keys. This is useful in high performance
- * scenarios where creating a composite key whenever the data is accessed is too expensive. For
- * example for a very hot function, constructing a string like `first-second-third` for every call
- * will cause a significant hit to performance.
- */
-class NKeyMap {
-    constructor() {
-        this._data = new Map();
-    }
-    /**
-     * Sets a value on the map. Note that unlike a standard `Map`, the first argument is the value.
-     * This is because the spread operator is used for the keys and must be last..
-     * @param value The value to set.
-     * @param keys The keys for the value.
-     */
-    set(value, ...keys) {
-        let currentMap = this._data;
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (!currentMap.has(keys[i])) {
-                currentMap.set(keys[i], new Map());
-            }
-            currentMap = currentMap.get(keys[i]);
+    get(key) {
+        const values = this.map.get(key);
+        if (!values) {
+            return new Set();
         }
-        currentMap.set(keys[keys.length - 1], value);
-    }
-    get(...keys) {
-        let currentMap = this._data;
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (!currentMap.has(keys[i])) {
-                return undefined;
-            }
-            currentMap = currentMap.get(keys[i]);
-        }
-        return currentMap.get(keys[keys.length - 1]);
-    }
-    clear() {
-        this._data.clear();
-    }
-    /**
-     * Get a textual representation of the map for debugging purposes.
-     */
-    toString() {
-        const printMap = (map, depth) => {
-            let result = '';
-            for (const [key, value] of map) {
-                result += `${'  '.repeat(depth)}${key}: `;
-                if (value instanceof Map) {
-                    result += '\n' + printMap(value, depth + 1);
-                }
-                else {
-                    result += `${value}\n`;
-                }
-            }
-            return result;
-        };
-        return printMap(this._data, 0);
+        return values;
     }
 }
-
-export { BidirectionalMap, LRUCache, LinkedMap, NKeyMap, ResourceMap, ResourceSet, SetMap };
