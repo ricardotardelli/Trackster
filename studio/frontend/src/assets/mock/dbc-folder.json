@@ -1,54 +1,353 @@
 {
   "folderName": "dbc",
   "files": [
-    { "name": "acura_ilx_2016_nidec.dbc", "sizeBytes": 5422, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "acura_ilx_2016.dbc", "sizeBytes": 6769, "lastModified": "2026-04-11 19:07", "status": "validated" },
-    { "name": "acura_rdx_2018.dbc", "sizeBytes": 7957, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "acura_rdx_2020.dbc", "sizeBytes": 8712, "lastModified": "2026-04-11 19:07", "status": "validated" },
-    { "name": "acura_rdx_2021.dbc", "sizeBytes": 8808, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "acura_rlx_2016.dbc", "sizeBytes": 7641, "lastModified": "2026-04-11 19:07", "status": "validated" },
-    { "name": "acura_tlx_2017.dbc", "sizeBytes": 7902, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "acura_tlx_2020.dbc", "sizeBytes": 8732, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "cadillac_ct6_2018.dbc", "sizeBytes": 10245, "lastModified": "2026-04-11 19:07", "status": "validated" },
-    { "name": "cadillac_escalade_2017.dbc", "sizeBytes": 11983, "lastModified": "2026-04-11 19:07", "status": "validated" },
-    { "name": "chevrolet_bolt_euv_2022.dbc", "sizeBytes": 13284, "lastModified": "2026-04-11 19:07", "status": "rejected" },
-    { "name": "chevrolet_silverado_2019.dbc", "sizeBytes": 11092, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "chrysler_pacifica_2018_hybrid.dbc", "sizeBytes": 9572, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "chrysler_pacifica_2020.dbc", "sizeBytes": 10112, "lastModified": "2026-04-11 19:07", "status": "rejected" },
-    { "name": "ford_escape_2020.dbc", "sizeBytes": 11487, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "ford_f150_2018.dbc", "sizeBytes": 12355, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "ford_focus_2018.dbc", "sizeBytes": 9984, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "ford_mustang_2020.dbc", "sizeBytes": 10943, "lastModified": "2026-04-11 19:07", "status": "rejected" },
-    { "name": "ford_transit_2021.dbc", "sizeBytes": 10512, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "gmc_sierra_2019.dbc", "sizeBytes": 11102, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "honda_accord_2018.dbc", "sizeBytes": 13221, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "honda_civic_2016.dbc", "sizeBytes": 11872, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "honda_crv_2017.dbc", "sizeBytes": 12533, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "honda_insight_2019.dbc", "sizeBytes": 12744, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "honda_odyssey_2018.dbc", "sizeBytes": 13412, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "honda_pilot_2017.dbc", "sizeBytes": 12109, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "hyundai_elantra_2017.dbc", "sizeBytes": 9833, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "hyundai_kona_2020.dbc", "sizeBytes": 10422, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "hyundai_sonata_2020.dbc", "sizeBytes": 11234, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "kia_niro_2020.dbc", "sizeBytes": 10873, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "kia_seltos_2021.dbc", "sizeBytes": 10123, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "kia_sorento_2019.dbc", "sizeBytes": 10988, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "mazda_cx5_2017.dbc", "sizeBytes": 11302, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "mazda_cx9_2016.dbc", "sizeBytes": 11011, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "nissan_altima_2020.dbc", "sizeBytes": 11542, "lastModified": "2026-04-11 19:07", "status": "rejected" },
-    { "name": "nissan_leaf_2018.dbc", "sizeBytes": 12101, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "subaru_forester_2017.dbc", "sizeBytes": 10934, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "subaru_outback_2018.dbc", "sizeBytes": 11187, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "tesla_model3_2020.dbc", "sizeBytes": 14021, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "tesla_modely_2021.dbc", "sizeBytes": 14210, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "toyota_camry_2018.dbc", "sizeBytes": 13102, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "toyota_corolla_2020.dbc", "sizeBytes": 12874, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "toyota_highlander_2020.dbc", "sizeBytes": 13654, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "toyota_prius_2017.dbc", "sizeBytes": 12432, "lastModified": "2026-04-11 19:07", "status": "rejected" },
-    { "name": "volkswagen_golf_2017.dbc", "sizeBytes": 11764, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "volkswagen_passat_2018.dbc", "sizeBytes": 11902, "lastModified": "2026-04-11 19:07", "status": "Validated" },
-    { "name": "volvo_s60_2019.dbc", "sizeBytes": 13500, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "volvo_xc90_2020.dbc", "sizeBytes": 13888, "lastModified": "2026-04-11 19:07", "status": "pending" },
-    { "name": "Z123456789012345678901234.dbc", "sizeBytes": 13888, "lastModified": "2026-04-11 19:07", "status": "pending" }
+    {
+      "name": "acura_ilx_2016_nidec.dbc",
+      "sizeBytes": 5422,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "bmw_e9x_e8x.dbc",
+      "sizeBytes": 26079,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "cadillac_ct6_chassis.dbc",
+      "sizeBytes": 2590,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "cadillac_ct6_object.dbc",
+      "sizeBytes": 235626,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "cadillac_ct6_powertrain.dbc",
+      "sizeBytes": 9232,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "chrysler_cusw.dbc",
+      "sizeBytes": 7383,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "chrysler_pacifica_2017_hybrid_private_fusion.dbc",
+      "sizeBytes": 7493,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "comma_body.dbc",
+      "sizeBytes": 3610,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "ESR.dbc",
+      "sizeBytes": 65956,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "fca_giorgio.dbc",
+      "sizeBytes": 9714,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "FORD_CADS.dbc",
+      "sizeBytes": 219264,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "FORD_CADS_64.dbc",
+      "sizeBytes": 491940,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "ford_cgea1_2_bodycan_2011.dbc",
+      "sizeBytes": 50658,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "ford_cgea1_2_ptcan_2011.dbc",
+      "sizeBytes": 70620,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "ford_fusion_2018_adas.dbc",
+      "sizeBytes": 14490,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "ford_fusion_2018_pt.dbc",
+      "sizeBytes": 5053,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "ford_lincoln_base_pt.dbc",
+      "sizeBytes": 820143,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gm_global_a_chassis.dbc",
+      "sizeBytes": 1656,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gm_global_a_high_voltage_management.dbc",
+      "sizeBytes": 9694,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gm_global_a_lowspeed.dbc",
+      "sizeBytes": 3538,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gm_global_a_lowspeed_1818125.dbc",
+      "sizeBytes": 191105,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gm_global_a_object.dbc",
+      "sizeBytes": 45890,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gm_global_a_powertrain_expansion.dbc",
+      "sizeBytes": 1471,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "gwm_haval_h6_phev_2024.dbc",
+      "sizeBytes": 12149,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "hongqi_hs5.dbc",
+      "sizeBytes": 5331,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "hyundai_2015_ccan.dbc",
+      "sizeBytes": 83103,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "hyundai_2015_mcan.dbc",
+      "sizeBytes": 79231,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "hyundai_i30_2014.dbc",
+      "sizeBytes": 23940,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "hyundai_kia_generic.dbc",
+      "sizeBytes": 95188,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "hyundai_santafe_2007.dbc",
+      "sizeBytes": 3941,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "luxgen_s5_2015.dbc",
+      "sizeBytes": 4783,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "mazda_2017.dbc",
+      "sizeBytes": 30135,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "mazda_3_2019.dbc",
+      "sizeBytes": 14588,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "mazda_radar.dbc",
+      "sizeBytes": 1658,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "mazda_rx8.dbc",
+      "sizeBytes": 2344,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "mercedes_benz_e350_2010.dbc",
+      "sizeBytes": 6147,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "nissan_xterra_2011.dbc",
+      "sizeBytes": 2371,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "opel_omega_2001.dbc",
+      "sizeBytes": 3157,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "psa_aee2010_r3.dbc",
+      "sizeBytes": 57797,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "rivian_park_assist_can.dbc",
+      "sizeBytes": 1420,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "rivian_primary_actuator.dbc",
+      "sizeBytes": 78399,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "tesla_can.dbc",
+      "sizeBytes": 55148,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "tesla_model3_party.dbc",
+      "sizeBytes": 33791,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "tesla_model3_vehicle.dbc",
+      "sizeBytes": 24667,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "tesla_powertrain.dbc",
+      "sizeBytes": 7894,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "toyota_2017_ref_pt.dbc",
+      "sizeBytes": 69810,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "toyota_adas.dbc",
+      "sizeBytes": 9683,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "toyota_iQ_2009_can.dbc",
+      "sizeBytes": 7464,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "toyota_prius_2010_pt.dbc",
+      "sizeBytes": 7533,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "toyota_radar_dsu_tssp.dbc",
+      "sizeBytes": 6711,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "toyota_tss2_adas.dbc",
+      "sizeBytes": 9941,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "volvo_v40_2017_pt.dbc",
+      "sizeBytes": 13431,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "volvo_v60_2015_pt.dbc",
+      "sizeBytes": 10860,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "vw_meb.dbc",
+      "sizeBytes": 263261,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "vw_mlb.dbc",
+      "sizeBytes": 232214,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "vw_mqb.dbc",
+      "sizeBytes": 128595,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "vw_mqbevo.dbc",
+      "sizeBytes": 114875,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    },
+    {
+      "name": "vw_pq.dbc",
+      "sizeBytes": 104550,
+      "lastModified": "2026-04-11 20:07",
+      "status": "pending"
+    }
   ]
 }

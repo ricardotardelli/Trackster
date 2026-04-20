@@ -1,0 +1,124 @@
+<div class="dbc-custom-find">
+  <div class="dbc-custom-find__main">
+    <div class="dbc-custom-find__field">
+      <mat-icon class="dbc-custom-find__field-icon">search</mat-icon>
+
+      <input
+        #findInput
+        type="text"
+        class="dbc-custom-find__input"
+        placeholder="Find"
+        [(ngModel)]="findState.query"
+        (ngModelChange)="onFindQueryChange()"
+        (keydown)="onFindKeydown($event)" />
+
+      <span
+        class="dbc-custom-find__count"
+        [class.dbc-custom-find__count--error]="findState.regexError">
+        {{ getMatchesLabel() }}
+      </span>
+    </div>
+
+    <div class="dbc-custom-find__actions">
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        (click)="findPrevious()"
+        [disabled]="!hasMatches()"
+        title="Previous match">
+        <mat-icon>keyboard_arrow_up</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        (click)="findNext()"
+        [disabled]="!hasMatches()"
+        title="Next match">
+        <mat-icon>keyboard_arrow_down</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        [class.is-active]="replaceVisible"
+        (click)="toggleReplace()"
+        [title]="replaceVisible ? 'Hide replace' : 'Show replace'">
+        <mat-icon>find_replace</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        [class.is-active]="findState.matchCase"
+        (click)="toggleMatchCase()"
+        title="Match case">
+        <span class="dbc-icon-btn__text">Aa</span>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        [class.is-active]="findState.wholeWord"
+        (click)="toggleWholeWord()"
+        title="Match whole word">
+        <span class="dbc-icon-btn__text">W</span>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        [class.is-active]="findState.regex"
+        (click)="toggleRegex()"
+        title="Use regular expression">
+        <span class="dbc-icon-btn__text">.*</span>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        (click)="close()"
+        title="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="dbc-custom-find__replace" *ngIf="replaceVisible">
+    <div class="dbc-custom-find__field">
+      <mat-icon class="dbc-custom-find__field-icon">edit</mat-icon>
+
+      <input
+        #replaceInput
+        type="text"
+        class="dbc-custom-find__input"
+        placeholder="Replace"
+        [(ngModel)]="findState.replaceText"
+        (keydown)="onReplaceKeydown($event)" />
+    </div>
+
+    <div class="dbc-custom-find__actions">
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        (click)="replaceCurrent()"
+        [disabled]="!hasMatches()"
+        title="Replace current">
+        <mat-icon>published_with_changes</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="dbc-icon-btn"
+        (click)="replaceAll()"
+        [disabled]="!hasMatches()"
+        title="Replace all">
+        <mat-icon>done_all</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="dbc-custom-find__error" *ngIf="findState.regexError">
+    Invalid regular expression
+  </div>
+</div>

@@ -11,8 +11,9 @@ import {
   type EditorInitializedEvent
 } from '@jean-merelis/ngx-monaco-editor';
 import * as monaco from 'monaco-editor';
-
 import { DialogShellComponent } from '../dialogshell/dialogshell.component';
+import { DbcFindComponent } from './dbcfind.component';
+import { ChangeDetectorRef, NgZone } from '@angular/core';
 
 const monacoLoader = new DefaultMonacoLoader({
   paths: {
@@ -37,7 +38,8 @@ interface OriginalDbcFile {
     FormsModule,
     DialogShellComponent,
     NgxMonacoEditorComponent,
-    MatIconModule 
+    MatIconModule,
+    DbcFindComponent
   ],
   providers: [
     { provide: NGX_MONACO_LOADER_PROVIDER, useValue: monacoLoader }
@@ -51,29 +53,42 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
 
   originalText = this.dbcText;
   problemsCount = 0;
+  findVisible = false;
+  replaceVisible = false;
+  initialFindQuery = '';
 
   editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     automaticLayout: true,
+    fixedOverflowWidgets: true,
     minimap: { enabled: false },
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 20,
     lineNumbers: 'on',
-    lineNumbersMinChars: 2,
-    glyphMargin: false,
-    folding: false,
+    lineNumbersMinChars: 3,
+    glyphMargin: true,
+    folding: true,
     lineDecorationsWidth: 8,
     roundedSelection: false,
     scrollBeyondLastLine: false,
     wordWrap: 'off',
-    tabSize: 2,
+    tabSize: 4,
     insertSpaces: true,
     language: 'dbc',
     theme: 'dbcLight',
-    overviewRulerBorder: false,
+    overviewRulerBorder: true,
     hideCursorInOverviewRuler: true,
     padding: {
       top: 10,
       bottom: 10
+    },
+    guides: {
+      indentation: true,
+      highlightActiveIndentation: true,
+      bracketPairs: true,
+      bracketPairsHorizontal: true
+    },
+    bracketPairColorization: {
+      enabled: true
     },
     scrollbar: {
       vertical: 'auto',
@@ -94,7 +109,9 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
       subtitle: string;
       content?: string;
     },
-    private readonly dialogRef: MatDialogRef<DbcEditorComponent>
+    private readonly dialogRef: MatDialogRef<DbcEditorComponent>,
+    private readonly ngZone: NgZone,
+    private readonly cdr: ChangeDetectorRef
   ) {
     this.dbcText = data.content ?? this.dbcText;
     this.originalText = this.dbcText;
@@ -111,15 +128,92 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
     }
 
     event.monaco.editor.setTheme('dbcVsCodeLight');
-    //event.monaco.editor.setTheme('dbcVsCodeDark');
-    //event.monaco.editor.setTheme('dbcLight');
 
-    console.log('LANG:', this.editorInstance.getModel()?.getLanguageId());
+    this.editorInstance.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF,
+      () => {
+        this.toggleFind(false);
+      }
+    );
+
+    this.editorInstance.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH,
+      () => {
+        this.toggleFind(true);
+      }
+    );
+
+    this.editorInstance.onKeyDown((keyboardEvent) => {
+      if (keyboardEvent.keyCode === monaco.KeyCode.Escape && this.findVisible) {
+        keyboardEvent.preventDefault();
+        keyboardEvent.stopPropagation();
+        this.closeFind();
+      }
+    });
 
     setTimeout(() => {
       this.editorInstance?.layout();
-      this.editorInstance?.focus();
     }, 0);
+  }
+
+  get editor(): monaco.editor.IStandaloneCodeEditor | null {
+    return this.editorInstance;
+  }
+
+  toggleFind(showReplace: boolean): void {
+    this.ngZone.run(() => {
+      if (this.findVisible) {
+        if (showReplace && !this.replaceVisible) {
+          this.openFind(true);
+          return;
+        }
+
+        this.closeFind();
+        return;
+      }
+
+      this.openFind(showReplace);
+    });
+  }
+
+  openFind(showReplace: boolean): void {
+    const selectedText = this.getSelectedEditorText();
+
+    this.initialFindQuery = selectedText;
+    this.replaceVisible = showReplace;
+    this.findVisible = true;
+    this.cdr.detectChanges();
+  }
+
+  private getSelectedEditorText(): string {
+    if (!this.editorInstance) {
+      return '';
+    }
+
+    const selection = this.editorInstance.getSelection();
+    const model = this.editorInstance.getModel();
+
+    if (!selection || !model || selection.isEmpty()) {
+      return '';
+    }
+
+    const selectedText = model.getValueInRange(selection);
+
+    if (!selectedText || selectedText.includes('\n')) {
+      return '';
+    }
+
+    return selectedText;
+  }
+
+  closeFind(): void {
+    this.ngZone.run(() => {
+      this.findVisible = false;
+      this.replaceVisible = false;
+      this.cdr.detectChanges();
+    });
+
+    this.editorInstance?.focus();
   }
 
   save(): void {
@@ -143,10 +237,10 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
     const blob = new Blob([this.dbcText], { type: 'text/plain;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = this.data.file?.name ?? 'file.dbc';
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = this.data.file?.name ?? 'file.dbc';
+    anchor.click();
 
     window.URL.revokeObjectURL(url);
   }
@@ -162,11 +256,16 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
   }
 
   find(): void {
-    this.editorInstance?.getAction('actions.find')?.run();
+    this.toggleFind(false);
   }
 
   goToLine(): void {
-    this.editorInstance?.getAction('editor.action.gotoLine')?.run();
+    if (!this.editorInstance) {
+      return;
+    }
+
+    this.editorInstance.focus();
+    this.editorInstance.trigger('toolbar', 'editor.action.gotoLine', null);
   }
 
   toggleWrap(): void {

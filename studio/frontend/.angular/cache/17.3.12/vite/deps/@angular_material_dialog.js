@@ -5,12 +5,12 @@ import {
   DomPortalOutlet,
   PortalModule,
   TemplatePortal
-} from "./chunk-7I7EFUQI.js";
+} from "./chunk-HVNSQNFR.js";
 import {
   ScrollDispatcher,
   ScrollingModule,
   ViewportRuler
-} from "./chunk-DDBYPOXB.js";
+} from "./chunk-PRXMPR4L.js";
 import {
   animate,
   animateChild,
@@ -20,7 +20,7 @@ import {
   style,
   transition,
   trigger
-} from "./chunk-OATOJWWZ.js";
+} from "./chunk-XSUWKVHN.js";
 import {
   A11yModule,
   BidiModule,
@@ -39,11 +39,11 @@ import {
   coerceNumberProperty,
   hasModifierKey,
   supportsScrollBehavior
-} from "./chunk-LIROJXGN.js";
+} from "./chunk-52MOUPQ2.js";
 import {
   DOCUMENT,
   Location
-} from "./chunk-FGAT6QY4.js";
+} from "./chunk-DYM76RFS.js";
 import {
   ANIMATION_MODULE_TYPE,
   ApplicationRef,
@@ -94,7 +94,7 @@ import {
   ɵɵqueryRefresh,
   ɵɵtemplate,
   ɵɵviewQuery
-} from "./chunk-2XJMC2HV.js";
+} from "./chunk-V3NIGZ5G.js";
 import {
   Subject,
   Subscription,
@@ -106,11 +106,12 @@ import {
   take,
   takeUntil,
   takeWhile
-} from "./chunk-NI6KYH2A.js";
+} from "./chunk-ARYSD6E7.js";
+import "./chunk-24ZYNOED.js";
 import {
   __spreadProps,
   __spreadValues
-} from "./chunk-3OV72XIM.js";
+} from "./chunk-MF5NBIAP.js";
 
 // node_modules/@angular/cdk/fesm2022/overlay.mjs
 var scrollBehaviorSupported = supportsScrollBehavior();

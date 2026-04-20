@@ -59,31 +59,11 @@
                   <button type="button" class="intake-button primary" (click)="fileInput.click()">
                     Upload
                   </button>
-
-                  <input
-                    #fileInput
-                    type="file"
-                    accept=".dbc"
-                    multiple
-                    hidden
-                    (change)="onNativeFilesSelected($event)"
-                  />
-
-                  <button
-                    type="button"
-                    class="intake-button primary"
-                    [disabled]="!hasPendingSelection()"
-                    (click)="validateSelectedFiles()"
-                  >
+                  <input #fileInput type="file" accept=".dbc" multiple hidden (change)="onNativeFilesSelected($event)" />
+                  <button type="button" class="intake-button primary" [disabled]="!hasPendingSelection()" (click)="validateSelectedFiles()" >
                     Validate Selected
                   </button>
-
-                  <button
-                    type="button"
-                    class="intake-button danger"
-                    [disabled]="!hasAnySelection()"
-                    (click)="removeSelectedFiles()"
-                  >
+                  <button type="button" class="intake-button danger" [disabled]="!hasAnySelection()" (click)="removeSelectedFiles()" >
                     Remove Selected
                   </button>
                 </div>
@@ -93,20 +73,12 @@
                 <table mat-table [dataSource]="originalFilesDataSource" matSort #intakeSort="matSort" class="file-table" >
                   <ng-container matColumnDef="select">
                     <th mat-header-cell *matHeaderCellDef class="select-column">
-                      <mat-checkbox
-                        [checked]="areAllPendingSelected()"
-                        [indeterminate]="isPendingSelectionIndeterminate()"
-                        [disabled]="!hasPendingFiles()"
-                        (change)="toggleAllPendingSelections($event.checked)"
-                      ></mat-checkbox>
+                      <mat-checkbox [checked]="areAllPendingSelected()" [indeterminate]="isPendingSelectionIndeterminate()" [disabled]="!hasPendingFiles()"
+                        (change)="toggleAllPendingSelections($event.checked)" ></mat-checkbox>
                     </th>
                     <td mat-cell *matCellDef="let file" class="select-column">
-                      <mat-checkbox
-                        [checked]="isOriginalChecked(file)"
-                        [disabled]="!isFileSelectable(file)"
-                        (click)="$event.stopPropagation()"
-                        (change)="toggleOriginalChecked(file, $event.checked)"
-                      ></mat-checkbox>
+                      <mat-checkbox [checked]="isOriginalChecked(file)" [disabled]="!isFileSelectable(file)" (click)="$event.stopPropagation()"
+                        (change)="toggleOriginalChecked(file, $event.checked)" ></mat-checkbox>
                     </td>
                   </ng-container>
                   <ng-container matColumnDef="name">
@@ -136,20 +108,17 @@
                     </td>
                   </ng-container>
                   <tr mat-header-row *matHeaderRowDef="intakeDisplayedColumns; sticky: true"></tr>
-                  <tr
-                    mat-row *matRowDef="let row; columns: intakeDisplayedColumns" class="file-table-row" [class.row-selected]="isOriginalSelected(row)"
+                  <tr mat-row *matRowDef="let row; columns: intakeDisplayedColumns" class="file-table-row" [class.row-selected]="isOriginalSelected(row)"
                     [class.row-disabled]="!isFileSelectable(row)" tabindex="0" (click)="selectOriginalFile(row)" (keydown.enter)="selectOriginalFile(row)"
                     (dblclick)="openDbcEditor(row)"
                   ></tr>
                 </table>
               </div>
             </section>
-
             <section class="module-card validated-card details-card">
               <div class="card-header-row">
                 <h3>Validation Report</h3>
               </div>
-
               <div class="details-body" *ngIf="selectedOriginalFile && selectedValidationPreview; else noSelectionState">
                 <div class="details-file-header">
                   <div class="details-file-meta">
@@ -159,7 +128,6 @@
                         {{ selectedOriginalFile.status }}
                       </span>
                     </div>
-
                     <div class="details-file-subline">
                       <span>{{ formatFileSize(selectedOriginalFile.sizeBytes) }}</span>
                       <span>•</span>
@@ -167,7 +135,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="details-summary-grid">
                   <div class="summary-box">
                     <span class="summary-label">Messages</span>

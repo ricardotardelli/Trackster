@@ -1,19 +1,20 @@
 import {
   CognitoAWSCredentialsAndIdentityIdProvider,
   DefaultIdentityIdStore
-} from "./chunk-RUP4D5PD.js";
+} from "./chunk-NI6BL7JH.js";
 import {
   Amplify,
   CookieStorage,
   cognitoUserPoolsTokenProvider,
   defaultStorage,
   parseAmplifyConfig
-} from "./chunk-N67RFWKV.js";
-import "./chunk-NI6KYH2A.js";
+} from "./chunk-CWW5KUA5.js";
+import "./chunk-ARYSD6E7.js";
+import "./chunk-24ZYNOED.js";
 import {
   __spreadProps,
   __spreadValues
-} from "./chunk-3OV72XIM.js";
+} from "./chunk-MF5NBIAP.js";
 
 // node_modules/@aws-amplify/auth/dist/esm/providers/cognito/credentialsProvider/index.mjs
 var cognitoCredentialsProvider = new CognitoAWSCredentialsAndIdentityIdProvider(new DefaultIdentityIdStore(defaultStorage));

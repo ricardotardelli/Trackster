@@ -1,0 +1,161 @@
+:host {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 60;
+  width: min(640px, calc(100% - 24px));
+  pointer-events: auto;
+}
+
+.dbc-custom-find {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.dbc-custom-find__main,
+.dbc-custom-find__replace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.dbc-custom-find__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 6px;
+  background: #ffffff;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.dbc-custom-find__field:focus-within {
+  border-color: rgba(59, 130, 246, 0.42);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.10);
+}
+
+.dbc-custom-find__field-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  line-height: 16px;
+  color: #94a3b8;
+}
+
+.dbc-custom-find__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+}
+
+.dbc-custom-find__input::placeholder {
+  color: #94a3b8;
+}
+
+.dbc-custom-find__count {
+  flex: 0 0 auto;
+  padding-left: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dbc-custom-find__count--error {
+  color: #b91c1c;
+}
+
+.dbc-custom-find__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dbc-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.dbc-icon-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.24);
+  color: #0f172a;
+}
+
+.dbc-icon-btn:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.dbc-icon-btn.is-active {
+  border-color: rgba(59, 130, 246, 0.28);
+  background: rgba(59, 130, 246, 0.10);
+  color: #1d4ed8;
+}
+
+.dbc-icon-btn mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  line-height: 16px;
+  color: inherit;
+}
+
+.dbc-icon-btn__text {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: inherit;
+  letter-spacing: 0.01em;
+}
+
+.dbc-custom-find__error {
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  padding-left: 2px;
+}
+
+/* Monaco highlight classes */
+:host ::ng-deep .dbc-find-match {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 2px;
+}
+
+:host ::ng-deep .dbc-find-match-current {
+  background: rgba(59, 130, 246, 0.18);
+  outline: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 2px;
+}

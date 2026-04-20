@@ -1,3 +1,4 @@
+import { firstValueFrom } from 'rxjs';
 import { DbcEditorComponent } from '../dbceditor/dbceditor.component';
 import { MatDialog } from '@angular/material/dialog';
 import { DialogShellComponent } from '../dialogshell/dialogshell.component';
@@ -7,6 +8,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
 type ValidationLogLevel = 'info' | 'warning' | 'error';
@@ -16,7 +18,6 @@ interface DbcFolderFile {
   sizeBytes: number;
   lastModified: string;
   status: OriginalDbcStatus;
-  content?: string;
 }
 
 interface DbcFolderResponse {
@@ -29,7 +30,6 @@ interface OriginalDbcFile {
   sizeBytes: number;
   lastModified: string;
   status: OriginalDbcStatus;
-  content?: string;
 }
 
 interface ValidationLogEntry {
@@ -71,6 +71,20 @@ interface ValidationPreview {
   summary: ValidationPreviewSummary;
   logEntries: ValidationLogEntry[];
   messages: ValidationMessagePreview[];
+}
+
+interface DbcApiConfig {
+  folderCatalogUrl: string;
+  fileContentUrl: string;
+}
+
+interface AppConfig {
+  dbcApi?: DbcApiConfig;
+}
+
+interface DbcContentResponse {
+  fileName: string;
+  content: string;
 }
 
 @Component({
@@ -117,9 +131,55 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   originalFilesDataSource = new MatTableDataSource<OriginalDbcFile>([]);
   checkedOriginalFileNames = new Set<string>();
 
-  ngOnInit(): void {
+  private appConfig: AppConfig | null = null;
+
+  private async loadAppConfig(): Promise<AppConfig> {
+    if (this.appConfig) {
+      return this.appConfig;
+    }
+
+    const stamp = Date.now();
+    const candidates = [
+      '/assets/config.json',
+      'assets/config.json',
+      `/assets/config.json?t=${stamp}`,
+      `assets/config.json?t=${stamp}`
+    ];
+
+    let lastStatus: number | null = null;
+
+    for (const url of candidates) {
+      try {
+        const response = await fetch(url, { cache: 'no-store' });
+        lastStatus = response.status;
+
+        if (!response.ok) {
+          continue;
+        }
+
+        const text = await response.text();
+        this.appConfig = JSON.parse(text) as AppConfig;
+        return this.appConfig;
+      } catch {
+      }
+    }
+
+    throw new Error(
+      `Unable to load runtime config from assets/config.json. Last HTTP status: ${lastStatus ?? 'unknown'}`
+    );
+  }
+
+  private shouldUseLocalMock(): boolean {
+    const isLocalhost =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+
+    return environment.disableAuth && isLocalhost;
+  }
+
+  async ngOnInit(): Promise<void>{
     this.originalFilesDataSource.data = this.originalFiles;
-    this.loadDbcFolderCatalog();
+    await this.loadDbcFolderCatalog();
   }
 
   ngAfterViewInit(): void {
@@ -375,57 +435,20 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
-  onNativeFilesSelected(event: Event): void {
+ async onNativeFilesSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = input.files ? Array.from(input.files) : [];
 
     if (files.length > 0) {
       this.onSelectFiles(files);
+      await this.uploadFilesFake();
     }
 
     input.value = '';
   }
 
-  loadDbcFolderCatalog(): void {
-    this.getDbcFolderCatalog().subscribe({
-      next: (response) => {
-        const mappedFiles = response.files.map((file) => this.mapFolderFileToOriginalFile(file));
-
-        this.folderName = response.folderName;
-        this.originalFiles = mappedFiles;
-        this.originalFilesDataSource.data = mappedFiles;
-        this.checkedOriginalFileNames.clear();
-
-        const selectedByName =
-          (this.selectedOriginalFileName &&
-            mappedFiles.find((file) => file.name === this.selectedOriginalFileName)) ||
-          null;
-
-        const nextSelected = selectedByName ?? mappedFiles[0] ?? null;
-
-        if (nextSelected) {
-          this.selectOriginalFile(nextSelected);
-        } else {
-          this.selectedOriginalFileName = null;
-          this.selectedOriginalFile = null;
-          this.selectedValidationPreview = null;
-        }
-      },
-      error: (error) => {
-        console.error('Failed to load DBC folder catalog.', error);
-        this.folderName = '';
-        this.originalFiles = [];
-        this.originalFilesDataSource.data = [];
-        this.checkedOriginalFileNames.clear();
-        this.selectedOriginalFileName = null;
-        this.selectedOriginalFile = null;
-        this.selectedValidationPreview = null;
-      }
-    });
-  }
-
-  private getDbcFolderCatalog() {
-    return this.http.get<DbcFolderResponse>('assets/mock/dbc-folder.json');
+  private async uploadFilesFake(): Promise<void> {
+    await this.uploadSelectedFiles();
   }
 
   private mapFolderFileToOriginalFile(file: DbcFolderFile): OriginalDbcFile {
@@ -433,17 +456,94 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       name: file.name,
       sizeBytes: file.sizeBytes,
       lastModified: file.lastModified,
-      status: file.status,
-      content: file.content
+      status: file.status
     };
   }
 
-  private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
-    if (typeof file.content === 'string') {
-      return file.content;
+  async loadDbcFolderCatalog(): Promise<void> {
+    try {
+      const response = await this.getDbcFolderCatalog();
+      const mappedFiles = response.files.map((file) => this.mapFolderFileToOriginalFile(file));
+
+      this.folderName = response.folderName;
+      this.originalFiles = mappedFiles;
+      this.originalFilesDataSource.data = mappedFiles;
+      this.checkedOriginalFileNames.clear();
+
+      const selectedByName =
+        (this.selectedOriginalFileName &&
+          mappedFiles.find((file) => file.name === this.selectedOriginalFileName)) ||
+        null;
+
+      const nextSelected = selectedByName ?? mappedFiles[0] ?? null;
+
+      if (nextSelected) {
+        this.selectOriginalFile(nextSelected);
+      } else {
+        this.selectedOriginalFileName = null;
+        this.selectedOriginalFile = null;
+        this.selectedValidationPreview = null;
+      }
+    } 
+    catch (error) {
+      console.error('Failed to load DBC folder catalog.', error);
+      this.folderName = '';
+      this.originalFiles = [];
+      this.originalFilesDataSource.data = [];
+      this.checkedOriginalFileNames.clear();
+      this.selectedOriginalFileName = null;
+      this.selectedOriginalFile = null;
+      this.selectedValidationPreview = null;
+    }
+  }
+
+  private async getDbcFolderCatalog(): Promise<DbcFolderResponse> {
+    if (this.shouldUseLocalMock()) {
+      return await firstValueFrom(
+        this.http.get<DbcFolderResponse>('assets/mock/dbc-folder.json')
+      );
     }
 
-    return '';
+    const config = await this.loadAppConfig();
+
+    if (!config.dbcApi?.folderCatalogUrl?.trim()) {
+      throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
+    }
+
+    return await firstValueFrom(
+      this.http.get<DbcFolderResponse>(config.dbcApi.folderCatalogUrl.trim())
+    );
+  }
+
+  private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
+    try {
+      if (this.shouldUseLocalMock()) {
+        return await firstValueFrom(
+          this.http.get(`assets/mock/dbc/${file.name}`, {
+            responseType: 'text'
+          })
+        );
+      }
+
+      const config = await this.loadAppConfig();
+
+      if (!config.dbcApi?.fileContentUrl?.trim()) {
+        throw new Error('dbcApi.fileContentUrl missing or empty in config.json');
+      }
+
+      const response = await firstValueFrom(
+        this.http.get<DbcContentResponse>(config.dbcApi.fileContentUrl.trim(), {
+          params: {
+            fileName: file.name
+          }
+        })
+      );
+
+      return response.content ?? '';
+    } catch (error) {
+      console.error('Failed to load DBC content:', file.name, error);
+      return '';
+    }
   }
 
   private buildFakeValidationPreview(file: OriginalDbcFile): ValidationPreview {
