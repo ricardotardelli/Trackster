@@ -43,12 +43,14 @@ export interface DbcMessage {
   hexId: string;
   name: string;
   sizeBytes: number;
+  transmitter: string;
   signals: DbcSignal[];
 }
 
 export interface DbcFullReport {
   isValid: boolean;
   errors: ValidationError[];
+  warnings: ValidationError[];
   stats: {
     messages: { total: number; valid: number; invalid: number };
     signals: { total: number; valid: number; invalid: number };
@@ -71,6 +73,7 @@ export class DbcParser {
   public static parse(content: string): DbcFullReport {
     const lines = content.split(/\r?\n/);
     const errors: ValidationError[] = [];
+    const warnings: ValidationError[] = [];
     const messagesMap = new Map<number, DbcMessage>();
 
     const invalidMessageAddrs = new Set<number>();
@@ -108,6 +111,7 @@ export class DbcParser {
         const rawId = match[1];
         const name = match[2];
         const rawSize = match[3];
+        const transmitter = match[4];
 
         const id = this.parseDbcInteger(rawId);
         const sizeBytes = this.parseDbcInteger(rawSize);
@@ -174,6 +178,7 @@ export class DbcParser {
           hexId: `0x${id.toString(16).toUpperCase()}`,
           name,
           sizeBytes,
+          transmitter,
           signals: []
         };
 
@@ -418,6 +423,7 @@ export class DbcParser {
     return {
       isValid: errors.length === 0,
       errors,
+      warnings,
       stats: {
         messages: {
           total: messagesMap.size,

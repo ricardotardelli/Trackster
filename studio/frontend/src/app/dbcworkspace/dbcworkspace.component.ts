@@ -1,5 +1,6 @@
 import { firstValueFrom } from 'rxjs';
 import { DbcEditorComponent } from '../dbceditor/dbceditor.component';
+import { DbcParser, type DbcFullReport } from '../dbceditor/dbcparser';
 import { MatDialog } from '@angular/material/dialog';
 import { DialogShellComponent } from '../dialogshell/dialogshell.component';
 import { CommonModule } from '@angular/common';
@@ -30,6 +31,7 @@ interface OriginalDbcFile {
   sizeBytes: number;
   lastModified: string;
   status: OriginalDbcStatus;
+  content?: string;
 }
 
 interface ValidationLogEntry {
@@ -171,13 +173,13 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
   private shouldUseLocalMock(): boolean {
     const isLocalhost =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
 
     return environment.disableAuth && isLocalhost;
   }
 
-  async ngOnInit(): Promise<void>{
+  async ngOnInit(): Promise<void> {
     this.originalFilesDataSource.data = this.originalFiles;
     await this.loadDbcFolderCatalog();
   }
@@ -254,7 +256,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       const newSelected = uploadedEntries[0] ?? null;
 
       if (newSelected) {
-        this.selectOriginalFile(newSelected);
+        void this.selectOriginalFile(newSelected);
       }
     } finally {
       this.isUploading = false;
@@ -269,27 +271,18 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     );
   }
 
-  validateSelectedFiles(): void {
+  async validateSelectedFiles(): Promise<void> {
     if (!this.hasPendingSelection()) {
       return;
     }
 
     const selectedNameBeforeUpdate = this.selectedOriginalFileName;
 
-    this.originalFiles = this.originalFiles.map((file) => {
-      if (
-        this.checkedOriginalFileNames.has(file.name) &&
-        this.isFileValidatable(file)
-      ) {
-        return {
-          ...file,
-          status: 'validated',
-          lastModified: this.getCurrentTimestamp()
-        };
-      }
-
-      return file;
-    });
+    if (this.shouldUseLocalMock()) {
+      await this.validateSelectedFilesLocally();
+    } else {
+      await this.validateSelectedFilesApi();
+    }
 
     this.checkedOriginalFileNames.clear();
     this.originalFilesDataSource.data = this.originalFiles;
@@ -300,9 +293,40 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       );
 
       if (updatedSelected) {
-        this.selectOriginalFile(updatedSelected);
+        await this.selectOriginalFile(updatedSelected);
       }
     }
+  }
+
+  private async validateSelectedFilesLocally(): Promise<void> {
+    const updatedFiles: OriginalDbcFile[] = await Promise.all(
+      this.originalFiles.map(async (file): Promise<OriginalDbcFile> => {
+        if (
+          this.checkedOriginalFileNames.has(file.name) &&
+          this.isFileValidatable(file)
+        ) {
+          const content = await this.resolveDbcContent(file);
+          const report = DbcParser.parse(content);
+
+          return {
+            ...file,
+            status:
+              report.errors.length === 0
+                ? 'validated'
+                : 'rejected',
+            lastModified: this.getCurrentTimestamp()
+          };
+        }
+
+        return file;
+      })
+    );
+
+    this.originalFiles = updatedFiles;
+  }
+
+  private async validateSelectedFilesApi(): Promise<void> {
+    throw new Error('Production validation via API is not implemented yet.');
   }
 
   removeSelectedFiles(): void {
@@ -321,7 +345,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       const nextSelected = remaining[0] ?? null;
 
       if (nextSelected) {
-        this.selectOriginalFile(nextSelected);
+        void this.selectOriginalFile(nextSelected);
       } else {
         this.selectedOriginalFileName = null;
         this.selectedOriginalFile = null;
@@ -330,10 +354,10 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
   }
 
-  selectOriginalFile(file: OriginalDbcFile): void {
+  async selectOriginalFile(file: OriginalDbcFile): Promise<void> {
     this.selectedOriginalFileName = file.name;
     this.selectedOriginalFile = file;
-    this.selectedValidationPreview = this.buildFakeValidationPreview(file);
+    await this.refreshSelectedValidationPanel(file);
   }
 
   isOriginalSelected(file: OriginalDbcFile): boolean {
@@ -417,7 +441,9 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
 
     const sorted = [...this.originalFiles].sort(
-      (a, b) => this.toSortableTimestamp(b.lastModified) - this.toSortableTimestamp(a.lastModified)
+      (a, b) =>
+        this.toSortableTimestamp(b.lastModified) -
+        this.toSortableTimestamp(a.lastModified)
     );
 
     return sorted[0].lastModified;
@@ -435,7 +461,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
- async onNativeFilesSelected(event: Event): Promise<void> {
+  async onNativeFilesSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = input.files ? Array.from(input.files) : [];
 
@@ -478,14 +504,13 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       const nextSelected = selectedByName ?? mappedFiles[0] ?? null;
 
       if (nextSelected) {
-        this.selectOriginalFile(nextSelected);
+        void this.selectOriginalFile(nextSelected);
       } else {
         this.selectedOriginalFileName = null;
         this.selectedOriginalFile = null;
         this.selectedValidationPreview = null;
       }
-    } 
-    catch (error) {
+    } catch (error) {
       console.error('Failed to load DBC folder catalog.', error);
       this.folderName = '';
       this.originalFiles = [];
@@ -517,6 +542,10 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
   private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
     try {
+      if (file.content != null) {
+        return file.content;
+      }
+
       if (this.shouldUseLocalMock()) {
         return await firstValueFrom(
           this.http.get(`assets/mock/dbc/${file.name}`, {
@@ -546,241 +575,109 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
   }
 
-  private buildFakeValidationPreview(file: OriginalDbcFile): ValidationPreview {
-    if (file.status === 'validated') {
-      return this.buildValidatedPreview(file);
-    }
+  private async refreshSelectedValidationPanel(
+    file: OriginalDbcFile
+  ): Promise<void> {
+    try {
+      const content = await this.resolveDbcContent(file);
+      const report = DbcParser.parse(content);
 
-    if (file.status === 'rejected') {
-      return this.buildRejectedPreview(file);
-    }
+      this.selectedValidationPreview = this.mapParserReportToPreview(report, file);
+    } catch (error) {
+      console.error('Failed to refresh validation panel:', file.name, error);
 
-    return this.buildPendingPreview(file);
+      this.selectedValidationPreview = {
+        summary: {
+          messages: 0,
+          signals: 0,
+          warnings: 0,
+          errors: 1
+        },
+        logEntries: [
+          {
+            level: 'error',
+            code: 'DBC_PANEL_LOAD_ERROR',
+            message: 'Failed to load or parse the selected DBC file.',
+            context: file.name
+          }
+        ],
+        messages: []
+      };
+    }
   }
 
-  private buildValidatedPreview(file: OriginalDbcFile): ValidationPreview {
-    const messages: ValidationMessagePreview[] = [
+  private mapParserReportToPreview(
+    report: DbcFullReport,
+    file: OriginalDbcFile
+  ): ValidationPreview {
+    const messages: ValidationMessagePreview[] = report.data.map((message) => ({
+      id: message.hexId,
+      name: message.name,
+      dlc: message.sizeBytes,
+      transmitter: message.transmitter || '-',
+      signals: message.signals.map((signal) => ({
+        name: signal.name,
+        startBit: signal.startBit,
+        length: signal.sizeBits,
+        endianness:
+          signal.endianness === 'Big Endian'
+            ? 'big_endian'
+            : 'little_endian',
+        signed: signal.isSigned,
+        factor: signal.factor,
+        offset: signal.offset,
+        min: signal.range.min,
+        max: signal.range.max,
+        unit: signal.unit || undefined
+      }))
+    }));
+
+    const warningEntries: ValidationLogEntry[] = report.warnings.map((warning) => ({
+      level: 'warning',
+      code: warning.messageCode ?? warning.type,
+      message: warning.message,
+      context: `Line ${warning.line}`
+    }));
+
+    const errorEntries: ValidationLogEntry[] = report.errors.map((error) => ({
+      level: 'error',
+      code: error.messageCode ?? error.type,
+      message: error.message,
+      context: `Line ${error.line}`
+    }));
+
+    const infoEntries: ValidationLogEntry[] = [
       {
-        id: '0x120',
-        name: 'VehicleSpeedStatus',
-        dlc: 8,
-        transmitter: 'VCU',
-        signals: [
-          {
-            name: 'VehicleSpeed',
-            startBit: 0,
-            length: 16,
-            endianness: 'little_endian',
-            signed: false,
-            factor: 0.01,
-            offset: 0,
-            min: 0,
-            max: 250,
-            unit: 'km/h'
-          },
-          {
-            name: 'WheelBasedSpeed',
-            startBit: 16,
-            length: 16,
-            endianness: 'little_endian',
-            signed: false,
-            factor: 0.01,
-            offset: 0,
-            min: 0,
-            max: 250,
-            unit: 'km/h'
-          },
-          {
-            name: 'SpeedValidity',
-            startBit: 32,
-            length: 2,
-            endianness: 'little_endian',
-            signed: false,
-            factor: 1,
-            offset: 0,
-            min: 0,
-            max: 3
-          }
-        ]
+        level: 'info',
+        code: 'DBC_PARSE_RESULT',
+        message: report.isValid
+          ? 'DBC parsed successfully.'
+          : 'DBC parsed with validation errors.',
+        context: file.name
       },
       {
-        id: '0x221',
-        name: 'EngineData',
-        dlc: 8,
-        transmitter: 'ECM',
-        signals: [
-          {
-            name: 'EngineRpm',
-            startBit: 0,
-            length: 16,
-            endianness: 'little_endian',
-            signed: false,
-            factor: 0.25,
-            offset: 0,
-            min: 0,
-            max: 8000,
-            unit: 'rpm'
-          },
-          {
-            name: 'ThrottlePosition',
-            startBit: 16,
-            length: 8,
-            endianness: 'little_endian',
-            signed: false,
-            factor: 0.4,
-            offset: 0,
-            min: 0,
-            max: 100,
-            unit: '%'
-          },
-          {
-            name: 'EngineCoolantTemp',
-            startBit: 24,
-            length: 8,
-            endianness: 'little_endian',
-            signed: true,
-            factor: 1,
-            offset: -40,
-            min: -40,
-            max: 215,
-            unit: '°C'
-          }
-        ]
+        level: 'info',
+        code: 'DBC_MESSAGES_TOTAL',
+        message: `Messages: ${report.stats.messages.total} total, ${report.stats.messages.valid} valid, ${report.stats.messages.invalid} invalid.`,
+        context: file.name
       },
       {
-        id: '0x305',
-        name: 'GpsPose',
-        dlc: 8,
-        transmitter: 'TCU',
-        signals: [
-          {
-            name: 'LatitudeRaw',
-            startBit: 0,
-            length: 32,
-            endianness: 'big_endian',
-            signed: true,
-            factor: 0.000001,
-            offset: 0,
-            min: -90,
-            max: 90,
-            unit: 'deg'
-          },
-          {
-            name: 'LongitudeRaw',
-            startBit: 32,
-            length: 32,
-            endianness: 'big_endian',
-            signed: true,
-            factor: 0.000001,
-            offset: 0,
-            min: -180,
-            max: 180,
-            unit: 'deg'
-          }
-        ]
+        level: 'info',
+        code: 'DBC_SIGNALS_TOTAL',
+        message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid} invalid.`,
+        context: file.name
       }
     ];
 
-    const totalSignals = messages.reduce((sum, message) => sum + message.signals.length, 0);
-
     return {
       summary: {
-        messages: messages.length,
-        signals: totalSignals,
-        warnings: 1,
-        errors: 0
+        messages: report.stats.messages.total,
+        signals: report.stats.signals.total,
+        warnings: report.warnings.length,
+        errors: report.errors.length
       },
-      logEntries: [
-        {
-          level: 'info',
-          code: 'DBC-001',
-          message: 'File loaded successfully.',
-          context: file.name
-        },
-        {
-          level: 'info',
-          code: 'DBC-010',
-          message: 'Message definitions parsed without structural errors.',
-          context: '3 messages detected'
-        },
-        {
-          level: 'warning',
-          code: 'DBC-021',
-          message: 'One signal does not define an explicit unit.',
-          context: 'VehicleSpeedStatus.SpeedValidity'
-        },
-        {
-          level: 'info',
-          code: 'DBC-099',
-          message: 'Validation completed successfully.',
-          context: 'File is ready for simulation catalog usage'
-        }
-      ],
+      logEntries: [...infoEntries, ...warningEntries, ...errorEntries],
       messages
-    };
-  }
-
-  private buildPendingPreview(file: OriginalDbcFile): ValidationPreview {
-    return {
-      summary: {
-        messages: 0,
-        signals: 0,
-        warnings: 0,
-        errors: 0
-      },
-      logEntries: [
-        {
-          level: 'info',
-          code: 'DBC-000',
-          message: 'File uploaded and queued for validation.',
-          context: file.name
-        },
-        {
-          level: 'info',
-          code: 'DBC-002',
-          message: 'Awaiting validation execution.',
-          context: 'No parser output available yet'
-        }
-      ],
-      messages: []
-    };
-  }
-
-  private buildRejectedPreview(file: OriginalDbcFile): ValidationPreview {
-    return {
-      summary: {
-        messages: 1,
-        signals: 0,
-        warnings: 1,
-        errors: 2
-      },
-      logEntries: [
-        {
-          level: 'info',
-          code: 'DBC-001',
-          message: 'File loaded successfully.',
-          context: file.name
-        },
-        {
-          level: 'warning',
-          code: 'DBC-014',
-          message: 'Message declaration found with incomplete metadata.',
-          context: 'Message BrakeStatus'
-        },
-        {
-          level: 'error',
-          code: 'DBC-031',
-          message: 'Signal bit range exceeds message payload length.',
-          context: 'BrakeStatus.BrakePressure'
-        },
-        {
-          level: 'error',
-          code: 'DBC-041',
-          message: 'Validation failed due to structural inconsistency.',
-          context: 'Signal extraction aborted'
-        }
-      ],
-      messages: []
     };
   }
 
@@ -812,7 +709,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         file,
         title: 'DBC Editor',
         subtitle: file.name,
-        content
+        content,
+        storageMode: this.shouldUseLocalMock() ? 'local' : 'api'
       }
     });
 
@@ -829,6 +727,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         return {
           ...currentFile,
           content: result.content,
+          status: 'pending',
           lastModified: this.getCurrentTimestamp()
         };
       });
@@ -839,7 +738,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         this.originalFiles.find((currentFile) => currentFile.name === file.name) ?? null;
 
       if (updatedSelected) {
-        this.selectOriginalFile(updatedSelected);
+        void this.selectOriginalFile(updatedSelected);
       }
 
       console.log('Updated DBC content:', result.content);

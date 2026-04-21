@@ -110,6 +110,7 @@ export class DbcEditorComponent {
       title: string;
       subtitle: string;
       content?: string;
+      storageMode: 'local' | 'api';
     },
     private readonly dialogRef: MatDialogRef<DbcEditorComponent>,
     private readonly ngZone: NgZone,
@@ -264,16 +265,23 @@ export class DbcEditorComponent {
 
   save(): void {
     const content = this.editorInstance?.getModel()?.getValue() ?? this.dbcText;
-
-    this.dialogRef.close({
-      saved: true,
-      content
-    });
+    if (this.data.storageMode === 'local') {
+      // save local mock
+      this.dialogRef.close({
+        saved: true,
+        content
+      });
+    } 
+    else {
+      // save api
+    }
   }
 
   cancel(): void {
     this.clearDiagnostics();
-    this.dialogRef.close();
+    this.dialogRef.close({
+      saved: false
+    });
   }
 
   revert(): void {

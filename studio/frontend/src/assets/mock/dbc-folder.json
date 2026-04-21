@@ -5,7 +5,7 @@
       "name": "acura_ilx_2016_nidec.dbc",
       "sizeBytes": 5422,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "bmw_e9x_e8x.dbc",
@@ -17,37 +17,37 @@
       "name": "cadillac_ct6_chassis.dbc",
       "sizeBytes": 2590,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "cadillac_ct6_object.dbc",
       "sizeBytes": 235626,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "cadillac_ct6_powertrain.dbc",
       "sizeBytes": 9232,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     },
     {
       "name": "chrysler_cusw.dbc",
       "sizeBytes": 7383,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "chrysler_pacifica_2017_hybrid_private_fusion.dbc",
       "sizeBytes": 7493,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     },
     {
       "name": "comma_body.dbc",
       "sizeBytes": 3610,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     },
     {
       "name": "ESR.dbc",
@@ -59,7 +59,7 @@
       "name": "fca_giorgio.dbc",
       "sizeBytes": 9714,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     },
     {
       "name": "FORD_CADS.dbc",
@@ -83,7 +83,7 @@
       "name": "ford_cgea1_2_ptcan_2011.dbc",
       "sizeBytes": 70620,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     },
     {
       "name": "ford_fusion_2018_adas.dbc",
@@ -281,13 +281,13 @@
       "name": "toyota_adas.dbc",
       "sizeBytes": 9683,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     },
     {
       "name": "toyota_iQ_2009_can.dbc",
       "sizeBytes": 7464,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "toyota_prius_2010_pt.dbc",
@@ -323,13 +323,13 @@
       "name": "vw_meb.dbc",
       "sizeBytes": 263261,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "vw_mlb.dbc",
       "sizeBytes": 232214,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "validated"
     },
     {
       "name": "vw_mqb.dbc",
@@ -347,7 +347,7 @@
       "name": "vw_pq.dbc",
       "sizeBytes": 104550,
       "lastModified": "2026-04-11 20:07",
-      "status": "pending"
+      "status": "rejected"
     }
   ]
 }
