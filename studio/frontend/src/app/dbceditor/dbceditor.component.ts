@@ -1,7 +1,7 @@
 import { MatIconModule } from '@angular/material/icon';
 import { registerDbcLanguage } from './dbc-monaco-language';
 import { CommonModule } from '@angular/common';
-import { Component, Inject } from '@angular/core';
+import { ChangeDetectorRef, Component, Inject, NgZone } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import {
@@ -13,7 +13,7 @@ import {
 import * as monaco from 'monaco-editor';
 import { DialogShellComponent } from '../dialogshell/dialogshell.component';
 import { DbcFindComponent } from './dbcfind.component';
-import { ChangeDetectorRef, NgZone } from '@angular/core';
+import { DbcParser, type DbcFullReport } from './dbcparser';
 
 const monacoLoader = new DefaultMonacoLoader({
   paths: {
@@ -41,21 +41,23 @@ interface OriginalDbcFile {
     MatIconModule,
     DbcFindComponent
   ],
-  providers: [
-    { provide: NGX_MONACO_LOADER_PROVIDER, useValue: monacoLoader }
-  ],
+  providers: [{ provide: NGX_MONACO_LOADER_PROVIDER, useValue: monacoLoader }],
   templateUrl: './dbceditor.component.html',
   styleUrl: './dbceditor.component.css'
 })
 export class DbcEditorComponent {
   dbcText = `BO_ 256 VEHICLE_SPEED: 8 Vector__XXX
-SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
+ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
 
+  diagnosticsReport: DbcFullReport | null = null;
+  lastDiagnosticsRunAt: string | null = null;
   originalText = this.dbcText;
   problemsCount = 0;
   findVisible = false;
   replaceVisible = false;
   initialFindQuery = '';
+  isChangedSinceDiagnostics = false;
+  issuesDropdownVisible = false;
 
   editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     automaticLayout: true,
@@ -74,7 +76,7 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
     tabSize: 4,
     insertSpaces: true,
     language: 'dbc',
-    theme: 'dbcLight',
+    theme: 'dbcVsCodeLight',
     overviewRulerBorder: true,
     hideCursorInOverviewRuler: true,
     padding: {
@@ -151,9 +153,53 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
       }
     });
 
+    this.editorInstance.onDidChangeModelContent(() => {
+      if (!this.lastDiagnosticsRunAt) {
+        return;
+      }
+
+      this.ngZone.run(() => {
+        this.isChangedSinceDiagnostics = true;
+        this.cdr.detectChanges();
+      });
+    });
+
     setTimeout(() => {
       this.editorInstance?.layout();
     }, 0);
+  }
+
+  get lastDiagnosticsLabel(): string {
+    if (!this.lastDiagnosticsRunAt) {
+      return 'Never';
+    }
+
+    const date = new Date(this.lastDiagnosticsRunAt);
+
+    return date.toLocaleTimeString(); 
+  }
+
+  get diagnosticsState(): 'not-verified' | 'ok' | 'error' {
+    if (!this.lastDiagnosticsRunAt || this.isChangedSinceDiagnostics) {
+      return 'not-verified';
+    }
+
+    if (this.problemsCount > 0) {
+      return 'error';
+    }
+
+    return 'ok';
+  }
+
+  get diagnosticsLabel(): string {
+    switch (this.diagnosticsState) {
+      case 'not-verified':
+        return 'Not verified';
+      case 'ok':
+        return 'No issues';
+      case 'error':
+        return `Problems: ${this.problemsCount}`;
+    }
   }
 
   get editor(): monaco.editor.IStandaloneCodeEditor | null {
@@ -217,24 +263,29 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
   }
 
   save(): void {
+    const content = this.editorInstance?.getModel()?.getValue() ?? this.dbcText;
+
     this.dialogRef.close({
       saved: true,
-      content: this.dbcText
+      content
     });
   }
 
   cancel(): void {
+    this.clearDiagnostics();
     this.dialogRef.close();
   }
 
   revert(): void {
     this.dbcText = this.originalText;
     this.editorInstance?.setValue(this.dbcText);
+    this.clearDiagnostics();
     this.editorInstance?.layout();
   }
 
   download(): void {
-    const blob = new Blob([this.dbcText], { type: 'text/plain;charset=utf-8' });
+    const content = this.editorInstance?.getModel()?.getValue() ?? this.dbcText;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
 
     const anchor = document.createElement('a');
@@ -245,14 +296,117 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
     window.URL.revokeObjectURL(url);
   }
 
-  validate(): void {
-    const content = this.editorInstance?.getValue() ?? this.dbcText;
-    console.log('Validate DBC content length:', content.length);
-    this.problemsCount = 0;
+  runDiagnostics(): void {
+    if (!this.editorInstance) {
+      return;
+    }
+
+    const model = this.editorInstance.getModel();
+
+    if (!model) {
+      return;
+    }
+
+    const content = model.getValue();
+    const report = DbcParser.parse(content);
+
+    this.diagnosticsReport = report;
+    this.problemsCount = report.errors.length;
+    this.lastDiagnosticsRunAt = new Date().toISOString();
+    this.isChangedSinceDiagnostics = false;
+
+    this.applyDiagnosticsToEditor(model, report);
+
+    if (report.errors.length > 0) {
+      const firstError = report.errors[0];
+
+      this.editorInstance.setPosition({
+        lineNumber: firstError.line,
+        column: firstError.column ?? 1
+      });
+
+      this.editorInstance.revealPositionInCenter({
+        lineNumber: firstError.line,
+        column: firstError.column ?? 1
+      });
+
+      this.editorInstance.focus();
+    }
+    
+    this.issuesDropdownVisible = false;
   }
 
-  format(): void {
-    this.editorInstance?.getAction('editor.action.formatDocument')?.run();
+  private diagnosticsDecorations: string[] = [];
+
+  private applyDiagnosticsToEditor( model: monaco.editor.ITextModel, report: DbcFullReport ): void {
+    const markers: monaco.editor.IMarkerData[] = report.errors.map(error => ({
+      startLineNumber: error.line,
+      startColumn: error.column ?? 1,
+      endLineNumber: error.line,
+      endColumn: error.endColumn ?? 999,
+      message: `[${error.type}] ${error.message}`,
+      severity: this.mapSeverityToMonaco(error.severity)
+    }));
+
+    monaco.editor.setModelMarkers(model, 'dbc-diagnostics', markers);
+
+    const decorations: monaco.editor.IModelDeltaDecoration[] = report.errors.map(
+      error => ({
+        range: new monaco.Range(error.line, 1, error.line, 1),
+        options: {
+          isWholeLine: true,
+          className:
+            error.severity === 'warning'
+              ? 'dbc-warning-line'
+              : 'dbc-error-line'
+        }
+      })
+    );
+
+    this.diagnosticsDecorations = this.editorInstance?.deltaDecorations(
+      this.diagnosticsDecorations,
+      decorations
+    ) ?? [];
+  }
+
+  private mapSeverityToMonaco(
+    severity: 'error' | 'warning'
+  ): monaco.MarkerSeverity {
+    switch (severity) {
+      case 'warning':
+        return monaco.MarkerSeverity.Warning;
+      case 'error':
+      default:
+        return monaco.MarkerSeverity.Error;
+    }
+  }
+
+  clearDiagnostics(): void {
+    if (!this.editorInstance) {
+      return;
+    }
+
+    const model = this.editorInstance.getModel();
+
+    if (!model) {
+      return;
+    }
+
+    this.diagnosticsReport = null;
+    this.problemsCount = 0;
+    this.lastDiagnosticsRunAt = null;
+    this.lastDiagnosticsRunAt = null;
+    this.isChangedSinceDiagnostics = false;
+
+    monaco.editor.setModelMarkers(model, 'dbc-diagnostics', []);
+  }
+
+  undo(): void {
+    this.editorInstance?.trigger('toolbar', 'undo', null);
+  }
+
+  redo(): void {
+    this.editorInstance?.trigger('toolbar', 'redo', null);
   }
 
   find(): void {
@@ -276,4 +430,34 @@ SG_ Speed : 0|16@1+ (0.01,0) [0|250] "km/h" Vector__XXX`;
     this.editorInstance?.updateOptions({ wordWrap: nextWrap });
     this.editorInstance?.layout();
   }
+
+  toggleIssuesDropdown(): void {
+    if (this.diagnosticsState !== 'error') {
+      return;
+    }
+
+    this.issuesDropdownVisible = !this.issuesDropdownVisible;
+  }
+
+  goToIssue(error: any): void {
+    if (!this.editorInstance) {
+      return;
+    }
+
+    this.editorInstance.setPosition({
+      lineNumber: error.line,
+      column: error.column ?? 1
+    });
+
+    this.editorInstance.revealPositionInCenter({
+      lineNumber: error.line,
+      column: error.column ?? 1
+    });
+
+    this.editorInstance.focus();
+
+    this.issuesDropdownVisible = false;
+  }
+
+
 }

@@ -6,23 +6,31 @@
   (closeClicked)="cancel()">
   <div class="dbc-editor-layout">
     <div class="dbc-editor-toolbar">
-      <div class="dbc-editor-toolbar__left">
-        <div class="dbc-toolbar-group dbc-toolbar-group--primary">
-          <button class="dbc-tool-btn" (click)="validate()">
+      <div class="dbc-toolbar">
+        <div class="dbc-toolbar-left">
+          <button class="dbc-tool-btn" (click)="runDiagnostics()">
             <mat-icon>check_circle</mat-icon>
-            <span>Validate</span>
+            <span>Diagnostic</span>
           </button>
-        </div>
 
-        <div class="dbc-toolbar-group">
-          <button class="dbc-tool-btn" (click)="format()">
-            <mat-icon>code</mat-icon>
-            <span>Format</span>
+          <button class="dbc-tool-btn" (click)="undo()">
+            <mat-icon>undo</mat-icon>
+            <span>Undo</span>
+          </button>
+
+          <button class="dbc-tool-btn" (click)="redo()">
+            <mat-icon>redo</mat-icon>
+            <span>Redo</span>
           </button>
 
           <button class="dbc-tool-btn" (click)="find()">
             <mat-icon>search</mat-icon>
             <span>Find</span>
+          </button>
+
+          <button class="dbc-tool-btn" (click)="toggleFind(true)">
+            <mat-icon>find_replace</mat-icon>
+            <span>Replace</span>
           </button>
 
           <button
@@ -33,15 +41,49 @@
             <span>Line</span>
           </button>
 
-          <button class="dbc-tool-btn" (click)="toggleWrap()">
+          <button
+            class="dbc-tool-btn"
+            [class.is-active]="editorOptions.wordWrap === 'on'"
+            (click)="toggleWrap()">
             <mat-icon>wrap_text</mat-icon>
             <span>Wrap</span>
           </button>
-        </div>
-      </div>
 
-      <div class="dbc-editor-toolbar__right">
-        <span class="dbc-problems-pill">Problems: {{ problemsCount || 0 }}</span>
+          <button class="dbc-tool-btn" (click)="revert()">
+            <mat-icon>restart_alt</mat-icon>
+            <span>Revert</span>
+          </button>
+        </div>
+
+        <div class="dbc-toolbar-right">
+          <div class="dbc-diagnostics-wrapper">
+            <button
+              class="dbc-diagnostics-badge"
+              [ngClass]="{
+                'dbc-diagnostics-badge--not-verified': diagnosticsState === 'not-verified',
+                'dbc-diagnostics-badge--ok': diagnosticsState === 'ok',
+                'dbc-diagnostics-badge--error': diagnosticsState === 'error',
+                'dbc-diagnostics-badge--clickable': diagnosticsState === 'error'
+              }"
+              (click)="toggleIssuesDropdown()">
+              {{ diagnosticsLabel }}
+              <span *ngIf="diagnosticsState === 'error'" class="dbc-badge-arrow">▾</span>
+            </button>
+
+            <div *ngIf="issuesDropdownVisible" class="dbc-issues-dropdown">
+              <div
+                *ngFor="let error of diagnosticsReport?.errors; let i = index"
+                class="dbc-issue-item"
+                (click)="goToIssue(error)">
+                Line {{ error.line }} — {{ error.message }}
+              </div>
+            </div>
+          </div>
+
+          <span class="dbc-diagnostics-time">
+            Last run: {{ lastDiagnosticsLabel }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -69,13 +111,6 @@
       class="trackster-button trackster-button--secondary"
       (click)="cancel()">
       Cancel
-    </button>
-
-    <button
-      type="button"
-      class="trackster-button trackster-button--secondary"
-      (click)="revert()">
-      Revert
     </button>
 
     <button
