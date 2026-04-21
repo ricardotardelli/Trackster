@@ -24,7 +24,7 @@
     "@ngx-dropzone/cdk": "^17.3.0",
     "aws-amplify": "^6.16.3",
     "leaflet": "^1.9.4",
-    "monaco-editor": "^0.43.0",
+    "monaco-editor": "^0.47.0",
     "ngx-dropzone": "^3.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

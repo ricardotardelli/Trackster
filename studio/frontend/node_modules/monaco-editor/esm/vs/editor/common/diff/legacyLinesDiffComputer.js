@@ -3,7 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import { LcsDiff } from '../../../base/common/diff/diff.js';
-import { RangeMapping, LineRangeMapping, LinesDiff } from './linesDiffComputer.js';
+import { LinesDiff } from './linesDiffComputer.js';
+import { RangeMapping, DetailedLineRangeMapping } from './rangeMapping.js';
 import * as strings from '../../../base/common/strings.js';
 import { Range } from '../core/range.js';
 import { assertFn, checkAdjacentItems } from '../../../base/common/assert.js';
@@ -39,12 +40,12 @@ export class LegacyLinesDiffComputer {
             else {
                 modifiedRange = new LineRange(c.modifiedStartLineNumber, c.modifiedEndLineNumber + 1);
             }
-            let change = new LineRangeMapping(originalRange, modifiedRange, (_a = c.charChanges) === null || _a === void 0 ? void 0 : _a.map(c => new RangeMapping(new Range(c.originalStartLineNumber, c.originalStartColumn, c.originalEndLineNumber, c.originalEndColumn), new Range(c.modifiedStartLineNumber, c.modifiedStartColumn, c.modifiedEndLineNumber, c.modifiedEndColumn))));
+            let change = new DetailedLineRangeMapping(originalRange, modifiedRange, (_a = c.charChanges) === null || _a === void 0 ? void 0 : _a.map(c => new RangeMapping(new Range(c.originalStartLineNumber, c.originalStartColumn, c.originalEndLineNumber, c.originalEndColumn), new Range(c.modifiedStartLineNumber, c.modifiedStartColumn, c.modifiedEndLineNumber, c.modifiedEndColumn))));
             if (lastChange) {
-                if (lastChange.modifiedRange.endLineNumberExclusive === change.modifiedRange.startLineNumber
-                    || lastChange.originalRange.endLineNumberExclusive === change.originalRange.startLineNumber) {
+                if (lastChange.modified.endLineNumberExclusive === change.modified.startLineNumber
+                    || lastChange.original.endLineNumberExclusive === change.original.startLineNumber) {
                     // join touching diffs. Probably moving diffs up/down in the algorithm causes touching diffs.
-                    change = new LineRangeMapping(lastChange.originalRange.join(change.originalRange), lastChange.modifiedRange.join(change.modifiedRange), lastChange.innerChanges && change.innerChanges ?
+                    change = new DetailedLineRangeMapping(lastChange.original.join(change.original), lastChange.modified.join(change.modified), lastChange.innerChanges && change.innerChanges ?
                         lastChange.innerChanges.concat(change.innerChanges) : undefined);
                     changes.pop();
                 }
@@ -53,10 +54,10 @@ export class LegacyLinesDiffComputer {
             lastChange = change;
         }
         assertFn(() => {
-            return checkAdjacentItems(changes, (m1, m2) => m2.originalRange.startLineNumber - m1.originalRange.endLineNumberExclusive === m2.modifiedRange.startLineNumber - m1.modifiedRange.endLineNumberExclusive &&
+            return checkAdjacentItems(changes, (m1, m2) => m2.original.startLineNumber - m1.original.endLineNumberExclusive === m2.modified.startLineNumber - m1.modified.endLineNumberExclusive &&
                 // There has to be an unchanged line in between (otherwise both diffs should have been joined)
-                m1.originalRange.endLineNumberExclusive < m2.originalRange.startLineNumber &&
-                m1.modifiedRange.endLineNumberExclusive < m2.modifiedRange.startLineNumber);
+                m1.original.endLineNumberExclusive < m2.original.startLineNumber &&
+                m1.modified.endLineNumberExclusive < m2.modified.startLineNumber);
         });
         return new LinesDiff(changes, [], result.quitEarly);
     }

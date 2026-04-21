@@ -2,7 +2,7 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-import { once } from '../../../../base/common/functional.js';
+import { createSingleCallFunction } from '../../../../base/common/functional.js';
 import { DisposableStore, MutableDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { getCodeEditor, isDiffEditor } from '../../../browser/editorBrowser.js';
 import { OverviewRulerLane } from '../../../common/model.js';
@@ -66,7 +66,7 @@ export class AbstractEditorNavigationQuickAccessProvider {
                         editor.restoreViewState(lastKnownEditorViewState);
                     }
                 };
-                disposables.add(once(token.onCancellationRequested)(() => { var _a; return (_a = context.restoreViewState) === null || _a === void 0 ? void 0 : _a.call(context); }));
+                disposables.add(createSingleCallFunction(token.onCancellationRequested)(() => { var _a; return (_a = context.restoreViewState) === null || _a === void 0 ? void 0 : _a.call(context); }));
             }
             // Clean up decorations on dispose
             disposables.add(toDisposable(() => this.clearDecorations(editor)));

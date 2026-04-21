@@ -3,8 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import { LegacyLinesDiffComputer } from './legacyLinesDiffComputer.js';
-import { AdvancedLinesDiffComputer } from './advancedLinesDiffComputer.js';
+import { DefaultLinesDiffComputer } from './defaultLinesDiffComputer/defaultLinesDiffComputer.js';
 export const linesDiffComputers = {
     getLegacy: () => new LegacyLinesDiffComputer(),
-    getAdvanced: () => new AdvancedLinesDiffComputer(),
+    getDefault: () => new DefaultLinesDiffComputer(),
 };

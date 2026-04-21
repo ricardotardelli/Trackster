@@ -30,7 +30,10 @@
             "styles": [
               "src/custom-theme.scss",
               "src/styles.css"
-            ]
+            ],
+            "loader": {
+              ".ttf": "file"
+            }
           },
           "configurations": {
             "production": {

@@ -30,16 +30,6 @@ import { ILanguageConfigurationService } from '../languages/languageConfiguratio
 function MODEL_ID(resource) {
     return resource.toString();
 }
-function computeModelSha1(model) {
-    // compute the sha1
-    const shaComputer = new StringSHA1();
-    const snapshot = model.createSnapshot();
-    let text;
-    while ((text = snapshot.read())) {
-        shaComputer.update(text);
-    }
-    return shaComputer.digest();
-}
 class ModelData {
     constructor(model, onWillDispose, onDidChangeLanguage) {
         this.model = model;
@@ -264,7 +254,10 @@ let ModelService = ModelService_1 = class ModelService extends Disposable {
         if (resource && this._disposedModels.has(MODEL_ID(resource))) {
             const disposedModelData = this._removeDisposedModel(resource);
             const elements = this._undoRedoService.getElements(resource);
-            const sha1IsEqual = (computeModelSha1(model) === disposedModelData.sha1);
+            const sha1Computer = this._getSHA1Computer();
+            const sha1IsEqual = (sha1Computer.canComputeSHA1(model)
+                ? sha1Computer.computeSHA1(model) === disposedModelData.sha1
+                : false);
             if (sha1IsEqual || disposedModelData.sharesUndoRedoStack) {
                 for (const element of elements.past) {
                     if (isEditStackElement(element) && element.matchesResource(resource)) {
@@ -361,6 +354,7 @@ let ModelService = ModelService_1 = class ModelService extends Disposable {
             }
         }
         const maxMemory = ModelService_1.MAX_MEMORY_FOR_CLOSED_FILES_UNDO_STACK;
+        const sha1Computer = this._getSHA1Computer();
         if (!maintainUndoRedoStack) {
             if (!sharesUndoRedoStack) {
                 const initialUndoRedoSnapshot = modelData.model.getInitialUndoRedoSnapshot();
@@ -369,8 +363,8 @@ let ModelService = ModelService_1 = class ModelService extends Disposable {
                 }
             }
         }
-        else if (!sharesUndoRedoStack && heapSize > maxMemory) {
-            // the undo stack for this file would never fit in the configured memory, so don't bother with it.
+        else if (!sharesUndoRedoStack && (heapSize > maxMemory || !sha1Computer.canComputeSHA1(model))) {
+            // the undo stack for this file would never fit in the configured memory or the file is very large, so don't bother with it.
             const initialUndoRedoSnapshot = modelData.model.getInitialUndoRedoSnapshot();
             if (initialUndoRedoSnapshot !== null) {
                 this._undoRedoService.restoreSnapshot(initialUndoRedoSnapshot);
@@ -380,7 +374,7 @@ let ModelService = ModelService_1 = class ModelService extends Disposable {
             this._ensureDisposedModelsHeapSize(maxMemory - heapSize);
             // We only invalidate the elements, but they remain in the undo-redo service.
             this._undoRedoService.setElementsValidFlag(model.uri, false, (element) => (isEditStackElement(element) && element.matchesResource(model.uri)));
-            this._insertDisposedModel(new DisposedModelInfo(model.uri, modelData.model.getInitialUndoRedoSnapshot(), Date.now(), sharesUndoRedoStack, heapSize, computeModelSha1(model), model.getVersionId(), model.getAlternativeVersionId()));
+            this._insertDisposedModel(new DisposedModelInfo(model.uri, modelData.model.getInitialUndoRedoSnapshot(), Date.now(), sharesUndoRedoStack, heapSize, sha1Computer.computeSHA1(model), model.getVersionId(), model.getAlternativeVersionId()));
         }
         delete this._models[modelId];
         modelData.dispose();
@@ -396,6 +390,9 @@ let ModelService = ModelService_1 = class ModelService extends Disposable {
         ModelService_1._setModelOptionsForModel(model, newOptions, oldOptions);
         this._onModelModeChanged.fire({ model, oldLanguageId: oldLanguageId });
     }
+    _getSHA1Computer() {
+        return new DefaultModelSHA1Computer();
+    }
 };
 ModelService.MAX_MEMORY_FOR_CLOSED_FILES_UNDO_STACK = 20 * 1024 * 1024;
 ModelService = ModelService_1 = __decorate([
@@ -406,3 +403,19 @@ ModelService = ModelService_1 = __decorate([
     __param(4, ILanguageConfigurationService)
 ], ModelService);
 export { ModelService };
+export class DefaultModelSHA1Computer {
+    canComputeSHA1(model) {
+        return (model.getValueLength() <= DefaultModelSHA1Computer.MAX_MODEL_SIZE);
+    }
+    computeSHA1(model) {
+        // compute the sha1
+        const shaComputer = new StringSHA1();
+        const snapshot = model.createSnapshot();
+        let text;
+        while ((text = snapshot.read())) {
+            shaComputer.update(text);
+        }
+        return shaComputer.digest();
+    }
+}
+DefaultModelSHA1Computer.MAX_MODEL_SIZE = 10 * 1024 * 1024; // takes 200ms to compute a sha1 on a 10MB model on a new machine
