@@ -585,16 +585,21 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         throw new Error('dbcApi.contentUrl missing or empty in config.json');
       }
 
+      const headers = await this.getAuthorizationHeaders();
+
       const response = await firstValueFrom(
         this.http.get<DbcContentResponse>(config.dbcApi.contentUrl.trim(), {
+          headers,
           params: {
+            customerId: '00000000',
             fileName: file.name
           }
         })
       );
 
       return response.content ?? '';
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Failed to load DBC content:', file.name, error);
       return '';
     }
