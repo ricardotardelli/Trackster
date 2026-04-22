@@ -3,8 +3,8 @@
    "s3Default":     "s3-trackster-can-bucket",
    "engineURL":     "https://su90gxqchi.execute-api.us-east-1.amazonaws.com/Prod/generate",
    "dbcApi": {
-      "listUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-folder",
-      "contentUrl": "https://su90gxqchi.execute-api.us-east-1.amazonaws.com/Prod/dbc/content"
+      "folderCatalogUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-folder",
+      "contentUrl": ""
    },
    "dbcFiles":  [
       "Bus_A",
