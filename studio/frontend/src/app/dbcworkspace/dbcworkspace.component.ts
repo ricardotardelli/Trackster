@@ -91,7 +91,7 @@ interface ValidationPreview {
 
 interface DbcApiConfig {
   folderCatalogUrl: string;
-  fileContentUrl: string;
+  contentUrl: string;
 }
 
 interface AppConfig {
@@ -581,12 +581,12 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
       const config = await this.loadAppConfig();
 
-      if (!config.dbcApi?.fileContentUrl?.trim()) {
-        throw new Error('dbcApi.fileContentUrl missing or empty in config.json');
+      if (!config.dbcApi?.contentUrl?.trim()) {
+        throw new Error('dbcApi.contentUrl missing or empty in config.json');
       }
 
       const response = await firstValueFrom(
-        this.http.get<DbcContentResponse>(config.dbcApi.fileContentUrl.trim(), {
+        this.http.get<DbcContentResponse>(config.dbcApi.contentUrl.trim(), {
           params: {
             fileName: file.name
           }
