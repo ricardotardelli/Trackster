@@ -1,3 +1,5 @@
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { firstValueFrom } from 'rxjs';
 import { DbcEditorComponent } from '../dbceditor/dbceditor.component';
 import { DbcParser, type DbcFullReport } from '../dbceditor/dbcparser';
@@ -8,7 +10,6 @@ import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
@@ -24,6 +25,19 @@ interface DbcFolderFile {
 interface DbcFolderResponse {
   folderName: string;
   files: DbcFolderFile[];
+}
+
+interface DbcFolderApiFile {
+  key: string;
+  fileName: string;
+  size: number;
+  lastModified: string | null;
+}
+
+interface DbcFolderApiResponse {
+  customerId: string;
+  path: string;
+  files: DbcFolderApiFile[];
 }
 
 interface OriginalDbcFile {
@@ -119,6 +133,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   selectedValidationPreview: ValidationPreview | null = null;
 
   folderName = '';
+
+  customerId = "00000000";
 
   readonly intakeDisplayedColumns: string[] = [
     'select',
@@ -535,9 +551,18 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
     }
 
-    return await firstValueFrom(
-      this.http.get<DbcFolderResponse>(config.dbcApi.folderCatalogUrl.trim())
+    const headers = await this.getAuthorizationHeaders();
+
+    const apiResponse = await firstValueFrom(
+      this.http.get<DbcFolderApiResponse>(config.dbcApi.folderCatalogUrl.trim(), {
+        headers,
+        params: {
+          customerId: this.customerId
+        }
+      })
     );
+
+    return this.mapApiFolderResponse(apiResponse);
   }
 
   private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
@@ -743,5 +768,30 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
       console.log('Updated DBC content:', result.content);
     });
+  }
+
+  private async getAuthorizationHeaders(): Promise<HttpHeaders> {
+    const session = await fetchAuthSession();
+    const accessToken = session.tokens?.accessToken?.toString();
+
+    if (!accessToken) {
+      throw new Error('Missing access token for authenticated API call.');
+    }
+
+    return new HttpHeaders({
+      Authorization: `Bearer ${accessToken}`
+    });
+  }
+
+  private mapApiFolderResponse(apiResponse: DbcFolderApiResponse): DbcFolderResponse {
+    return {
+      folderName: apiResponse.path,
+      files: apiResponse.files.map((file) => ({
+        name: file.fileName,
+        sizeBytes: file.size,
+        lastModified: file.lastModified ?? this.getCurrentTimestamp(),
+        status: 'pending' as OriginalDbcStatus
+      }))
+    };
   }
 }
