@@ -563,11 +563,21 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
-    if (file.content != null) {
+    console.log('RESOLVE START:', {
+      fileName: file.name,
+      hasLocalContent: file.content != null,
+      localContentLength: file.content?.length ?? 0
+    });
+
+    if (file.content != null && file.content.trim().length > 0) {
+      console.log('USING LOCAL CONTENT (CACHE)', {
+        length: file.content.length
+      });
       return file.content;
     }
 
     if (this.shouldUseLocalMock()) {
+      console.log('USING LOCAL MOCK PATH');
       return await firstValueFrom(
         this.http.get(`assets/mock/dbc/${file.name}`, {
           responseType: 'text'
@@ -782,7 +792,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     try {
       content = await this.resolveDbcContent(file);
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Failed to load DBC content for editor:', file.name, error);
       content = file.content ?? '';
     }
