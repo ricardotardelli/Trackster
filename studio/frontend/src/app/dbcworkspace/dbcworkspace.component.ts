@@ -14,6 +14,18 @@ import { environment } from '../../environments/environment';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
 type ValidationLogLevel = 'info' | 'warning' | 'error';
+type ValidationMessageStatus = 'ok' | 'warning' | 'error';
+
+interface ValidationMessagePreview {
+  id: string;
+  name: string;
+  dlc: number;
+  transmitter: string;
+  status: ValidationMessageStatus;
+  warningCount: number;
+  errorCount: number;
+  signals: ValidationSignalPreview[];
+}
 
 interface DbcFolderFile {
   name: string;
@@ -60,6 +72,9 @@ interface ValidationMessagePreview {
   name: string;
   dlc: number;
   transmitter: string;
+  status: ValidationMessageStatus;
+  warningCount: number;
+  errorCount: number;
   signals: ValidationSignalPreview[];
 }
 
@@ -610,80 +625,119 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
   }
 
-  private mapParserReportToPreview(
-    report: DbcFullReport,
-    file: OriginalDbcFile
-  ): ValidationPreview {
-    const messages: ValidationMessagePreview[] = report.data.map((message) => ({
-      id: message.hexId,
-      name: message.name,
-      dlc: message.sizeBytes,
-      transmitter: message.transmitter || '-',
-      signals: message.signals.map((signal) => ({
-        name: signal.name,
-        startBit: signal.startBit,
-        length: signal.sizeBits,
-        endianness:
-          signal.endianness === 'Big Endian'
-            ? 'big_endian'
-            : 'little_endian',
-        signed: signal.isSigned,
-        factor: signal.factor,
-        offset: signal.offset,
-        min: signal.range.min,
-        max: signal.range.max,
-        unit: signal.unit || undefined
-      }))
-    }));
+    private mapParserReportToPreview(
+      report: DbcFullReport,
+      file: OriginalDbcFile
+    ): ValidationPreview {
+      const messages: ValidationMessagePreview[] = report.data.map((message, index) => {
+        const startLine =
+          typeof message.sourceLine === 'number' ? message.sourceLine : null;
 
-    const warningEntries: ValidationLogEntry[] = report.warnings.map((warning) => ({
-      level: 'warning',
-      code: warning.messageCode ?? warning.type,
-      message: warning.message,
-      context: `Line ${warning.line}`
-    }));
+        const nextMessage = report.data[index + 1];
+        const endLineExclusive =
+          nextMessage && typeof nextMessage.sourceLine === 'number'
+            ? nextMessage.sourceLine
+            : null;
 
-    const errorEntries: ValidationLogEntry[] = report.errors.map((error) => ({
-      level: 'error',
-      code: error.messageCode ?? error.type,
-      message: error.message,
-      context: `Line ${error.line}`
-    }));
+        const warningCount =
+          startLine == null
+            ? 0
+            : report.warnings.filter((warning) => {
+                if (endLineExclusive == null) {
+                  return warning.line >= startLine;
+                }
 
-    const infoEntries: ValidationLogEntry[] = [
-      {
-        level: 'info',
-        code: 'DBC_PARSE_RESULT',
-        message: report.isValid
-          ? 'DBC parsed successfully.'
-          : 'DBC parsed with validation errors.',
-        context: file.name
-      },
-      {
-        level: 'info',
-        code: 'DBC_MESSAGES_TOTAL',
-        message: `Messages: ${report.stats.messages.total} total, ${report.stats.messages.valid} valid, ${report.stats.messages.invalid} invalid.`,
-        context: file.name
-      },
-      {
-        level: 'info',
-        code: 'DBC_SIGNALS_TOTAL',
-        message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid} invalid.`,
-        context: file.name
-      }
-    ];
+                return warning.line >= startLine && warning.line < endLineExclusive;
+              }).length;
 
-    return {
-      summary: {
-        messages: report.stats.messages.total,
-        signals: report.stats.signals.total,
-        warnings: report.warnings.length,
-        errors: report.errors.length
-      },
-      logEntries: [...infoEntries, ...warningEntries, ...errorEntries],
-      messages
-    };
-  }
+        const errorCount =
+          startLine == null
+            ? 0
+            : report.errors.filter((error) => {
+                if (endLineExclusive == null) {
+                  return error.line >= startLine;
+                }
+
+                return error.line >= startLine && error.line < endLineExclusive;
+              }).length;
+
+        const status: ValidationMessageStatus =
+          errorCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'ok';
+
+        return {
+          id: message.hexId,
+          name: message.name,
+          dlc: message.sizeBytes,
+          transmitter: message.transmitter || '-',
+          status,
+          warningCount,
+          errorCount,
+          signals: message.signals.map((signal) => ({
+            name: signal.name,
+            startBit: signal.startBit,
+            length: signal.sizeBits,
+            endianness:
+              signal.endianness === 'Big Endian'
+                ? 'big_endian'
+                : 'little_endian',
+            signed: signal.isSigned,
+            factor: signal.factor,
+            offset: signal.offset,
+            min: signal.range.min,
+            max: signal.range.max,
+            unit: signal.unit || undefined
+          }))
+        };
+      });
+
+      const warningEntries: ValidationLogEntry[] = report.warnings.map((warning) => ({
+        level: 'warning',
+        code: warning.messageCode ?? warning.type,
+        message: warning.message,
+        context: `Line ${warning.line}`
+      }));
+
+      const errorEntries: ValidationLogEntry[] = report.errors.map((error) => ({
+        level: 'error',
+        code: error.messageCode ?? error.type,
+        message: error.message,
+        context: `Line ${error.line}`
+      }));
+
+      const infoEntries: ValidationLogEntry[] = [
+        {
+          level: 'info',
+          code: 'DBC_PARSE_RESULT',
+          message: report.isValid
+            ? 'DBC parsed successfully.'
+            : 'DBC parsed with validation errors.',
+          context: file.name
+        },
+        {
+          level: 'info',
+          code: 'DBC_MESSAGES_TOTAL',
+          message: `Messages: ${report.stats.messages.total} total, ${report.stats.messages.valid} valid, ${report.stats.messages.invalid} invalid.`,
+          context: file.name
+        },
+        {
+          level: 'info',
+          code: 'DBC_SIGNALS_TOTAL',
+          message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid} invalid.`,
+          context: file.name
+        }
+      ];
+
+      return {
+        summary: {
+          messages: report.stats.messages.total,
+          signals: report.stats.signals.total,
+          warnings: report.warnings.length,
+          errors: report.errors.length
+        },
+        logEntries: [...infoEntries, ...warningEntries, ...errorEntries],
+        messages
+      };
+    }
 
   private getCurrentTimestamp(): string {
     const now = new Date();

@@ -115,10 +115,12 @@
                 </table>
               </div>
             </section>
+
             <section class="module-card validated-card details-card">
               <div class="card-header-row">
                 <h3>Validation Report</h3>
               </div>
+
               <div class="details-body" *ngIf="selectedOriginalFile && selectedValidationPreview; else noSelectionState">
                 <div class="details-file-header">
                   <div class="details-file-meta">
@@ -135,6 +137,7 @@
                     </div>
                   </div>
                 </div>
+
                 <div class="details-summary-grid">
                   <div class="summary-box">
                     <span class="summary-label">Messages</span>
@@ -191,7 +194,15 @@
                   </div>
 
                   <div class="message-list">
-                    <div class="message-card" *ngFor="let message of selectedValidationPreview.messages">
+                    <div
+                      class="message-card"
+                      *ngFor="let message of selectedValidationPreview.messages"
+                      [ngClass]="{
+                        'message-card-ok': message.status === 'ok',
+                        'message-card-warning': message.status === 'warning',
+                        'message-card-error': message.status === 'error'
+                      }"
+                    >
                       <div class="message-card-header">
                         <div class="message-title-block">
                           <h5>{{ message.name }}</h5>
@@ -199,8 +210,13 @@
                         </div>
 
                         <div class="message-meta-block">
+                          <span class="message-status-badge" [ngClass]="'message-status-' + message.status">
+                            {{ message.status }}
+                          </span>
                           <span>DLC {{ message.dlc }}</span>
                           <span>{{ message.transmitter }}</span>
+                          <span *ngIf="message.warningCount > 0">Warnings {{ message.warningCount }}</span>
+                          <span *ngIf="message.errorCount > 0">Errors {{ message.errorCount }}</span>
                         </div>
                       </div>
 
