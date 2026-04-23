@@ -184,7 +184,7 @@
 
                 <section
                   class="details-section"
-                  *ngIf="selectedOriginalFile.status === 'validated' && selectedValidationPreview.messages.length > 0"
+                  *ngIf="selectedValidationPreview.messages.length > 0"
                 >
                   <div class="section-header">
                     <h4>Parsed Messages and Signals</h4>
@@ -242,20 +242,14 @@
 
                 <section
                   class="details-section details-note-block"
-                  *ngIf="selectedOriginalFile.status !== 'validated'"
+                  *ngIf="selectedValidationPreview.messages.length === 0"
                 >
                   <div class="section-header">
                     <h4>Signal Catalog</h4>
                   </div>
 
                   <div class="details-note">
-                    <p *ngIf="selectedOriginalFile.status === 'pending'">
-                      Signal details are not available yet because this file has not been validated.
-                    </p>
-
-                    <p *ngIf="selectedOriginalFile.status === 'rejected'">
-                      Signal extraction is not available because the file failed validation.
-                    </p>
+                    <p>No parsed messages or signals are available for the selected file.</p>
                   </div>
                 </section>
               </div>
