@@ -113,6 +113,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
   selectedFiles: File[] = [];
   isUploading = false;
+  isLoadingCatalog = false;
+  catalogLoadError: string | null = null;
 
   selectedOriginalFileName: string | null = null;
   selectedOriginalFile: OriginalDbcFile | null = null;
@@ -500,6 +502,9 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   async loadDbcFolderCatalog(): Promise<void> {
+    this.isLoadingCatalog = true;
+    this.catalogLoadError = null;
+
     try {
       const response = await this.getDbcFolderCatalog();
       const mappedFiles = response.files.map((file) =>
@@ -527,6 +532,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       }
     } catch (error) {
       console.error('Failed to load DBC folder catalog.', error);
+      this.catalogLoadError = 'Failed to load DBC catalog.';
       this.folderName = '';
       this.originalFiles = [];
       this.originalFilesDataSource.data = [];
@@ -534,6 +540,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       this.selectedOriginalFileName = null;
       this.selectedOriginalFile = null;
       this.selectedValidationPreview = null;
+    } finally {
+      this.isLoadingCatalog = false;
     }
   }
 
@@ -613,7 +621,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     console.log('API RESPONSE PREVIEW:', response?.slice(0, 100));
 
     return response;
-
   }
 
   private async refreshSelectedValidationPanel(

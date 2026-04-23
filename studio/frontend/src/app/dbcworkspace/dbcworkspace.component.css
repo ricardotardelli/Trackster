@@ -891,3 +891,27 @@
 .placeholder-body::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+.catalog-loading,
+.catalog-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 140px;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.catalog-loading {
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  background: #f8fbff;
+  color: #64748b;
+}
+
+.catalog-error {
+  border: 1px solid rgba(252, 165, 165, 0.9);
+  background: #fef2f2;
+  color: #991b1b;
+}

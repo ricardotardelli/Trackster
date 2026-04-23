@@ -93,7 +93,15 @@
                 </div>
               </div>
 
-              <div class="table-shell">
+              <div class="catalog-loading" *ngIf="isLoadingCatalog">
+                Loading DBC catalog...
+              </div>
+
+              <div class="catalog-error" *ngIf="catalogLoadError && !isLoadingCatalog">
+                {{ catalogLoadError }}
+              </div>
+
+              <div class="table-shell" *ngIf="!isLoadingCatalog && !catalogLoadError">
                 <table
                   mat-table
                   [dataSource]="originalFilesDataSource"
