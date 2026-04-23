@@ -1,0 +1,59 @@
+{
+  "isValid": false,
+
+  "data": [
+    {
+      "sourceLine": 10,
+      "hexId": "0x100",
+      "name": "VehicleSpeed",
+      "sizeBytes": 8,
+      "transmitter": "ECU1",
+      "signals": [
+        {
+          "sourceLine": 11,
+          "name": "Speed",
+          "startBit": 0,
+          "sizeBits": 16,
+          "endianness": "Little Endian",
+          "isSigned": false,
+          "factor": 0.1,
+          "offset": 0,
+          "range": {
+            "min": 0,
+            "max": 250
+          },
+          "unit": "km/h"
+        }
+      ]
+    }
+  ],
+
+  "warnings": [
+    {
+      "line": 11,
+      "type": "RANGE_WARNING",
+      "message": "Signal range may be too large"
+    }
+  ],
+
+  "errors": [
+    {
+      "line": 12,
+      "type": "OVERLAP_ERROR",
+      "message": "Signal overlaps with another"
+    }
+  ],
+
+  "stats": {
+    "messages": {
+      "total": 1,
+      "valid": 0,
+      "invalid": 1
+    },
+    "signals": {
+      "total": 1,
+      "valid": 0,
+      "invalid": 1
+    }
+  }
+}

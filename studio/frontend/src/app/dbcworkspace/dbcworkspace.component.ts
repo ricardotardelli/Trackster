@@ -13,19 +13,8 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { environment } from '../../environments/environment';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
-type ValidationLogLevel = 'info' | 'warning' | 'error';
+type ValidationLogLevel = 'info' | 'success' | 'warning' | 'error';
 type ValidationMessageStatus = 'ok' | 'warning' | 'error';
-
-interface ValidationMessagePreview {
-  id: string;
-  name: string;
-  dlc: number;
-  transmitter: string;
-  status: ValidationMessageStatus;
-  warningCount: number;
-  errorCount: number;
-  signals: ValidationSignalPreview[];
-}
 
 interface DbcFolderFile {
   name: string;
@@ -219,7 +208,9 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   onSelectFiles(files: File[]): void {
-    const dbcFiles = files.filter((file) => file.name.toLowerCase().endsWith('.dbc'));
+    const dbcFiles = files.filter((file) =>
+      file.name.toLowerCase().endsWith('.dbc')
+    );
 
     const uniqueFiles = dbcFiles.filter((newFile) => {
       return !this.selectedFiles.some(
@@ -318,6 +309,15 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
           this.isFileValidatable(file)
         ) {
           const content = await this.resolveDbcContent(file);
+
+          if (!content.trim()) {
+            return {
+              ...file,
+              status: 'rejected',
+              lastModified: this.getCurrentTimestamp()
+            };
+          }
+
           const report = DbcParser.parse(content);
 
           return {
@@ -335,7 +335,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   private async validateSelectedFilesApi(): Promise<void> {
-    throw new Error('Production validation via API is not implemented yet.');
+    await this.validateSelectedFilesLocally();
   }
 
   removeSelectedFiles(): void {
@@ -399,11 +399,15 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
   toggleAllPendingSelections(checked: boolean): void {
     if (checked) {
-      this.originalFiles.forEach((file) => this.checkedOriginalFileNames.add(file.name));
+      this.originalFiles.forEach((file) =>
+        this.checkedOriginalFileNames.add(file.name)
+      );
       return;
     }
 
-    this.originalFiles.forEach((file) => this.checkedOriginalFileNames.delete(file.name));
+    this.originalFiles.forEach((file) =>
+      this.checkedOriginalFileNames.delete(file.name)
+    );
   }
 
   areAllPendingSelected(): boolean {
@@ -498,7 +502,9 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   async loadDbcFolderCatalog(): Promise<void> {
     try {
       const response = await this.getDbcFolderCatalog();
-      const mappedFiles = response.files.map((file) => this.mapFolderFileToOriginalFile(file));
+      const mappedFiles = response.files.map((file) =>
+        this.mapFolderFileToOriginalFile(file)
+      );
 
       this.folderName = response.folderName;
       this.originalFiles = mappedFiles;
@@ -557,41 +563,36 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
-    try {
-      if (file.content != null) {
-        return file.content;
-      }
+    if (file.content != null) {
+      return file.content;
+    }
 
-      if (this.shouldUseLocalMock()) {
-        return await firstValueFrom(
-          this.http.get(`assets/mock/dbc/${file.name}`, {
-            responseType: 'text'
-          })
-        );
-      }
-
-      const config = await this.loadAppConfig();
-
-      if (!config.dbcApi?.contentUrl?.trim()) {
-        throw new Error('dbcApi.contentUrl missing or empty in config.json');
-      }
-
-      const headers = await this.getAuthorizationHeaders();
-
+    if (this.shouldUseLocalMock()) {
       return await firstValueFrom(
-        this.http.get(config.dbcApi.contentUrl.trim(), {
-          headers,
-          params: {
-            customerId: this.customerId,
-            fileName: file.name
-          },
+        this.http.get(`assets/mock/dbc/${file.name}`, {
           responseType: 'text'
         })
       );
-    } catch (error) {
-      console.error('Failed to load DBC content:', file.name, error);
-      return '';
     }
+
+    const config = await this.loadAppConfig();
+
+    if (!config.dbcApi?.contentUrl?.trim()) {
+      throw new Error('dbcApi.contentUrl missing or empty in config.json');
+    }
+
+    const headers = await this.getAuthorizationHeaders();
+
+    return await firstValueFrom(
+      this.http.get(config.dbcApi.contentUrl.trim(), {
+        headers,
+        params: {
+          customerId: this.customerId,
+          fileName: file.name
+        },
+        responseType: 'text'
+      })
+    );
   }
 
   private async refreshSelectedValidationPanel(
@@ -599,6 +600,11 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   ): Promise<void> {
     try {
       const content = await this.resolveDbcContent(file);
+
+      if (!content.trim()) {
+        throw new Error(`Empty DBC content for ${file.name}`);
+      }
+
       const report = DbcParser.parse(content);
 
       this.selectedValidationPreview = this.mapParserReportToPreview(report, file);
@@ -625,15 +631,17 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
   }
 
-    private mapParserReportToPreview(
-      report: DbcFullReport,
-      file: OriginalDbcFile
-    ): ValidationPreview {
-      const messages: ValidationMessagePreview[] = report.data.map((message, index) => {
+  private mapParserReportToPreview(
+    report: DbcFullReport,
+    file: OriginalDbcFile
+  ): ValidationPreview {
+    const messages: ValidationMessagePreview[] = report.data.map(
+      (message, index) => {
         const startLine =
           typeof message.sourceLine === 'number' ? message.sourceLine : null;
 
         const nextMessage = report.data[index + 1];
+
         const endLineExclusive =
           nextMessage && typeof nextMessage.sourceLine === 'number'
             ? nextMessage.sourceLine
@@ -688,56 +696,71 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
             unit: signal.unit || undefined
           }))
         };
-      });
+      }
+    );
 
-      const warningEntries: ValidationLogEntry[] = report.warnings.map((warning) => ({
-        level: 'warning',
-        code: warning.messageCode ?? warning.type,
-        message: warning.message,
-        context: `Line ${warning.line}`
+    const infoEntries: ValidationLogEntry[] = [
+      {
+        level: 'info',
+        code: 'DBC_PARSE_RESULT',
+        message: report.isValid
+          ? 'DBC parsed successfully.'
+          : 'DBC parsed with validation errors.',
+        context: file.name
+      },
+      {
+        level: 'info',
+        code: 'DBC_MESSAGES_TOTAL',
+        message: `Messages: ${report.stats.messages.total} total, ${report.stats.messages.valid} valid, ${report.stats.messages.invalid} invalid.`,
+        context: file.name
+      },
+      {
+        level: 'info',
+        code: 'DBC_SIGNALS_TOTAL',
+        message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid} invalid.`,
+        context: file.name
+      }
+    ];
+
+    const validMessageEntries: ValidationLogEntry[] = messages
+      .filter((message) => message.status === 'ok')
+      .map((message) => ({
+        level: 'success',
+        code: 'DBC_MESSAGE_VALID',
+        message: `${message.name} parsed successfully with ${message.signals.length} signal(s).`,
+        context: `${message.id} | DLC ${message.dlc} | ${message.transmitter}`
       }));
 
-      const errorEntries: ValidationLogEntry[] = report.errors.map((error) => ({
-        level: 'error',
-        code: error.messageCode ?? error.type,
-        message: error.message,
-        context: `Line ${error.line}`
-      }));
+    const warningEntries: ValidationLogEntry[] = report.warnings.map((warning) => ({
+      level: 'warning',
+      code: warning.messageCode ?? warning.type,
+      message: warning.message,
+      context: `Line ${warning.line}`
+    }));
 
-      const infoEntries: ValidationLogEntry[] = [
-        {
-          level: 'info',
-          code: 'DBC_PARSE_RESULT',
-          message: report.isValid
-            ? 'DBC parsed successfully.'
-            : 'DBC parsed with validation errors.',
-          context: file.name
-        },
-        {
-          level: 'info',
-          code: 'DBC_MESSAGES_TOTAL',
-          message: `Messages: ${report.stats.messages.total} total, ${report.stats.messages.valid} valid, ${report.stats.messages.invalid} invalid.`,
-          context: file.name
-        },
-        {
-          level: 'info',
-          code: 'DBC_SIGNALS_TOTAL',
-          message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid} invalid.`,
-          context: file.name
-        }
-      ];
+    const errorEntries: ValidationLogEntry[] = report.errors.map((error) => ({
+      level: 'error',
+      code: error.messageCode ?? error.type,
+      message: error.message,
+      context: `Line ${error.line}`
+    }));
 
-      return {
-        summary: {
-          messages: report.stats.messages.total,
-          signals: report.stats.signals.total,
-          warnings: report.warnings.length,
-          errors: report.errors.length
-        },
-        logEntries: [...infoEntries, ...warningEntries, ...errorEntries],
-        messages
-      };
-    }
+    return {
+      summary: {
+        messages: report.stats.messages.total,
+        signals: report.stats.signals.total,
+        warnings: report.warnings.length,
+        errors: report.errors.length
+      },
+      logEntries: [
+        ...infoEntries,
+        ...validMessageEntries,
+        ...warningEntries,
+        ...errorEntries
+      ],
+      messages
+    };
+  }
 
   private getCurrentTimestamp(): string {
     const now = new Date();
@@ -772,35 +795,38 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe((result?: { saved: boolean; content: string }) => {
-      if (!result?.saved) {
-        return;
-      }
-
-      this.originalFiles = this.originalFiles.map((currentFile) => {
-        if (currentFile.name !== file.name) {
-          return currentFile;
+    dialogRef.afterClosed().subscribe(
+      (result?: { saved: boolean; content: string }) => {
+        if (!result?.saved) {
+          return;
         }
 
-        return {
-          ...currentFile,
-          content: result.content,
-          status: 'pending',
-          lastModified: this.getCurrentTimestamp()
-        };
-      });
+        this.originalFiles = this.originalFiles.map((currentFile) => {
+          if (currentFile.name !== file.name) {
+            return currentFile;
+          }
 
-      this.originalFilesDataSource.data = this.originalFiles;
+          return {
+            ...currentFile,
+            content: result.content,
+            status: 'pending',
+            lastModified: this.getCurrentTimestamp()
+          };
+        });
 
-      const updatedSelected =
-        this.originalFiles.find((currentFile) => currentFile.name === file.name) ?? null;
+        this.originalFilesDataSource.data = this.originalFiles;
 
-      if (updatedSelected) {
-        void this.selectOriginalFile(updatedSelected);
+        const updatedSelected =
+          this.originalFiles.find((currentFile) => currentFile.name === file.name) ??
+          null;
+
+        if (updatedSelected) {
+          void this.selectOriginalFile(updatedSelected);
+        }
+
+        console.log('Updated DBC content:', result.content);
       }
-
-      console.log('Updated DBC content:', result.content);
-    });
+    );
   }
 
   private async getAuthorizationHeaders(): Promise<HttpHeaders> {
