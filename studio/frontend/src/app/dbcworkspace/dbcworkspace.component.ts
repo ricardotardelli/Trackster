@@ -586,14 +586,19 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
 
     const config = await this.loadAppConfig();
+    console.log('CONFIG LOADED:', {
+      contentUrl: config.dbcApi?.contentUrl
+    });
 
     if (!config.dbcApi?.contentUrl?.trim()) {
       throw new Error('dbcApi.contentUrl missing or empty in config.json');
     }
 
     const headers = await this.getAuthorizationHeaders();
+    console.log('USING API PATH');
+    console.log('AUTH HEADERS READY');
 
-    return await firstValueFrom(
+    const response = await firstValueFrom(
       this.http.get(config.dbcApi.contentUrl.trim(), {
         headers,
         params: {
@@ -603,6 +608,12 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         responseType: 'text'
       })
     );
+
+    console.log('API RESPONSE LENGTH:', response?.length);
+    console.log('API RESPONSE PREVIEW:', response?.slice(0, 100));
+
+    return response;
+
   }
 
   private async refreshSelectedValidationPanel(
