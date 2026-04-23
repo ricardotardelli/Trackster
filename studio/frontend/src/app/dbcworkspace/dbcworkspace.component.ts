@@ -778,7 +778,14 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   async openDbcEditor(file: OriginalDbcFile): Promise<void> {
-    const content = await this.resolveDbcContent(file);
+    let content = '';
+
+    try {
+      content = await this.resolveDbcContent(file);
+    } catch (error) {
+      console.error('Failed to load DBC content for editor:', file.name, error);
+      content = file.content ?? '';
+    }
 
     const dialogRef = this.dialog.open(DbcEditorComponent, {
       width: '1500px',
@@ -809,6 +816,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
           return {
             ...currentFile,
             content: result.content,
+            sizeBytes: new Blob([result.content]).size,
             status: 'pending',
             lastModified: this.getCurrentTimestamp()
           };
@@ -823,8 +831,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         if (updatedSelected) {
           void this.selectOriginalFile(updatedSelected);
         }
-
-        console.log('Updated DBC content:', result.content);
       }
     );
   }
