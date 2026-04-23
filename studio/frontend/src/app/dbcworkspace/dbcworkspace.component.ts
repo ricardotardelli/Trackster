@@ -27,19 +27,6 @@ interface DbcFolderResponse {
   files: DbcFolderFile[];
 }
 
-interface DbcFolderApiFile {
-  key: string;
-  fileName: string;
-  size: number;
-  lastModified: string | null;
-}
-
-interface DbcFolderApiResponse {
-  customerId: string;
-  path: string;
-  files: DbcFolderApiFile[];
-}
-
 interface OriginalDbcFile {
   name: string;
   sizeBytes: number;
@@ -98,11 +85,6 @@ interface AppConfig {
   dbcApi?: DbcApiConfig;
 }
 
-interface DbcContentResponse {
-  fileName: string;
-  content: string;
-}
-
 @Component({
   selector: 'app-dbcworkspace',
   standalone: true,
@@ -133,8 +115,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   selectedValidationPreview: ValidationPreview | null = null;
 
   folderName = '';
-
-  customerId = "00000000";
+  customerId = '00000000';
 
   readonly intakeDisplayedColumns: string[] = [
     'select',
@@ -326,10 +307,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
           return {
             ...file,
-            status:
-              report.errors.length === 0
-                ? 'validated'
-                : 'rejected',
+            status: report.errors.length === 0 ? 'validated' : 'rejected',
             lastModified: this.getCurrentTimestamp()
           };
         }
@@ -553,16 +531,14 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     const headers = await this.getAuthorizationHeaders();
 
-    const apiResponse = await firstValueFrom(
-      this.http.get<DbcFolderApiResponse>(config.dbcApi.folderCatalogUrl.trim(), {
+    return await firstValueFrom(
+      this.http.get<DbcFolderResponse>(config.dbcApi.folderCatalogUrl.trim(), {
         headers,
         params: {
           customerId: this.customerId
         }
       })
     );
-
-    return this.mapApiFolderResponse(apiResponse);
   }
 
   private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
@@ -587,19 +563,17 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
       const headers = await this.getAuthorizationHeaders();
 
-      const response = await firstValueFrom(
-        this.http.get<DbcContentResponse>(config.dbcApi.contentUrl.trim(), {
+      return await firstValueFrom(
+        this.http.get(config.dbcApi.contentUrl.trim(), {
           headers,
           params: {
-            customerId: '00000000',
+            customerId: this.customerId,
             fileName: file.name
-          }
+          },
+          responseType: 'text'
         })
       );
-
-      return response.content ?? '';
-    } 
-    catch (error) {
+    } catch (error) {
       console.error('Failed to load DBC content:', file.name, error);
       return '';
     }
@@ -786,17 +760,5 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     return new HttpHeaders({
       Authorization: `Bearer ${accessToken}`
     });
-  }
-
-  private mapApiFolderResponse(apiResponse: DbcFolderApiResponse): DbcFolderResponse {
-    return {
-      folderName: apiResponse.path,
-      files: apiResponse.files.map((file) => ({
-        name: file.fileName,
-        sizeBytes: file.size,
-        lastModified: file.lastModified ?? this.getCurrentTimestamp(),
-        status: 'pending' as OriginalDbcStatus
-      }))
-    };
   }
 }
