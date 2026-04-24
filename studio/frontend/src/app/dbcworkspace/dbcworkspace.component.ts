@@ -96,6 +96,12 @@ interface DbcApiConfig {
   contentUrl: string;
   uploadUrl: string;
   deleteUrl: string;
+  validateUrl: string;
+}
+
+interface DbcValidateResponse {
+  fileName: string;
+  status: OriginalDbcStatus;
 }
 
 interface AppConfig {
@@ -411,7 +417,90 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   private async validateSelectedFilesApi(): Promise<void> {
-    await this.validateSelectedFilesLocally();
+    const config = await this.loadAppConfig();
+
+    if (!config.dbcApi?.validateUrl?.trim()) {
+      throw new Error('dbcApi.validateUrl missing or empty in config.json');
+    }
+
+    const headers = (await this.getAuthorizationHeaders()).set(
+      'Content-Type',
+      'application/json'
+    );
+
+    const updatedFiles: OriginalDbcFile[] = await Promise.all(
+      this.originalFiles.map(async (file): Promise<OriginalDbcFile> => {
+        if (
+          !this.checkedOriginalFileNames.has(file.name) ||
+          !this.isFileValidatable(file)
+        ) {
+          return file;
+        }
+
+        const content = await this.resolveDbcContent(file);
+
+        if (!content.trim()) {
+          const parserReport = {
+            data: [],
+            errors: [
+              {
+                message: 'Empty DBC content.'
+              }
+            ]
+          };
+
+          const response = await firstValueFrom(
+            this.http.post<DbcValidateResponse>(
+              config.dbcApi!.validateUrl.trim(),
+              {
+                fileName: file.name,
+                parserReport
+              },
+              {
+                headers,
+                params: {
+                  customerId: this.customerId
+                }
+              }
+            )
+          );
+
+          return {
+            ...file,
+            status: response.status,
+            lastModified: this.getCurrentTimestamp()
+          };
+        }
+
+        const report = DbcParser.parse(content);
+
+        const response = await firstValueFrom(
+          this.http.post<DbcValidateResponse>(
+            config.dbcApi!.validateUrl.trim(),
+            {
+              fileName: file.name,
+              parserReport: report
+            },
+            {
+              headers,
+              params: {
+                customerId: this.customerId
+              }
+            }
+          )
+        );
+
+        return {
+          ...file,
+          status: response.status,
+          lastModified: this.getCurrentTimestamp()
+        };
+      })
+    );
+
+    this.originalFiles = updatedFiles;
+
+    await this.loadDbcFolderCatalog();
   }
 
   async removeSelectedFiles(): Promise<void> {

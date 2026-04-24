@@ -6,7 +6,8 @@
       "folderCatalogUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-folder",
       "contentUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-content",
       "uploadUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-upload",
-      "deleteUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-delete"
+      "deleteUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-delete",
+      "validateUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-validate"
    },
    "dbcFiles":  [
       "Bus_A",
