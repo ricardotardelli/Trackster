@@ -28,6 +28,12 @@ interface DbcFolderResponse {
   files: DbcFolderFile[];
 }
 
+interface DbcUploadResponse {
+  name: string;
+  sizeBytes: number;
+  status: OriginalDbcStatus;
+}
+
 interface OriginalDbcFile {
   name: string;
   sizeBytes: number;
@@ -83,6 +89,7 @@ interface ValidationPreview {
 interface DbcApiConfig {
   folderCatalogUrl: string;
   contentUrl: string;
+  uploadUrl: string;
 }
 
 interface AppConfig {
@@ -132,7 +139,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   ];
 
   originalFiles: OriginalDbcFile[] = [];
-
   originalFilesDataSource = new MatTableDataSource<OriginalDbcFile>([]);
   checkedOriginalFileNames = new Set<string>();
 
@@ -242,30 +248,92 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     this.isUploading = true;
 
     try {
-      const now = this.getCurrentTimestamp();
-
-      const uploadedEntries: OriginalDbcFile[] = await Promise.all(
-        this.selectedFiles.map(async (file) => ({
-          name: file.name,
-          sizeBytes: file.size,
-          lastModified: now,
-          status: 'rejected' as OriginalDbcStatus,
-          content: await file.text()
-        }))
-      );
-
-      this.originalFiles = [...uploadedEntries, ...this.originalFiles];
-      this.originalFilesDataSource.data = this.originalFiles;
-      this.selectedFiles = [];
-
-      const newSelected = uploadedEntries[0] ?? null;
-
-      if (newSelected) {
-        void this.selectOriginalFile(newSelected);
+      if (this.shouldUseLocalMock()) {
+        await this.uploadSelectedFilesLocally();
+      } else {
+        await this.uploadSelectedFilesApi();
       }
+
+      this.selectedFiles = [];
+      await this.loadDbcFolderCatalog();
     } finally {
       this.isUploading = false;
     }
+  }
+
+  private async uploadSelectedFilesLocally(): Promise<void> {
+    const now = this.getCurrentTimestamp();
+
+    const uploadedEntries: OriginalDbcFile[] = await Promise.all(
+      this.selectedFiles.map(async (file) => ({
+        name: file.name,
+        sizeBytes: file.size,
+        lastModified: now,
+        status: 'pending' as OriginalDbcStatus,
+        content: await file.text()
+      }))
+    );
+
+    const uploadedNames = new Set(uploadedEntries.map((file) => file.name));
+
+    this.originalFiles = [
+      ...uploadedEntries,
+      ...this.originalFiles.filter((file) => !uploadedNames.has(file.name))
+    ];
+
+    this.originalFilesDataSource.data = this.originalFiles;
+
+    const firstUploaded = uploadedEntries[0] ?? null;
+
+    if (firstUploaded) {
+      await this.selectOriginalFile(firstUploaded);
+    }
+  }
+
+  private async uploadSelectedFilesApi(): Promise<void> {
+    const config = await this.loadAppConfig();
+
+    if (!config.dbcApi?.uploadUrl?.trim()) {
+      throw new Error('dbcApi.uploadUrl missing or empty in config.json');
+    }
+
+    const headers = (await this.getAuthorizationHeaders()).set(
+      'Content-Type',
+      'application/json'
+    );
+
+    for (const file of this.selectedFiles) {
+      const contentBase64 = await this.fileToBase64(file);
+
+      await firstValueFrom(
+        this.http.post<DbcUploadResponse>(
+          config.dbcApi.uploadUrl.trim(),
+          {
+            fileName: file.name,
+            contentBase64
+          },
+          {
+            headers,
+            params: {
+              customerId: this.customerId
+            }
+          }
+        )
+      );
+    }
+  }
+
+  private async fileToBase64(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    let binary = '';
+
+    for (let index = 0; index < bytes.length; index += 1) {
+      binary += String.fromCharCode(bytes[index]);
+    }
+
+    return btoa(binary);
   }
 
   hasPendingSelection(): boolean {
@@ -482,14 +550,10 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     if (files.length > 0) {
       this.onSelectFiles(files);
-      await this.uploadFilesFake();
+      await this.uploadSelectedFiles();
     }
 
     input.value = '';
-  }
-
-  private async uploadFilesFake(): Promise<void> {
-    await this.uploadSelectedFiles();
   }
 
   private mapFolderFileToOriginalFile(file: DbcFolderFile): OriginalDbcFile {
@@ -571,21 +635,11 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   private async resolveDbcContent(file: OriginalDbcFile): Promise<string> {
-    console.log('RESOLVE START:', {
-      fileName: file.name,
-      hasLocalContent: file.content != null,
-      localContentLength: file.content?.length ?? 0
-    });
-
     if (file.content != null && file.content.trim().length > 0) {
-      console.log('USING LOCAL CONTENT (CACHE)', {
-        length: file.content.length
-      });
       return file.content;
     }
 
     if (this.shouldUseLocalMock()) {
-      console.log('USING LOCAL MOCK PATH');
       return await firstValueFrom(
         this.http.get(`assets/mock/dbc/${file.name}`, {
           responseType: 'text'
@@ -594,19 +648,14 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     }
 
     const config = await this.loadAppConfig();
-    console.log('CONFIG LOADED:', {
-      contentUrl: config.dbcApi?.contentUrl
-    });
 
     if (!config.dbcApi?.contentUrl?.trim()) {
       throw new Error('dbcApi.contentUrl missing or empty in config.json');
     }
 
     const headers = await this.getAuthorizationHeaders();
-    console.log('USING API PATH');
-    console.log('AUTH HEADERS READY');
 
-    const response = await firstValueFrom(
+    return await firstValueFrom(
       this.http.get(config.dbcApi.contentUrl.trim(), {
         headers,
         params: {
@@ -616,11 +665,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         responseType: 'text'
       })
     );
-
-    console.log('API RESPONSE LENGTH:', response?.length);
-    console.log('API RESPONSE PREVIEW:', response?.slice(0, 100));
-
-    return response;
   }
 
   private async refreshSelectedValidationPanel(
@@ -745,7 +789,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       {
         level: 'info',
         code: 'DBC_SIGNALS_TOTAL',
-        message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid} invalid.`,
+        message: `Signals: ${report.stats.signals.total} total, ${report.stats.signals.valid} valid, ${report.stats.signals.invalid}.`,
         context: file.name
       }
     ];
@@ -810,8 +854,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     try {
       content = await this.resolveDbcContent(file);
-    } 
-    catch (error) {
+    } catch (error) {
       console.error('Failed to load DBC content for editor:', file.name, error);
       content = file.content ?? '';
     }

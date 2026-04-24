@@ -4,7 +4,8 @@
    "engineURL":     "https://su90gxqchi.execute-api.us-east-1.amazonaws.com/Prod/generate",
    "dbcApi": {
       "folderCatalogUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-folder",
-      "contentUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-content"
+      "contentUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-content",
+      "uploadUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-upload"
    },
    "dbcFiles":  [
       "Bus_A",
