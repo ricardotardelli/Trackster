@@ -34,6 +34,11 @@ interface DbcUploadResponse {
   status: OriginalDbcStatus;
 }
 
+interface DbcDeleteResponse {
+  deleted: boolean;
+  fileName: string;
+}
+
 interface OriginalDbcFile {
   name: string;
   sizeBytes: number;
@@ -90,6 +95,7 @@ interface DbcApiConfig {
   folderCatalogUrl: string;
   contentUrl: string;
   uploadUrl: string;
+  deleteUrl: string;
 }
 
 interface AppConfig {
@@ -408,7 +414,17 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     await this.validateSelectedFilesLocally();
   }
 
-  removeSelectedFiles(): void {
+  async removeSelectedFiles(): Promise<void> {
+    if (this.checkedOriginalFileNames.size === 0) {
+      return;
+    }
+
+    if (!this.shouldUseLocalMock()) {
+      await this.deleteSelectedFilesApi();
+      await this.loadDbcFolderCatalog();
+      return;
+    }
+
     const remaining = this.originalFiles.filter(
       (file) => !this.checkedOriginalFileNames.has(file.name)
     );
@@ -431,6 +447,32 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         this.selectedValidationPreview = null;
       }
     }
+  }
+
+  private async deleteSelectedFilesApi(): Promise<void> {
+    const config = await this.loadAppConfig();
+
+    if (!config.dbcApi?.deleteUrl?.trim()) {
+      throw new Error('dbcApi.deleteUrl missing or empty in config.json');
+    }
+
+    const headers = await this.getAuthorizationHeaders();
+
+    const selectedNames = Array.from(this.checkedOriginalFileNames);
+
+    for (const fileName of selectedNames) {
+      await firstValueFrom(
+        this.http.delete<DbcDeleteResponse>(config.dbcApi.deleteUrl.trim(), {
+          headers,
+          params: {
+            customerId: this.customerId,
+            fileName
+          }
+        })
+      );
+    }
+
+    this.checkedOriginalFileNames.clear();
   }
 
   async selectOriginalFile(file: OriginalDbcFile): Promise<void> {
