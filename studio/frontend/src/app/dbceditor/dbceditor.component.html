@@ -120,4 +120,33 @@
       Save
     </button>
   </div>
+
+  <ng-template #confirmSaveDialog>
+    <app-dialogshell
+      title="Confirm save"
+      subtitle="This file has changes"
+      [showFooter]="true"
+      (closeClicked)="confirmDialogRef?.close(false)">
+
+      <div style="padding: 6px 2px 2px; color: #334155; font-size: 14px;">
+        Do you want to save the changes before closing the editor?
+      </div>
+
+      <div dialog-actions>
+        <button
+          type="button"
+          class="trackster-button trackster-button--secondary"
+          (click)="confirmDialogRef?.close(false)">
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          class="trackster-button trackster-button--primary"
+          (click)="confirmDialogRef?.close(true)">
+          Save
+        </button>
+      </div>
+    </app-dialogshell>
+  </ng-template>
 </app-dialogshell>

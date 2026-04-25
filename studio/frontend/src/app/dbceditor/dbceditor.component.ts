@@ -3,7 +3,6 @@ import { registerDbcLanguage } from './dbc-monaco-language';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, Inject, NgZone } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import {
   DefaultMonacoLoader,
   NGX_MONACO_LOADER_PROVIDER,
@@ -17,6 +16,8 @@ import { DbcParser, type DbcFullReport } from './dbcparser';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { firstValueFrom } from 'rxjs';
+import { ViewChild, TemplateRef } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 
 const monacoLoader = new DefaultMonacoLoader({
   paths: {
@@ -112,6 +113,10 @@ export class DbcEditorComponent {
     }
   };
 
+  @ViewChild('confirmSaveDialog') confirmSaveDialog!: TemplateRef<any>;
+  confirmDialogRef: any;
+
+
   private editorInstance: monaco.editor.IStandaloneCodeEditor | null = null;
 
   constructor(
@@ -127,7 +132,8 @@ export class DbcEditorComponent {
     private readonly dialogRef: MatDialogRef<DbcEditorComponent>,
     private readonly ngZone: NgZone,
     private readonly cdr: ChangeDetectorRef,
-    private readonly http: HttpClient
+    private readonly http: HttpClient,
+    private readonly dialog: MatDialog
   ) {
     this.dbcText = data.content ?? this.dbcText;
     this.originalText = this.dbcText;
@@ -278,6 +284,19 @@ export class DbcEditorComponent {
 
   async save(): Promise<void> {
     const content = this.editorInstance?.getModel()?.getValue() ?? this.dbcText;
+
+    const hasChanges = content !== this.originalText;
+    if (!hasChanges) {
+      this.dialogRef.close({
+        saved: false
+      });
+      return;
+    }
+          
+    const confirmed = await this.confirmSaveChanges();
+    if (!confirmed) {
+      return;
+    }
 
     if (this.data.storageMode === 'local') {
       this.dialogRef.close({
@@ -549,6 +568,19 @@ export class DbcEditorComponent {
     return new HttpHeaders({
       Authorization: `Bearer ${accessToken}`
     });
+  }
+
+  private async confirmSaveChanges(): Promise<boolean> {
+    this.confirmDialogRef = this.dialog.open(this.confirmSaveDialog, {
+      width: '420px',
+      maxWidth: 'calc(100vw - 32px)',
+      disableClose: true,
+      autoFocus: false,
+      restoreFocus: false,
+      panelClass: 'trackster-confirm-dialog-panel'
+    });
+
+    return await firstValueFrom(this.confirmDialogRef.afterClosed());
   }
 
 }

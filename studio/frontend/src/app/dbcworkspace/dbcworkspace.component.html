@@ -180,11 +180,11 @@
               <div class="card-header-row">
                 <h3>Validation Report</h3>
               </div>
+              <div class="catalog-loading" *ngIf="isLoadingValidationPreview">
+                Loading validation report...
+              </div>
 
-              <div
-                class="details-body"
-                *ngIf="selectedOriginalFile && selectedValidationPreview; else noSelectionState"
-              >
+              <div class="details-body" *ngIf="!isLoadingValidationPreview && selectedOriginalFile && selectedValidationPreview; else noSelectionState" >
                 <div class="details-file-header">
                   <div class="details-file-meta">
                     <div class="details-file-title-row">

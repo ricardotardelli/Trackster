@@ -138,6 +138,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   selectedOriginalFileName: string | null = null;
   selectedOriginalFile: OriginalDbcFile | null = null;
   selectedValidationPreview: ValidationPreview | null = null;
+  isLoadingValidationPreview = false;
 
   folderName = '';
   customerId = '00000000';
@@ -567,7 +568,14 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   async selectOriginalFile(file: OriginalDbcFile): Promise<void> {
     this.selectedOriginalFileName = file.name;
     this.selectedOriginalFile = file;
-    await this.refreshSelectedValidationPanel(file);
+    this.selectedValidationPreview = null;
+    this.isLoadingValidationPreview = true;
+
+    try {
+      await this.refreshSelectedValidationPanel(file);
+    } finally {
+      this.isLoadingValidationPreview = false;
+    }
   }
 
   isOriginalSelected(file: OriginalDbcFile): boolean {

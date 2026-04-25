@@ -111,3 +111,29 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 .trackster-button--secondary:hover {
   background: #f1f5f9;
 }
+
+.cdk-overlay-pane.trackster-confirm-dialog-panel {
+  border-radius: 28px !important;
+  overflow: hidden !important;
+}
+
+.cdk-overlay-pane.trackster-confirm-dialog-panel .mat-mdc-dialog-container {
+  padding: 0 !important;
+  border-radius: 28px !important;
+  overflow: hidden !important;
+}
+
+.cdk-overlay-pane.trackster-confirm-dialog-panel .mat-mdc-dialog-surface {
+  padding: 0 !important;
+  border-radius: 28px !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.cdk-overlay-pane.trackster-confirm-dialog-panel .mdc-dialog__surface {
+  border-radius: 28px !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
