@@ -6,7 +6,9 @@
 
         <p>
           <strong>State:</strong>
-          <span class="status-value status-ok">Ready to simulation</span>
+          <span class="status-value" [ngClass]="getValidatedCount() > 0 ? 'status-ok' : 'status-error'" >
+            {{ getValidatedCount() > 0 ? 'Ready to simulation' : 'Validate at least 1 DBC' }}
+          </span>
         </p>
 
         <p>
@@ -366,7 +368,7 @@
     (closeClicked)="confirmDeleteDialogRef?.close(false)">
 
     <div style="padding: 6px 2px 2px; color: #334155; font-size: 14px;">
-      Are you sure you want to remove the selected DBC file(s)?
+      Are you sure you want to remove {{ checkedOriginalFileNames.size }} DBC file(s)?
     </div>
 
     <div dialog-actions>

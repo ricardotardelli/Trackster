@@ -108,8 +108,16 @@
   font-weight: 700;
 }
 
+.status-value.status-error {
+  color: #dc2626; 
+}
+
 .status-ok {
   color: #15803d;
+}
+
+.status-value.status-ok {
+  color: #16a34a; 
 }
 
 /* CARD GRID */
