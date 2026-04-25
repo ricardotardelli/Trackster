@@ -14,6 +14,9 @@ import * as monaco from 'monaco-editor';
 import { DialogShellComponent } from '../dialogshell/dialogshell.component';
 import { DbcFindComponent } from './dbcfind.component';
 import { DbcParser, type DbcFullReport } from './dbcparser';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { firstValueFrom } from 'rxjs';
 
 const monacoLoader = new DefaultMonacoLoader({
   paths: {
@@ -22,6 +25,14 @@ const monacoLoader = new DefaultMonacoLoader({
 });
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
+
+interface DbcApiConfig {
+  uploadUrl: string;
+}
+
+interface AppConfig {
+  dbcApi?: DbcApiConfig;
+}
 
 interface OriginalDbcFile {
   name: string;
@@ -111,10 +122,12 @@ export class DbcEditorComponent {
       subtitle: string;
       content?: string;
       storageMode: 'local' | 'api';
+      customerId?: string;
     },
     private readonly dialogRef: MatDialogRef<DbcEditorComponent>,
     private readonly ngZone: NgZone,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly http: HttpClient
   ) {
     this.dbcText = data.content ?? this.dbcText;
     this.originalText = this.dbcText;
@@ -263,18 +276,48 @@ export class DbcEditorComponent {
     this.editorInstance?.focus();
   }
 
-  save(): void {
+  async save(): Promise<void> {
     const content = this.editorInstance?.getModel()?.getValue() ?? this.dbcText;
+
     if (this.data.storageMode === 'local') {
-      // save local mock
       this.dialogRef.close({
         saved: true,
         content
       });
-    } 
-    else {
-      // save api
+      return;
     }
+
+    const config = await this.loadAppConfig();
+
+    if (!config.dbcApi?.uploadUrl?.trim()) {
+      throw new Error('dbcApi.uploadUrl missing or empty in config.json');
+    }
+
+    const headers = (await this.getAuthorizationHeaders()).set(
+      'Content-Type',
+      'application/json'
+    );
+
+    await firstValueFrom(
+      this.http.post(
+        config.dbcApi!.uploadUrl.trim(),
+        {
+          fileName: this.data.file.name,
+          contentBase64: this.textToBase64(content)
+        },
+        {
+          headers,
+          params: {
+            customerId: this.data.customerId ?? '00000000'
+          }
+        }
+      )
+    );
+
+    this.dialogRef.close({
+      saved: true,
+      content
+    });
   }
 
   cancel(): void {
@@ -467,5 +510,45 @@ export class DbcEditorComponent {
     this.issuesDropdownVisible = false;
   }
 
+  private appConfig: AppConfig | null = null;
+
+  private textToBase64(value: string): string {
+    const bytes = new TextEncoder().encode(value);
+    let binary = '';
+
+    for (let index = 0; index < bytes.length; index += 1) {
+      binary += String.fromCharCode(bytes[index]);
+    }
+
+    return btoa(binary);
+  }
+
+  private async loadAppConfig(): Promise<AppConfig> {
+    if (this.appConfig) {
+      return this.appConfig;
+    }
+
+    const response = await fetch('/assets/config.json', { cache: 'no-store' });
+
+    if (!response.ok) {
+      throw new Error('Unable to load assets/config.json');
+    }
+
+    this.appConfig = await response.json() as AppConfig;
+    return this.appConfig;
+  }
+
+  private async getAuthorizationHeaders(): Promise<HttpHeaders> {
+    const session = await fetchAuthSession();
+    const accessToken = session.tokens?.accessToken?.toString();
+
+    if (!accessToken) {
+      throw new Error('Missing access token for authenticated API call.');
+    }
+
+    return new HttpHeaders({
+      Authorization: `Bearer ${accessToken}`
+    });
+  }
 
 }

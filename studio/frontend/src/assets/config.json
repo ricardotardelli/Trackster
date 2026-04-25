@@ -7,7 +7,8 @@
       "contentUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-content",
       "uploadUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-upload",
       "deleteUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-delete",
-      "validateUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-validate"
+      "validateUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-validate",
+      "saveUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-save"
    },
    "dbcFiles":  [
       "Bus_A",

@@ -1001,7 +1001,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
         title: 'DBC Editor',
         subtitle: file.name,
         content,
-        storageMode: this.shouldUseLocalMock() ? 'local' : 'api'
+        storageMode: this.shouldUseLocalMock() ? 'local' : 'api',
+        customerId: this.customerId
       }
     });
 
