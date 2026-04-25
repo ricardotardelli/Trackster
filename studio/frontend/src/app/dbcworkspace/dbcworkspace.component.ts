@@ -11,6 +11,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { environment } from '../../environments/environment';
+import { TemplateRef } from '@angular/core';
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
 type ValidationLogLevel = 'info' | 'success' | 'warning' | 'error';
@@ -129,6 +130,12 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     private readonly dialog: MatDialog,
     private readonly http: HttpClient
   ) {}
+
+  @ViewChild('confirmDeleteDialog') confirmDeleteDialog!: TemplateRef<any>;
+  confirmDeleteDialogRef: any;
+
+  @ViewChild('confirmValidateDialog') confirmValidateDialog!: TemplateRef<any>;
+  confirmValidateDialogRef: any;
 
   selectedFiles: File[] = [];
   isUploading = false;
@@ -352,13 +359,18 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   hasPendingSelection(): boolean {
     return this.originalFiles.some(
       (file) =>
-        (file.status === 'pending' || file.status === 'rejected') &&
+        file.status === 'pending' &&
         this.checkedOriginalFileNames.has(file.name)
     );
   }
 
   async validateSelectedFiles(): Promise<void> {
     if (!this.hasPendingSelection()) {
+      return;
+    }
+
+    const confirmed = await this.confirmValidate();
+    if (!confirmed) {
       return;
     }
 
@@ -509,6 +521,11 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       return;
     }
 
+    const confirmed = await this.confirmDelete();
+    if (!confirmed) {
+      return;
+    }
+
     if (!this.shouldUseLocalMock()) {
       await this.deleteSelectedFilesApi();
       await this.loadDbcFolderCatalog();
@@ -583,7 +600,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   isFileValidatable(file: OriginalDbcFile): boolean {
-    return file.status === 'pending' || file.status === 'rejected';
+    return file.status === 'pending';
   }
 
   isFileSelectable(file: OriginalDbcFile): boolean {
@@ -1058,5 +1075,31 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     return new HttpHeaders({
       Authorization: `Bearer ${accessToken}`
     });
+  }
+
+  private async confirmDelete(): Promise<boolean> {
+    this.confirmDeleteDialogRef = this.dialog.open(this.confirmDeleteDialog, {
+      width: '420px',
+      maxWidth: 'calc(100vw - 32px)',
+      disableClose: true,
+      autoFocus: false,
+      restoreFocus: false,
+      panelClass: 'trackster-confirm-dialog-panel'
+    });
+
+    return await firstValueFrom(this.confirmDeleteDialogRef.afterClosed());
+  }
+
+  private async confirmValidate(): Promise<boolean> {
+    this.confirmValidateDialogRef = this.dialog.open(this.confirmValidateDialog, {
+      width: '420px',
+      maxWidth: 'calc(100vw - 32px)',
+      disableClose: true,
+      autoFocus: false,
+      restoreFocus: false,
+      panelClass: 'trackster-confirm-dialog-panel'
+    });
+
+    return await firstValueFrom(this.confirmValidateDialogRef.afterClosed());
   }
 }

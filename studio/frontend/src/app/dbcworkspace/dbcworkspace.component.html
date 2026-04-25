@@ -380,3 +380,59 @@
     </div>
   </div>
 </div>
+<ng-template #confirmDeleteDialog>
+  <app-dialogshell
+    title="Confirm removal"
+    subtitle="This action cannot be undone"
+    [showFooter]="true"
+    (closeClicked)="confirmDeleteDialogRef?.close(false)">
+
+    <div style="padding: 6px 2px 2px; color: #334155; font-size: 14px;">
+      Are you sure you want to remove the selected DBC file(s)?
+    </div>
+
+    <div dialog-actions>
+      <button
+        type="button"
+        class="trackster-button trackster-button--secondary"
+        (click)="confirmDeleteDialogRef?.close(false)">
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-button trackster-button--primary"
+        (click)="confirmDeleteDialogRef?.close(true)">
+        Remove
+      </button>
+    </div>
+  </app-dialogshell>
+</ng-template>
+<ng-template #confirmValidateDialog>
+  <app-dialogshell
+    title="Confirm validation"
+    subtitle="Selected DBC files will be validated"
+    [showFooter]="true"
+    (closeClicked)="confirmValidateDialogRef?.close(false)">
+
+    <div style="padding: 6px 2px 2px; color: #334155; font-size: 14px;">
+      Are you sure you want to validate {{ checkedOriginalFileNames.size }} selected DBC file(s)?
+    </div>
+
+    <div dialog-actions>
+      <button
+        type="button"
+        class="trackster-button trackster-button--secondary"
+        (click)="confirmValidateDialogRef?.close(false)">
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-button trackster-button--primary"
+        (click)="confirmValidateDialogRef?.close(true)">
+        Validate
+      </button>
+    </div>
+  </app-dialogshell>
+</ng-template>
