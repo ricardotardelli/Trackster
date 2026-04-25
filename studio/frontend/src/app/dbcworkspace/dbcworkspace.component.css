@@ -230,7 +230,7 @@
   min-height: 0;
   height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   border-radius: 10px;
   scrollbar-width: thin;
 }
