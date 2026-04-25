@@ -60,36 +60,14 @@
                 <h3>Intake</h3>
 
                 <div class="card-header-actions">
-                  <button type="button" class="intake-button primary" (click)="fileInput.click()">
-                    Upload
-                  </button>
+                  <button type="button" class="intake-button primary" [disabled]="!selectedOriginalFile" (click)="openDbcEditor(selectedOriginalFile!)"> Edit </button>
 
-                  <input
-                    #fileInput
-                    type="file"
-                    accept=".dbc"
-                    multiple
-                    hidden
-                    (change)="onNativeFilesSelected($event)"
-                  />
+                  <button type="button" class="intake-button primary" (click)="fileInput.click()"> Upload </button>
 
-                  <button
-                    type="button"
-                    class="intake-button primary"
-                    [disabled]="!hasPendingSelection()"
-                    (click)="validateSelectedFiles()"
-                  >
-                    Validate Selected
-                  </button>
+                  <input #fileInput type="file" accept=".dbc" multiple hidden (change)="onNativeFilesSelected($event)" />
+                  <button type="button" class="intake-button primary" [disabled]="!hasPendingSelection()" (click)="validateSelectedFiles()" > Validate Selected </button>
 
-                  <button
-                    type="button"
-                    class="intake-button danger"
-                    [disabled]="!hasAnySelection()"
-                    (click)="removeSelectedFiles()"
-                  >
-                    Remove Selected
-                  </button>
+                  <button type="button" class="intake-button danger" [disabled]="!hasAnySelection()" (click)="removeSelectedFiles()" > Remove Selected</button>
                 </div>
               </div>
 
