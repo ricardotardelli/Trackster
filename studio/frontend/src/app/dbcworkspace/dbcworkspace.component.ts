@@ -162,6 +162,11 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   originalFilesDataSource = new MatTableDataSource<OriginalDbcFile>([]);
   checkedOriginalFileNames = new Set<string>();
 
+  globalValidationSummary = {
+    messages: 0,
+    signals: 0
+  };
+
   private appConfig: AppConfig | null = null;
 
   private async loadAppConfig(): Promise<AppConfig> {
@@ -384,6 +389,8 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     this.checkedOriginalFileNames.clear();
     this.originalFilesDataSource.data = this.originalFiles;
+
+    await this.refreshGlobalValidationSummary();
 
     if (selectedNameBeforeUpdate) {
       const updatedSelected = this.originalFiles.find(
@@ -743,6 +750,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       this.originalFiles = mappedFiles;
       this.originalFilesDataSource.data = mappedFiles;
       this.checkedOriginalFileNames.clear();
+      await this.refreshGlobalValidationSummary();
 
       const selectedByName =
         (this.selectedOriginalFileName &&
@@ -1109,5 +1117,37 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     });
 
     return await firstValueFrom(this.confirmValidateDialogRef.afterClosed());
+  }
+
+  private async refreshGlobalValidationSummary(): Promise<void> {
+    const validatedFiles = this.originalFiles.filter(
+      (file) => file.status === 'validated'
+    );
+
+    if (validatedFiles.length === 0) {
+      this.globalValidationSummary = {
+        messages: 0,
+        signals: 0
+      };
+      return;
+    }
+
+    const reports = await Promise.all(
+      validatedFiles.map(async (file) => {
+        const content = await this.resolveDbcContent(file);
+        return DbcParser.parse(content);
+      })
+    );
+
+    this.globalValidationSummary = {
+      messages: reports.reduce(
+        (total, report) => total + report.stats.messages.total,
+        0
+      ),
+      signals: reports.reduce(
+        (total, report) => total + report.stats.signals.total,
+        0
+      )
+    };
   }
 }
