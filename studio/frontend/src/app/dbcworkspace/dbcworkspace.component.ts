@@ -750,7 +750,7 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       this.originalFiles = mappedFiles;
       this.originalFilesDataSource.data = mappedFiles;
       this.checkedOriginalFileNames.clear();
-      await this.refreshGlobalValidationSummary();
+      void this.refreshGlobalValidationSummary();
 
       const selectedByName =
         (this.selectedOriginalFileName &&
@@ -1120,34 +1120,45 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   }
 
   private async refreshGlobalValidationSummary(): Promise<void> {
-    const validatedFiles = this.originalFiles.filter(
-      (file) => file.status === 'validated'
-    );
+    try {
+      const validatedFiles = this.originalFiles.filter(
+        (file) => file.status === 'validated'
+      );
 
-    if (validatedFiles.length === 0) {
+      if (validatedFiles.length === 0) {
+        this.globalValidationSummary = {
+          messages: 0,
+          signals: 0
+        };
+        return;
+      }
+
+      let messages = 0;
+      let signals = 0;
+
+      for (const file of validatedFiles) {
+        try {
+          const content = await this.resolveDbcContent(file);
+          const report = DbcParser.parse(content);
+
+          messages += report.stats.messages.total;
+          signals += report.stats.signals.total;
+        } catch (error) {
+          console.error('Failed to include DBC in global summary:', file.name, error);
+        }
+      }
+
+      this.globalValidationSummary = {
+        messages,
+        signals
+      };
+    } catch (error) {
+      console.error('Failed to refresh global validation summary.', error);
+
       this.globalValidationSummary = {
         messages: 0,
         signals: 0
       };
-      return;
     }
-
-    const reports = await Promise.all(
-      validatedFiles.map(async (file) => {
-        const content = await this.resolveDbcContent(file);
-        return DbcParser.parse(content);
-      })
-    );
-
-    this.globalValidationSummary = {
-      messages: reports.reduce(
-        (total, report) => total + report.stats.messages.total,
-        0
-      ),
-      signals: reports.reduce(
-        (total, report) => total + report.stats.signals.total,
-        0
-      )
-    };
   }
 }
