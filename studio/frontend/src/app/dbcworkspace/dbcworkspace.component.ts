@@ -162,11 +162,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
   originalFilesDataSource = new MatTableDataSource<OriginalDbcFile>([]);
   checkedOriginalFileNames = new Set<string>();
 
-  globalValidationSummary = {
-    messages: 0,
-    signals: 0
-  };
-
   private appConfig: AppConfig | null = null;
 
   private async loadAppConfig(): Promise<AppConfig> {
@@ -389,8 +384,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
 
     this.checkedOriginalFileNames.clear();
     this.originalFilesDataSource.data = this.originalFiles;
-
-    await this.refreshGlobalValidationSummary();
 
     if (selectedNameBeforeUpdate) {
       const updatedSelected = this.originalFiles.find(
@@ -750,7 +743,6 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
       this.originalFiles = mappedFiles;
       this.originalFilesDataSource.data = mappedFiles;
       this.checkedOriginalFileNames.clear();
-      void this.refreshGlobalValidationSummary();
 
       const selectedByName =
         (this.selectedOriginalFileName &&
@@ -1117,48 +1109,5 @@ export class DbcworkspaceComponent implements OnInit, AfterViewInit {
     });
 
     return await firstValueFrom(this.confirmValidateDialogRef.afterClosed());
-  }
-
-  private async refreshGlobalValidationSummary(): Promise<void> {
-    try {
-      const validatedFiles = this.originalFiles.filter(
-        (file) => file.status === 'validated'
-      );
-
-      if (validatedFiles.length === 0) {
-        this.globalValidationSummary = {
-          messages: 0,
-          signals: 0
-        };
-        return;
-      }
-
-      let messages = 0;
-      let signals = 0;
-
-      for (const file of validatedFiles) {
-        try {
-          const content = await this.resolveDbcContent(file);
-          const report = DbcParser.parse(content);
-
-          messages += report.stats.messages.total;
-          signals += report.stats.signals.total;
-        } catch (error) {
-          console.error('Failed to include DBC in global summary:', file.name, error);
-        }
-      }
-
-      this.globalValidationSummary = {
-        messages,
-        signals
-      };
-    } catch (error) {
-      console.error('Failed to refresh global validation summary.', error);
-
-      this.globalValidationSummary = {
-        messages: 0,
-        signals: 0
-      };
-    }
   }
 }
