@@ -774,27 +774,38 @@ export class SimulatorComponent implements OnInit {
       throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
     }
 
-    const validatedDbcFiles = await this.loadValidatedDbcFiles(
-      config.dbcApi.folderCatalogUrl.trim()
-    );
-
     this.suppressFormReset = true;
 
     this.gpsAreas = [...config.gpsAreas];
     this.canFrameOptions = [...config.canFrames];
-    this.dbcOptions = [...validatedDbcFiles];
 
     this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
-    this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
     this.form.controls.workQueueUrl.setValue(config.workQueueUrl.trim(), { emitEvent: false });
     this.form.controls.s3Bucket.setValue(config.s3Default.trim(), { emitEvent: false });
     this.form.controls.engineUrl.setValue(config.engineURL.trim(), { emitEvent: false });
 
     this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
-    this.form.controls.dbcFiles.updateValueAndValidity({ emitEvent: false });
     this.form.controls.workQueueUrl.updateValueAndValidity({ emitEvent: false });
     this.form.controls.s3Bucket.updateValueAndValidity({ emitEvent: false });
     this.form.controls.engineUrl.updateValueAndValidity({ emitEvent: false });
+
+    this.isConfigLoaded = true;
+
+    try {
+      const validatedDbcFiles = await this.loadValidatedDbcFiles(
+        config.dbcApi.folderCatalogUrl.trim()
+      );
+
+      this.dbcOptions = [...validatedDbcFiles];
+      this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
+    } catch (error) {
+      console.error('Unable to load validated DBC files:', error);
+
+      this.dbcOptions = [];
+      this.form.controls.dbcFiles.setValue([], { emitEvent: false });
+    }
+
+    this.form.controls.dbcFiles.updateValueAndValidity({ emitEvent: false });
     this.form.updateValueAndValidity({ emitEvent: false });
 
     this.suppressFormReset = false;
