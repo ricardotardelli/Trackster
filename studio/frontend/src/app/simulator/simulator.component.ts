@@ -34,6 +34,13 @@ interface RoutePayload {
   destination: RoutePoint | null;
 }
 
+interface CanFrameOption {
+  dbcFile: string;
+  canId: string;
+  messageName: string;
+  label: string;
+}
+
 type DistanceUnit = 'Km' | 'Mi';
 
 type OutputFormatValue = 'BIN' | 'JSON' | 'CSV';
@@ -178,6 +185,7 @@ export class SimulatorComponent implements OnInit {
 
   private suppressFormReset = false;
   private formValueChangesBound = false;
+  private canFrameCatalog: CanFrameOption[] = [];
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -471,6 +479,8 @@ export class SimulatorComponent implements OnInit {
 
     this.form.controls.dbcFiles.setValue(next);
     this.form.controls.dbcFiles.markAsTouched();
+
+    this.updateCanFrameOptionsFromSelectedDbcs();
     this.updatePayloadPreview();
   }
 
@@ -677,7 +687,6 @@ export class SimulatorComponent implements OnInit {
 
     try {
       await this.loadConfig();
-      this.isConfigLoaded = true;
       this.updatePayloadPreview();
     } catch (error: unknown) {
       this.formStatus = 'error';
@@ -752,10 +761,6 @@ export class SimulatorComponent implements OnInit {
       throw new Error('gpsAreas missing or empty in config.json');
     }
 
-    if (!Array.isArray(config.canFrames) || config.canFrames.length === 0) {
-      throw new Error('canFrames missing or empty in config.json');
-    }
-
     if (typeof config.workQueueUrl !== 'string' || !config.workQueueUrl.trim()) {
       throw new Error('workQueueUrl missing or empty in config.json');
     }
@@ -775,17 +780,21 @@ export class SimulatorComponent implements OnInit {
       throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
     }
 
+    if (
+      typeof config.dbcApi?.getDbcCanIds !== 'string' ||
+      !config.dbcApi.getDbcCanIds.trim()
+    ) {
+      throw new Error('dbcApi.getDbcCanIds missing or empty in config.json');
+    }
+
     this.suppressFormReset = true;
 
     this.gpsAreas = [...config.gpsAreas];
-    this.canFrameOptions = [...config.canFrames];
 
-    this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
     this.form.controls.workQueueUrl.setValue(config.workQueueUrl.trim(), { emitEvent: false });
     this.form.controls.s3Bucket.setValue(config.s3Default.trim(), { emitEvent: false });
     this.form.controls.engineUrl.setValue(config.engineURL.trim(), { emitEvent: false });
 
-    this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
     this.form.controls.workQueueUrl.updateValueAndValidity({ emitEvent: false });
     this.form.controls.s3Bucket.updateValueAndValidity({ emitEvent: false });
     this.form.controls.engineUrl.updateValueAndValidity({ emitEvent: false });
@@ -799,15 +808,27 @@ export class SimulatorComponent implements OnInit {
 
       this.dbcOptions = [...validatedDbcFiles];
       this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
-    } 
-    catch (error) {
+    } catch (error) {
       console.error('Unable to load validated DBC files:', error);
 
       this.dbcOptions = [];
       this.form.controls.dbcFiles.setValue([], { emitEvent: false });
     }
 
+    try {
+      this.canFrameCatalog = await this.loadCanFrameCatalog(
+        config.dbcApi.getDbcCanIds.trim()
+      );
+    } catch (error) {
+      console.error('Unable to load CAN frame catalog:', error);
+
+      this.canFrameCatalog = [];
+    }
+
+    this.updateCanFrameOptionsFromSelectedDbcs();
+
     this.form.controls.dbcFiles.updateValueAndValidity({ emitEvent: false });
+    this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
     this.form.updateValueAndValidity({ emitEvent: false });
 
     this.suppressFormReset = false;
@@ -819,9 +840,9 @@ export class SimulatorComponent implements OnInit {
     workQueueUrl?: string;
     s3Default?: string;
     engineURL?: string;
-    customerId?: string;
     dbcApi?: {
       folderCatalogUrl?: string;
+      getDbcCanIds?: string;
     };
   }> {
     const stamp = Date.now();
@@ -850,9 +871,9 @@ export class SimulatorComponent implements OnInit {
           workQueueUrl?: string;
           s3Default?: string;
           engineURL?: string;
-          customerId?: string;
           dbcApi?: {
             folderCatalogUrl?: string;
+            getDbcCanIds?: string;
           };
         };
       } catch {
@@ -864,7 +885,7 @@ export class SimulatorComponent implements OnInit {
     );
   }
 
-  private async loadValidatedDbcFiles( folderCatalogUrl: string ): Promise<string[]> {
+  private async loadValidatedDbcFiles(folderCatalogUrl: string): Promise<string[]> {
     const url = new URL(folderCatalogUrl);
 
     url.searchParams.set('customerId', this.customerId);
@@ -910,8 +931,121 @@ export class SimulatorComponent implements OnInit {
       .sort((a, b) => a.localeCompare(b));
   }
 
+  private async loadCanFrameCatalog(getDbcCanIdsUrl: string): Promise<CanFrameOption[]> {
+    const url = new URL(getDbcCanIdsUrl);
+
+    url.searchParams.set('customerId', this.customerId);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    const authorizationToken = await this.getAuthorizationToken();
+
+    if (authorizationToken) {
+      headers['Authorization'] = authorizationToken;
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers,
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Unable to load CAN frame catalog. HTTP ${response.status} ${response.statusText || ''}`.trim()
+      );
+    }
+
+    const body = await response.json() as {
+      frames?: Array<{
+        dbcFile?: string;
+        canId?: string;
+        messageName?: string;
+      }>;
+    };
+
+    if (!Array.isArray(body.frames)) {
+      throw new Error('Invalid CAN frame catalog response. Expected frames array.');
+    }
+
+    return body.frames
+      .filter((frame) => {
+        return (
+          typeof frame.dbcFile === 'string' &&
+          typeof frame.canId === 'string' &&
+          typeof frame.messageName === 'string'
+        );
+      })
+      .map((frame) => {
+        const dbcFile = frame.dbcFile as string;
+        const canId = frame.canId as string;
+        const messageName = frame.messageName as string;
+
+        return {
+          dbcFile,
+          canId,
+          messageName,
+          label: `${canId} · ${messageName} · ${dbcFile}`
+        };
+      })
+      .sort((a, b) => {
+        const dbcCompare = a.dbcFile.localeCompare(b.dbcFile);
+
+        if (dbcCompare !== 0) {
+          return dbcCompare;
+        }
+
+        return a.canId.localeCompare(b.canId);
+      });
+  }
+
+  private updateCanFrameOptionsFromSelectedDbcs(): void {
+    const selectedDbcFiles = new Set(this.form.controls.dbcFiles.value);
+
+    const filteredFrames = this.canFrameCatalog.filter((frame) =>
+      selectedDbcFiles.has(frame.dbcFile)
+    );
+
+    this.canFrameOptions = filteredFrames.map((frame) => frame.label);
+
+    const availableLabels = new Set(this.canFrameOptions);
+    const selectedFrames = this.form.controls.canFrames.value;
+
+    const nextSelectedFrames = selectedFrames.filter((frame) =>
+      availableLabels.has(frame)
+    );
+
+    if (nextSelectedFrames.length === selectedFrames.length) {
+      this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
+      return;
+    }
+
+    this.form.controls.canFrames.setValue(nextSelectedFrames, { emitEvent: false });
+    this.form.controls.canFrames.updateValueAndValidity({ emitEvent: false });
+  }
+
   private buildEngineEnvelope() {
     const raw = this.form.getRawValue();
+
+    const selectedCanFrames = raw.canFrames.map((frameLabel) => {
+      const frame = this.canFrameCatalog.find((item) => item.label === frameLabel);
+
+      if (!frame) {
+        return {
+          dbcFile: '',
+          canId: frameLabel,
+          messageName: ''
+        };
+      }
+
+      return {
+        dbcFile: frame.dbcFile,
+        canId: frame.canId,
+        messageName: frame.messageName
+      };
+    });
 
     return {
       amountOfVehicles: Number(raw.amountOfVehicles),
@@ -923,7 +1057,7 @@ export class SimulatorComponent implements OnInit {
       gpsCoordinates: this.interpGpsCoords.length > 0
         ? [...this.interpGpsCoords]
         : [...this.selectedGpsCoordinates],
-      canFrames: raw.canFrames.map((frame) => frame.split(' - ')[0].trim()),
+      canFrames: selectedCanFrames,
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
       vinSuffix: raw.vinSuffix,
