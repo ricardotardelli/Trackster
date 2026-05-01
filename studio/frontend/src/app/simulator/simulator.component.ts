@@ -36,6 +36,8 @@ interface RoutePayload {
 
 type DistanceUnit = 'Km' | 'Mi';
 
+type OutputFormatValue = 'BIN' | 'JSON' | 'CSV';
+
 type SimulationModeValue =
   | 'Time Window'
   | 'Adaptive Blocks'
@@ -82,6 +84,8 @@ export class SimulatorComponent implements OnInit {
     private readonly authService: AuthService,
     private readonly dialog: MatDialog
   ) {}
+
+  readonly outputFormatOptions: readonly OutputFormatValue[] = ['BIN', 'JSON', 'CSV'];
 
   readonly driverProfileOptions: readonly DriverProfileOption[] = [
     {
@@ -163,6 +167,7 @@ export class SimulatorComponent implements OnInit {
   isDriverProfileOpen = false;
   isUnityOpen = false;
   isSimulationModeOpen = false;
+  isOutputFormatOpen = false;
 
   isSubmitting = false;
   isConfigLoaded = false;
@@ -189,6 +194,7 @@ export class SimulatorComponent implements OnInit {
     speed: [80, [Validators.required, Validators.pattern(/^\d+(\.\d+)?$/)]],
     simulationMode: ['Time Window' as SimulationModeValue, Validators.required],
     unity: ['Km' as DistanceUnit, [Validators.required]],
+    outputFormat: ['BIN' as OutputFormatValue, Validators.required],
     s3Bucket: ['', [Validators.required]],
     workQueueUrl: [''],
     engineUrl: ['', [Validators.required, Validators.pattern(/^https?:\/\/.+/i)]],
@@ -258,6 +264,10 @@ export class SimulatorComponent implements OnInit {
 
   get unitySummary(): string {
     return this.form.controls.unity.value || 'Km';
+  }
+
+  get outputFormatSummary(): string {
+    return this.form.controls.outputFormat.value || 'BIN';
   }
 
   get simulationModeSummary(): string {
@@ -384,6 +394,14 @@ export class SimulatorComponent implements OnInit {
     }
   }
 
+  toggleOutputFormatOpen(): void {
+    this.isOutputFormatOpen = !this.isOutputFormatOpen;
+    if (this.isOutputFormatOpen) {
+      this.closeAllDropdowns();
+      this.isOutputFormatOpen = true;
+    }
+  }
+
   selectGpsArea(area: string): void {
     this.form.controls.gpsArea.setValue(area);
     this.form.controls.gpsArea.markAsTouched();
@@ -403,6 +421,13 @@ export class SimulatorComponent implements OnInit {
     this.form.controls.unity.setValue(value);
     this.form.controls.unity.markAsTouched();
     this.isUnityOpen = false;
+    this.updatePayloadPreview();
+  }
+
+  selectOutputFormat(value: OutputFormatValue): void {
+    this.form.controls.outputFormat.setValue(value);
+    this.form.controls.outputFormat.markAsTouched();
+    this.isOutputFormatOpen = false;
     this.updatePayloadPreview();
   }
 
@@ -716,6 +741,7 @@ export class SimulatorComponent implements OnInit {
     this.isDriverProfileOpen = false;
     this.isUnityOpen = false;
     this.isSimulationModeOpen = false;
+    this.isOutputFormatOpen = false;
   }
 
   private async loadConfig(): Promise<void> {
@@ -835,6 +861,7 @@ export class SimulatorComponent implements OnInit {
       unity: raw.unity === 'Mi' ? 'Mi' : 'Km',
       simulationMode: raw.simulationMode,
       driverProfile: String(raw.driverProfile || '').trim(),
+      outputFormat: raw.outputFormat,
       s3Bucket: raw.s3Bucket.trim(),
       workQueueUrl: raw.workQueueUrl.trim()
     };

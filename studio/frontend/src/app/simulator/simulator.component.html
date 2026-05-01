@@ -1,367 +1,388 @@
-<form class="workspace-view workspace-view-form" [formGroup]="form" (ngSubmit)="submit()" >
-    <div class="module-stage-shell">
-        <div class="workspace-grid">
-        <aside class="workspace-sidebar status-panel">
-            <h2>Session Status</h2>
-            <p>
-            <strong>Generation:</strong>
-            <span class="status-value" [class.status-ok]="formStatus === 'generated'" [class.status-error]="formStatus === 'error'" >
-                {{ formStatusLabel }}
-            </span>
-            </p>
-            <p>
-            <strong>Timestamp:</strong>
-            <span class="status-value" [class.status-ok]="!!generationTimestamp">
-                {{ generationTimestamp || 'Not generated' }}
-            </span>
-            </p>
-            <p>
-            <strong>DBC:</strong>
-            <span class="status-value" [class.status-ok]="f.dbcFiles.valid" [class.status-error]="!f.dbcFiles.valid" >
-                {{ f.dbcFiles.value.length }}/{{ dbcOptions.length }} selected
-            </span>
-            </p>
-            <p>
-            <strong>CAN Frames:</strong>
-            <span class="status-value" [class.status-ok]="f.canFrames.valid" [class.status-error]="!f.canFrames.valid" >
-                {{ f.canFrames.value.length }}/{{ canFrameOptions.length }} selected
-            </span>
-            </p>
-            <p>
-            <strong>Route Region:</strong>
-            <span class="status-value" [class.status-ok]="f.gpsArea.valid" [class.status-error]="!f.gpsArea.valid" >
-                {{ f.gpsArea.value || 'Not selected' }}
-            </span>
-            </p>
-            <p>
-            <strong>Drive Profile:</strong>
-            <span class="status-value status-ok">
-                {{ driverProfileSummary }}
-            </span>
-            </p>
-            <p>
-            <strong>Simulation:</strong>
-            <span class="status-value status-ok">
-                {{ simulationModeSummary }}
-            </span>
-            </p>
-            <p>
-            <strong>Mode:</strong>
-            <span class="status-value status-ok">
-                {{ generationTypeSummary }}
-            </span>
-            </p>
+<form class="workspace-view workspace-view-form" [formGroup]="form" (ngSubmit)="submit()">
+  <div class="module-stage-shell">
+    <div class="workspace-grid">
+      <aside class="workspace-sidebar status-panel">
+        <h2>Session Status</h2>
+        <p>
+          <strong>Generation:</strong>
+          <span class="status-value" [class.status-ok]="formStatus === 'generated'" [class.status-error]="formStatus === 'error'">
+            {{ formStatusLabel }}
+          </span>
+        </p>
+        <p>
+          <strong>Timestamp:</strong>
+          <span class="status-value" [class.status-ok]="!!generationTimestamp">
+            {{ generationTimestamp || 'Not generated' }}
+          </span>
+        </p>
+        <p>
+          <strong>DBC:</strong>
+          <span class="status-value" [class.status-ok]="f.dbcFiles.valid" [class.status-error]="!f.dbcFiles.valid">
+            {{ f.dbcFiles.value.length }}/{{ dbcOptions.length }} selected
+          </span>
+        </p>
+        <p>
+          <strong>CAN Frames:</strong>
+          <span class="status-value" [class.status-ok]="f.canFrames.valid" [class.status-error]="!f.canFrames.valid">
+            {{ f.canFrames.value.length }}/{{ canFrameOptions.length }} selected
+          </span>
+        </p>
+        <p>
+          <strong>Route Region:</strong>
+          <span class="status-value" [class.status-ok]="f.gpsArea.valid" [class.status-error]="!f.gpsArea.valid">
+            {{ f.gpsArea.value || 'Not selected' }}
+          </span>
+        </p>
+        <p>
+          <strong>Drive Profile:</strong>
+          <span class="status-value status-ok">
+            {{ driverProfileSummary }}
+          </span>
+        </p>
+        <p>
+          <strong>Simulation:</strong>
+          <span class="status-value status-ok">
+            {{ simulationModeSummary }}
+          </span>
+        </p>
+        <p>
+          <strong>Mode:</strong>
+          <span class="status-value status-ok">
+            {{ generationTypeSummary }}
+          </span>
+        </p>
 
-            <p>
-            <strong>VIN Prefix:</strong>
-            <span class="status-value" [class.status-ok]="f.vinPrefix.valid" [class.status-error]="!f.vinPrefix.valid" >
-                {{ f.vinPrefix.value || 'Not provided' }}
-            </span>
-            </p>
-            <p>
-            <strong>VIN Trailer:</strong>
-            <span class="status-value" [class.status-ok]="f.vinSuffix.valid" [class.status-error]="!f.vinSuffix.valid" >
-                {{ f.vinSuffix.value || 'Not provided' }}
-            </span>
-            </p>
-            <p>
-            <strong>S3 Bucket:</strong>
-            <span class="status-value" [class.status-ok]="f.s3Bucket.valid" [class.status-error]="!f.s3Bucket.valid" >
-                {{ f.s3Bucket.value || 'Not provided' }}
-            </span>
-            </p>
-            <p>
-            <strong>Engine URL:</strong>
-            <span class="status-value" [class.status-ok]="f.engineUrl.valid" [class.status-error]="!f.engineUrl.valid" >
-                {{ f.engineUrl.value || 'Not provided' }}
-            </span>
-            </p>
-        </aside>
-        <section class="workspace-body">
-            <div class="workspace-body-header">
-            <h2>Simulation Generator</h2>
-            <p>
-                Configure vehicle generation, signal sources, route settings, and payload preparation
-                from a unified simulation workspace.
-            </p>
-            </div>
-            <div class="workspace-body-content form-grid">
-            <label class="field quarter">
-                <span>Vehicle Volume</span>
-                <input type="number" formControlName="amountOfVehicles" step="1" min="0" />
-                <small [class.visible]="f.amountOfVehicles.touched && f.amountOfVehicles.invalid">
-                Enter an integer greater than or equal to 0.
-                </small>
-            </label>
-            <label class="field quarter">
-                <span>VIN Prefix</span>
-                <input type="text" formControlName="vinPrefix" placeholder="Ex: CARFWG" />
-                <small [class.visible]="f.vinPrefix.touched && f.vinPrefix.invalid">
-                Mandatory field (exactly 6 characters).
-                </small>
-            </label>
-            <label class="field quarter">
-                <span>VIN Trailer</span>
-                <input type="text" formControlName="vinSuffix" placeholder="Ex: ACHDF" />
-                <small [class.visible]="f.vinSuffix.touched && f.vinSuffix.invalid">
-                Mandatory field (exactly 5 characters).
-                </small>
-            </label>
-            <div class="field quarter">
-                <span>Drive Profile</span>
-                <div class="multi-select" [class.open]="isDriverProfileOpen">
-                <button type="button" class="multi-select-trigger" (click)="toggleDriverProfileOpen()">
-                    <span class="multi-select-value">{{ driverProfileSummary }}</span>
-                    <span class="multi-select-caret" *ngIf="isDriverProfileOpen">&#9652;</span>
-                    <span class="multi-select-caret" *ngIf="!isDriverProfileOpen">&#9662;</span>
+        <p>
+          <strong>VIN Prefix:</strong>
+          <span class="status-value" [class.status-ok]="f.vinPrefix.valid" [class.status-error]="!f.vinPrefix.valid">
+            {{ f.vinPrefix.value || 'Not provided' }}
+          </span>
+        </p>
+        <p>
+          <strong>VIN Trailer:</strong>
+          <span class="status-value" [class.status-ok]="f.vinSuffix.valid" [class.status-error]="!f.vinSuffix.valid">
+            {{ f.vinSuffix.value || 'Not provided' }}
+          </span>
+        </p>
+        <p>
+          <strong>S3 Bucket:</strong>
+          <span class="status-value" [class.status-ok]="f.s3Bucket.valid" [class.status-error]="!f.s3Bucket.valid">
+            {{ f.s3Bucket.value || 'Not provided' }}
+          </span>
+        </p>
+        <p>
+          <strong>Engine URL:</strong>
+          <span class="status-value" [class.status-ok]="f.engineUrl.valid" [class.status-error]="!f.engineUrl.valid">
+            {{ f.engineUrl.value || 'Not provided' }}
+          </span>
+        </p>
+      </aside>
+      <section class="workspace-body">
+        <div class="workspace-body-header">
+          <h2>Simulation Generator</h2>
+          <p>
+            Configure vehicle generation, signal sources, route settings, and payload preparation
+            from a unified simulation workspace.
+          </p>
+        </div>
+        <div class="workspace-body-content form-grid">
+          <label class="field quarter">
+            <span>Vehicle Volume</span>
+            <input type="number" formControlName="amountOfVehicles" step="1" min="0" />
+            <small [class.visible]="f.amountOfVehicles.touched && f.amountOfVehicles.invalid">
+              Enter an integer greater than or equal to 0.
+            </small>
+          </label>
+          <label class="field quarter">
+            <span>VIN Prefix</span>
+            <input type="text" formControlName="vinPrefix" placeholder="Ex: CARFWG" />
+            <small [class.visible]="f.vinPrefix.touched && f.vinPrefix.invalid">
+              Mandatory field (exactly 6 characters).
+            </small>
+          </label>
+          <label class="field quarter">
+            <span>VIN Trailer</span>
+            <input type="text" formControlName="vinSuffix" placeholder="Ex: ACHDF" />
+            <small [class.visible]="f.vinSuffix.touched && f.vinSuffix.invalid">
+              Mandatory field (exactly 5 characters).
+            </small>
+          </label>
+          <div class="field quarter">
+            <span>Drive Profile</span>
+            <div class="multi-select" [class.open]="isDriverProfileOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleDriverProfileOpen()">
+                <span class="multi-select-value">{{ driverProfileSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isDriverProfileOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isDriverProfileOpen">&#9662;</span>
+              </button>
+              <div class="multi-select-panel" *ngIf="isDriverProfileOpen">
+                <button *ngFor="let option of driverProfileOptions" type="button" class="single-select-option"
+                  (click)="selectDriverProfile(option.value)"
+                  [title]="option.description">
+                  {{ option.label }}
                 </button>
-                <div class="multi-select-panel" *ngIf="isDriverProfileOpen">
-                    <button *ngFor="let option of driverProfileOptions" type="button" class="single-select-option"
-                    (click)="selectDriverProfile(option.value)"
-                    [title]="option.description" >
-                    {{ option.label }}
-                    </button>
-                </div>
-                </div>
-                <small [class.visible]="f.driverProfile.touched && f.driverProfile.invalid">
-                Select a driver profile.
-                </small>
+              </div>
             </div>
-            <label class="field quarter">
-                <span>Start Timestamp</span>
-                <input type="datetime-local" formControlName="initialDateTime" />
-                <small [class.visible]="f.initialDateTime.touched && f.initialDateTime.invalid">
-                Mandatory date/time field.
-                </small>
-            </label>
-            <label class="field quarter">
-                <span>Duration Window (hours)</span>
-                <input type="number" formControlName="amountOfTime" step="0.1" min="0" />
-                <small [class.visible]="f.amountOfTime.touched && f.amountOfTime.invalid">
-                Enter a valid decimal number.
-                </small>
-            </label>
-            <label class="field quarter">
-                <span>Frame Latency (seconds)</span>
-                <input type="number" formControlName="latencyTime" step="1" min="0" />
-                <small [class.visible]="f.latencyTime.touched && f.latencyTime.invalid">
-                Mandatory integer field.
-                </small>
-            </label>
+            <small [class.visible]="f.driverProfile.touched && f.driverProfile.invalid">
+              Select a driver profile.
+            </small>
+          </div>
+          <label class="field quarter">
+            <span>Start Timestamp</span>
+            <input type="datetime-local" formControlName="initialDateTime" />
+            <small [class.visible]="f.initialDateTime.touched && f.initialDateTime.invalid">
+              Mandatory date/time field.
+            </small>
+          </label>
+          <label class="field quarter">
+            <span>Duration Window (hours)</span>
+            <input type="number" formControlName="amountOfTime" step="0.1" min="0" />
+            <small [class.visible]="f.amountOfTime.touched && f.amountOfTime.invalid">
+              Enter a valid decimal number.
+            </small>
+          </label>
+          <label class="field quarter">
+            <span>Frame Latency (seconds)</span>
+            <input type="number" formControlName="latencyTime" step="1" min="0" />
+            <small [class.visible]="f.latencyTime.touched && f.latencyTime.invalid">
+              Mandatory integer field.
+            </small>
+          </label>
 
-            <div class="field quarter">
-                <span>Simulation Strategy</span>
-                <div class="multi-select" [class.open]="isSimulationModeOpen">
-                <button type="button" class="multi-select-trigger" (click)="toggleSimulationModeOpen()">
-                    <span class="multi-select-value">{{ simulationModeSummary }}</span>
-                    <span class="multi-select-caret" *ngIf="isSimulationModeOpen">&#9652;</span>
-                    <span class="multi-select-caret" *ngIf="!isSimulationModeOpen">&#9662;</span>
+          <div class="field quarter">
+            <span>Simulation Strategy</span>
+            <div class="multi-select" [class.open]="isSimulationModeOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleSimulationModeOpen()">
+                <span class="multi-select-value">{{ simulationModeSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isSimulationModeOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isSimulationModeOpen">&#9662;</span>
+              </button>
+
+              <div class="multi-select-panel" *ngIf="isSimulationModeOpen">
+                <button
+                  *ngFor="let option of simulationModeOptions"
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectSimulationMode(option.value)"
+                  [title]="option.description">
+                  {{ option.label }}
                 </button>
-
-                <div class="multi-select-panel" *ngIf="isSimulationModeOpen">
-                    <button
-                    *ngFor="let option of simulationModeOptions"
-                    type="button"
-                    class="single-select-option"
-                    (click)="selectSimulationMode(option.value)"
-                    [title]="option.description"
-                    >
-                    {{ option.label }}
-                    </button>
-                </div>
-                </div>
-
-                <small [class.visible]="f.simulationMode.touched && f.simulationMode.invalid">
-                Select a simulation mode.
-                </small>
+              </div>
             </div>
 
-            <label class="field quarter">
-                <span>Block Budget (0 = auto)</span>
-                <input type="number" formControlName="numberOfBlocks" step="1" min="0" />
-                <small [class.visible]="f.numberOfBlocks.touched && f.numberOfBlocks.invalid">
-                Mandatory integer field.
-                </small>
-            </label>
+            <small [class.visible]="f.simulationMode.touched && f.simulationMode.invalid">
+              Select a simulation mode.
+            </small>
+          </div>
 
-            <label class="field quarter">
-                <span>Block Size (Bytes)</span>
-                <input type="number" formControlName="sizeOfBlocksBytes" step="1" min="0" />
-                <small [class.visible]="f.sizeOfBlocksBytes.touched && f.sizeOfBlocksBytes.invalid">
-                Mandatory integer field.
-                </small>
-            </label>
+          <label class="field quarter">
+            <span>Block Budget (0 = auto)</span>
+            <input type="number" formControlName="numberOfBlocks" step="1" min="0" />
+            <small [class.visible]="f.numberOfBlocks.touched && f.numberOfBlocks.invalid">
+              Mandatory integer field.
+            </small>
+          </label>
 
-            <label class="field quarter">
-                <span>Target Speed</span>
-                <input type="number" formControlName="speed" step="0.1" min="0" />
-                <small [class.visible]="f.speed.touched && f.speed.invalid">
-                Enter a valid speed.
-                </small>
-            </label>
+          <label class="field quarter">
+            <span>Block Size (Bytes)</span>
+            <input type="number" formControlName="sizeOfBlocksBytes" step="1" min="0" />
+            <small [class.visible]="f.sizeOfBlocksBytes.touched && f.sizeOfBlocksBytes.invalid">
+              Mandatory integer field.
+            </small>
+          </label>
 
-            <div class="field quarter">
-                <span>Distance Unit</span>
-                <div class="multi-select" [class.open]="isUnityOpen">
-                <button type="button" class="multi-select-trigger" (click)="toggleUnityOpen()">
-                    <span class="multi-select-value">{{ unitySummary }}</span>
-                    <span class="multi-select-caret" *ngIf="isUnityOpen">&#9652;</span>
-                    <span class="multi-select-caret" *ngIf="!isUnityOpen">&#9662;</span>
-                </button>
+          <label class="field quarter">
+            <span>Target Speed</span>
+            <input type="number" formControlName="speed" step="0.1" min="0" />
+            <small [class.visible]="f.speed.touched && f.speed.invalid">
+              Enter a valid speed.
+            </small>
+          </label>
 
-                <div class="multi-select-panel" *ngIf="isUnityOpen">
-                    <button type="button" class="single-select-option" (click)="selectUnity('Km')">Km</button>
-                    <button type="button" class="single-select-option" (click)="selectUnity('Mi')">Mi</button>
-                </div>
-                </div>
+          <div class="field quarter">
+            <span>Distance Unit</span>
+            <div class="multi-select" [class.open]="isUnityOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleUnityOpen()">
+                <span class="multi-select-value">{{ unitySummary }}</span>
+                <span class="multi-select-caret" *ngIf="isUnityOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isUnityOpen">&#9662;</span>
+              </button>
 
-                <small [class.visible]="f.unity.touched && f.unity.invalid">
-                Select a unit.
-                </small>
+              <div class="multi-select-panel" *ngIf="isUnityOpen">
+                <button type="button" class="single-select-option" (click)="selectUnity('Km')">Km</button>
+                <button type="button" class="single-select-option" (click)="selectUnity('Mi')">Mi</button>
+              </div>
             </div>
 
-            <div class="field quarter">
-                <span>DBC Sources</span>
-                <div class="multi-select" [class.open]="isDbcOpen">
-                <button type="button" class="multi-select-trigger" (click)="toggleDbcOpen()">
-                    <span class="multi-select-value">{{ dbcSummary }}</span>
-                    <span class="multi-select-caret" *ngIf="isDbcOpen">&#9652;</span>
-                    <span class="multi-select-caret" *ngIf="!isDbcOpen">&#9662;</span>
-                </button>
+            <small [class.visible]="f.unity.touched && f.unity.invalid">
+              Select a unit.
+            </small>
+          </div>
 
-                <div class="multi-select-panel" *ngIf="isDbcOpen">
-                    <label class="multi-select-option" *ngFor="let dbc of dbcOptions">
-                    <input
-                        type="checkbox"
-                        [checked]="isDbcSelected(dbc)"
-                        (change)="onDbcToggle(dbc, $any($event.target).checked)"
-                    />
-                    <span class="option-label">{{ dbc }}</span>
-                    </label>
+          <div class="field quarter">
+            <span>DBC Sources</span>
+            <div class="multi-select" [class.open]="isDbcOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleDbcOpen()">
+                <span class="multi-select-value">{{ dbcSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isDbcOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isDbcOpen">&#9662;</span>
+              </button>
 
-                    <div class="single-select-empty" *ngIf="dbcOptions.length === 0">
-                    No DBC files configured.
-                    </div>
-                </div>
-                </div>
-
-                <small [class.visible]="f.dbcFiles.touched && f.dbcFiles.invalid">
-                Select at least one DBC file.
-                </small>
-            </div>
-
-            <div class="field quarter">
-                <span>Signal Frame Set</span>
-                <div class="multi-select" [class.open]="isCanOpen">
-                <button type="button" class="multi-select-trigger" (click)="toggleCanOpen()">
-                    <span class="multi-select-value">{{ canSummary }}</span>
-                    <span class="multi-select-caret" *ngIf="isCanOpen">&#9652;</span>
-                    <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
-                </button>
-
-                <div class="multi-select-panel" *ngIf="isCanOpen">
-                    <div class="multi-select-actions">
-                    <button
-                        type="button"
-                        class="small"
-                        (click)="selectAllCanFrames()"
-                        [disabled]="canFrameOptions.length === 0"
-                    >
-                        Select All
-                    </button>
-
-                    <button
-                        type="button"
-                        class="small"
-                        (click)="clearAllCanFrames()"
-                        [disabled]="f.canFrames.value.length === 0"
-                    >
-                        Clear All
-                    </button>
-                    </div>
-
-                    <label class="multi-select-option" *ngFor="let frame of canFrameOptions">
-                    <input
-                        type="checkbox"
-                        [checked]="isCanSelected(frame)"
-                        (change)="onCanToggle(frame, $any($event.target).checked)"
-                    />
-                    <span class="option-label">{{ frame }}</span>
-                    </label>
-                </div>
-                </div>
-
-                <small [class.visible]="f.canFrames.touched && f.canFrames.invalid">
-                Select at least one CAN frame.
-                </small>
-            </div>
-
-            <div class="field double country-field">
-                <span>Route Region</span>
-                <div class="multi-select" [class.open]="isGpsOpen">
-                <button type="button" class="multi-select-trigger" (click)="toggleGpsOpen()">
-                    <span class="multi-select-value">{{ gpsSummary }}</span>
-                    <span class="multi-select-caret gps-caret" *ngIf="isGpsOpen">&#9652;</span>
-                    <span class="multi-select-caret gps-caret" *ngIf="!isGpsOpen">&#9662;</span>
-
-                    <span class="map-icon gps-map-icon" (click)="openMap($event)" aria-label="Design tracking points">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#007bff">
-                        <path d="M20.5 3l-5.5 2-6-2L3.5 5v16l5.5-2 6 2 5.5-2V3zM9 5.5l6 2v11l-6-2v-11z"/>
-                    </svg>
-                    </span>
-                </button>
-
-                <div class="multi-select-panel" *ngIf="isGpsOpen">
-                    <input
-                    type="text"
-                    class="single-select-filter"
-                    placeholder="Type to filter regions..."
-                    [(ngModel)]="gpsFilter"
-                    [ngModelOptions]="{ standalone: true }"
-                    />
-
-                    <button
-                    type="button"
-                    class="single-select-option"
-                    *ngFor="let area of filteredGpsAreas"
-                    (click)="selectGpsArea(area)"
-                    >
-                    {{ area }}
-                    </button>
-
-                    <div class="single-select-empty" *ngIf="filteredGpsAreas.length === 0">
-                    No regions found.
-                    </div>
-                </div>
-                </div>
-
-                <small [class.visible]="f.gpsArea.touched && f.gpsArea.invalid">
-                Select a GPS area.
-                </small>
-            </div>
-
-            <label class="field quarter field-hidden">
-                <span>Generation type</span>
-                <div class="switch-row">
-                <span class="switch-label">Progressive Flow</span>
-                <label class="switch-control">
-                    <input type="checkbox" formControlName="generationTypeAllAtOnce" />
-                    <span class="switch-slider"></span>
+              <div class="multi-select-panel" *ngIf="isDbcOpen">
+                <label class="multi-select-option" *ngFor="let dbc of dbcOptions">
+                  <input
+                    type="checkbox"
+                    [checked]="isDbcSelected(dbc)"
+                    (change)="onDbcToggle(dbc, $any($event.target).checked)"
+                  />
+                  <span class="option-label">{{ dbc }}</span>
                 </label>
-                <span class="switch-label">Burst Generation</span>
-                </div>
-            </label>
-            </div>
-        </section>
-        </div>
 
-        <div class="actions">
-        <button type="button" class="payload-inline-toggle" (click)="openPayloadModal()">
-            Show payload preview
-        </button>
-        <button type="submit" [disabled]="form.invalid || isSubmitting">
-            {{ isSubmitting ? 'Generating...' : 'Generate Simulation' }}
-        </button>
+                <div class="single-select-empty" *ngIf="dbcOptions.length === 0">
+                  No DBC files configured.
+                </div>
+              </div>
+            </div>
+
+            <small [class.visible]="f.dbcFiles.touched && f.dbcFiles.invalid">
+              Select at least one DBC file.
+            </small>
+          </div>
+
+          <div class="field quarter">
+            <span>Signal Frame Set</span>
+            <div class="multi-select" [class.open]="isCanOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleCanOpen()">
+                <span class="multi-select-value">{{ canSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isCanOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
+              </button>
+
+              <div class="multi-select-panel" *ngIf="isCanOpen">
+                <div class="multi-select-actions">
+                  <button
+                    type="button"
+                    class="small"
+                    (click)="selectAllCanFrames()"
+                    [disabled]="canFrameOptions.length === 0">
+                    Select All
+                  </button>
+
+                  <button
+                    type="button"
+                    class="small"
+                    (click)="clearAllCanFrames()"
+                    [disabled]="f.canFrames.value.length === 0">
+                    Clear All
+                  </button>
+                </div>
+
+                <label class="multi-select-option" *ngFor="let frame of canFrameOptions">
+                  <input
+                    type="checkbox"
+                    [checked]="isCanSelected(frame)"
+                    (change)="onCanToggle(frame, $any($event.target).checked)"
+                  />
+                  <span class="option-label">{{ frame }}</span>
+                </label>
+              </div>
+            </div>
+
+            <small [class.visible]="f.canFrames.touched && f.canFrames.invalid">
+              Select at least one CAN frame.
+            </small>
+          </div>
+
+          <div class="field quarter country-field">
+            <span>Route Region</span>
+            <div class="multi-select" [class.open]="isGpsOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleGpsOpen()">
+                <span class="multi-select-value">{{ gpsSummary }}</span>
+                <span class="multi-select-caret gps-caret" *ngIf="isGpsOpen">&#9652;</span>
+                <span class="multi-select-caret gps-caret" *ngIf="!isGpsOpen">&#9662;</span>
+
+                <span class="map-icon gps-map-icon" (click)="openMap($event)" aria-label="Design tracking points">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#007bff">
+                    <path d="M20.5 3l-5.5 2-6-2L3.5 5v16l5.5-2 6 2 5.5-2V3zM9 5.5l6 2v11l-6-2v-11z"/>
+                  </svg>
+                </span>
+              </button>
+
+              <div class="multi-select-panel" *ngIf="isGpsOpen">
+                <input
+                  type="text"
+                  class="single-select-filter"
+                  placeholder="Type to filter regions..."
+                  [(ngModel)]="gpsFilter"
+                  [ngModelOptions]="{ standalone: true }"
+                />
+
+                <button
+                  type="button"
+                  class="single-select-option"
+                  *ngFor="let area of filteredGpsAreas"
+                  (click)="selectGpsArea(area)">
+                  {{ area }}
+                </button>
+
+                <div class="single-select-empty" *ngIf="filteredGpsAreas.length === 0">
+                  No regions found.
+                </div>
+              </div>
+            </div>
+
+            <small [class.visible]="f.gpsArea.touched && f.gpsArea.invalid">
+              Select a GPS area.
+            </small>
+          </div>
+
+          <div class="field quarter">
+            <span>Output Format</span>
+            <div class="multi-select" [class.open]="isOutputFormatOpen">
+              <button type="button" class="multi-select-trigger" (click)="toggleOutputFormatOpen()">
+                <span class="multi-select-value">{{ outputFormatSummary }}</span>
+                <span class="multi-select-caret" *ngIf="isOutputFormatOpen">&#9652;</span>
+                <span class="multi-select-caret" *ngIf="!isOutputFormatOpen">&#9662;</span>
+              </button>
+
+              <div class="multi-select-panel" *ngIf="isOutputFormatOpen">
+                <button
+                  *ngFor="let option of outputFormatOptions"
+                  type="button"
+                  class="single-select-option"
+                  (click)="selectOutputFormat(option)">
+                  {{ option }}
+                </button>
+              </div>
+            </div>
+
+            <small [class.visible]="f.outputFormat.touched && f.outputFormat.invalid">
+              Select an output format.
+            </small>
+          </div>
+
+          <label class="field quarter field-hidden">
+            <span>Generation type</span>
+            <div class="switch-row">
+              <span class="switch-label">Progressive Flow</span>
+              <label class="switch-control">
+                <input type="checkbox" formControlName="generationTypeAllAtOnce" />
+                <span class="switch-slider"></span>
+              </label>
+              <span class="switch-label">Burst Generation</span>
+            </div>
+          </label>
         </div>
+      </section>
     </div>
+
+    <div class="actions">
+      <button type="button" class="payload-inline-toggle" (click)="openPayloadModal()">
+        Show payload preview
+      </button>
+      <button type="submit" [disabled]="form.invalid || isSubmitting">
+        {{ isSubmitting ? 'Generating...' : 'Generate Simulation' }}
+      </button>
+    </div>
+  </div>
 </form>

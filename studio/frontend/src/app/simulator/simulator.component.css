@@ -92,9 +92,17 @@
 }
 
 .country-field {
-  grid-column: span 2;
+  grid-column: span 1;
   width: 100%;
   min-width: 0;
+}
+
+.country-field .multi-select-trigger {
+  padding-right: 78px;
+}
+
+.country-field .multi-select-value {
+  max-width: calc(100% - 68px);
 }
 
 .field-hidden {
