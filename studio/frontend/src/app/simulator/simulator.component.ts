@@ -183,6 +183,9 @@ export class SimulatorComponent implements OnInit {
   formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
 
+  isLoadingDbcOptions = false;
+  isLoadingCanFrameOptions = false;
+
   private suppressFormReset = false;
   private formValueChangesBound = false;
   private canFrameCatalog: CanFrameOption[] = [];
@@ -220,7 +223,7 @@ export class SimulatorComponent implements OnInit {
   }
 
   get gpsSummary(): string {
-    return this.form.controls.gpsArea.value || 'Select a region';
+    return this.form.controls.gpsArea.value || 'Select country';
   }
 
   get filteredGpsAreas(): readonly string[] {
@@ -351,7 +354,7 @@ export class SimulatorComponent implements OnInit {
   }
 
   toggleCanOpen(): void {
-    if (!this.isConfigLoaded) {
+    if (!this.isConfigLoaded || this.isLoadingCanFrameOptions) {
       return;
     }
 
@@ -363,9 +366,9 @@ export class SimulatorComponent implements OnInit {
   }
 
   toggleDbcOpen(): void {
-    if (!this.isConfigLoaded) {
-      return;
-    }
+     if (!this.isConfigLoaded || this.isLoadingDbcOptions) {
+        return;
+      }
 
     this.isDbcOpen = !this.isDbcOpen;
     if (this.isDbcOpen) {
@@ -757,6 +760,8 @@ export class SimulatorComponent implements OnInit {
   private async loadConfig(): Promise<void> {
     const config = await this.fetchRuntimeConfig();
 
+    this.isLoadingDbcOptions = true;
+
     if (!Array.isArray(config.gpsAreas) || config.gpsAreas.length === 0) {
       throw new Error('gpsAreas missing or empty in config.json');
     }
@@ -808,21 +813,31 @@ export class SimulatorComponent implements OnInit {
 
       this.dbcOptions = [...validatedDbcFiles];
       this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Unable to load validated DBC files:', error);
 
       this.dbcOptions = [];
       this.form.controls.dbcFiles.setValue([], { emitEvent: false });
     }
+    finally {
+      this.isLoadingDbcOptions = false;
+    }
+
+    this.isLoadingCanFrameOptions = true;
 
     try {
       this.canFrameCatalog = await this.loadCanFrameCatalog(
         config.dbcApi.getDbcCanIds.trim()
       );
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Unable to load CAN frame catalog:', error);
 
       this.canFrameCatalog = [];
+    }
+    finally {
+      this.isLoadingCanFrameOptions = false;
     }
 
     this.updateCanFrameOptionsFromSelectedDbcs();

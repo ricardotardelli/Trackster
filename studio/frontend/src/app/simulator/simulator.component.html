@@ -223,7 +223,9 @@
             <span>DBC Sources</span>
             <div class="multi-select" [class.open]="isDbcOpen">
               <button type="button" class="multi-select-trigger" (click)="toggleDbcOpen()">
-                <span class="multi-select-value">{{ dbcSummary }}</span>
+                <span class="multi-select-value">
+                  {{ isLoadingDbcOptions ? 'Loading DBC files...' : dbcSummary }}
+                </span>
                 <span class="multi-select-caret" *ngIf="isDbcOpen">&#9652;</span>
                 <span class="multi-select-caret" *ngIf="!isDbcOpen">&#9662;</span>
               </button>
@@ -253,7 +255,9 @@
             <span>Signal Frame Set</span>
             <div class="multi-select" [class.open]="isCanOpen">
               <button type="button" class="multi-select-trigger" (click)="toggleCanOpen()">
-                <span class="multi-select-value">{{ canSummary }}</span>
+                <span class="multi-select-value">
+                  {{ isLoadingCanFrameOptions ? 'Loading CAN frames...' : canSummary }}
+                </span>
                 <span class="multi-select-caret" *ngIf="isCanOpen">&#9652;</span>
                 <span class="multi-select-caret" *ngIf="!isCanOpen">&#9662;</span>
               </button>

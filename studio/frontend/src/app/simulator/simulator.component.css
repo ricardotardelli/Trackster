@@ -98,11 +98,7 @@
 }
 
 .country-field .multi-select-trigger {
-  padding-right: 78px;
-}
-
-.country-field .multi-select-value {
-  max-width: calc(100% - 68px);
+  padding-right: 44px;
 }
 
 .field-hidden {
