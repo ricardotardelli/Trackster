@@ -211,7 +211,7 @@ export class SimulatorComponent implements OnInit {
   }
 
   get gpsSummary(): string {
-    return this.form.controls.gpsArea.value || 'Select a region';
+    return this.form.controls.gpsArea.value || 'Select region';
   }
 
   get filteredGpsAreas(): readonly string[] {
