@@ -767,10 +767,6 @@ export class SimulatorComponent implements OnInit {
       throw new Error('engineURL missing or empty in config.json');
     }
 
-    if (typeof config.customerId !== 'string' || !config.customerId.trim()) {
-      throw new Error('customerId missing or empty in config.json');
-    }
-
     if (
       typeof config.dbcApi?.folderCatalogUrl !== 'string' ||
       !config.dbcApi.folderCatalogUrl.trim()
@@ -779,8 +775,7 @@ export class SimulatorComponent implements OnInit {
     }
 
     const validatedDbcFiles = await this.loadValidatedDbcFiles(
-      config.dbcApi.folderCatalogUrl.trim(),
-      config.customerId.trim()
+      config.dbcApi.folderCatalogUrl.trim()
     );
 
     this.suppressFormReset = true;
@@ -856,27 +851,58 @@ export class SimulatorComponent implements OnInit {
     );
   }
 
-  private async loadValidatedDbcFiles(
-    folderCatalogUrl: string,
-    customerId: string
-  ): Promise<string[]> {
+  private extractCustomerIdFromJwt(token: string): string {
+    try {
+      const payloadBase64 = token.split('.')[1];
+
+      const normalized = payloadBase64
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+      const payloadJson = atob(normalized);
+
+      const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+
+      const customerId =
+        payload['custom:customerId'] ??
+        payload['customerId'];
+
+      if (typeof customerId !== 'string') {
+        throw new Error('customerId claim missing in JWT.');
+      }
+
+      return customerId;
+    } catch (error) {
+      throw new Error(
+        `Unable to parse customerId from JWT token: ${String(error)}`
+      );
+    }
+  }
+
+  private async loadValidatedDbcFiles( folderCatalogUrl: string ): Promise<string[]> {
+    const authorizationToken = await this.getAuthorizationToken();
+
+    if (!authorizationToken) {
+      throw new Error('Unable to retrieve authorization token.');
+    }
+
+    const customerId = this.extractCustomerIdFromJwt(authorizationToken);
+
+    if (!customerId) {
+      throw new Error('Unable to resolve customerId from JWT token.');
+    }
+
     const url = new URL(folderCatalogUrl);
+
     url.searchParams.set('customerId', customerId);
     url.searchParams.set('status', 'validated');
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    const authorizationToken = await this.getAuthorizationToken();
-
-    if (authorizationToken) {
-      headers['Authorization'] = authorizationToken;
-    }
-
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authorizationToken
+      },
       cache: 'no-store'
     });
 
