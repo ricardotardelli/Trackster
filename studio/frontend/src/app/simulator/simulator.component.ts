@@ -211,7 +211,7 @@ export class SimulatorComponent implements OnInit {
   }
 
   get gpsSummary(): string {
-    return this.form.controls.gpsArea.value || 'Select region';
+    return this.form.controls.gpsArea.value || 'Select a region';
   }
 
   get filteredGpsAreas(): readonly string[] {
@@ -755,10 +755,6 @@ export class SimulatorComponent implements OnInit {
       throw new Error('canFrames missing or empty in config.json');
     }
 
-    if (!Array.isArray(config.dbcFiles) || config.dbcFiles.length === 0) {
-      throw new Error('dbcFiles missing or empty in config.json');
-    }
-
     if (typeof config.workQueueUrl !== 'string' || !config.workQueueUrl.trim()) {
       throw new Error('workQueueUrl missing or empty in config.json');
     }
@@ -771,11 +767,27 @@ export class SimulatorComponent implements OnInit {
       throw new Error('engineURL missing or empty in config.json');
     }
 
+    if (typeof config.customerId !== 'string' || !config.customerId.trim()) {
+      throw new Error('customerId missing or empty in config.json');
+    }
+
+    if (
+      typeof config.dbcApi?.folderCatalogUrl !== 'string' ||
+      !config.dbcApi.folderCatalogUrl.trim()
+    ) {
+      throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
+    }
+
+    const validatedDbcFiles = await this.loadValidatedDbcFiles(
+      config.dbcApi.folderCatalogUrl.trim(),
+      config.customerId.trim()
+    );
+
     this.suppressFormReset = true;
 
     this.gpsAreas = [...config.gpsAreas];
     this.canFrameOptions = [...config.canFrames];
-    this.dbcOptions = [...config.dbcFiles];
+    this.dbcOptions = [...validatedDbcFiles];
 
     this.form.controls.canFrames.setValue([...this.canFrameOptions], { emitEvent: false });
     this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
@@ -796,10 +808,13 @@ export class SimulatorComponent implements OnInit {
   private async fetchRuntimeConfig(): Promise<{
     gpsAreas?: string[];
     canFrames?: string[];
-    dbcFiles?: string[];
     workQueueUrl?: string;
     s3Default?: string;
     engineURL?: string;
+    customerId?: string;
+    dbcApi?: {
+      folderCatalogUrl?: string;
+    };
   }> {
     const stamp = Date.now();
     const candidates = [
@@ -824,10 +839,13 @@ export class SimulatorComponent implements OnInit {
         return JSON.parse(text) as {
           gpsAreas?: string[];
           canFrames?: string[];
-          dbcFiles?: string[];
           workQueueUrl?: string;
           s3Default?: string;
           engineURL?: string;
+          customerId?: string;
+          dbcApi?: {
+            folderCatalogUrl?: string;
+          };
         };
       } catch {
       }
@@ -836,6 +854,54 @@ export class SimulatorComponent implements OnInit {
     throw new Error(
       `Unable to load runtime config from assets/config.json. Last HTTP status: ${lastStatus ?? 'unknown'}`
     );
+  }
+
+  private async loadValidatedDbcFiles(
+    folderCatalogUrl: string,
+    customerId: string
+  ): Promise<string[]> {
+    const url = new URL(folderCatalogUrl);
+    url.searchParams.set('customerId', customerId);
+    url.searchParams.set('status', 'validated');
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    const authorizationToken = await this.getAuthorizationToken();
+
+    if (authorizationToken) {
+      headers['Authorization'] = authorizationToken;
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers,
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Unable to load validated DBC files. HTTP ${response.status} ${response.statusText || ''}`.trim()
+      );
+    }
+
+    const body = await response.json() as {
+      folderName?: string;
+      files?: Array<{
+        name?: string;
+        status?: string;
+      }>;
+    };
+
+    if (!Array.isArray(body.files)) {
+      throw new Error('Invalid DBC list response. Expected files array.');
+    }
+
+    return body.files
+      .filter((file) => file.status === 'validated' && typeof file.name === 'string')
+      .map((file) => file.name as string)
+      .sort((a, b) => a.localeCompare(b));
   }
 
   private buildEngineEnvelope() {

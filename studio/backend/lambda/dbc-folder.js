@@ -21,15 +21,54 @@ function buildJsonResponse(statusCode, body) {
   };
 }
 
-async function streamToString(stream) {
-  return new Promise((resolve, reject) => {
+async function bodyToString(body) {
+  if (!body) {
+    return '';
+  }
+
+  if (typeof body.transformToString === 'function') {
+    return await body.transformToString();
+  }
+
+  return await new Promise((resolve, reject) => {
     const chunks = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('error', reject);
-    stream.on('end', () =>
-      resolve(Buffer.concat(chunks).toString('utf-8'))
-    );
+
+    body.on('data', (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    body.on('error', reject);
+
+    body.on('end', () => {
+      resolve(Buffer.concat(chunks).toString('utf-8'));
+    });
   });
+}
+
+function getFileName(key) {
+  return key.split('/').pop();
+}
+
+function removeExtension(fileName, extension) {
+  return fileName.replace(new RegExp(`\\.${extension}$`, 'i'), '');
+}
+
+async function readJsonStatus(jsonKey) {
+  const result = await s3.send(
+    new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: jsonKey
+    })
+  );
+
+  const rawBody = await bodyToString(result.Body);
+  const json = JSON.parse(rawBody);
+
+  if (json?.st !== 'validated' && json?.st !== 'rejected') {
+    throw new Error(`Invalid status field in ${jsonKey}. Expected st = validated or rejected.`);
+  }
+
+  return json.st;
 }
 
 export const handler = async (event) => {
@@ -38,79 +77,60 @@ export const handler = async (event) => {
 
     if (!customerId || !isValidCustomerId(customerId)) {
       return buildJsonResponse(400, {
-        error: 'Invalid customerId'
+        error: 'Invalid customerId. Must be 8 alphanumeric characters.'
       });
     }
 
     const prefix = `dbc-files/${customerId}/`;
 
-    const result = await s3.send(
+    const listResult = await s3.send(
       new ListObjectsV2Command({
         Bucket: BUCKET_NAME,
         Prefix: prefix
       })
     );
 
-    const objects = result.Contents || [];
+    const objects = listResult.Contents || [];
 
-    // Map JSON: baseName -> key
-    const jsonMap = new Map(
-      objects
-        .filter((o) => o.Key && o.Key.toLowerCase().endsWith('.json'))
-        .map((o) => {
-          const fileName = o.Key.split('/').pop();
-          const base = fileName.replace(/\.json$/i, '').toLowerCase();
-          return [base, o.Key];
-        })
-    );
+    const jsonKeysByBaseName = new Map();
+
+    for (const object of objects) {
+      if (!object.Key || !object.Key.toLowerCase().endsWith('.json')) {
+        continue;
+      }
+
+      const fileName = getFileName(object.Key);
+      const baseName = removeExtension(fileName, 'json').toLowerCase();
+
+      jsonKeysByBaseName.set(baseName, object.Key);
+    }
+
+    const dbcObjects = objects.filter((object) => {
+      return object.Key && object.Key.toLowerCase().endsWith('.dbc');
+    });
 
     const files = await Promise.all(
-      objects
-        .filter((o) => o.Key && o.Key.toLowerCase().endsWith('.dbc'))
-        .map(async (item) => {
-          const name = item.Key.split('/').pop();
-          const baseName = name.replace(/\.dbc$/i, '').toLowerCase();
+      dbcObjects.map(async (object) => {
+        const fileName = getFileName(object.Key);
+        const baseName = removeExtension(fileName, 'dbc').toLowerCase();
 
-          let status = 'pending';
-          const jsonKey = jsonMap.get(baseName);
+        const jsonKey = jsonKeysByBaseName.get(baseName);
 
-          if (jsonKey) {
-            try {
-              const obj = await s3.send(
-                new GetObjectCommand({
-                  Bucket: BUCKET_NAME,
-                  Key: jsonKey
-                })
-              );
+        let status = 'pending';
 
-              const body = await streamToString(obj.Body);
-              console.log('JSON RAW:', jsonKey, body);
+        if (jsonKey) {
+          status = await readJsonStatus(jsonKey);
+        }
 
-              const json = JSON.parse(body);
-
-              const st = json?.st || json?.status;
-
-              if (st === 'validated' || st === 'rejected') {
-                status = st;
-              } else {
-                console.error('INVALID STATUS FIELD:', json);
-              }
-
-            } catch (err) {
-              console.error('ERROR reading JSON:', jsonKey, err);
-              status = 'pending';
-            }
-          }
-
-          return {
-            name,
-            sizeBytes: item.Size ?? 0,
-            lastModified: item.LastModified
-              ? new Date(item.LastModified).toISOString()
-              : new Date().toISOString(),
-            status
-          };
-        })
+        return {
+          name: fileName,
+          sizeBytes: object.Size ?? 0,
+          lastModified: object.LastModified
+            ? new Date(object.LastModified).toISOString()
+            : new Date().toISOString(),
+          status
+        };
+      })
     );
 
     files.sort((a, b) => a.name.localeCompare(b.name));
@@ -119,12 +139,12 @@ export const handler = async (event) => {
       folderName: customerId,
       files
     });
-
   } catch (error) {
-    console.error('FATAL ERROR:', error);
+    console.error('ERROR:', error);
 
     return buildJsonResponse(500, {
-      error: 'Internal server error'
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 };
