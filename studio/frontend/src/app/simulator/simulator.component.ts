@@ -156,6 +156,7 @@ export class SimulatorComponent implements OnInit {
   gpsAreas: string[] = [];
   canFrameOptions: string[] = [];
   dbcOptions: string[] = [];
+  customerId = '00000000';
   selectedGpsCoordinates: string[] = [];
   interpGpsCoords: string[] = [];
   routeDataForMap: RoutePayload | null = null;
@@ -798,7 +799,8 @@ export class SimulatorComponent implements OnInit {
 
       this.dbcOptions = [...validatedDbcFiles];
       this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Unable to load validated DBC files:', error);
 
       this.dbcOptions = [];
@@ -862,58 +864,25 @@ export class SimulatorComponent implements OnInit {
     );
   }
 
-  private extractCustomerIdFromJwt(token: string): string {
-    try {
-      const payloadBase64 = token.split('.')[1];
-
-      const normalized = payloadBase64
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-
-      const payloadJson = atob(normalized);
-
-      const payload = JSON.parse(payloadJson) as Record<string, unknown>;
-
-      const customerId =
-        payload['custom:customerId'] ??
-        payload['customerId'];
-
-      if (typeof customerId !== 'string') {
-        throw new Error('customerId claim missing in JWT.');
-      }
-
-      return customerId;
-    } catch (error) {
-      throw new Error(
-        `Unable to parse customerId from JWT token: ${String(error)}`
-      );
-    }
-  }
-
   private async loadValidatedDbcFiles( folderCatalogUrl: string ): Promise<string[]> {
-    const authorizationToken = await this.getAuthorizationToken();
-
-    if (!authorizationToken) {
-      throw new Error('Unable to retrieve authorization token.');
-    }
-
-    const customerId = this.extractCustomerIdFromJwt(authorizationToken);
-
-    if (!customerId) {
-      throw new Error('Unable to resolve customerId from JWT token.');
-    }
-
     const url = new URL(folderCatalogUrl);
 
-    url.searchParams.set('customerId', customerId);
+    url.searchParams.set('customerId', this.customerId);
     url.searchParams.set('status', 'validated');
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    const authorizationToken = await this.getAuthorizationToken();
+
+    if (authorizationToken) {
+      headers['Authorization'] = authorizationToken;
+    }
 
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authorizationToken
-      },
+      headers,
       cache: 'no-store'
     });
 
