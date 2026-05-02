@@ -51,15 +51,9 @@ type SimulationModeValue =
   | 'Velocity Target'
   | 'Distance Target';
 
-type DriverProfileValue =
-  | 'Balanced'
-  | 'Efficiency'
-  | 'Dynamic'
-  | 'Performance'
-  | 'City Cycle'
-  | 'Cruise'
-  | 'Terrain'
-  | 'Fleet';
+type DriverProfileValue = | 'Balanced' | 'Efficiency' | 'Dynamic' | 'Performance' | 'City Cycle' | 'Cruise' | 'Terrain' | 'Fleet';
+
+type GpsCoordinateRle = [coordinate: string, repeat: number];
 
 interface DriverProfileOption {
   value: DriverProfileValue;
@@ -1069,9 +1063,11 @@ export class SimulatorComponent implements OnInit {
       numberOfBlocks: Number(raw.numberOfBlocks),
       blocksSize: Number(raw.sizeOfBlocksBytes),
       gpsArea: raw.gpsArea,
-      gpsCoordinates: this.interpGpsCoords.length > 0
-        ? [...this.interpGpsCoords]
-        : [...this.selectedGpsCoordinates],
+      gpsCoordinates: this.compressSequentialGpsCoordinates(
+        this.interpGpsCoords.length > 0
+          ? this.interpGpsCoords
+          : this.selectedGpsCoordinates
+      ),
       canFrames: selectedCanFrames,
       dbcFiles: raw.dbcFiles,
       vinPrefix: raw.vinPrefix,
@@ -1383,5 +1379,22 @@ export class SimulatorComponent implements OnInit {
       autoFocus: false,
       restoreFocus: true
     });
+  }
+
+  private compressSequentialGpsCoordinates(coordinates: string[]): GpsCoordinateRle[] {
+    const compressed: GpsCoordinateRle[] = [];
+
+    for (const coordinate of coordinates) {
+      const last = compressed[compressed.length - 1];
+
+      if (last && last[0] === coordinate) {
+        last[1] += 1;
+        continue;
+      }
+
+      compressed.push([coordinate, 1]);
+    }
+
+    return compressed;
   }
 }

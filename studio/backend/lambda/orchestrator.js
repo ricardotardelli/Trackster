@@ -1,10 +1,6 @@
 // ============================================================================
 // Trackster Orchestrator - OEM CAN/FDFD Pipeline
 // ============================================================================
-// Purpose:
-//   Convert frontend payload into many SQS messages.
-//   Each vehicle = ONE SQS message (the worker generates ONE .bin per message)
-// ============================================================================
 
 const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
 
@@ -24,19 +20,79 @@ const VIN_PREFIX_LENGTH = 6;
 const VIN_SUFFIX_LENGTH = 17 - VIN_PREFIX_LENGTH - VIN_SEQ_LENGTH;
 
 function normalizeVinPrefix(raw) {
-  return String(raw || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, VIN_PREFIX_LENGTH);
+  return String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, VIN_PREFIX_LENGTH);
 }
 
 function normalizeVinSuffix(raw) {
-  return String(raw || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, VIN_SUFFIX_LENGTH);
+  return String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, VIN_SUFFIX_LENGTH);
 }
 
 function normalizeUnity(raw) {
   return String(raw || "").trim().toUpperCase() === "MI" ? "Mi" : "Km";
 }
 
+function normalizeOutputFormat(raw) {
+  const value = String(raw || "").trim().toUpperCase();
+
+  if (value === "JSON") {
+    return "JSON";
+  }
+
+  if (value === "CSV") {
+    return "CSV";
+  }
+
+  return "BIN";
+}
+
 function normalizeDriverProfile(raw) {
   return String(raw || "").trim();
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
+function normalizeCanFrames(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((frame) => {
+      if (typeof frame === "string") {
+        return {
+          dbcFile: "",
+          canId: frame.trim(),
+          messageName: ""
+        };
+      }
+
+      if (!frame || typeof frame !== "object") {
+        return null;
+      }
+
+      return {
+        dbcFile: String(frame.dbcFile || "").trim(),
+        canId: String(frame.canId || "").trim(),
+        messageName: String(frame.messageName || "").trim()
+      };
+    })
+    .filter((frame) => frame && frame.canId);
 }
 
 function padSeq(n) {
@@ -52,27 +108,34 @@ function makeRunIdUTC() {
   const p2 = (n) => String(n).padStart(2, "0");
   const p3 = (n) => String(n).padStart(3, "0");
 
-  const year = d.getUTCFullYear();
-  const month = p2(d.getUTCMonth() + 1);
-  const day = p2(d.getUTCDate());
-  const hour = p2(d.getUTCHours());
-  const min = p2(d.getUTCMinutes());
-  const sec = p2(d.getUTCSeconds());
-  const ms = p3(d.getUTCMilliseconds());
-
-  return `${year}${month}${day}T${hour}${min}${sec}${ms}`;
+  return (
+    `${d.getUTCFullYear()}` +
+    `${p2(d.getUTCMonth() + 1)}` +
+    `${p2(d.getUTCDate())}` +
+    `T${p2(d.getUTCHours())}` +
+    `${p2(d.getUTCMinutes())}` +
+    `${p2(d.getUTCSeconds())}` +
+    `${p3(d.getUTCMilliseconds())}`
+  );
 }
 
 function httpResp(code, obj) {
   return {
     statusCode: code,
-    headers: { "Content-Type": "application/json", ...CORS },
+    headers: {
+      "Content-Type": "application/json",
+      ...CORS
+    },
     body: JSON.stringify(obj)
   };
 }
 
 function cors204() {
-  return { statusCode: 204, headers: { ...CORS }, body: "" };
+  return {
+    statusCode: 204,
+    headers: { ...CORS },
+    body: ""
+  };
 }
 
 function getHttpMethod(event) {
@@ -81,7 +144,10 @@ function getHttpMethod(event) {
 
 function parseBody(event) {
   const method = getHttpMethod(event);
-  if (method === "OPTIONS") return { __preflight: true };
+
+  if (method === "OPTIONS") {
+    return { __preflight: true };
+  }
 
   if (typeof event?.body === "string") {
     try {
@@ -107,15 +173,18 @@ function parsePositiveNumber(value) {
 function expandVehicles(totalVehicles, vinPrefix, vinSuffix) {
   const total = Math.max(0, parsePositiveInt(totalVehicles));
   const list = [];
-  let seq = 1;
 
   for (let i = 0; i < total; i++) {
+    const seq = i + 1;
+
     if (seq > MAX_VIN_SEQ) {
-      throw new Error(`VIN sequence overflow: requested more than ${MAX_VIN_SEQ} vehicles but VIN format supports only ${VIN_SEQ_LENGTH} digits`);
+      throw new Error(
+        `VIN sequence overflow: requested more than ${MAX_VIN_SEQ} vehicles but VIN format supports only ${VIN_SEQ_LENGTH} digits`
+      );
     }
 
     list.push({
-      vin: makeVin(vinPrefix, vinSuffix, seq++),
+      vin: makeVin(vinPrefix, vinSuffix, seq),
       type: "car"
     });
   }
@@ -150,10 +219,16 @@ module.exports.handler = async (event, context) => {
 
   try {
     const method = getHttpMethod(event);
-    if (method === "OPTIONS") return cors204();
+
+    if (method === "OPTIONS") {
+      return cors204();
+    }
 
     const p = parseBody(event);
-    if (p.__preflight) return cors204();
+
+    if (p.__preflight) {
+      return cors204();
+    }
 
     const amountOfVehicles = Math.max(0, parsePositiveInt(p.amountOfVehicles));
     const amountOfTime = parsePositiveNumber(p.amountOfTime);
@@ -161,9 +236,9 @@ module.exports.handler = async (event, context) => {
     const numberOfBlocks = Math.max(0, parsePositiveInt(p.numberOfBlocks));
     const blocksSize = Math.max(0, parsePositiveInt(p.blocksSize ?? p.blocks_size));
     const gpsArea = String(p.gpsArea || "").trim();
-    const gpsCoordinates = Array.isArray(p.gpsCoordinates) ? p.gpsCoordinates : ["77114820178BE135"];
-    const canFrames = Array.isArray(p.canFrames) ? p.canFrames : [];
-    const dbcFiles = Array.isArray(p.dbcFiles) ? p.dbcFiles : [];
+    const gpsCoordinates = normalizeStringArray(p.gpsCoordinates);
+    const canFrames = normalizeCanFrames(p.canFrames);
+    const dbcFiles = normalizeStringArray(p.dbcFiles);
     const vinPrefix = p.vinPrefix;
     const vinSuffix = p.vinSuffix ?? p.vinSufix;
     const initialDateTime = String(p.initialDateTime || "").trim();
@@ -171,11 +246,16 @@ module.exports.handler = async (event, context) => {
     const speed = parsePositiveNumber(p.speed);
     const unity = normalizeUnity(p.unity);
     const driverProfile = normalizeDriverProfile(p.driverProfile);
+    const outputFormat = normalizeOutputFormat(p.outputFormat);
     const s3Bucket = resolveS3Bucket(p);
     const workQueueUrl = resolveWorkQueueUrl(p);
 
     if (!workQueueUrl) {
       return httpResp(400, { requestId, error: "workQueueUrl is required" });
+    }
+
+    if (!s3Bucket) {
+      return httpResp(400, { requestId, error: "s3Bucket is required" });
     }
 
     if (!amountOfVehicles) {
@@ -198,7 +278,20 @@ module.exports.handler = async (event, context) => {
       return httpResp(400, { requestId, error: "speed is required" });
     }
 
+    if (!gpsCoordinates.length) {
+      return httpResp(400, { requestId, error: "gpsCoordinates is required" });
+    }
+
+    if (!dbcFiles.length) {
+      return httpResp(400, { requestId, error: "dbcFiles is required" });
+    }
+
+    if (!canFrames.length) {
+      return httpResp(400, { requestId, error: "canFrames is required" });
+    }
+
     const epochMs = Date.parse(initialDateTime);
+
     if (!Number.isFinite(epochMs)) {
       return httpResp(400, { requestId, error: "initialDateTime is invalid" });
     }
@@ -208,6 +301,7 @@ module.exports.handler = async (event, context) => {
     const durationSec = Math.max(1, Math.round(amountOfTime * 3600));
 
     const vehicles = expandVehicles(amountOfVehicles, vinPrefix, vinSuffix);
+
     if (!vehicles.length) {
       return httpResp(400, { requestId, error: "amountOfVehicles resolved to 0 vehicles" });
     }
@@ -220,7 +314,7 @@ module.exports.handler = async (event, context) => {
     }
 
     console.log(
-      `[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl} speed=${speed} unity=${unity} driverProfile=${driverProfile || "EMPTY"}`
+      `[ORCHESTRATOR] requestId=${requestId} vehicles=${vehicles.length} queue=${workQueueUrl} speed=${speed} unity=${unity} outputFormat=${outputFormat} driverProfile=${driverProfile || "EMPTY"}`
     );
 
     const sqs = new SQSClient({ region: REGION });
@@ -230,38 +324,50 @@ module.exports.handler = async (event, context) => {
       MessageBody: JSON.stringify({
         vin: v.vin,
         type: v.type,
+
         intervalSec,
         durationSec,
         epochMs,
         epochSec,
+
         amountOfVehicles,
         amountOfTime,
         generationType,
         numberOfBlocks,
         blocksSize,
+
         gpsArea,
         gpsCoordinates,
+
         canFrames,
         dbcFiles,
-        vinPrefix,
-        vinSuffix,
+
+        vinPrefix: normalizeVinPrefix(vinPrefix),
+        vinSuffix: normalizeVinSuffix(vinSuffix),
         initialDateTime,
+
         latencyTime,
         speed,
         unity,
         driverProfile,
+        outputFormat,
+
         s3Bucket,
         runId
       })
     }));
 
     let sentBatches = 0;
+
     for (let i = 0; i < allEntries.length; i += SQS_BATCH) {
       const batch = allEntries.slice(i, i + SQS_BATCH);
-      const resp = await sqs.send(new SendMessageBatchCommand({
-        QueueUrl: workQueueUrl,
-        Entries: batch
-      }));
+
+      const resp = await sqs.send(
+        new SendMessageBatchCommand({
+          QueueUrl: workQueueUrl,
+          Entries: batch
+        })
+      );
 
       sentBatches++;
 
@@ -282,29 +388,40 @@ module.exports.handler = async (event, context) => {
       vehicles,
       sentBatches,
       queue_url: workQueueUrl,
+
       intervalSec,
       durationSec,
+      epochMs,
+      epochSec,
+
       amountOfVehicles,
       amountOfTime,
       generationType,
       numberOfBlocks,
       blocksSize,
+
       gpsArea,
+      gpsCoordinates,
+
       canFrames,
       dbcFiles,
-      vinPrefix,
-      vinSuffix,
+
+      vinPrefix: normalizeVinPrefix(vinPrefix),
+      vinSuffix: normalizeVinSuffix(vinSuffix),
       initialDateTime,
+
       latencyTime,
       speed,
       unity,
       driverProfile,
+      outputFormat,
+
       s3Bucket,
-      epochSec,
       runId
     });
   } catch (err) {
     console.error("[ORCHESTRATOR] Unhandled error:", err);
+
     return httpResp(500, {
       requestId,
       error: "Unhandled exception in orchestrator",
