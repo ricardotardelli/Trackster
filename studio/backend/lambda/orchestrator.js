@@ -698,6 +698,8 @@ module.exports.handler = async (event, context) => {
 
     const messageSizeBytes = assertSafeSqsMessageSize(probeBody);
 
+    const sqsPayloadPreview = JSON.parse(probeBody);
+
     console.log(
       `[ORCHESTRATOR] requestId=${requestId} runId=${runId} vehicles=${vehicles.length} canIds=${resolvedCanIds.length} canFrames=${resolvedCanFrames.length} messageSizeBytes=${messageSizeBytes} queue=${workQueueUrl}`
     );
@@ -780,7 +782,8 @@ module.exports.handler = async (event, context) => {
       unity,
       driverProfile,
       outputFormat,
-      s3Bucket
+      s3Bucket,
+      sqsPayloadPreview
     });
   } catch (err) {
     console.error("[ORCHESTRATOR] Unhandled error:", err);
