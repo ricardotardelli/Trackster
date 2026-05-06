@@ -18,6 +18,16 @@ const FORMAT_VERSION = 1;
 const DEFAULT_BUS = 0;
 const DEFAULT_BLOCK_INTERVAL_NS = 10_000_000;
 
+const CAN_FD_DLC_TO_BYTES = {
+  9: 12,
+  10: 16,
+  11: 20,
+  12: 24,
+  13: 32,
+  14: 48,
+  15: 64,
+};
+
 exports.handler = async function handler(event) {
   const records = Array.isArray(event?.Records)
     ? event.Records
@@ -297,6 +307,8 @@ function normalizeSignal(raw, index) {
       offset: Number(raw[5] ?? 0),
       min: raw[6],
       max: raw[7],
+      muxType: normalizeMuxType(raw[9]),
+      muxValue: normalizeMuxValue(raw[10]),
     };
   }
 
@@ -310,7 +322,58 @@ function normalizeSignal(raw, index) {
     offset: Number(raw.offset ?? raw.o ?? 0),
     min: raw.min ?? raw.minRaw,
     max: raw.max ?? raw.maxRaw,
+    muxType: normalizeMuxType(raw.mx ?? raw.muxType),
+    muxValue: normalizeMuxValue(raw.mv ?? raw.muxValue),
   };
+}
+
+function normalizeMuxType(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numeric = Number(value);
+
+  if (Number.isFinite(numeric)) {
+    if (numeric === 1) return 'multiplexor';
+    if (numeric === 0) return 'multiplexed';
+  }
+
+  const text = String(value).trim().toLowerCase();
+
+  if (text === 'm' || text === 'mux' || text === 'multiplexor' || text === 'multiplexer') {
+    return 'multiplexor';
+  }
+
+  if (text.startsWith('m') && text.length > 1) {
+    return 'multiplexed';
+  }
+
+  if (text === 'multiplexed') {
+    return 'multiplexed';
+  }
+
+  return null;
+}
+
+function normalizeMuxValue(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numeric = Number(value);
+
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const text = String(value).trim().toLowerCase();
+
+  if (/^m\d+$/.test(text)) {
+    return Number(text.slice(1));
+  }
+
+  return null;
 }
 
 function normalizeByteOrder(value) {
@@ -412,9 +475,9 @@ function buildGeneratedBlock(message, blockIndex, runtime) {
     return {
       timestampDeltaNs: frameIndex,
       bus: dbcMessage.bus,
-      flags: dbcMessage.dlc > 8 ? 1 : 0,
+      flags: payload.length > 8 ? 1 : 0,
       canId: dbcMessage.canId,
-      dlc: dbcMessage.dlc,
+      dlc: payload.length,
       payload,
     };
   });
@@ -477,25 +540,26 @@ function buildFrameFromInputFrame(frame, frameIndex, runtime) {
 
   if (frame.payload || frame.data || frame.dat) {
     payload = normalizePayload(frame.payload ?? frame.data ?? frame.dat);
+
+    const requestedPayloadLength = resolvePayloadLengthFromFrameDlc(
+      frame.dlc,
+      payload.length
+    );
+
+    payload = padPayloadToLength(payload, requestedPayloadLength);
   } else {
     const values = frame.values || frame.signals || {};
     payload = encodeMessagePayload(dbcMessage, values);
   }
 
-  const dlc = Number(frame.dlc ?? payload.length ?? dbcMessage.dlc);
-
-  if (payload.length !== dlc) {
-    throw new Error(
-      `Payload length does not match DLC for CAN ID ${canId}. DLC=${dlc}, payload=${payload.length}`
-    );
-  }
+  const payloadLength = payload.length;
 
   return {
     timestampDeltaNs,
     bus,
-    flags: dlc > 8 ? 1 : 0,
+    flags: payloadLength > 8 ? 1 : 0,
     canId,
-    dlc,
+    dlc: payloadLength,
     payload,
   };
 }
@@ -560,9 +624,44 @@ function generateDefaultPhysicalValue(signal, blockIndex, frameIndex) {
 }
 
 function encodeMessagePayload(dbcMessage, signalValues) {
-  const payload = Buffer.alloc(dbcMessage.dlc, 0);
+  const payloadLength = normalizeCanPayloadLength(dbcMessage.dlc);
+  const payload = Buffer.alloc(payloadLength, 0);
+
+  const muxSignal = dbcMessage.signals.find((signal) => signal.muxType === 'multiplexor');
+  let muxRawValue = null;
+
+  if (muxSignal) {
+    const muxKey = muxSignal.name || `${muxSignal.startBit}_${muxSignal.bitLength}`;
+    const muxPhysicalValue = Number(signalValues[muxKey] ?? 0);
+    muxRawValue = physicalToRaw(muxSignal, muxPhysicalValue);
+
+    writeSignalBits(payload, {
+      startBit: muxSignal.startBit,
+      bitLength: muxSignal.bitLength,
+      byteOrder: muxSignal.byteOrder,
+      rawValue: muxRawValue,
+    });
+  }
 
   for (const signal of dbcMessage.signals) {
+    if (signal.muxType === 'multiplexor') {
+      continue;
+    }
+
+    if (signal.muxType === 'multiplexed') {
+      if (!muxSignal) {
+        continue;
+      }
+
+      if (signal.muxValue === null || signal.muxValue === undefined) {
+        continue;
+      }
+
+      if (BigInt(signal.muxValue) !== BigInt(muxRawValue)) {
+        continue;
+      }
+    }
+
     const signalKey = signal.name || `${signal.startBit}_${signal.bitLength}`;
     const physicalValue = Number(signalValues[signalKey] ?? 0);
     const rawValue = physicalToRaw(signal, physicalValue);
@@ -733,6 +832,100 @@ function normalizePayload(value) {
   throw new Error('Invalid payload format.');
 }
 
+function normalizeCanPayloadLength(length) {
+  const value = Number(length);
+
+  if (!Number.isInteger(value) || value < 0 || value > 64) {
+    throw new Error(`Invalid CAN payload length: ${length}`);
+  }
+
+  if (value <= 8) {
+    return value;
+  }
+
+  if (value <= 12) return 12;
+  if (value <= 16) return 16;
+  if (value <= 20) return 20;
+  if (value <= 24) return 24;
+  if (value <= 32) return 32;
+  if (value <= 48) return 48;
+  if (value <= 64) return 64;
+
+  throw new Error(`Invalid CAN FD payload length: ${length}`);
+}
+
+function bytesToCanDlc(payloadLength) {
+  const length = Number(payloadLength);
+
+  if (!Number.isInteger(length) || length < 0 || length > 64) {
+    throw new Error(`Invalid CAN payload length for DLC mapping: ${payloadLength}`);
+  }
+
+  if (length <= 8) return length;
+  if (length <= 12) return 9;
+  if (length <= 16) return 10;
+  if (length <= 20) return 11;
+  if (length <= 24) return 12;
+  if (length <= 32) return 13;
+  if (length <= 48) return 14;
+  if (length <= 64) return 15;
+
+  throw new Error(`Invalid CAN FD payload length for DLC mapping: ${payloadLength}`);
+}
+
+function canDlcToPayloadLength(dlc) {
+  const value = Number(dlc);
+
+  if (!Number.isInteger(value) || value < 0 || value > 15) {
+    throw new Error(`Invalid CAN DLC: ${dlc}`);
+  }
+
+  if (value <= 8) {
+    return value;
+  }
+
+  return CAN_FD_DLC_TO_BYTES[value];
+}
+
+function resolvePayloadLengthFromFrameDlc(frameDlc, payloadLength) {
+  if (frameDlc === undefined || frameDlc === null || frameDlc === '') {
+    return normalizeCanPayloadLength(payloadLength);
+  }
+
+  const dlcValue = Number(frameDlc);
+
+  if (!Number.isInteger(dlcValue) || dlcValue < 0 || dlcValue > 64) {
+    throw new Error(`Invalid frame DLC: ${frameDlc}`);
+  }
+
+  if (dlcValue >= 9 && dlcValue <= 15) {
+    const encodedLength = canDlcToPayloadLength(dlcValue);
+
+    if (payloadLength <= encodedLength) {
+      return encodedLength;
+    }
+  }
+
+  return normalizeCanPayloadLength(dlcValue);
+}
+
+function padPayloadToLength(payload, targetLength) {
+  if (payload.length > targetLength) {
+    throw new Error(
+      `Payload length exceeds CAN DLC payload size. payload=${payload.length}, target=${targetLength}`
+    );
+  }
+
+  if (payload.length === targetLength) {
+    return payload;
+  }
+
+  return Buffer.concat([
+    payload,
+    Buffer.alloc(targetLength - payload.length, 0),
+  ]);
+}
+
 function buildTracksterBin(blocks, requestedBlockSize) {
   const targetBlockSize = Number(requestedBlockSize || 0);
 
@@ -847,14 +1040,19 @@ function buildBlockHeader(block) {
 function buildFrameRecord(frame) {
   const canId = Number(frame.canId);
   const bus = Number(frame.bus || 0);
-  const flags = Number(frame.flags || 0);
   const timestampDeltaNs = Number(frame.timestampDeltaNs || 0);
 
-  const payload = Buffer.isBuffer(frame.payload)
-    ? frame.payload
+  let payload = Buffer.isBuffer(frame.payload)
+    ? Buffer.from(frame.payload)
     : Buffer.from(frame.payload || []);
 
-  const dlc = Number(frame.dlc ?? payload.length);
+  const requestedPayloadLength = Number(frame.dlc ?? payload.length);
+  const payloadLength = normalizeCanPayloadLength(requestedPayloadLength);
+
+  payload = padPayloadToLength(payload, payloadLength);
+
+  const dlcCode = bytesToCanDlc(payload.length);
+  const flags = Number(frame.flags ?? (payload.length > 8 ? 1 : 0));
 
   if (!Number.isInteger(canId) || canId < 0) {
     throw new Error(`Invalid CAN ID: ${frame.canId}`);
@@ -872,23 +1070,12 @@ function buildFrameRecord(frame) {
     throw new Error(`Invalid timestamp delta for CAN ID ${canId}: ${timestampDeltaNs}`);
   }
 
-  if (!Number.isInteger(dlc) || dlc < 0 || dlc > 64) {
-    throw new Error(`Invalid DLC for CAN ID ${canId}: ${dlc}`);
-  }
-
-  if (payload.length !== dlc) {
-    throw new Error(
-      `Payload length does not match DLC for CAN ID ${canId}. ` +
-      `DLC=${dlc}, payload=${payload.length}`
-    );
-  }
-
-  const buffer = Buffer.alloc(FRAME_FIXED_HEADER_SIZE + dlc);
+  const buffer = Buffer.alloc(FRAME_FIXED_HEADER_SIZE + payload.length);
 
   buffer.writeUInt32LE(canId, 0);
   buffer.writeUInt32LE(timestampDeltaNs, 4);
   buffer.writeUInt8(bus, 8);
-  buffer.writeUInt8(dlc, 9);
+  buffer.writeUInt8(dlcCode, 9);
   buffer.writeUInt8(flags, 10);
 
   payload.copy(buffer, FRAME_FIXED_HEADER_SIZE);

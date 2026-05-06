@@ -22,6 +22,22 @@ const MAX_SAFE_SQS_BYTES = 900 * 1024;
 const CUSTOMER_ID = process.env.CUSTOMER_ID || "00000000";
 const COMPILED_DBC_BUCKET = process.env.COMPILED_DBC_BUCKET || "trackster-customer-dbc";
 
+const RUNTIME_DBC_VERSION = 2;
+
+const RUNTIME_SIGNAL_FIELDS = [
+  "sb",
+  "bl",
+  "bo",
+  "sg",
+  "f",
+  "o",
+  "min",
+  "max",
+  "n",
+  "mx",
+  "mv"
+];
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -421,6 +437,89 @@ function buildDuplicateSignature(canId, messageName, frame) {
   return `${normalizeCanId(canId)}::${normalizedMessageName}::${signalSignature}`;
 }
 
+function getCompiledFieldIndex(compiledFields, fieldName) {
+  if (!Array.isArray(compiledFields)) {
+    return -1;
+  }
+
+  return compiledFields.indexOf(fieldName);
+}
+
+function readCompiledSignalField(signal, compiledFields, fieldName, fallbackIndex, fallbackValue = null) {
+  if (Array.isArray(signal)) {
+    const index = getCompiledFieldIndex(compiledFields, fieldName);
+
+    if (index >= 0 && index < signal.length) {
+      return signal[index];
+    }
+
+    if (fallbackIndex >= 0 && fallbackIndex < signal.length) {
+      return signal[fallbackIndex];
+    }
+
+    return fallbackValue;
+  }
+
+  if (signal && typeof signal === "object") {
+    if (Object.prototype.hasOwnProperty.call(signal, fieldName)) {
+      return signal[fieldName];
+    }
+
+    return fallbackValue;
+  }
+
+  return fallbackValue;
+}
+
+function normalizeCompiledSignalForRuntime(signal, compiledFields) {
+  const sb = readCompiledSignalField(signal, compiledFields, "sb", 0);
+  const bl = readCompiledSignalField(signal, compiledFields, "bl", 1);
+  const bo = readCompiledSignalField(signal, compiledFields, "bo", 2);
+  const sg = readCompiledSignalField(signal, compiledFields, "sg", 3);
+  const factor = readCompiledSignalField(signal, compiledFields, "f", 4, 1);
+  const offset = readCompiledSignalField(signal, compiledFields, "o", 5, 0);
+  const min = readCompiledSignalField(signal, compiledFields, "min", 6, 0);
+  const max = readCompiledSignalField(signal, compiledFields, "max", 7, 0);
+
+  const name =
+    readCompiledSignalField(signal, compiledFields, "n", 8, "") ||
+    readCompiledSignalField(signal, compiledFields, "name", -1, "");
+
+  const mx = readCompiledSignalField(signal, compiledFields, "mx", 9, null);
+  const mv = readCompiledSignalField(signal, compiledFields, "mv", 10, null);
+
+  return [
+    sb,
+    bl,
+    bo,
+    sg,
+    factor,
+    offset,
+    min,
+    max,
+    name ? String(name) : "",
+    mx === undefined ? null : mx,
+    mv === undefined ? null : mv
+  ];
+}
+
+function normalizeCompiledFrameForRuntime(frame, compiledFields) {
+  if (!frame || typeof frame !== "object") {
+    return frame;
+  }
+
+  const rawSignals = Array.isArray(frame.s)
+    ? frame.s
+    : Array.isArray(frame.signals)
+      ? frame.signals
+      : [];
+
+  return {
+    ...frame,
+    s: rawSignals.map((signal) => normalizeCompiledSignalForRuntime(signal, compiledFields))
+  };
+}
+
 async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
   const selectedByDbc = buildSelectedCanFrameMap(canFrames);
 
@@ -440,8 +539,8 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
   }
 
   const runtime = {
-    v: 1,
-    f: ["sb", "bl", "bo", "sg", "f", "o", "min", "max"],
+    v: RUNTIME_DBC_VERSION,
+    f: RUNTIME_SIGNAL_FIELDS,
     m: {}
   };
 
@@ -459,10 +558,6 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
     const loaded = await readCompiledDbc(s3, dbcFile);
     const compiled = loaded.compiled;
 
-    if (Array.isArray(compiled.f) && compiled.f.length > 0) {
-      runtime.f = compiled.f;
-    }
-
     sources.push({
       dbcFile,
       compiledKey: loaded.key,
@@ -470,9 +565,9 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
     });
 
     for (const [canId, selectedFrame] of selectedForThisDbc.entries()) {
-      const frame = compiled.m[canId];
+      const originalFrame = compiled.m[canId];
 
-      if (!frame) {
+      if (!originalFrame) {
         missing.push({
           dbcFile,
           canId,
@@ -480,6 +575,11 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
         });
         continue;
       }
+
+      const frame = normalizeCompiledFrameForRuntime(
+        originalFrame,
+        compiled.f
+      );
 
       const duplicateSignature = buildDuplicateSignature(
         canId,
@@ -668,25 +768,25 @@ module.exports.handler = async (event, context) => {
     const baseMessage = {
       runId,
       customerId: CUSTOMER_ID,
-    
+
       intervalSec,
       durationSec,
       epochMs,
       epochSec,
-    
+
       numberOfBlocks,
       blocksSize,
-    
+
       gpsCoordinates,
       canFrames,
-    
+
       speed,
       unity,
       driverProfile,
       outputFormat,
-    
+
       s3Bucket,
-    
+
       compiledDbc
     };
 

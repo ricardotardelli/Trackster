@@ -1,59 +1,24 @@
 {
-  "isValid": false,
+  "v": 2,
+  "src": "example_multiplexed.dbc",
+  "st": "validated",
+  "ts": "2026-05-06T00:00:00.000Z",
 
-  "data": [
-    {
-      "sourceLine": 10,
-      "hexId": "0x100",
-      "name": "VehicleSpeed",
-      "sizeBytes": 8,
-      "transmitter": "ECU1",
-      "signals": [
-        {
-          "sourceLine": 11,
-          "name": "Speed",
-          "startBit": 0,
-          "sizeBits": 16,
-          "endianness": "Little Endian",
-          "isSigned": false,
-          "factor": 0.1,
-          "offset": 0,
-          "range": {
-            "min": 0,
-            "max": 250
-          },
-          "unit": "km/h"
-        }
+  "f": ["sb", "bl", "bo", "sg", "f", "o", "min", "max", "mx", "mv", "n"],
+
+  "m": {
+    "0x100": {
+      "l": 8,
+      "n": "VEHICLE_DATA",
+
+      "s": [
+        [0, 4, 1, 0, 1, 0, 0, 15, 1, null, "MODE"],
+
+        [8, 16, 1, 0, 0.1, 0, 0, 250, 0, 0, "SPEED"],
+        [8, 16, 1, 0, 1, 0, 0, 8000, 0, 1, "RPM"],
+
+        [24, 8, 1, 0, 1, 0, 0, 100, null, null, "BATTERY_LEVEL"]
       ]
-    }
-  ],
-
-  "warnings": [
-    {
-      "line": 11,
-      "type": "RANGE_WARNING",
-      "message": "Signal range may be too large"
-    }
-  ],
-
-  "errors": [
-    {
-      "line": 12,
-      "type": "OVERLAP_ERROR",
-      "message": "Signal overlaps with another"
-    }
-  ],
-
-  "stats": {
-    "messages": {
-      "total": 1,
-      "valid": 0,
-      "invalid": 1
-    },
-    "signals": {
-      "total": 1,
-      "valid": 0,
-      "invalid": 1
     }
   }
 }
