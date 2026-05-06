@@ -45,5 +45,14 @@ https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-upload?customerId=000
  - API DBC messages canid list
  https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-signals?customerId=00000000
 
-
+- Headers
+   - GLOBAL HEADER 40 bytes
+   - BLOCK HEADER  32 bytes
+   - FRAME RECORD  11 bytes fixos + payload[dlc]
+        - timestampDeltaNs  uint32
+        - bus               uint8
+        - flags             uint8
+        - canId             uint32
+        - dlc               uint8
+        - payload           dlc bytes
 

@@ -667,25 +667,26 @@ module.exports.handler = async (event, context) => {
 
     const baseMessage = {
       runId,
-
+      customerId: CUSTOMER_ID,
+    
       intervalSec,
       durationSec,
       epochMs,
       epochSec,
-
+    
       numberOfBlocks,
       blocksSize,
-
+    
       gpsCoordinates,
       canFrames,
-
+    
       speed,
       unity,
       driverProfile,
       outputFormat,
-
+    
       s3Bucket,
-
+    
       compiledDbc
     };
 

@@ -1,699 +1,909 @@
-"use strict";
+'use strict';
 
-/*============================================================================
-Trackster Telemetry Worker (SQS)
-- Trigger: SQS
-- Contract (current): record.body JSON with:
-  { vin, type, intervalSec, durationSec  }
-- S3 key: <VIN>/can_data_<TIMESTAMP>_<FILE SEQUENCE>.bin
-============================================================================*/
-const fs = require("fs");
-const path = require("path");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
-const REGION = process.env.AWS_REGION || "us-east-1";
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const REGION = process.env.AWS_REGION || process.env.REGION || 'us-east-1';
+const OUTPUT_BUCKET = process.env.OUTPUT_BUCKET || '';
+
 const s3 = new S3Client({ region: REGION });
 
-const BASE_DIR = __dirname;
-const DBC_DIR = path.join(BASE_DIR, "dbc");
+const GLOBAL_HEADER_SIZE = 40;
+const BLOCK_HEADER_SIZE = 32;
+const FRAME_FIXED_HEADER_SIZE = 11;
 
-const GENERIC_HEADER_SIZE = 0x26;         // 38 bytes (keep as-is per your current working validator expectations)
-const NUM_CAN_BLOCKS_OFFSET = 0x23;       // 3 bytes (0x23..0x25)
+const TRACKSTER_MAGIC = 'TRKS';
+const BLOCK_MAGIC = 'BLK1';
+const FORMAT_VERSION = 1;
 
-const BLOCK_HEADER_SIZE = 29;
-const GPS_BYTES = Buffer.from("0000000000000000", "hex");
+const DEFAULT_BUS = 0;
+const DEFAULT_BLOCK_INTERVAL_NS = 10_000_000;
 
-const FD_PAYLOAD_SIZES = [
-  0, 1, 2, 3, 4, 5, 6, 7, 8,
-  12, 16, 20, 24, 32, 48, 64
-];
-const specCache = new Map();
+exports.handler = async function handler(event) {
+  const records = Array.isArray(event?.Records)
+    ? event.Records
+    : [{ body: JSON.stringify(event) }];
 
-async function putObjectNoOverwrite({ Bucket, Key, Body, ContentType }) {
-  return s3.send(new PutObjectCommand({
-    Bucket,
-    Key,
-    Body,
-    ContentType,
-    IfNoneMatch: "*" // only create if object does NOT exist
-  }));
-}
+  const results = [];
 
-function normalizeGpsHex(value) {
-  const normalized = String(value || "").trim().toUpperCase();
-  if (!/^[0-9A-F]{16}$/.test(normalized)) {
-    throw new Error(`Invalid GPS coordinate: "${value}"`);
-  }
-  return normalized;
-}
+  for (const record of records) {
+    try {
+      const message = parseSqsBody(record.body);
+      const result = await processMessage(message);
+      results.push(result);
+    } catch (error) {
+      console.error('[WORKER] Failed to process record.', {
+        errorName: error?.name,
+        errorMessage: error?.message,
+        stack: error?.stack,
+      });
 
-function getGpsBytesForBlock(gpsCoordinates, blockIndex, totalBlocks) {
-  if (!Array.isArray(gpsCoordinates) || gpsCoordinates.length === 0) {
-    return GPS_BYTES;
-  }
-
-  const normalizedCoordinates = gpsCoordinates.map(normalizeGpsHex);
-  const coordCount = normalizedCoordinates.length;
-
-  if (totalBlocks <= 1) {
-    return Buffer.from(normalizedCoordinates[0], "hex");
-  }
-
-  if (coordCount === 1) {
-    return Buffer.from(normalizedCoordinates[0], "hex");
-  }
-
-  let selectedIndex = 0;
-
-  if (coordCount >= totalBlocks) {
-    if (blockIndex === 0) {
-      selectedIndex = 0;
-    } else if (blockIndex === totalBlocks - 1) {
-      selectedIndex = coordCount - 1;
-    } else {
-      selectedIndex = Math.round(
-        blockIndex * (coordCount - 1) / (totalBlocks - 1)
-      );
-    }
-  } else {
-    const base = Math.floor(totalBlocks / coordCount);
-    const rest = totalBlocks % coordCount;
-
-    let startBlock = 0;
-
-    for (let i = 0; i < coordCount; i++) {
-      const blocksForThisCoordinate = base + (i === coordCount - 1 ? rest : 0);
-      const endBlockExclusive = startBlock + blocksForThisCoordinate;
-
-      if (blockIndex >= startBlock && blockIndex < endBlockExclusive) {
-        selectedIndex = i;
-        break;
-      }
-
-      startBlock = endBlockExclusive;
-    }
-  }
-
-  return Buffer.from(normalizedCoordinates[selectedIndex], "hex");
-}
-
-function isAlreadyExists(err) {
-  return err?.$metadata?.httpStatusCode === 412 ||
-         err?.name === "PreconditionFailed";
-}
-
-function mapToFdSize(minBytes) {
-  for (const s of FD_PAYLOAD_SIZES) if (s >= minBytes) return s;
-  throw new Error("Payload too large");
-}
-
-function fdDlcFromSize(payloadSize) {
-  if (payloadSize <= 8) return payloadSize;
-  const idx = FD_PAYLOAD_SIZES.indexOf(payloadSize);
-  if (idx === -1) throw new Error("Invalid CAN-FD payload size: " + payloadSize);
-  return idx; // 12->9, 16->10, 20->11, 24->12, 32->13, 48->14, 64->15
-}
-
-function makeRng(seed) {
-  let x = (seed >>> 0) || 1;
-  return () => {
-    x = (x * 16807) % 2147483647;
-    return x / 2147483647;
-  };
-}
-
-function hashStringToU32(str) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function parseNumber(x) {
-  if (x === undefined || x === null) return Number.NaN;
-  const s = String(x).trim().replace(",", ".");
-  if (!s) return Number.NaN;
-  const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : Number.NaN;
-}
-
-function writeIntel(payload, startBit, length, rawUnsigned) {
-  for (let i = 0; i < length; i++) {
-    const bitIndex = startBit + i;
-    const byte = Math.floor(bitIndex / 8);
-    const bit = bitIndex % 8;
-    if (byte < 0 || byte >= payload.length) continue;
-    payload[byte] &= ~(1 << bit);
-  }
-
-  for (let i = 0; i < length; i++) {
-    const bitVal = (rawUnsigned >> i) & 1;
-    if (!bitVal) continue;
-
-    const bitIndex = startBit + i;
-    const byte = Math.floor(bitIndex / 8);
-    const bit = bitIndex % 8;
-
-    if (byte < 0 || byte >= payload.length) continue;
-    payload[byte] |= (1 << bit);
-  }
-}
-
-function writeMotorola(payload, startBit, length, rawUnsigned) {
-  let byte = Math.floor(startBit / 8);
-  let bitInByte = startBit % 8;
-
-  for (let i = 0; i < length; i++) {
-    const actualBit = 7 - bitInByte;
-    if (byte >= 0 && byte < payload.length) {
-      payload[byte] &= ~(1 << actualBit);
-    }
-    if (bitInByte === 7) { byte += 1; bitInByte = 0; }
-    else bitInByte += 1;
-  }
-
-  byte = Math.floor(startBit / 8);
-  bitInByte = startBit % 8;
-
-  for (let i = 0; i < length; i++) {
-    const bitVal = (rawUnsigned >> (length - 1 - i)) & 1;
-    if (bitVal) {
-      const actualBit = 7 - bitInByte;
-      if (byte >= 0 && byte < payload.length) {
-        payload[byte] |= (1 << actualBit);
-      }
-    }
-
-    if (bitInByte === 7) { byte += 1; bitInByte = 0; }
-    else bitInByte += 1;
-  }
-}
-
-function readIntel(payload, startBit, length) {
-  let v = 0;
-  for (let i = 0; i < length; i++) {
-    const bitIndex = startBit + i;
-    const byte = Math.floor(bitIndex / 8);
-    const bit = bitIndex % 8;
-    if (byte < 0 || byte >= payload.length) continue;
-    const bitVal = (payload[byte] >> bit) & 1;
-    v |= (bitVal << i);
-  }
-  return v >>> 0;
-}
-
-function readMotorola(payload, startBit, length) {
-  let v = 0;
-  let byte = Math.floor(startBit / 8);
-  let bitInByte = startBit % 8; // 0=MSB..7=LSB
-
-  for (let i = 0; i < length; i++) {
-    const actualBit = 7 - bitInByte;
-    let bitVal = 0;
-    if (byte >= 0 && byte < payload.length) {
-      bitVal = (payload[byte] >> actualBit) & 1;
-    }
-    v = (v << 1) | bitVal;
-
-    if (bitInByte === 7) { byte += 1; bitInByte = 0; }
-    else bitInByte += 1;
-  }
-  return v >>> 0;
-}
-
-function toTwosComplementUnsigned(rawSigned, length) {
-  const L = BigInt(length);
-  const mod = 1n << L;
-  const x = BigInt(rawSigned);
-  const u = ((x % mod) + mod) % mod;
-  return Number(u); // length here is small in DBC; safe to cast for bit ops
-}
-
-function parseDbc(text) {
-  const lines = text.split(/\r?\n/);
-  const messages = {};
-  let current = null;
-
-  for (const line of lines) {
-    const t = line.trimStart();
-
-    if (t.startsWith("BO_ ")) {
-      const m = t.match(/^BO_\s+(\d+)\s+\w+\s*:\s+(\d+)/);
-      if (!m) continue;
-
-      current = {
-        id: Number(m[1]),
-        dlcBytes: Number(m[2]),
-        signals: []
-      };
-      messages[current.id] = current;
-      continue;
-    }
-
-    if (t.startsWith("SG_ ") && current) {
-      const m = t.match(
-        /^SG_\s+(\w+)(?:\s+[mM]\d+|\s+M)?\s*:\s*(\d+)\|(\d+)@(\d)([+-])\s+\(([^,]+),([^)]+)\)\s+\[([^|]+)\|([^\]]+)\]/
-      );
-      if (!m) continue;
-
-      const sigName = m[1];
-
-      current.signals.push({
-        name: sigName,
-        startBit: Number(m[2]),
-        length: Number(m[3]),
-        endian: Number(m[4]),
-        signed: m[5] === "-",
-        scale: parseNumber(m[6]),
-        offset: parseNumber(m[7]),
-        min: parseNumber(m[8]),
-        max: parseNumber(m[9])
+      results.push({
+        ok: false,
+        error: error?.message || String(error),
       });
     }
   }
 
-  return messages;
+  return {
+    ok: results.every((item) => item.ok),
+    results,
+  };
+};
+
+function parseSqsBody(body) {
+  if (typeof body === 'object' && body !== null) {
+    return body;
+  }
+
+  if (typeof body !== 'string') {
+    throw new Error('Invalid SQS body.');
+  }
+
+  const parsed = JSON.parse(body);
+
+  if (typeof parsed?.Message === 'string') {
+    return JSON.parse(parsed.Message);
+  }
+
+  return parsed;
 }
 
-function chooseRawForSignal(s, rnd) {
-  const L = Number(s.length);
+async function processMessage(message) {
+  const outputBucket = getOutputBucket(message);
+  const outputKey = buildOutputKey(message);
 
-  const scale  = Number(s.scale);
-  const offset = Number(s.offset);
+  const runtime = extractRuntime(message);
+  const blocks = buildSimulationBlocks(message, runtime);
+  const binBuffer = buildTracksterBin(blocks, message.blocksSize ?? message.blocks_size);
 
-  const hasPhysRange =
-    Number.isFinite(s.min) && Number.isFinite(s.max) &&
-    Number.isFinite(scale) && scale !== 0 &&
-    Number.isFinite(offset);
+  await s3.send(new PutObjectCommand({
+    Bucket: outputBucket,
+    Key: outputKey,
+    Body: binBuffer,
+    ContentType: 'application/octet-stream',
+    Metadata: {
+      format: 'trackster-bin',
+      version: String(FORMAT_VERSION),
+      customerid: String(message.customerId || ''),
+      runid: String(message.runId || ''),
+      vin: String(message.vin || ''),
+      blocks: String(blocks.length),
+      frames: String(countFrames(blocks)),
+    },
+  }));
 
-  let rawLo, rawHi;
-  if (s.signed) {
-    rawLo = -(2 ** (L - 1));
-    rawHi =  (2 ** (L - 1)) - 1;
+  console.log('[WORKER] BIN written.', {
+    bucket: outputBucket,
+    key: outputKey,
+    bytes: binBuffer.length,
+    blocks: blocks.length,
+    frames: countFrames(blocks),
+  });
+
+  return {
+    ok: true,
+    bucket: outputBucket,
+    key: outputKey,
+    bytes: binBuffer.length,
+    blocks: blocks.length,
+    frames: countFrames(blocks),
+  };
+}
+
+function getOutputBucket(message) {
+  const bucket =
+    message.s3Bucket ||
+    message.outputBucket ||
+    message.bucket ||
+    message.output?.bucket ||
+    OUTPUT_BUCKET;
+
+  if (!bucket) {
+    throw new Error('Missing output bucket. Expected message.s3Bucket or OUTPUT_BUCKET.');
+  }
+
+  return String(bucket).trim();
+}
+
+function buildOutputKey(message) {
+  const customerId = getRequiredString(message.customerId, 'customerId');
+  const runId = getRequiredString(message.runId, 'runId');
+  const vin = getRequiredString(message.vin, 'vin');
+
+  const extension = normalizeOutputExtension(message.outputFormat);
+  const runFolder = normalizeRunFolder(runId);
+
+  return [
+    sanitizePathPart(customerId),
+    runFolder,
+    `${sanitizeFileName(vin)}.${extension}`,
+  ].join('/');
+}
+
+function normalizeRunFolder(runId) {
+  const digits = String(runId || '').replace(/\D/g, '');
+
+  if (digits.length >= 14) {
+    return digits.slice(0, 14);
+  }
+
+  if (digits.length > 0) {
+    return digits.padEnd(14, '0');
+  }
+
+  throw new Error(`Invalid runId for S3 folder: ${runId}`);
+}
+
+function normalizeOutputExtension(outputFormat) {
+  const value = String(outputFormat || 'BIN').trim().toLowerCase();
+
+  if (value === 'json') return 'json';
+  if (value === 'csv') return 'csv';
+
+  return 'bin';
+}
+
+function getRequiredString(value, fieldName) {
+  const text = String(value || '').trim();
+
+  if (!text) {
+    throw new Error(`${fieldName} is required`);
+  }
+
+  return text;
+}
+
+function sanitizePathPart(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/[^a-zA-Z0-9._=-]/g, '_');
+}
+
+function sanitizeFileName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function countFrames(blocks) {
+  return blocks.reduce((sum, block) => sum + block.frames.length, 0);
+}
+
+function extractRuntime(message) {
+  const runtime =
+    message.compiledDbc ||
+    message.compiledDbcRuntime ||
+    message.runtimeCompiledDbc ||
+    message.dbcRuntime ||
+    message.runtime;
+
+  if (!runtime) {
+    throw new Error('Missing compiled DBC runtime. Expected message.compiledDbc.');
+  }
+
+  const messages = normalizeRuntimeMessages(runtime);
+
+  if (!messages.length) {
+    throw new Error('Compiled DBC runtime has no messages.');
+  }
+
+  return {
+    messages,
+  };
+}
+
+function normalizeRuntimeMessages(runtime) {
+  const result = [];
+
+  if (runtime.m && typeof runtime.m === 'object' && !Array.isArray(runtime.m)) {
+    for (const [canIdKey, entries] of Object.entries(runtime.m)) {
+      const list = Array.isArray(entries) ? entries : [entries];
+
+      for (const entry of list) {
+        result.push(normalizeRuntimeEntry(canIdKey, entry));
+      }
+    }
+
+    return result.filter(Boolean);
+  }
+
+  if (Array.isArray(runtime.messages)) {
+    return runtime.messages
+      .map((item) => normalizeRuntimeEntry(item?.canId ?? item?.id, item))
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(runtime.m)) {
+    return runtime.m
+      .map((item) => normalizeRuntimeEntry(item?.canId ?? item?.id, item))
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeRuntimeEntry(canIdKey, entry) {
+  if (!entry) {
+    return null;
+  }
+
+  const frame = entry.frame || entry;
+  const canId = parseCanId(entry.canId ?? frame.canId ?? frame.id ?? frame.address ?? canIdKey);
+  const name = String(entry.messageName || frame.messageName || frame.name || frame.n || `MSG_${canId}`);
+  const dlc = Number(frame.dlc ?? frame.length ?? frame.l ?? 8);
+  const bus = Number(frame.bus ?? frame.src ?? DEFAULT_BUS);
+
+  const rawSignals =
+    frame.signals ||
+    frame.s ||
+    frame.signalList ||
+    [];
+
+  const signals = Array.isArray(rawSignals)
+    ? rawSignals.map(normalizeSignal).filter(Boolean)
+    : [];
+
+  if (!Number.isInteger(canId) || canId < 0) {
+    throw new Error(`Invalid CAN ID in runtime message: ${canIdKey}`);
+  }
+
+  if (!Number.isInteger(dlc) || dlc < 0 || dlc > 64) {
+    throw new Error(`Invalid DLC for ${name}: ${dlc}`);
+  }
+
+  return {
+    canId,
+    name,
+    dlc,
+    bus,
+    signals,
+  };
+}
+
+function normalizeSignal(raw, index) {
+  if (!raw) {
+    return null;
+  }
+
+  if (Array.isArray(raw)) {
+    return {
+      name: raw[8] ? String(raw[8]) : `signal_${index}`,
+      startBit: Number(raw[0]),
+      bitLength: Number(raw[1]),
+      byteOrder: Number(raw[2]) === 0 ? 'big' : 'little',
+      isSigned: Boolean(raw[3]),
+      factor: Number(raw[4] ?? 1),
+      offset: Number(raw[5] ?? 0),
+      min: raw[6],
+      max: raw[7],
+    };
+  }
+
+  return {
+    name: raw.name ? String(raw.name) : `signal_${index}`,
+    startBit: Number(raw.startBit ?? raw.sb),
+    bitLength: Number(raw.bitLength ?? raw.sizeBits ?? raw.bl),
+    byteOrder: normalizeByteOrder(raw.byteOrder ?? raw.endianness ?? raw.bo),
+    isSigned: Boolean(raw.isSigned ?? raw.signed ?? raw.sg),
+    factor: Number(raw.factor ?? raw.f ?? 1),
+    offset: Number(raw.offset ?? raw.o ?? 0),
+    min: raw.min ?? raw.minRaw,
+    max: raw.max ?? raw.maxRaw,
+  };
+}
+
+function normalizeByteOrder(value) {
+  if (value === 0) return 'big';
+  if (value === 1) return 'little';
+
+  const text = String(value || '').toLowerCase();
+
+  if (text.includes('big') || text.includes('motorola')) {
+    return 'big';
+  }
+
+  return 'little';
+}
+
+function parseCanId(value) {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  const text = String(value || '').trim();
+
+  if (text.startsWith('0x') || text.startsWith('0X')) {
+    return parseInt(text, 16);
+  }
+
+  return parseInt(text, 10);
+}
+
+function buildSimulationBlocks(message, runtime) {
+  const sourceBlocks =
+    message.blocks ||
+    message.simulationBlocks ||
+    message.payloadBlocks;
+
+  if (Array.isArray(sourceBlocks) && sourceBlocks.length > 0) {
+    return sourceBlocks.map((block, index) => buildBlockFromInputBlock(block, index, runtime));
+  }
+
+  const blockCount = Number(
+    message.numberOfBlocks ||
+    message.blockCount ||
+    message.blocksCount ||
+    message.totalBlocks ||
+    1
+  );
+
+  if (!Number.isInteger(blockCount) || blockCount <= 0) {
+    throw new Error(`Invalid block count: ${blockCount}`);
+  }
+
+  const blocks = [];
+
+  for (let blockIndex = 0; blockIndex < blockCount; blockIndex += 1) {
+    blocks.push(buildGeneratedBlock(message, blockIndex, runtime));
+  }
+
+  return blocks;
+}
+
+function buildBlockFromInputBlock(block, blockIndex, runtime) {
+  const timestampNs = toBigIntSafe(
+    block.timestampNs ??
+    block.timestamp ??
+    block.startTimestampNs ??
+    blockIndex * DEFAULT_BLOCK_INTERVAL_NS
+  );
+
+  const rawFrames =
+    block.frames ||
+    block.canFrames ||
+    block.messages ||
+    [];
+
+  const frames = rawFrames.map((frame, frameIndex) => {
+    return buildFrameFromInputFrame(frame, frameIndex, runtime);
+  });
+
+  return {
+    timestampNs,
+    frames,
+  };
+}
+
+function buildGeneratedBlock(message, blockIndex, runtime) {
+  const epochMs = Number(message.epochMs || 0);
+  const intervalSec = Number(message.intervalSec || 1);
+
+  const timestampNs = epochMs > 0
+    ? BigInt(Math.floor((epochMs + blockIndex * intervalSec * 1000) * 1_000_000))
+    : BigInt(blockIndex * DEFAULT_BLOCK_INTERVAL_NS);
+
+  const selectedMessages = extractSelectedMessages(message, runtime);
+
+  const frames = selectedMessages.map((dbcMessage, frameIndex) => {
+    const signalValues = resolveSignalValues(message, dbcMessage, blockIndex, frameIndex);
+    const payload = encodeMessagePayload(dbcMessage, signalValues);
+
+    return {
+      timestampDeltaNs: frameIndex,
+      bus: dbcMessage.bus,
+      flags: dbcMessage.dlc > 8 ? 1 : 0,
+      canId: dbcMessage.canId,
+      dlc: dbcMessage.dlc,
+      payload,
+    };
+  });
+
+  return {
+    timestampNs,
+    frames,
+  };
+}
+
+function extractSelectedMessages(message, runtime) {
+  const canFrames = Array.isArray(message.canFrames) ? message.canFrames : [];
+
+  if (canFrames.length > 0) {
+    const selected = [];
+
+    for (const item of canFrames) {
+      const canId = parseCanId(item.canId ?? item.id ?? item.address ?? item);
+      const messageName = item.messageName || item.name;
+
+      const found = findRuntimeMessage(runtime, canId, messageName);
+
+      if (!found) {
+        throw new Error(`Selected CAN frame not found in runtime: ${canId} / 0x${canId.toString(16).toUpperCase()}`);
+      }
+
+      selected.push(found);
+    }
+
+    return selected;
+  }
+
+  return runtime.messages;
+}
+
+function buildFrameFromInputFrame(frame, frameIndex, runtime) {
+  const canId = parseCanId(
+    frame.canId ??
+    frame.id ??
+    frame.address
+  );
+
+  const messageName = frame.name || frame.messageName;
+  const dbcMessage = findRuntimeMessage(runtime, canId, messageName);
+
+  if (!dbcMessage) {
+    throw new Error(`Frame CAN ID not found in runtime: ${canId} / 0x${canId.toString(16).toUpperCase()}`);
+  }
+
+  const timestampDeltaNs = Number(
+    frame.timestampDeltaNs ??
+    frame.deltaNs ??
+    frame.t ??
+    frameIndex
+  );
+
+  const bus = Number(frame.bus ?? frame.src ?? dbcMessage.bus ?? DEFAULT_BUS);
+
+  let payload;
+
+  if (frame.payload || frame.data || frame.dat) {
+    payload = normalizePayload(frame.payload ?? frame.data ?? frame.dat);
   } else {
-    rawLo = 0;
-    rawHi = (2 ** L) - 1;
+    const values = frame.values || frame.signals || {};
+    payload = encodeMessagePayload(dbcMessage, values);
   }
 
-  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const dlc = Number(frame.dlc ?? payload.length ?? dbcMessage.dlc);
 
-  if (!hasPhysRange) return 0;
-
-  const physMin = Math.min(s.min, s.max);
-  const physMax = Math.max(s.min, s.max);
-
-  // raw range implied by physical range
-  let rMin = (physMin - offset) / scale;
-  let rMax = (physMax - offset) / scale;
-
-  // FIX #1: handle negative scale
-  if (scale < 0) {
-    const tmp = rMin; rMin = rMax; rMax = tmp;
+  if (payload.length !== dlc) {
+    throw new Error(
+      `Payload length does not match DLC for CAN ID ${canId}. DLC=${dlc}, payload=${payload.length}`
+    );
   }
 
-  rMin = Math.ceil(rMin);
-  rMax = Math.floor(rMax);
-
-  // FIX #2: clamp to representable raw range
-  rMin = clamp(rMin, rawLo, rawHi);
-  rMax = clamp(rMax, rawLo, rawHi);
-
-  // Normalize if still inverted after clamping
-  if (rMax < rMin) {
-    const r0 = clamp(Math.round((0 - offset) / scale), rawLo, rawHi);
-    return r0;
-  }
-
-  // Pull away from edges a bit
-  if (rMax - rMin >= 4) { rMin += 1; rMax -= 1; }
-
-  for (let t = 0; t < 10; t++) {
-    const pick = rMin + Math.floor(rnd() * (rMax - rMin + 1));
-    const phys = pick * scale + offset;
-    if (phys >= physMin && phys <= physMax) {
-      return pick; // already within [rMin,rMax]
-    }
-  }
-
-  return Math.round((rMin + rMax) / 2);
+  return {
+    timestampDeltaNs,
+    bus,
+    flags: dlc > 8 ? 1 : 0,
+    canId,
+    dlc,
+    payload,
+  };
 }
 
-function buildPayload(msg, rnd) {
-  let minBytes = msg.dlcBytes;
+function findRuntimeMessage(runtime, canId, messageName) {
+  if (messageName) {
+    const exact = runtime.messages.find((msg) => {
+      return msg.canId === canId && msg.name === String(messageName);
+    });
 
-  for (const s of msg.signals) {
-    const startByte = Math.floor(s.startBit / 8);
-    const bytesForSignal = startByte + Math.ceil(s.length / 8);
-    if (bytesForSignal > minBytes) minBytes = bytesForSignal;
+    if (exact) {
+      return exact;
+    }
   }
 
-  const payloadSize = mapToFdSize(minBytes);
-  const payload = Buffer.alloc(payloadSize, 0x00);
+  return runtime.messages.find((msg) => msg.canId === canId) || null;
+}
 
-  for (const s of msg.signals) {
-    const raw = chooseRawForSignal(s, rnd);
+function resolveSignalValues(message, dbcMessage, blockIndex, frameIndex) {
+  const values = {};
 
-    let rawUnsigned;
-    if (s.signed) rawUnsigned = toTwosComplementUnsigned(raw, s.length);
-    else rawUnsigned = raw >>> 0;
+  const globalValues =
+    message.signalValues ||
+    message.values ||
+    {};
 
-    if (s.endian === 1) writeIntel(payload, s.startBit, s.length, rawUnsigned);
-    else writeMotorola(payload, s.startBit, s.length, rawUnsigned);
+  const byMessage =
+    globalValues[dbcMessage.name] ||
+    globalValues[String(dbcMessage.canId)] ||
+    globalValues[`0x${dbcMessage.canId.toString(16).toUpperCase()}`] ||
+    {};
+
+  for (const signal of dbcMessage.signals) {
+    const key = signal.name || `${signal.startBit}_${signal.bitLength}`;
+
+    if (Object.prototype.hasOwnProperty.call(byMessage, key)) {
+      values[key] = byMessage[key];
+      continue;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(globalValues, key)) {
+      values[key] = globalValues[key];
+      continue;
+    }
+
+    values[key] = generateDefaultPhysicalValue(signal, blockIndex, frameIndex);
   }
 
-  if (msg.id === 0x3AC || msg.id === 0x390 || msg.id === 0x448) {
-    console.log("DIAG CAN", "0x" + msg.id.toString(16).toUpperCase(), "payloadHex", payload.toString("hex"));
+  return values;
+}
 
-    if (msg.id === 0x3AC) {
-      const intel = readIntel(payload, 25, 2);
-      const moto = readMotorola(payload, 25, 2);
-      console.log("DIAG 0x3AC GW_POWER_RES start=25 len=2 -> Intel:", intel, "Motorola:", moto);
-    }
+function generateDefaultPhysicalValue(signal, blockIndex, frameIndex) {
+  const rawMin = Number(signal.min ?? 0);
+  const rawMax = Number(signal.max ?? 0);
 
-    if (msg.id === 0x448) {
-      const intel = readIntel(payload, 32, 2);
-      const moto = readMotorola(payload, 32, 2);
-      console.log("DIAG 0x448 EVSECONFPAYOPT start=32 len=2 -> Intel:", intel, "Motorola:", moto);
-    }
+  if (Number.isFinite(rawMin) && Number.isFinite(rawMax) && rawMax > rawMin) {
+    const span = rawMax - rawMin;
+    return rawMin + ((blockIndex + frameIndex) % Math.min(span + 1, 100));
+  }
 
-    if (msg.id === 0x390) {
-      const destIntel = readIntel(payload, 19, 4);
-      const destMoto = readMotorola(payload, 19, 4);
-      const tempRawIntel = readIntel(payload, 32, 8);
-      const tempRawMoto = readMotorola(payload, 32, 8);
+  return 0;
+}
 
-      const physIntel = tempRawIntel * 0.5 - 40;
-      const physMoto = tempRawMoto * 0.5 - 40;
+function encodeMessagePayload(dbcMessage, signalValues) {
+  const payload = Buffer.alloc(dbcMessage.dlc, 0);
 
-      console.log("DIAG 0x390 DESTINATION start=19 len=4 -> Intel:", destIntel, "Motorola:", destMoto);
-      console.log(
-        "DIAG 0x390 OUTTEMP raw start=32 len=8 -> IntelRaw:",
-        tempRawIntel,
-        "MotorolaRaw:",
-        tempRawMoto,
-        "IntelPhys:",
-        physIntel,
-        "MotorolaPhys:",
-        physMoto
-      );
-    }
+  for (const signal of dbcMessage.signals) {
+    const signalKey = signal.name || `${signal.startBit}_${signal.bitLength}`;
+    const physicalValue = Number(signalValues[signalKey] ?? 0);
+    const rawValue = physicalToRaw(signal, physicalValue);
+
+    writeSignalBits(payload, {
+      startBit: signal.startBit,
+      bitLength: signal.bitLength,
+      byteOrder: signal.byteOrder,
+      rawValue,
+    });
   }
 
   return payload;
 }
 
-function makeTimestampAbsBytesFromDate(d) {
-  const b = Buffer.alloc(8, 0x00);
+function physicalToRaw(signal, physicalValue) {
+  const factor = Number(signal.factor || 1);
+  const offset = Number(signal.offset || 0);
+  const bitLength = Number(signal.bitLength);
 
-  const sec   = d.getUTCSeconds();          // 0..59  (valid 0..89)
-  const min   = d.getUTCMinutes();          // 0..59  (valid 0..89)
-  const hour  = d.getUTCHours();            // 0..23  (valid 0..35)
-  const day   = d.getUTCDate();             // 1..31  (valid 1..49)
-  const month = d.getUTCMonth() + 1;        // 1..12  (valid 1..18)
-  const year  = d.getUTCFullYear() - 2000;  // e.g. 26 (valid 0..153)
+  let raw = Math.round((physicalValue - offset) / factor);
+  let rawBig = BigInt(raw);
 
-  // Layout expected by decoder for 0x661: bytes are fields (not epoch)
-  // [0]=SEC, [1]=MIN, [2]=HOUR, [3]=DAY, [4]=MONTH, [5]=YEAR, [6]=0, [7]=0
-  b[0] = sec & 0xff;
-  b[1] = min & 0xff;
-  b[2] = hour & 0xff;
-  b[3] = day & 0xff;
-  b[4] = month & 0xff;
-  b[5] = year & 0xff;
+  if (signal.isSigned) {
+    const minSigned = -(1n << BigInt(bitLength - 1));
+    const maxSigned = (1n << BigInt(bitLength - 1)) - 1n;
 
-  return b;
-}
+    if (rawBig < minSigned) rawBig = minSigned;
+    if (rawBig > maxSigned) rawBig = maxSigned;
 
-function makeTimestampRelBytesMs(ms) {
-  const b = Buffer.alloc(8, 0x00);
-  b.writeBigUInt64BE(BigInt(ms), 0);
-  return b;
-}
-
-function normalizeDbcName(name) {
-  return String(name || "").trim().replace(/\.dbc$/i, "");
-}
-
-function resolveDbcPath(name) {
-  return path.join(DBC_DIR, `${normalizeDbcName(name)}.dbc`);
-}
-
-function resolveDbcFiles(payload) {
-  if (!Array.isArray(payload?.dbcFiles)) return [];
-
-  return Array.from(new Set(
-    payload.dbcFiles
-      .map(normalizeDbcName)
-      .filter(Boolean)
-  )).sort();
-}
-
-function normalizeCanId(value) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-
-  const text = String(value || "").trim();
-  if (!text) return Number.NaN;
-  if (/^0x/i.test(text)) return Number.parseInt(text, 16);
-  return Number.parseInt(text, 10);
-}
-
-function resolveCanWhitelist(payload) {
-  if (!Array.isArray(payload?.canFrames)) return new Set();
-
-  const canIds = payload.canFrames
-    .map(normalizeCanId)
-    .filter(Number.isFinite);
-
-  return new Set(canIds);
-}
-
-function loadSpec(selectedDbcFiles, whitelist) {
-  if (!whitelist.size) throw new Error("canFrames empty in message");
-
-  const dbcNames = selectedDbcFiles;
-  if (!dbcNames.length) throw new Error("dbcFiles empty in message");
-
-  const cacheKey = `${dbcNames.join("|")}::${Array.from(whitelist).sort((a, b) => a - b).join("|")}`;
-  const cached = specCache.get(cacheKey);
-  if (cached) return cached;
-
-  let messages = {};
-  for (const name of dbcNames) {
-    const fp = resolveDbcPath(name);
-    const dbcText = fs.readFileSync(fp, "utf8");
-    Object.assign(messages, parseDbc(dbcText));
-  }
-
-  const msgList = Object.values(messages)
-    .filter(m => whitelist.has(m.id))
-    .filter(m => m.id !== 0x335)
-    .sort((a, b) => a.id - b.id);
-
-  const spec = { msgList };
-  specCache.set(cacheKey, spec);
-  return spec;
-}
-
-function resolveS3Bucket(payload) {
-  const raw = String(
-    payload?.s3Bucket ||
-    payload?.bucket ||
-    payload?.s3_bucket ||
-    ""
-  ).trim();
-
-  if (!raw) return "";
-
-  if (raw.startsWith("arn:aws:s3:::")) {
-    return raw.slice("arn:aws:s3:::".length);
-  }
-
-  return raw;
-
-}
-
-function buildGenericHeader(numBlocks, epochMs, blockdatasize) {
-  const h = Buffer.alloc(GENERIC_HEADER_SIZE, 0x00);
-
-  h.writeUInt16BE(0x0001, 0x00);
-  h.writeUInt16BE(0x0002, 0x02);
-  h.writeUInt16BE(0x0003, 0x04);
-
-  const tsRel = BigInt(epochMs);
-  h.writeBigUInt64BE(tsRel, 0x06);
-
-  h.writeUInt8(0x01, 0x0E);
-
-  const controlLen = numBlocks * (BLOCK_HEADER_SIZE + blockdatasize);
-  h.writeUInt32BE(controlLen >>> 0, 0x0F);
-
-  h[NUM_CAN_BLOCKS_OFFSET + 0] = (numBlocks >> 16) & 0xff;
-  h[NUM_CAN_BLOCKS_OFFSET + 1] = (numBlocks >> 8) & 0xff;
-  h[NUM_CAN_BLOCKS_OFFSET + 2] = numBlocks & 0xff;
-
-  return h;
-}
-
-function generateBin(msgList, cycles, seed, intervalSec, epochMs, blockdatasize, msg, gpsCoordinates) {
-  const rnd = makeRng(seed);
-
-  const FRAMES_PER_BLOCK = 150;
-  const blocksPerCycle = Math.ceil(msgList.length / FRAMES_PER_BLOCK);
-  const requestedBlocks = Number(msg?.numberOfBlocks || 0);
-  const totalBlocks = requestedBlocks > 0 ? requestedBlocks : (cycles * blocksPerCycle);
-
-  const genericHeader = buildGenericHeader(totalBlocks, epochMs, blockdatasize);
-  const blocks = [];
-  const baseDate = new Date(epochMs);
-
-  let blockNo = 1;
-
-  for (let n = 0; n < totalBlocks; n++) {
-    const cycleIndex = Math.floor(n / blocksPerCycle);
-    const page = n % blocksPerCycle;
-
-    const simMs = cycleIndex * intervalSec * 1000;
-    const simDate = new Date(baseDate.getTime() + simMs);
-
-    let used = 0;
-    const frames = [];
-
-    const start = page * FRAMES_PER_BLOCK;
-    const end = Math.min(start + FRAMES_PER_BLOCK, msgList.length);
-
-    for (let k = start; k < end; k++) {
-      const m = msgList[k];
-      const payload = buildPayload(m, rnd);
-
-      const frame = Buffer.alloc(8 + payload.length);
-      frame.writeUInt32BE(m.id >>> 0, 0);
-      frame.writeUInt32BE(fdDlcFromSize(payload.length) >>> 0, 4);
-      payload.copy(frame, 8);
-
-      if (used + frame.length > blockdatasize) break;
-      frames.push(frame);
-      used += frame.length;
+    if (rawBig < 0n) {
+      rawBig = (1n << BigInt(bitLength)) + rawBig;
     }
 
-    const block = Buffer.alloc(BLOCK_HEADER_SIZE + blockdatasize, 0x00);
-
-    block[0] = (blockNo >> 16) & 0xff;
-    block[1] = (blockNo >> 8) & 0xff;
-    block[2] = blockNo & 0xff;
-
-    makeTimestampAbsBytesFromDate(simDate).copy(block, 0x03);
-    makeTimestampRelBytesMs(simMs).copy(block, 0x0b);
-    const gpsBytes = getGpsBytesForBlock(gpsCoordinates, blockNo - 1, totalBlocks);
-    gpsBytes.copy(block, 0x13);
-
-    block[0x1b] = (blockdatasize >> 8) & 0xff;
-    block[0x1c] = blockdatasize & 0xff;
-
-    let off = BLOCK_HEADER_SIZE;
-    for (const f of frames) {
-      f.copy(block, off);
-      off += f.length;
-      if (off >= block.length) break;
-    }
-
-    blocks.push(block);
-    blockNo++;
+    return rawBig;
   }
 
-  return Buffer.concat([genericHeader, ...blocks]);
+  const maxUnsigned = (1n << BigInt(bitLength)) - 1n;
+
+  if (rawBig < 0n) rawBig = 0n;
+  if (rawBig > maxUnsigned) rawBig = maxUnsigned;
+
+  return rawBig;
 }
 
-exports.handler = async (event) => {
-  console.log("### WORKER RUNNING ###");
-  console.log("EVENT RAW:", JSON.stringify(event));
+function writeSignalBits(payload, signal) {
+  validateSignalBounds(payload, signal.startBit, signal.bitLength, signal.byteOrder);
 
-  if (!event || !Array.isArray(event.Records) || event.Records.length === 0) {
-    console.log("No SQS records.");
+  if (signal.byteOrder === 'big') {
+    writeMotorolaBits(payload, signal.startBit, signal.bitLength, signal.rawValue);
+  } else {
+    writeIntelBits(payload, signal.startBit, signal.bitLength, signal.rawValue);
+  }
+}
+
+function validateSignalBounds(payload, startBit, bitLength, byteOrder) {
+  if (!Number.isInteger(startBit) || startBit < 0) {
+    throw new Error(`Invalid signal start bit: ${startBit}`);
+  }
+
+  if (!Number.isInteger(bitLength) || bitLength <= 0 || bitLength > 64) {
+    throw new Error(`Invalid signal bit length: ${bitLength}`);
+  }
+
+  const payloadBits = payload.length * 8;
+
+  if (startBit >= payloadBits) {
+    throw new Error(`Signal start bit out of payload bounds: ${startBit}`);
+  }
+
+  if (byteOrder === 'little') {
+    const endBit = startBit + bitLength - 1;
+
+    if (endBit >= payloadBits) {
+      throw new Error(
+        `Little-endian signal exceeds payload bounds. startBit=${startBit}, bitLength=${bitLength}, payloadBits=${payloadBits}`
+      );
+    }
+
     return;
   }
 
-  for (const rec of event.Records) {
-    let msg;
-    try {
-      msg = JSON.parse(rec.body);
-    } catch {
-      console.log("Skipping record: invalid JSON body");
-      continue;
-    }
+  const positions = getMotorolaBitPositions(startBit, bitLength);
 
-    const BLOCK_DATA_SIZE = Number(msg.blocksSize || 0x1E00);
-
-    const epochMs  = Number(msg.epochMs || 0);
-    const epochSec = Number(msg.epochSec || 0);
-
-    if (!epochMs || !epochSec) {
-      console.log("Skipping record: missing epochMs/epochSec");
-      continue;
-    }
-
-    const intervalSec = Number(msg.intervalSec || 0);
-    const durationSec = Number(msg.durationSec || 0);
-    if (!intervalSec || !durationSec) {
-      console.log("Skipping record: missing intervalSec/durationSec");
-      continue;
-    }
-
-    const cycles = Math.floor(durationSec / intervalSec);
-    if (cycles <= 0) {
-      console.log("Skipping record: cycles <= 0");
-      continue;
-    }
-
-    const vin = String(msg.vin || "").trim();
-    if (!vin) {
-      console.log("Skipping record: missing vin");
-      continue;
-    }
-
-    const dbcFiles = resolveDbcFiles(msg);
-    if (!dbcFiles.length) {
-      console.log("Skipping record: missing dbcFiles");
-      continue;
-    }
-
-    const whitelist = resolveCanWhitelist(msg);
-    if (!whitelist.size) {
-      console.log("Skipping record: missing canFrames");
-      continue;
-    }
-
-    const bucketName = resolveS3Bucket(msg);
-    if (!bucketName) {
-      console.log("Skipping record: missing s3Bucket/bucket in payload");
-      continue;
-    }
-
-    const { msgList } = loadSpec(dbcFiles, whitelist);
-
-    const seed = (epochMs ^ hashStringToU32(vin)) >>> 0;
-    const bin = generateBin(msgList, cycles, seed, intervalSec, epochMs, BLOCK_DATA_SIZE, msg, msg.gpsCoordinates);
-
-    let n = 1;
-    while (true) {
-      const key = `${vin}/can_data_${epochSec}_${n}.bin`;
-
-      try {
-        await putObjectNoOverwrite({
-          Bucket: bucketName,
-          Key: key,
-          Body: bin,
-          ContentType: "application/octet-stream"
-        });
-
-        console.log("PUT OK", { Bucket: bucketName, Key: key, bytes: bin.length });
-        break;
-      } catch (err) {
-        if (isAlreadyExists(err)) { n++; continue; }
-        throw err;
-      }
+  for (const bit of positions) {
+    if (bit < 0 || bit >= payloadBits) {
+      throw new Error(
+        `Motorola signal exceeds payload bounds. startBit=${startBit}, bitLength=${bitLength}, invalidBit=${bit}, payloadBits=${payloadBits}`
+      );
     }
   }
-};
+}
+
+function writeIntelBits(payload, startBit, bitLength, rawValue) {
+  const value = BigInt(rawValue);
+
+  for (let i = 0; i < bitLength; i += 1) {
+    const bitValue = Number((value >> BigInt(i)) & 1n);
+    const absoluteBit = startBit + i;
+    setPayloadBit(payload, absoluteBit, bitValue);
+  }
+}
+
+function writeMotorolaBits(payload, startBit, bitLength, rawValue) {
+  const value = BigInt(rawValue);
+  const positions = getMotorolaBitPositions(startBit, bitLength);
+
+  for (let i = 0; i < bitLength; i += 1) {
+    const sourceBitIndex = BigInt(bitLength - 1 - i);
+    const bitValue = Number((value >> sourceBitIndex) & 1n);
+    setPayloadBit(payload, positions[i], bitValue);
+  }
+}
+
+function getMotorolaBitPositions(startBit, bitLength) {
+  const positions = [];
+  let bit = Number(startBit);
+
+  for (let i = 0; i < bitLength; i += 1) {
+    positions.push(bit);
+
+    if (bit % 8 === 0) {
+      bit += 15;
+    } else {
+      bit -= 1;
+    }
+  }
+
+  return positions;
+}
+
+function setPayloadBit(payload, absoluteBit, value) {
+  const byteIndex = Math.floor(absoluteBit / 8);
+  const bitIndex = absoluteBit % 8;
+
+  if (byteIndex < 0 || byteIndex >= payload.length) {
+    throw new Error(`Bit index out of payload bounds: ${absoluteBit}`);
+  }
+
+  if (value) {
+    payload[byteIndex] |= (1 << bitIndex);
+  } else {
+    payload[byteIndex] &= ~(1 << bitIndex);
+  }
+}
+
+function normalizePayload(value) {
+  if (Buffer.isBuffer(value)) {
+    return Buffer.from(value);
+  }
+
+  if (Array.isArray(value)) {
+    return Buffer.from(value.map((item) => Number(item) & 0xff));
+  }
+
+  if (typeof value === 'string') {
+    const cleaned = value
+      .replace(/^0x/i, '')
+      .replace(/[^a-fA-F0-9]/g, '');
+
+    if (cleaned.length % 2 !== 0) {
+      throw new Error(`Invalid hex payload: ${value}`);
+    }
+
+    return Buffer.from(cleaned, 'hex');
+  }
+
+  throw new Error('Invalid payload format.');
+}
+
+function buildTracksterBin(blocks, requestedBlockSize) {
+  const targetBlockSize = Number(requestedBlockSize || 0);
+
+  const normalizedBlocks = blocks.map((block, blockIndex) => {
+    const frames = block.frames || [];
+    const frameBuffers = frames.map((frame) => buildFrameRecord(frame));
+    const blockPayload = Buffer.concat(frameBuffers);
+
+    const payloadBytes = blockPayload.length;
+    const minimumBlockSize = BLOCK_HEADER_SIZE + payloadBytes;
+
+    const blockSizeBytes = targetBlockSize > 0
+      ? targetBlockSize
+      : minimumBlockSize;
+
+    if (!Number.isInteger(blockSizeBytes) || blockSizeBytes < minimumBlockSize) {
+      throw new Error(
+        `Invalid blocksSize for block ${blockIndex}. ` +
+        `blocksSize=${blockSizeBytes}, minimumRequired=${minimumBlockSize}`
+      );
+    }
+
+    const fillerBytes = blockSizeBytes - minimumBlockSize;
+
+    return {
+      blockIndex,
+      timestampNs: toBigIntSafe(block.timestampNs || 0),
+      frameCount: frames.length,
+      payloadBytes,
+      blockSizeBytes,
+      payload: blockPayload,
+      filler: Buffer.alloc(fillerBytes, 0),
+    };
+  });
+
+  const totalFrameCount = normalizedBlocks.reduce(
+    (sum, block) => sum + block.frameCount,
+    0
+  );
+
+  const totalPayloadBytes = normalizedBlocks.reduce(
+    (sum, block) => sum + block.blockSizeBytes,
+    0
+  );
+
+  const globalHeader = buildGlobalHeader({
+    blockCount: normalizedBlocks.length,
+    totalFrameCount,
+    totalPayloadBytes,
+  });
+
+  const blockBuffers = normalizedBlocks.map((block) => {
+    const blockHeader = buildBlockHeader(block);
+
+    return Buffer.concat([
+      blockHeader,
+      block.payload,
+      block.filler,
+    ]);
+  });
+
+  return Buffer.concat([
+    globalHeader,
+    ...blockBuffers,
+  ]);
+}
+
+function buildGlobalHeader({
+  blockCount,
+  totalFrameCount,
+  totalPayloadBytes,
+}) {
+  const buffer = Buffer.alloc(GLOBAL_HEADER_SIZE);
+
+  buffer.write(TRACKSTER_MAGIC, 0, 4, 'ascii');
+
+  buffer.writeUInt16LE(FORMAT_VERSION, 4);
+  buffer.writeUInt8(1, 6);
+  buffer.writeUInt8(0, 7);
+
+  buffer.writeUInt16LE(GLOBAL_HEADER_SIZE, 8);
+  buffer.writeUInt16LE(BLOCK_HEADER_SIZE, 10);
+  buffer.writeUInt16LE(FRAME_FIXED_HEADER_SIZE, 12);
+  buffer.writeUInt16LE(0, 14);
+
+  buffer.writeUInt32LE(blockCount, 16);
+  buffer.writeUInt32LE(totalFrameCount, 20);
+
+  buffer.writeBigUInt64LE(BigInt(Date.now()), 24);
+
+  buffer.writeUInt32LE(totalPayloadBytes, 32);
+  buffer.writeUInt32LE(0, 36);
+
+  return buffer;
+}
+
+function buildBlockHeader(block) {
+  const buffer = Buffer.alloc(BLOCK_HEADER_SIZE);
+
+  buffer.write(BLOCK_MAGIC, 0, 4, 'ascii');
+
+  buffer.writeUInt32LE(block.blockIndex, 4);
+  buffer.writeBigUInt64LE(toBigIntSafe(block.timestampNs), 8);
+  buffer.writeUInt32LE(block.frameCount, 16);
+  buffer.writeUInt32LE(block.payloadBytes, 20);
+  buffer.writeUInt32LE(block.blockSizeBytes, 24);
+  buffer.writeUInt32LE(0, 28);
+
+  return buffer;
+}
+
+function buildFrameRecord(frame) {
+  const canId = Number(frame.canId);
+  const bus = Number(frame.bus || 0);
+  const flags = Number(frame.flags || 0);
+  const timestampDeltaNs = Number(frame.timestampDeltaNs || 0);
+
+  const payload = Buffer.isBuffer(frame.payload)
+    ? frame.payload
+    : Buffer.from(frame.payload || []);
+
+  const dlc = Number(frame.dlc ?? payload.length);
+
+  if (!Number.isInteger(canId) || canId < 0) {
+    throw new Error(`Invalid CAN ID: ${frame.canId}`);
+  }
+
+  if (!Number.isInteger(bus) || bus < 0 || bus > 255) {
+    throw new Error(`Invalid CAN bus: ${frame.bus}`);
+  }
+
+  if (!Number.isInteger(flags) || flags < 0 || flags > 255) {
+    throw new Error(`Invalid frame flags for CAN ID ${canId}: ${flags}`);
+  }
+
+  if (!Number.isInteger(timestampDeltaNs) || timestampDeltaNs < 0 || timestampDeltaNs > 0xffffffff) {
+    throw new Error(`Invalid timestamp delta for CAN ID ${canId}: ${timestampDeltaNs}`);
+  }
+
+  if (!Number.isInteger(dlc) || dlc < 0 || dlc > 64) {
+    throw new Error(`Invalid DLC for CAN ID ${canId}: ${dlc}`);
+  }
+
+  if (payload.length !== dlc) {
+    throw new Error(
+      `Payload length does not match DLC for CAN ID ${canId}. ` +
+      `DLC=${dlc}, payload=${payload.length}`
+    );
+  }
+
+  const buffer = Buffer.alloc(FRAME_FIXED_HEADER_SIZE + dlc);
+
+  buffer.writeUInt32LE(canId, 0);
+  buffer.writeUInt32LE(timestampDeltaNs, 4);
+  buffer.writeUInt8(bus, 8);
+  buffer.writeUInt8(dlc, 9);
+  buffer.writeUInt8(flags, 10);
+
+  payload.copy(buffer, FRAME_FIXED_HEADER_SIZE);
+
+  return buffer;
+}
+
+function toBigIntSafe(value) {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+
+  if (value === undefined || value === null || value === '') {
+    return 0n;
+  }
+
+  return BigInt(Math.trunc(Number(value)));
+}
