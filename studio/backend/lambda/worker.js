@@ -18,6 +18,9 @@ const FORMAT_VERSION = 1;
 const DEFAULT_BUS = 0;
 const DEFAULT_BLOCK_INTERVAL_NS = 10_000_000;
 
+const FRAME_FLAG_CAN_FD = 0x01;
+const FRAME_FLAG_EXTENDED_ID = 0x02;
+
 const CAN_FD_DLC_TO_BYTES = {
   9: 12,
   10: 16,
@@ -165,11 +168,6 @@ function normalizeRunFolder(runId) {
 }
 
 function normalizeOutputExtension(outputFormat) {
-  const value = String(outputFormat || 'BIN').trim().toLowerCase();
-
-  if (value === 'json') return 'json';
-  if (value === 'csv') return 'csv';
-
   return 'bin';
 }
 
@@ -260,6 +258,7 @@ function normalizeRuntimeEntry(canIdKey, entry) {
 
   const frame = entry.frame || entry;
   const canId = parseCanId(entry.canId ?? frame.canId ?? frame.id ?? frame.address ?? canIdKey);
+  const idf = normalizeCanIdFormat(entry.idf ?? frame.idf);
   const name = String(entry.messageName || frame.messageName || frame.name || frame.n || `MSG_${canId}`);
   const dlc = Number(frame.dlc ?? frame.length ?? frame.l ?? 8);
   const bus = Number(frame.bus ?? frame.src ?? DEFAULT_BUS);
@@ -274,9 +273,7 @@ function normalizeRuntimeEntry(canIdKey, entry) {
     ? rawSignals.map(normalizeSignal).filter(Boolean)
     : [];
 
-  if (!Number.isInteger(canId) || canId < 0) {
-    throw new Error(`Invalid CAN ID in runtime message: ${canIdKey}`);
-  }
+  validateCanIdForFormat(canId, idf, name);
 
   if (!Number.isInteger(dlc) || dlc < 0 || dlc > 64) {
     throw new Error(`Invalid DLC for ${name}: ${dlc}`);
@@ -284,11 +281,40 @@ function normalizeRuntimeEntry(canIdKey, entry) {
 
   return {
     canId,
+    idf,
     name,
     dlc,
     bus,
     signals,
   };
+}
+
+function normalizeCanIdFormat(value) {
+  const text = String(value || '').trim().toLowerCase();
+
+  if (text === 'extended' || text === 'ext' || text === '29bit' || text === '29-bit') {
+    return 'extended';
+  }
+
+  return 'standard';
+}
+
+function validateCanIdForFormat(canId, idf, name) {
+  if (!Number.isInteger(canId) || canId < 0) {
+    throw new Error(`Invalid CAN ID in runtime message: ${name}`);
+  }
+
+  if (idf === 'standard' && canId > 0x7ff) {
+    throw new Error(
+      `CAN ID 0x${canId.toString(16).toUpperCase()} for ${name} is marked as standard but exceeds 11-bit range.`
+    );
+  }
+
+  if (idf === 'extended' && canId > 0x1fffffff) {
+    throw new Error(
+      `CAN ID 0x${canId.toString(16).toUpperCase()} for ${name} is marked as extended but exceeds 29-bit range.`
+    );
+  }
 }
 
 function normalizeSignal(raw, index) {
@@ -475,7 +501,11 @@ function buildGeneratedBlock(message, blockIndex, runtime) {
     return {
       timestampDeltaNs: frameIndex,
       bus: dbcMessage.bus,
-      flags: payload.length > 8 ? 1 : 0,
+      flags: buildFrameFlags({
+        idf: dbcMessage.idf,
+        payloadLength: payload.length,
+      }),
+      idf: dbcMessage.idf,
       canId: dbcMessage.canId,
       dlc: payload.length,
       payload,
@@ -557,11 +587,30 @@ function buildFrameFromInputFrame(frame, frameIndex, runtime) {
   return {
     timestampDeltaNs,
     bus,
-    flags: payloadLength > 8 ? 1 : 0,
+    flags: buildFrameFlags({
+      idf: dbcMessage.idf,
+      payloadLength,
+      existingFlags: frame.flags,
+    }),
+    idf: dbcMessage.idf,
     canId,
     dlc: payloadLength,
     payload,
   };
+}
+
+function buildFrameFlags({ idf, payloadLength, existingFlags = 0 }) {
+  let flags = Number(existingFlags || 0);
+
+  if (payloadLength > 8) {
+    flags |= FRAME_FLAG_CAN_FD;
+  }
+
+  if (normalizeCanIdFormat(idf) === 'extended') {
+    flags |= FRAME_FLAG_EXTENDED_ID;
+  }
+
+  return flags;
 }
 
 function findRuntimeMessage(runtime, canId, messageName) {
@@ -1046,17 +1095,20 @@ function buildFrameRecord(frame) {
     ? Buffer.from(frame.payload)
     : Buffer.from(frame.payload || []);
 
+  const idf = normalizeCanIdFormat(frame.idf);
+  validateCanIdForFormat(canId, idf, `frame_${canId}`);
+
   const requestedPayloadLength = Number(frame.dlc ?? payload.length);
   const payloadLength = normalizeCanPayloadLength(requestedPayloadLength);
 
   payload = padPayloadToLength(payload, payloadLength);
 
   const dlcCode = bytesToCanDlc(payload.length);
-  const flags = Number(frame.flags ?? (payload.length > 8 ? 1 : 0));
-
-  if (!Number.isInteger(canId) || canId < 0) {
-    throw new Error(`Invalid CAN ID: ${frame.canId}`);
-  }
+  const flags = buildFrameFlags({
+    idf,
+    payloadLength: payload.length,
+    existingFlags: frame.flags,
+  });
 
   if (!Number.isInteger(bus) || bus < 0 || bus > 255) {
     throw new Error(`Invalid CAN bus: ${frame.bus}`);

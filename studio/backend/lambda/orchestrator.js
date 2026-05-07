@@ -7,6 +7,8 @@
 //   Build a compact runtime using only selected CAN frames.
 //   Allow the same CAN ID across different DBC files/messages.
 //   Reject only true duplicates: same CAN ID + same message name + same signals.
+//   Preserve CAN ID format from compiled DBC:
+//     idf = "standard" | "extended"
 //   Send one SQS message per vehicle.
 // ============================================================================
 
@@ -70,11 +72,6 @@ function normalizeUnity(raw) {
 }
 
 function normalizeOutputFormat(raw) {
-  const value = String(raw || "").trim().toUpperCase();
-
-  if (value === "JSON") return "JSON";
-  if (value === "CSV") return "CSV";
-
   return "BIN";
 }
 
@@ -108,6 +105,16 @@ function normalizeCanId(raw) {
   }
 
   return value;
+}
+
+function normalizeCanIdFormat(raw) {
+  const value = String(raw || "").trim().toLowerCase();
+
+  if (value === "extended") {
+    return "extended";
+  }
+
+  return "standard";
 }
 
 function normalizeGpsCoordinates(value) {
@@ -432,9 +439,10 @@ function buildSignalSignature(frame) {
 
 function buildDuplicateSignature(canId, messageName, frame) {
   const normalizedMessageName = String(messageName || "").trim().toLowerCase();
+  const idf = normalizeCanIdFormat(frame?.idf);
   const signalSignature = buildSignalSignature(frame);
 
-  return `${normalizeCanId(canId)}::${normalizedMessageName}::${signalSignature}`;
+  return `${normalizeCanId(canId)}::${idf}::${normalizedMessageName}::${signalSignature}`;
 }
 
 function getCompiledFieldIndex(compiledFields, fieldName) {
@@ -516,8 +524,41 @@ function normalizeCompiledFrameForRuntime(frame, compiledFields) {
 
   return {
     ...frame,
+    idf: normalizeCanIdFormat(frame.idf),
     s: rawSignals.map((signal) => normalizeCompiledSignalForRuntime(signal, compiledFields))
   };
+}
+
+function parseCanIdNumber(canId) {
+  const normalized = normalizeCanId(canId);
+
+  if (!/^0x[0-9a-f]+$/i.test(normalized)) {
+    return NaN;
+  }
+
+  return Number.parseInt(normalized.slice(2), 16);
+}
+
+function validateRuntimeCanId(canId, idf, dbcFile, messageName) {
+  const numericCanId = parseCanIdNumber(canId);
+
+  if (!Number.isFinite(numericCanId)) {
+    throw new Error(
+      `Invalid CAN ID "${canId}" in ${dbcFile} ${messageName || ""}`.trim()
+    );
+  }
+
+  if (idf === "standard" && (numericCanId < 0 || numericCanId > 0x7ff)) {
+    throw new Error(
+      `CAN ID ${canId} in ${dbcFile} ${messageName || ""} is marked as standard but exceeds 11-bit range.`.trim()
+    );
+  }
+
+  if (idf === "extended" && (numericCanId < 0 || numericCanId > 0x1fffffff)) {
+    throw new Error(
+      `CAN ID ${canId} in ${dbcFile} ${messageName || ""} is marked as extended but exceeds 29-bit range.`.trim()
+    );
+  }
 }
 
 async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
@@ -581,6 +622,15 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
         compiled.f
       );
 
+      const idf = normalizeCanIdFormat(frame.idf);
+
+      validateRuntimeCanId(
+        canId,
+        idf,
+        dbcFile,
+        selectedFrame.messageName || frame.n || frame.name || ""
+      );
+
       const duplicateSignature = buildDuplicateSignature(
         canId,
         selectedFrame.messageName,
@@ -589,7 +639,7 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
 
       if (duplicateGuard.has(duplicateSignature)) {
         throw new Error(
-          `Duplicate CAN message found: ${canId} ${selectedFrame.messageName}. Same CAN ID, same message name and same signal layout.`
+          `Duplicate CAN message found: ${canId} ${selectedFrame.messageName}. Same CAN ID, same ID format, same message name and same signal layout.`
         );
       }
 
@@ -603,6 +653,7 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
         dbcFile,
         canId,
         messageName: selectedFrame.messageName,
+        idf,
         frame
       });
     }
@@ -829,13 +880,6 @@ module.exports.handler = async (event, context) => {
         })
       );
 
-      // const resp = {
-      //   Successful: batch.map((entry) => ({
-      //     Id: entry.Id
-      //   })),
-      //   Failed: []
-      // };
-
       sentBatches++;
 
       if (resp.Failed && resp.Failed.length) {
@@ -886,7 +930,8 @@ module.exports.handler = async (event, context) => {
       s3Bucket,
       sqsPayloadPreview
     });
-  } catch (err) {
+  }
+  catch (err) {
     console.error("[ORCHESTRATOR] Unhandled error:", err);
 
     return httpResp(500, {
