@@ -43,7 +43,7 @@ interface CanFrameOption {
 
 type DistanceUnit = 'Km' | 'Mi';
 
-type OutputFormatValue = 'BIN' | 'JSON' | 'CSV';
+type OutputFormatValue = 'BIN';
 
 type SimulationModeValue =
   | 'Time Window'
@@ -86,7 +86,7 @@ export class SimulatorComponent implements OnInit {
     private readonly dialog: MatDialog
   ) {}
 
-  readonly outputFormatOptions: readonly OutputFormatValue[] = ['BIN', 'JSON', 'CSV'];
+  readonly outputFormatOptions: readonly OutputFormatValue[] = ['BIN'];
 
   readonly driverProfileOptions: readonly DriverProfileOption[] = [
     {
