@@ -9,11 +9,13 @@
 //   Reject only true duplicates: same CAN ID + same message name + same signals.
 //   Preserve CAN ID format from compiled DBC:
 //     idf = "standard" | "extended"
+//   Store run-manifest.json in:
+//     <clientId>/<timestamp>/run-manifest.json
 //   Send one SQS message per vehicle.
 // ============================================================================
 
 const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
-const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const REGION = "us-east-1";
 const SQS_BATCH = 10;
@@ -21,7 +23,7 @@ const MAX_VEHICLES = 150000;
 const MAX_CAN_IDS = 1024;
 const MAX_SAFE_SQS_BYTES = 900 * 1024;
 
-const CUSTOMER_ID = process.env.CUSTOMER_ID || "00000000";
+const DEFAULT_CLIENT_ID = process.env.CUSTOMER_ID || process.env.CLIENT_ID || "00000000";
 const COMPILED_DBC_BUCKET = process.env.COMPILED_DBC_BUCKET || "trackster-customer-dbc";
 
 const RUNTIME_DBC_VERSION = 2;
@@ -50,6 +52,21 @@ const MAX_VIN_SEQ = 999999;
 const VIN_SEQ_LENGTH = String(MAX_VIN_SEQ).length;
 const VIN_PREFIX_LENGTH = 6;
 const VIN_SUFFIX_LENGTH = 17 - VIN_PREFIX_LENGTH - VIN_SEQ_LENGTH;
+
+function normalizeClientId(raw) {
+  return String(raw || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+function resolveClientId(payload) {
+  return normalizeClientId(
+    payload?.clientId ||
+    payload?.customerId ||
+    payload?.customerID ||
+    DEFAULT_CLIENT_ID
+  );
+}
 
 function normalizeVinPrefix(raw) {
   return String(raw || "")
@@ -201,17 +218,19 @@ function makeVin(prefix, suffix, seq) {
 function makeRunIdUTC() {
   const d = new Date();
   const p2 = (n) => String(n).padStart(2, "0");
-  const p3 = (n) => String(n).padStart(3, "0");
 
   return (
     `${d.getUTCFullYear()}` +
     `${p2(d.getUTCMonth() + 1)}` +
     `${p2(d.getUTCDate())}` +
-    `T${p2(d.getUTCHours())}` +
+    `${p2(d.getUTCHours())}` +
     `${p2(d.getUTCMinutes())}` +
-    `${p2(d.getUTCSeconds())}` +
-    `${p3(d.getUTCMilliseconds())}`
+    `${p2(d.getUTCSeconds())}`
   );
+}
+
+function makeRunManifestKey(clientId, runId) {
+  return `${clientId}/${runId}/run-manifest.json`;
 }
 
 function httpResp(code, obj) {
@@ -308,7 +327,7 @@ function resolveS3Bucket(payload) {
   ).trim();
 }
 
-function makeCompiledDbcKey(dbcFile) {
+function makeCompiledDbcKey(clientId, dbcFile) {
   const cleanName = String(dbcFile || "").trim().split("/").pop();
 
   if (!cleanName) {
@@ -317,7 +336,7 @@ function makeCompiledDbcKey(dbcFile) {
 
   const baseName = cleanName.replace(/\.[^.]+$/, "");
 
-  return `dbc-files/${CUSTOMER_ID}/${baseName}.json`;
+  return `dbc-files/${clientId}/${baseName}.json`;
 }
 
 async function streamToString(stream) {
@@ -338,8 +357,8 @@ async function streamToString(stream) {
   });
 }
 
-async function readCompiledDbc(s3, dbcFile) {
-  const key = makeCompiledDbcKey(dbcFile);
+async function readCompiledDbc(s3, clientId, dbcFile) {
+  const key = makeCompiledDbcKey(clientId, dbcFile);
 
   if (!key) {
     throw new Error(`Invalid DBC file name: ${dbcFile}`);
@@ -377,6 +396,17 @@ async function readCompiledDbc(s3, dbcFile) {
     key,
     compiled: parsed
   };
+}
+
+async function writeRunManifest(s3, bucket, key, manifest) {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: JSON.stringify(manifest, null, 2),
+      ContentType: "application/json"
+    })
+  );
 }
 
 function buildSelectedCanFrameMap(canFrames) {
@@ -561,7 +591,7 @@ function validateRuntimeCanId(canId, idf, dbcFile, messageName) {
   }
 }
 
-async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
+async function buildRuntimeCompiledDbc(s3, clientId, dbcFiles, canFrames) {
   const selectedByDbc = buildSelectedCanFrameMap(canFrames);
 
   const selectedFrameKeys = new Set(
@@ -596,7 +626,7 @@ async function buildRuntimeCompiledDbc(s3, dbcFiles, canFrames) {
       continue;
     }
 
-    const loaded = await readCompiledDbc(s3, dbcFile);
+    const loaded = await readCompiledDbc(s3, clientId, dbcFile);
     const compiled = loaded.compiled;
 
     sources.push({
@@ -704,6 +734,7 @@ module.exports.handler = async (event, context) => {
       return cors204();
     }
 
+    const clientId = resolveClientId(p);
     const amountOfVehicles = Math.max(0, parsePositiveInt(p.amountOfVehicles));
     const amountOfTime = parsePositiveNumber(p.amountOfTime);
     const generationType = String(p.generationType || "").trim();
@@ -724,6 +755,10 @@ module.exports.handler = async (event, context) => {
     const outputFormat = normalizeOutputFormat(p.outputFormat);
     const s3Bucket = resolveS3Bucket(p);
     const workQueueUrl = resolveWorkQueueUrl(p);
+
+    if (!clientId) {
+      return httpResp(400, { requestId, error: "clientId is required" });
+    }
 
     if (!workQueueUrl) {
       return httpResp(400, { requestId, error: "workQueueUrl is required" });
@@ -814,11 +849,12 @@ module.exports.handler = async (event, context) => {
       resolvedCanIds,
       resolvedCanFrames,
       missingCanIds
-    } = await buildRuntimeCompiledDbc(s3, dbcFiles, canFrames);
+    } = await buildRuntimeCompiledDbc(s3, clientId, dbcFiles, canFrames);
 
     const baseMessage = {
       runId,
-      customerId: CUSTOMER_ID,
+      customerId: clientId,
+      clientId,
 
       intervalSec,
       durationSec,
@@ -852,8 +888,77 @@ module.exports.handler = async (event, context) => {
 
     const sqsPayloadPreview = JSON.parse(probeBody);
 
+    const runManifestKey = makeRunManifestKey(clientId, runId);
+
+    const runManifest = {
+      manifestVersion: 1,
+      createdAt: new Date().toISOString(),
+
+      requestId,
+      runId,
+      timestamp: runId,
+      customerId: clientId,
+      clientId,
+
+      output: {
+        bucket: s3Bucket,
+        runFolder: `${clientId}/${runId}`,
+        manifestKey: runManifestKey,
+        outputFormat
+      },
+
+      simulation: {
+        amountOfVehicles,
+        amountOfTime,
+        generationType,
+        requestedNumberOfBlocks,
+        numberOfBlocks,
+        blocksSize,
+        intervalSec,
+        durationSec,
+        epochMs,
+        epochSec,
+        initialDateTime,
+        speed,
+        unity,
+        driverProfile
+      },
+
+      gps: {
+        gpsCoordinates,
+        gpsCoordinateRuns: gpsCoordinates.length,
+        gpsBlockCount
+      },
+
+      dbc: {
+        dbcFiles,
+        canFrames,
+        selectedCanFrames: canFrames.length,
+        resolvedCanIds,
+        resolvedCanFrames,
+        resolvedCanIdCount: resolvedCanIds.length,
+        resolvedCanFrameCount: resolvedCanFrames.length,
+        missingCanIds,
+        compiledSources,
+        compiledDbc
+      },
+
+      vehicles,
+
+      sqs: {
+        queueUrl: workQueueUrl,
+        messageSizeBytes
+      }
+    };
+
+    await writeRunManifest(s3, s3Bucket, runManifestKey, runManifest);
+
     console.log(
-      `[ORCHESTRATOR] requestId=${requestId} runId=${runId} vehicles=${vehicles.length} canIds=${resolvedCanIds.length} canFrames=${resolvedCanFrames.length} messageSizeBytes=${messageSizeBytes} queue=${workQueueUrl}`
+      `[ORCHESTRATOR] run manifest written: s3://${s3Bucket}/${runManifestKey}`
+    );
+
+    console.log(
+      `[ORCHESTRATOR] requestId=${requestId} runId=${runId} clientId=${clientId} vehicles=${vehicles.length} canIds=${resolvedCanIds.length} canFrames=${resolvedCanFrames.length} messageSizeBytes=${messageSizeBytes} queue=${workQueueUrl}`
     );
 
     const sqs = new SQSClient({ region: REGION });
@@ -896,6 +1001,9 @@ module.exports.handler = async (event, context) => {
     return httpResp(202, {
       requestId,
       runId,
+      timestamp: runId,
+      customerId: clientId,
+      clientId,
 
       enqueued_vehicles: vehicles.length,
       sentBatches,
@@ -928,6 +1036,10 @@ module.exports.handler = async (event, context) => {
       driverProfile,
       outputFormat,
       s3Bucket,
+
+      runManifestKey,
+      runFolder: `${clientId}/${runId}`,
+
       sqsPayloadPreview
     });
   }
