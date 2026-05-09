@@ -11,6 +11,9 @@
       "saveUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-save",
       "getDbcCanIds": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-signals"
    },
+   "decoderApi": {
+      "binFilesCatalogUrl": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/bin-files/catalog"
+   },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
                   "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium",

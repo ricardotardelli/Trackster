@@ -1,98 +1,114 @@
-<div class="decoder-view">
-  <div class="decoder-stage-shell">
-    <div class="decoder-grid">
-      <aside class="decoder-sidebar decoder-status-panel">
-        <h2>Session Status</h2>
+<div class="workspace-view">
+  <div class="module-stage-shell">
+    <div class="workspace-grid">
 
-        <p>
-          <strong>Workspace:</strong>
-          <span class="status-value status-ok">Signal Decoder</span>
-        </p>
+      <aside class="workspace-sidebar status-panel">
+        <h2>CAN Files Explorer</h2>
 
-        <p>
-          <strong>Module:</strong>
-          <span class="status-value status-ok">Decoder</span>
-        </p>
+        <div class="tree-shell">
+          <mat-tree
+            [dataSource]="s3TreeDataSource"
+            [treeControl]="s3TreeControl"
+            class="trackster-tree">
 
-        <p>
-          <strong>State:</strong>
-          <span class="status-value status-ok">Ready</span>
-        </p>
+            <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild">
+              <div class="tree-node tree-node-folder">
+                <button
+                  type="button"
+                  class="tree-toggle"
+                  matTreeNodeToggle>
+                  <mat-icon>
+                    {{ s3TreeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+                  </mat-icon>
+                </button>
 
-        <p>
-          <strong>DBC Context:</strong>
-          <span class="status-value">Available on demand</span>
-        </p>
+                <button
+                  type="button"
+                  class="tree-label"
+                  (click)="selectS3Node(node)">
+                  <mat-icon class="tree-icon">
+                    {{ s3TreeControl.isExpanded(node) ? 'folder_open' : 'folder' }}
+                  </mat-icon>
 
-        <p>
-          <strong>Payload Source:</strong>
-          <span class="status-value">Pending input</span>
-        </p>
+                  <span class="tree-text">
+                    {{ node.name }}
+                  </span>
+                </button>
+              </div>
 
-        <p>
-          <strong>Frames:</strong>
-          <span class="status-value">Not loaded</span>
-        </p>
+              <div
+                class="tree-children"
+                [class.tree-children-hidden]="!s3TreeControl.isExpanded(node)">
+                <ng-container matTreeNodeOutlet></ng-container>
+              </div>
+            </mat-nested-tree-node>
 
-        <p>
-          <strong>Signals:</strong>
-          <span class="status-value">Not decoded</span>
-        </p>
+            <mat-tree-node *matTreeNodeDef="let node">
+              <div class="tree-node tree-node-file">
+                <span class="tree-indent"></span>
 
-        <p>
-          <strong>Inspection:</strong>
-          <span class="status-value">Workspace prepared</span>
-        </p>
+                <button
+                  type="button"
+                  class="tree-label"
+                  [class.tree-label-selected]="selectedS3Node === node"
+                  [class.tree-label-bin]="node.name.endsWith('.bin')"
+                  [class.tree-label-json]="node.name.endsWith('.json')"
+                  (click)="selectS3Node(node)">
+                  <mat-icon class="tree-icon">
+                    {{ node.name.endsWith('.json') ? 'data_object' : 'description' }}
+                  </mat-icon>
 
-        <p>
-          <strong>Output:</strong>
-          <span class="status-value">No report generated</span>
-        </p>
+                  <span class="tree-text">
+                    {{ node.name }}
+                  </span>
+                </button>
+              </div>
+            </mat-tree-node>
 
-        <p>
-          <strong>Report Mode:</strong>
-          <span class="status-value">Placeholder</span>
-        </p>
-
-        <p>
-          <strong>Export:</strong>
-          <span class="status-value">Disabled</span>
-        </p>
+          </mat-tree>
+        </div>
       </aside>
 
-      <section class="decoder-body">
-        <div class="decoder-body-header">
-          <h2>Signal Decoder</h2>
+      <section class="workspace-body">
+        <div class="workspace-body-header">
+          <h2>Decoder Workspace</h2>
           <p>
-            Decode CAN payloads, inspect frames, validate interpreted signals, and prepare
-            troubleshooting workflows.
+            Inspect generated files, decode CAN payloads, replay sessions,
+            and prepare export workflows.
           </p>
         </div>
 
-        <div class="decoder-body-content">
-          <div class="decoder-card-grid">
-            <section class="decoder-card">
-              <h3>Frame Intake</h3>
-              <p>Paste hex frames, upload captured traffic, or load sample payloads for inspection.</p>
+        <div class="workspace-body-content">
+          <div class="module-card-grid">
+
+            <section class="module-card placeholder-card">
+              <div class="card-header-row">
+                <h3>Explorer</h3>
+              </div>
+
+              <div class="placeholder-body">
+                <p>
+                  S3 treeview placeholder.
+                </p>
+              </div>
             </section>
 
-            <section class="decoder-card">
-              <h3>Signal Readout</h3>
-              <p>Display message names, signals, engineering values, units, and timestamps.</p>
+            <section class="module-card placeholder-card">
+              <div class="card-header-row">
+                <h3>Decoder / Replay</h3>
+              </div>
+
+              <div class="placeholder-body">
+                <p>
+                  Decoder workspace placeholder.
+                </p>
+              </div>
             </section>
 
-            <section class="decoder-card decoder-card-wide">
-              <h3>Analysis Workspace</h3>
-              <p>This area can later host replay, troubleshooting, comparison views, and customer-facing diagnostics.</p>
-            </section>
           </div>
         </div>
       </section>
-    </div>
 
-    <div class="decoder-actions actions-placeholder" aria-hidden="true">
-      <button type="button" tabindex="-1">Show payload preview</button>
-      <button type="button" tabindex="-1">Generate Simulation</button>
     </div>
   </div>
 </div>

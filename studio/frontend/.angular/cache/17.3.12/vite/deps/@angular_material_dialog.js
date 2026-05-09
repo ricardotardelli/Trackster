@@ -10,7 +10,8 @@ import {
   ScrollDispatcher,
   ScrollingModule,
   ViewportRuler
-} from "./chunk-LTNADM3K.js";
+} from "./chunk-KZXJCIHR.js";
+import "./chunk-QJIC67QW.js";
 import {
   animate,
   animateChild,
@@ -23,8 +24,6 @@ import {
 } from "./chunk-ETWZJYM7.js";
 import {
   A11yModule,
-  BidiModule,
-  Directionality,
   ESCAPE,
   FocusMonitor,
   FocusTrapFactory,
@@ -39,7 +38,11 @@ import {
   coerceNumberProperty,
   hasModifierKey,
   supportsScrollBehavior
-} from "./chunk-ZEYMWC5M.js";
+} from "./chunk-BWL6YN4B.js";
+import {
+  BidiModule,
+  Directionality
+} from "./chunk-NXNULQOL.js";
 import {
   DOCUMENT,
   Location
