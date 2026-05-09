@@ -339,3 +339,13 @@
     min-height: 340px;
   }
 }
+
+.tree-loading {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding-left: 4px;
+  color: #5a6b82;
+  font-size: 0.82rem;
+  font-weight: 600;
+}

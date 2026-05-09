@@ -34,6 +34,8 @@ interface RuntimeConfig {
   styleUrl: './decoder.component.css'
 })
 export class DecoderComponent implements OnInit {
+  isLoadingBinCatalog = false;
+
   selectedS3Node: S3TreeNode | null = null;
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
@@ -59,6 +61,8 @@ export class DecoderComponent implements OnInit {
   private async loadS3GeneratedFilesTree(): Promise<void> {
     const config = await this.loadRuntimeConfig();
     const clientId = this.resolveClientId(config);
+
+    this.isLoadingBinCatalog = true;
 
     if (this.shouldUseLocalMock()) {
       this.setTreeData(this.buildLocalMockTree());
