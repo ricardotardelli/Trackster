@@ -59,59 +59,68 @@ export class DecoderComponent implements OnInit {
   }
 
   private async loadS3GeneratedFilesTree(): Promise<void> {
-    const config = await this.loadRuntimeConfig();
-    const clientId = this.resolveClientId(config);
 
     this.isLoadingBinCatalog = true;
 
-    if (this.shouldUseLocalMock()) {
-      this.setTreeData(this.buildLocalMockTree());
-      return;
-    }
+    try {
 
-    const catalogUrl = config.decoderApi?.binFilesCatalogUrl;
-    const bucket = config.s3Default;
+      const config = await this.loadRuntimeConfig();
+      const clientId = this.resolveClientId(config);
 
-    if (!catalogUrl) {
-      throw new Error(
-        'Missing decoderApi.binFilesCatalogUrl in assets/config.json'
-      );
-    }
-
-    if (!bucket) {
-      throw new Error(
-        'Missing s3Default in assets/config.json'
-      );
-    }
-
-    const token = await this.authService.getIdToken();
-
-    const url =
-      `${catalogUrl}` +
-      `?clientId=${encodeURIComponent(clientId)}` +
-      `&bucket=${encodeURIComponent(bucket)}`;
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`
+      if (this.shouldUseLocalMock()) {
+        this.setTreeData(this.buildLocalMockTree());
+        return;
       }
-    });
 
-    if (!response.ok) {
-      const text = await response.text();
+      const catalogUrl = config.decoderApi?.binFilesCatalogUrl;
+      const bucket = config.s3Default;
 
-      throw new Error(
-        `Failed to load BIN files catalog. HTTP ${response.status}. ${text}`
-      );
+      if (!catalogUrl) {
+        throw new Error(
+          'Missing decoderApi.binFilesCatalogUrl in assets/config.json'
+        );
+      }
+
+      if (!bucket) {
+        throw new Error(
+          'Missing s3Default in assets/config.json'
+        );
+      }
+
+      const token = await this.authService.getIdToken();
+
+      const url =
+        `${catalogUrl}` +
+        `?clientId=${encodeURIComponent(clientId)}` +
+        `&bucket=${encodeURIComponent(bucket)}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+
+        throw new Error(
+          `Failed to load BIN files catalog. HTTP ${response.status}. ${text}`
+        );
+      }
+
+      const payload = await response.json();
+
+      const keys = this.extractS3Keys(payload);
+      const tree = this.buildTreeFromS3Keys(keys, clientId);
+
+      this.setTreeData(tree);
+
+    } 
+    finally {
+
+      this.isLoadingBinCatalog = false;
     }
-
-    const payload = await response.json();
-
-    const keys = this.extractS3Keys(payload);
-    const tree = this.buildTreeFromS3Keys(keys, clientId);
-
-    this.setTreeData(tree);
   }
 
   private buildTreeFromS3Keys(
