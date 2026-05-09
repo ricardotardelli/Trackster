@@ -14,6 +14,7 @@ interface S3TreeNode {
 }
 
 interface RuntimeConfig {
+  s3Default?: string;
   customerId?: string;
   clientId?: string;
   decoderApi?: {
@@ -65,6 +66,7 @@ export class DecoderComponent implements OnInit {
     }
 
     const catalogUrl = config.decoderApi?.binFilesCatalogUrl;
+    const bucket = config.s3Default;
 
     if (!catalogUrl) {
       throw new Error(
@@ -72,24 +74,31 @@ export class DecoderComponent implements OnInit {
       );
     }
 
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
     const token = await this.authService.getIdToken();
 
-    const response = await fetch(catalogUrl, {
-      method: 'POST',
+    const url =
+      `${catalogUrl}` +
+      `?clientId=${encodeURIComponent(clientId)}` +
+      `&bucket=${encodeURIComponent(bucket)}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        clientId
-      })
+      }
     });
 
     if (!response.ok) {
       const text = await response.text();
 
       throw new Error(
-        `Failed to load generated files catalog. HTTP ${response.status}. ${text}`
+        `Failed to load BIN files catalog. HTTP ${response.status}. ${text}`
       );
     }
 
@@ -101,10 +110,11 @@ export class DecoderComponent implements OnInit {
     this.setTreeData(tree);
   }
 
-  private buildTreeFromS3Keys( keys: string[], clientId: string ): S3TreeNode[] {
-
+  private buildTreeFromS3Keys(
+    keys: string[],
+    clientId: string
+  ): S3TreeNode[] {
     const runs = new Map<string, S3TreeNode>();
-
     const prefix = `${clientId}/`;
 
     for (const rawKey of keys) {
@@ -199,36 +209,6 @@ export class DecoderComponent implements OnInit {
       .filter(key => key.length > 0);
   }
 
-  private shouldShowFile(fileName: string): boolean {
-    const normalized = fileName.toLowerCase();
-
-    return (
-      normalized.endsWith('.bin') ||
-      normalized === 'run-manifest.json'
-    );
-  }
-
-  private sortRunNodes(nodes: S3TreeNode[]): S3TreeNode[] {
-    return [...nodes].sort((a, b) => b.name.localeCompare(a.name));
-  }
-
-  private sortFileNodes(nodes: S3TreeNode[]): S3TreeNode[] {
-    return [...nodes].sort((a, b) => {
-      const aIsManifest = a.name.toLowerCase() === 'run-manifest.json';
-      const bIsManifest = b.name.toLowerCase() === 'run-manifest.json';
-
-      if (aIsManifest && !bIsManifest) {
-        return 1;
-      }
-
-      if (!aIsManifest && bIsManifest) {
-        return -1;
-      }
-
-      return a.name.localeCompare(b.name);
-    });
-  }
-
   private setTreeData(data: S3TreeNode[]): void {
     this.s3TreeDataSource.data = data;
     this.s3TreeControl.dataNodes = data;
@@ -236,12 +216,8 @@ export class DecoderComponent implements OnInit {
   }
 
   private expandInitialTree(data: S3TreeNode[]): void {
-    for (const rootNode of data) {
-      this.s3TreeControl.expand(rootNode);
-
-      for (const runNode of rootNode.children ?? []) {
-        this.s3TreeControl.expand(runNode);
-      }
+    for (const runNode of data) {
+      this.s3TreeControl.expand(runNode);
     }
   }
 
@@ -249,7 +225,9 @@ export class DecoderComponent implements OnInit {
     const response = await fetch(`assets/config.json?t=${Date.now()}`);
 
     if (!response.ok) {
-      throw new Error(`Failed to load assets/config.json. HTTP ${response.status}`);
+      throw new Error(
+        `Failed to load assets/config.json. HTTP ${response.status}`
+      );
     }
 
     return await response.json() as RuntimeConfig;
