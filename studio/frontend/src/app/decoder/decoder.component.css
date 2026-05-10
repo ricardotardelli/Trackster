@@ -129,7 +129,7 @@
   width: 9px;
   height: 20px;
   padding: 0;
-  margin-right: 2px;
+  margin-right: 1px;
   border: 0;
   background: transparent;
   color: #2563eb;
@@ -144,14 +144,82 @@
   line-height: 12px;
 }
 
+.tree-file-checkbox,
+.tree-folder-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 18px;
+  margin: 0 1px 0 0;
+  padding: 0;
+  flex: 0 0 14px;
+}
+
+.tree-folder-checkbox {
+  margin-left: 2px;
+}
+
+::ng-deep .tree-file-checkbox .mdc-form-field,
+::ng-deep .tree-folder-checkbox .mdc-form-field {
+  height: 18px !important;
+}
+
+::ng-deep .tree-file-checkbox .mdc-checkbox,
+::ng-deep .tree-folder-checkbox .mdc-checkbox {
+  width: 14px !important;
+  height: 14px !important;
+  padding: 0 !important;
+}
+
+::ng-deep .tree-file-checkbox .mdc-checkbox__background,
+::ng-deep .tree-folder-checkbox .mdc-checkbox__background {
+  width: 11px !important;
+  height: 11px !important;
+  top: 1px !important;
+  left: 1px !important;
+  border-radius: 3px !important;
+  border-color: rgba(107, 139, 184, 0.85) !important;
+}
+
+::ng-deep .tree-file-checkbox .mdc-checkbox:hover .mdc-checkbox__background,
+::ng-deep .tree-folder-checkbox .mdc-checkbox:hover .mdc-checkbox__background {
+  border-color: rgba(37, 99, 235, 0.9) !important;
+}
+
+::ng-deep .tree-file-checkbox .mdc-checkbox__native-control:enabled:checked ~ .mdc-checkbox__background,
+::ng-deep .tree-folder-checkbox .mdc-checkbox__native-control:enabled:checked ~ .mdc-checkbox__background,
+::ng-deep .tree-folder-checkbox .mdc-checkbox__native-control:enabled:indeterminate ~ .mdc-checkbox__background {
+  background-color: #0284c7 !important;
+  border-color: #0284c7 !important;
+}
+
+::ng-deep .tree-file-checkbox .mdc-checkbox__checkmark,
+::ng-deep .tree-folder-checkbox .mdc-checkbox__checkmark,
+::ng-deep .tree-folder-checkbox .mdc-checkbox__mixedmark {
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+}
+
+::ng-deep .tree-file-checkbox .mat-mdc-checkbox-touch-target,
+::ng-deep .tree-folder-checkbox .mat-mdc-checkbox-touch-target {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+::ng-deep .tree-file-checkbox label,
+::ng-deep .tree-folder-checkbox label {
+  display: none !important;
+}
+
 .tree-label {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
   height: 21px;
-  padding: 0 3px 0 1px;
+  padding: 0 3px 0 0;
   border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
@@ -173,6 +241,14 @@
 .tree-label-selected {
   background: rgba(191, 219, 254, 0.7);
   border-color: rgba(96, 165, 250, 0.56);
+  color: #0f3b67;
+}
+
+.tree-label-folder-selected {
+  color: #0f3b67;
+}
+
+.tree-label-folder-partial {
   color: #0f3b67;
 }
 
@@ -231,8 +307,8 @@
 }
 
 .tree-indent {
-  width: 6px;
-  flex: 0 0 6px;
+  width: 7px;
+  flex: 0 0 7px;
 }
 
 .workspace-body {

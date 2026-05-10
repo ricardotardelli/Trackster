@@ -27,9 +27,19 @@
                     </mat-icon>
                   </button>
 
+                  <mat-checkbox
+                    class="tree-folder-checkbox"
+                    [checked]="isFolderFullySelected(node)"
+                    [indeterminate]="isFolderPartiallySelected(node)"
+                    (click)="$event.stopPropagation()"
+                    (change)="toggleFolderSelection(node, $event.checked)">
+                  </mat-checkbox>
+
                   <button
                     type="button"
                     class="tree-label"
+                    [class.tree-label-folder-selected]="isFolderFullySelected(node)"
+                    [class.tree-label-folder-partial]="isFolderPartiallySelected(node)"
                     (click)="selectS3Node(node)">
                     <mat-icon class="tree-icon">
                       {{ s3TreeControl.isExpanded(node) ? 'folder_open' : 'folder' }}
@@ -51,6 +61,14 @@
               <mat-tree-node *matTreeNodeDef="let node">
                 <div class="tree-node tree-node-file">
                   <span class="tree-indent"></span>
+
+                  <mat-checkbox
+                    *ngIf="isBinFile(node)"
+                    class="tree-file-checkbox"
+                    [checked]="isBinSelected(node)"
+                    (click)="$event.stopPropagation()"
+                    (change)="toggleBinSelection(node, $event.checked)">
+                  </mat-checkbox>
 
                   <button
                     type="button"
@@ -145,7 +163,11 @@
                     </button>
 
                     <button mat-menu-item>
-                      <span>Entire run</span>
+                      <span>Entire folder</span>
+                    </button>
+
+                    <button mat-menu-item>
+                      <span>Filtered view</span>
                     </button>
                   </mat-menu>
                 </div>

@@ -10,6 +10,7 @@ import { AuthService } from '../auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 interface S3TreeNode {
   name: string;
@@ -36,7 +37,8 @@ interface RuntimeConfig {
     FormsModule,
     MatMenuModule,
     MatFormFieldModule,
-    MatSelectModule
+    MatSelectModule,
+    MatCheckboxModule
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css',
@@ -62,6 +64,8 @@ export class DecoderComponent implements OnInit {
   isLoadingBinCatalog = false;
 
   selectedS3Key: string | null = null;
+
+  selectedBinKeys: string[] = [];
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
     node => node.children ?? []
@@ -95,6 +99,74 @@ export class DecoderComponent implements OnInit {
     return node.name.toLowerCase().endsWith('.json');
   }
 
+  isBinSelected(node: S3TreeNode): boolean {
+    return this.selectedBinKeys.includes(node.key);
+  }
+
+  toggleBinSelection(node: S3TreeNode, checked: boolean): void {
+    if (!this.isBinFile(node)) {
+      return;
+    }
+
+    if (checked) {
+      if (!this.selectedBinKeys.includes(node.key)) {
+        this.selectedBinKeys = [...this.selectedBinKeys, node.key];
+      }
+
+      return;
+    }
+
+    this.selectedBinKeys = this.selectedBinKeys
+      .filter(key => key !== node.key);
+  }
+
+  isFolderFullySelected(node: S3TreeNode): boolean {
+    const binKeys = this.getBinKeysFromFolder(node);
+
+    if (binKeys.length === 0) {
+      return false;
+    }
+
+    return binKeys.every(key => this.selectedBinKeys.includes(key));
+  }
+
+  isFolderPartiallySelected(node: S3TreeNode): boolean {
+    const binKeys = this.getBinKeysFromFolder(node);
+
+    if (binKeys.length === 0) {
+      return false;
+    }
+
+    const selectedCount = binKeys
+      .filter(key => this.selectedBinKeys.includes(key))
+      .length;
+
+    return selectedCount > 0 && selectedCount < binKeys.length;
+  }
+
+  toggleFolderSelection(node: S3TreeNode, checked: boolean): void {
+    const folderBinKeys = this.getBinKeysFromFolder(node);
+
+    if (folderBinKeys.length === 0) {
+      return;
+    }
+
+    if (checked) {
+      const mergedKeys = new Set<string>([
+        ...this.selectedBinKeys,
+        ...folderBinKeys
+      ]);
+
+      this.selectedBinKeys = [...mergedKeys];
+      return;
+    }
+
+    const folderKeys = new Set<string>(folderBinKeys);
+
+    this.selectedBinKeys = this.selectedBinKeys
+      .filter(key => !folderKeys.has(key));
+  }
+
   toggleDecoderFilter(): void {
     this.isDecoderFilterOpen = !this.isDecoderFilterOpen;
 
@@ -115,6 +187,25 @@ export class DecoderComponent implements OnInit {
     }
 
     return value.toLowerCase().includes(filter);
+  }
+
+  private getBinKeysFromFolder(node: S3TreeNode): string[] {
+    const result: string[] = [];
+
+    const walk = (currentNode: S3TreeNode): void => {
+      if (this.isBinFile(currentNode)) {
+        result.push(currentNode.key);
+        return;
+      }
+
+      for (const child of currentNode.children ?? []) {
+        walk(child);
+      }
+    };
+
+    walk(node);
+
+    return result;
   }
 
   private async loadS3GeneratedFilesTree(): Promise<void> {
@@ -182,6 +273,23 @@ export class DecoderComponent implements OnInit {
 
     this.s3TreeDataSource.data = data;
     this.s3TreeControl.dataNodes = data;
+
+    this.selectedBinKeys = this.selectedBinKeys
+      .filter(key => this.treeContainsKey(data, key));
+  }
+
+  private treeContainsKey(nodes: S3TreeNode[], key: string): boolean {
+    for (const node of nodes) {
+      if (node.key === key) {
+        return true;
+      }
+
+      if (node.children && this.treeContainsKey(node.children, key)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private buildTreeFromS3Keys(
@@ -328,27 +436,27 @@ export class DecoderComponent implements OnInit {
         key: '00000000/20260508183000',
         children: [
           {
-            name: 'VIN000001KADUT.bin',
+            name: 'VINKDT000001KADUT.bin',
             key: '00000000/20260508183000/VIN000001KADUT.bin'
           },
           {
-            name: 'VIN000002KADUT.bin',
+            name: 'VINKDT000002KADUT.bin',
             key: '00000000/20260508183000/VIN000002KADUT.bin'
           },
           {
-            name: 'VIN000003KADUT.bin',
+            name: 'VINKDT000003KADUT.bin',
             key: '00000000/20260508183000/VIN000003KADUT.bin'
           },
           {
-            name: 'VIN000004KADUT.bin',
+            name: 'VINKDT000004KADUT.bin',
             key: '00000000/20260508183000/VIN000004KADUT.bin'
           },
           {
-            name: 'VIN000005KADUT.bin',
+            name: 'VINKDT000005KADUT.bin',
             key: '00000000/20260508183000/VIN000005KADUT.bin'
           },
           {
-            name: 'VIN000006KADUT.bin',
+            name: 'VINKDT000006KADUT.bin',
             key: '00000000/20260508183000/VIN000006KADUT.bin'
           }
         ]
@@ -414,16 +522,16 @@ export class DecoderComponent implements OnInit {
         key: '00000000/20260509013055',
         children: [
           {
-            name: 'BMWI4SIM0001.bin',
-            key: '00000000/20260509013055/BMWI4SIM0001.bin'
+            name: 'BMWISO4SIM0001.bin',
+            key: '00000000/20260509013055/BMWISO4SIM0001.bin'
           },
           {
-            name: 'BMWI4SIM0002.bin',
-            key: '00000000/20260509013055/BMWI4SIM0002.bin'
+            name: 'BMWISO4SIM0002.bin',
+            key: '00000000/20260509013055/BMWISOSIM0002.bin'
           },
           {
-            name: 'BMWI4SIM0003.bin',
-            key: '00000000/20260509013055/BMWI4SIM0003.bin'
+            name: 'BMWISO4SIM0003.bin',
+            key: '00000000/20260509013055/BMWISO4SIM0003.bin'
           }
         ]
       }
