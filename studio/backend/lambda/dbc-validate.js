@@ -38,6 +38,73 @@ function normalizeHexId(hexId) {
     : `0x${hexId.toLowerCase()}`;
 }
 
+function normalizeSignalName(signal, index) {
+  const name = String(signal?.name || '').trim();
+
+  if (name) {
+    return name;
+  }
+
+  return `signal_${index}`;
+}
+
+function normalizeMuxType(signal) {
+  const value =
+    signal?.muxType ??
+    signal?.multiplexType ??
+    signal?.multiplexing ??
+    null;
+
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const text = String(value).trim().toLowerCase();
+
+  if (
+    text === 'm' ||
+    text === 'mux' ||
+    text === 'multiplexor' ||
+    text === 'multiplexer'
+  ) {
+    return 'multiplexor';
+  }
+
+  if (
+    text === 'multiplexed' ||
+    /^m\d+$/i.test(text)
+  ) {
+    return 'multiplexed';
+  }
+
+  return text;
+}
+
+function normalizeMuxValue(signal) {
+  const value =
+    signal?.muxValue ??
+    signal?.multiplexValue ??
+    null;
+
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numeric = Number(value);
+
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const text = String(value).trim().toLowerCase();
+
+  if (/^m\d+$/.test(text)) {
+    return Number(text.slice(1));
+  }
+
+  return null;
+}
+
 function buildCompiledJson(fileName, parserReport) {
   const hasErrors =
     Array.isArray(parserReport?.errors) && parserReport.errors.length > 0;
@@ -54,8 +121,10 @@ function buildCompiledJson(fileName, parserReport) {
 
       messages[messageId] = {
         l: Number(message.sizeBytes ?? 8),
+        n: String(message.name || ''),
+        tx: String(message.transmitter || ''),
         s: Array.isArray(message.signals)
-          ? message.signals.map((signal) => [
+          ? message.signals.map((signal, index) => [
               Number(signal.startBit ?? 0),
               Number(signal.sizeBits ?? 0),
               signal.endianness === 'Big Endian' ? 0 : 1,
@@ -63,7 +132,11 @@ function buildCompiledJson(fileName, parserReport) {
               Number(signal.factor ?? 1),
               Number(signal.offset ?? 0),
               Number(signal.range?.min ?? 0),
-              Number(signal.range?.max ?? 0)
+              Number(signal.range?.max ?? 0),
+              normalizeSignalName(signal, index),
+              normalizeMuxType(signal),
+              normalizeMuxValue(signal),
+              String(signal.unit || '')
             ])
           : []
       };
@@ -71,11 +144,24 @@ function buildCompiledJson(fileName, parserReport) {
   }
 
   return {
-    v: 1,
+    v: 2,
     src: fileName,
     st: hasErrors ? 'rejected' : 'validated',
     ts: new Date().toISOString(),
-    f: ['sb', 'bl', 'bo', 'sg', 'f', 'o', 'min', 'max'],
+    f: [
+      'sb',
+      'bl',
+      'bo',
+      'sg',
+      'f',
+      'o',
+      'min',
+      'max',
+      'n',
+      'mx',
+      'mv',
+      'u'
+    ],
     m: messages
   };
 }

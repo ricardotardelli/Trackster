@@ -1,0 +1,3472 @@
+{
+  "manifestVersion": 1,
+  "createdAt": "2026-05-10T22:10:08.512Z",
+  "requestId": "da227a9b-958c-4f90-9e17-18deea0ed937",
+  "runId": "20260510221008",
+  "timestamp": "20260510221008",
+  "customerId": "00000000",
+  "clientId": "00000000",
+  "output": {
+    "bucket": "s3-trackster-can-bucket",
+    "runFolder": "00000000/20260510221008",
+    "manifestKey": "00000000/20260510221008/run-manifest.json",
+    "outputFormat": "BIN"
+  },
+  "simulation": {
+    "amountOfVehicles": 1,
+    "amountOfTime": 1,
+    "generationType": "all_at_once",
+    "requestedNumberOfBlocks": 0,
+    "numberOfBlocks": 720,
+    "blocksSize": 7560,
+    "intervalSec": 5,
+    "durationSec": 3600,
+    "epochMs": 1778454540000,
+    "epochSec": 1778454540,
+    "initialDateTime": "2026-05-10T23:09",
+    "speed": 80,
+    "unity": "Km",
+    "driverProfile": "Balanced"
+  },
+  "gps": {
+    "gpsCoordinates": [
+      [
+        "025E4D46FF7C11A0",
+        1
+      ],
+      [
+        "025E5120FF7C126F",
+        1
+      ],
+      [
+        "025E54FBFF7C133E",
+        1
+      ],
+      [
+        "025E58D5FF7C140E",
+        1
+      ],
+      [
+        "025E5CB0FF7C14DD",
+        1
+      ],
+      [
+        "025E608AFF7C15AC",
+        1
+      ],
+      [
+        "025E6465FF7C167B",
+        1
+      ],
+      [
+        "025E683FFF7C174A",
+        1
+      ],
+      [
+        "025E6C1AFF7C181A",
+        1
+      ],
+      [
+        "025E6FF4FF7C18E9",
+        1
+      ],
+      [
+        "025E73CFFF7C19B8",
+        1
+      ],
+      [
+        "025E77A9FF7C1A87",
+        1
+      ],
+      [
+        "025E7B84FF7C1B56",
+        1
+      ],
+      [
+        "025E7F5EFF7C1C26",
+        1
+      ],
+      [
+        "025E8339FF7C1CF5",
+        1
+      ],
+      [
+        "025E8713FF7C1DC4",
+        1
+      ],
+      [
+        "025E8AEEFF7C1E93",
+        1
+      ],
+      [
+        "025E8EC8FF7C1F62",
+        1
+      ],
+      [
+        "025E92A3FF7C2032",
+        1
+      ],
+      [
+        "025E967DFF7C2101",
+        1
+      ],
+      [
+        "025E9A58FF7C21D0",
+        1
+      ],
+      [
+        "025E9E32FF7C229F",
+        1
+      ],
+      [
+        "025EA20DFF7C236E",
+        1
+      ],
+      [
+        "025EA5E7FF7C243E",
+        1
+      ],
+      [
+        "025EA9C2FF7C250D",
+        1
+      ],
+      [
+        "025EAD9CFF7C25DC",
+        1
+      ],
+      [
+        "025EB177FF7C26AB",
+        1
+      ],
+      [
+        "025EB551FF7C277A",
+        1
+      ],
+      [
+        "025EB92CFF7C284A",
+        1
+      ],
+      [
+        "025EBD06FF7C2919",
+        1
+      ],
+      [
+        "025EC0E1FF7C29E8",
+        1
+      ],
+      [
+        "025EC4BBFF7C2AB7",
+        1
+      ],
+      [
+        "025EC895FF7C2B87",
+        1
+      ],
+      [
+        "025ECC70FF7C2C56",
+        1
+      ],
+      [
+        "025ED04AFF7C2D25",
+        1
+      ],
+      [
+        "025ED425FF7C2DF4",
+        1
+      ],
+      [
+        "025ED7FFFF7C2EC3",
+        1
+      ],
+      [
+        "025EDBDAFF7C2F93",
+        1
+      ],
+      [
+        "025EDFB4FF7C3062",
+        1
+      ],
+      [
+        "025EE38FFF7C3131",
+        1
+      ],
+      [
+        "025EE769FF7C3200",
+        1
+      ],
+      [
+        "025EEB44FF7C32CF",
+        1
+      ],
+      [
+        "025EEF1EFF7C339F",
+        1
+      ],
+      [
+        "025EF2F9FF7C346E",
+        1
+      ],
+      [
+        "025EF6D3FF7C353D",
+        1
+      ],
+      [
+        "025EFAAEFF7C360C",
+        1
+      ],
+      [
+        "025EFE88FF7C36DB",
+        1
+      ],
+      [
+        "025F0263FF7C37AB",
+        1
+      ],
+      [
+        "025F063DFF7C387A",
+        1
+      ],
+      [
+        "025F0A18FF7C3949",
+        1
+      ],
+      [
+        "025F0DF2FF7C3A18",
+        1
+      ],
+      [
+        "025F11CDFF7C3AE7",
+        1
+      ],
+      [
+        "025F15A7FF7C3BB7",
+        1
+      ],
+      [
+        "025F1982FF7C3C86",
+        1
+      ],
+      [
+        "025F1D5CFF7C3D55",
+        1
+      ],
+      [
+        "025F2137FF7C3E24",
+        1
+      ],
+      [
+        "025F2511FF7C3EF3",
+        1
+      ],
+      [
+        "025F28ECFF7C3FC3",
+        1
+      ],
+      [
+        "025F2CC6FF7C4092",
+        1
+      ],
+      [
+        "025F30A1FF7C4161",
+        1
+      ],
+      [
+        "025F347BFF7C4230",
+        1
+      ],
+      [
+        "025F3856FF7C42FF",
+        1
+      ],
+      [
+        "025F3C30FF7C43CF",
+        1
+      ],
+      [
+        "025F400BFF7C449E",
+        1
+      ],
+      [
+        "025F43E5FF7C456D",
+        1
+      ],
+      [
+        "025F47BFFF7C463C",
+        1
+      ],
+      [
+        "025F4B9AFF7C470B",
+        1
+      ],
+      [
+        "025F4F74FF7C47DB",
+        1
+      ],
+      [
+        "025F534FFF7C48AA",
+        1
+      ],
+      [
+        "025F5729FF7C4979",
+        1
+      ],
+      [
+        "025F5B04FF7C4A48",
+        1
+      ],
+      [
+        "025F5EDEFF7C4B17",
+        1
+      ],
+      [
+        "025F62B9FF7C4BE7",
+        1
+      ],
+      [
+        "025F6693FF7C4CB6",
+        1
+      ],
+      [
+        "025F6A6EFF7C4D85",
+        1
+      ],
+      [
+        "025F6E48FF7C4E54",
+        1
+      ],
+      [
+        "025F7223FF7C4F23",
+        1
+      ],
+      [
+        "025F75FDFF7C4FF3",
+        1
+      ],
+      [
+        "025F79D8FF7C50C2",
+        1
+      ],
+      [
+        "025F7DB2FF7C5191",
+        1
+      ],
+      [
+        "025F818DFF7C5260",
+        1
+      ],
+      [
+        "025F8567FF7C532F",
+        1
+      ],
+      [
+        "025F8942FF7C53FF",
+        1
+      ],
+      [
+        "025F8D1CFF7C54CE",
+        1
+      ],
+      [
+        "025F90F7FF7C559D",
+        1
+      ],
+      [
+        "025F94D1FF7C566C",
+        1
+      ],
+      [
+        "025F98ACFF7C573C",
+        1
+      ],
+      [
+        "025F9C86FF7C580B",
+        1
+      ],
+      [
+        "025FA061FF7C58DA",
+        1
+      ],
+      [
+        "025FA43BFF7C59A9",
+        1
+      ],
+      [
+        "025FA816FF7C5A78",
+        1
+      ],
+      [
+        "025FABF0FF7C5B48",
+        1
+      ],
+      [
+        "025FAFCBFF7C5C17",
+        1
+      ],
+      [
+        "025FB3A5FF7C5CE6",
+        1
+      ],
+      [
+        "025FB780FF7C5DB5",
+        1
+      ],
+      [
+        "025FBB5AFF7C5E84",
+        1
+      ],
+      [
+        "025FBF34FF7C5F54",
+        1
+      ],
+      [
+        "025FC30FFF7C6023",
+        1
+      ],
+      [
+        "025FC6E9FF7C60F2",
+        1
+      ],
+      [
+        "025FCAC4FF7C61C1",
+        1
+      ],
+      [
+        "025FCE9EFF7C6290",
+        1
+      ],
+      [
+        "025FD279FF7C6360",
+        1
+      ],
+      [
+        "025FD653FF7C642F",
+        1
+      ],
+      [
+        "025FDA2EFF7C64FE",
+        1
+      ],
+      [
+        "025FDE08FF7C65CD",
+        1
+      ],
+      [
+        "025FE1E3FF7C669C",
+        1
+      ],
+      [
+        "025FE5BDFF7C676C",
+        1
+      ],
+      [
+        "025FE998FF7C683B",
+        1
+      ],
+      [
+        "025FED72FF7C690A",
+        1
+      ],
+      [
+        "025FF14DFF7C69D9",
+        1
+      ],
+      [
+        "025FF527FF7C6AA8",
+        1
+      ],
+      [
+        "025FF902FF7C6B78",
+        1
+      ],
+      [
+        "025FFCDCFF7C6C47",
+        1
+      ],
+      [
+        "026000B7FF7C6D16",
+        1
+      ],
+      [
+        "02600491FF7C6DE5",
+        1
+      ],
+      [
+        "0260086CFF7C6EB4",
+        1
+      ],
+      [
+        "02600C46FF7C6F84",
+        1
+      ],
+      [
+        "02601021FF7C7053",
+        1
+      ],
+      [
+        "026013FBFF7C7122",
+        1
+      ],
+      [
+        "026017D6FF7C71F1",
+        1
+      ],
+      [
+        "02601BB0FF7C72C0",
+        1
+      ],
+      [
+        "02601F8BFF7C7390",
+        1
+      ],
+      [
+        "02602365FF7C745F",
+        1
+      ],
+      [
+        "02602740FF7C752E",
+        1
+      ],
+      [
+        "02602B1AFF7C75FD",
+        1
+      ],
+      [
+        "02602EF5FF7C76CC",
+        1
+      ],
+      [
+        "026032CFFF7C779C",
+        1
+      ],
+      [
+        "026036AAFF7C786B",
+        1
+      ],
+      [
+        "02603A84FF7C793A",
+        1
+      ],
+      [
+        "02603E5EFF7C7A09",
+        1
+      ],
+      [
+        "02604239FF7C7AD8",
+        1
+      ],
+      [
+        "02604613FF7C7BA8",
+        1
+      ],
+      [
+        "026049EEFF7C7C77",
+        1
+      ],
+      [
+        "02604D8FFF7C7E14",
+        1
+      ],
+      [
+        "026050E7FF7C80B3",
+        1
+      ],
+      [
+        "02605440FF7C8351",
+        1
+      ],
+      [
+        "02605799FF7C85F0",
+        1
+      ],
+      [
+        "02605AF2FF7C888F",
+        1
+      ],
+      [
+        "02605E4AFF7C8B2D",
+        1
+      ],
+      [
+        "026061A3FF7C8DCC",
+        1
+      ],
+      [
+        "026064FCFF7C906B",
+        1
+      ],
+      [
+        "02606855FF7C9309",
+        1
+      ],
+      [
+        "02606BADFF7C95A8",
+        1
+      ],
+      [
+        "02606F06FF7C9847",
+        1
+      ],
+      [
+        "0260725FFF7C9AE5",
+        1
+      ],
+      [
+        "026075B8FF7C9D84",
+        1
+      ],
+      [
+        "02607910FF7CA023",
+        1
+      ],
+      [
+        "02607C69FF7CA2C1",
+        1
+      ],
+      [
+        "02607FC2FF7CA560",
+        1
+      ],
+      [
+        "0260831AFF7CA7FF",
+        1
+      ],
+      [
+        "02608673FF7CAA9D",
+        1
+      ],
+      [
+        "026089CCFF7CAD3C",
+        1
+      ],
+      [
+        "02608D25FF7CAFDB",
+        1
+      ],
+      [
+        "0260907DFF7CB279",
+        1
+      ],
+      [
+        "026093D6FF7CB518",
+        1
+      ],
+      [
+        "0260972FFF7CB7B7",
+        1
+      ],
+      [
+        "02609A88FF7CBA55",
+        1
+      ],
+      [
+        "02609DE0FF7CBCF4",
+        1
+      ],
+      [
+        "0260A139FF7CBF93",
+        1
+      ],
+      [
+        "0260A492FF7CC231",
+        1
+      ],
+      [
+        "0260A7EBFF7CC4D0",
+        1
+      ],
+      [
+        "0260AB43FF7CC76F",
+        1
+      ],
+      [
+        "0260AE9CFF7CCA0D",
+        1
+      ],
+      [
+        "0260B1F5FF7CCCAC",
+        1
+      ],
+      [
+        "0260B54DFF7CCF4B",
+        1
+      ],
+      [
+        "0260B8A6FF7CD1E9",
+        1
+      ],
+      [
+        "0260BBFFFF7CD488",
+        1
+      ],
+      [
+        "0260BF58FF7CD727",
+        1
+      ],
+      [
+        "0260C2B0FF7CD9C5",
+        1
+      ],
+      [
+        "0260C609FF7CDC64",
+        1
+      ],
+      [
+        "0260C962FF7CDF03",
+        1
+      ],
+      [
+        "0260CCBBFF7CE1A1",
+        1
+      ],
+      [
+        "0260D013FF7CE440",
+        1
+      ],
+      [
+        "0260D36CFF7CE6DF",
+        1
+      ],
+      [
+        "0260D6C5FF7CE97D",
+        1
+      ],
+      [
+        "0260DA1EFF7CEC1C",
+        1
+      ],
+      [
+        "0260DD76FF7CEEBB",
+        1
+      ],
+      [
+        "0260E0CFFF7CF159",
+        1
+      ],
+      [
+        "0260E428FF7CF3F8",
+        1
+      ],
+      [
+        "0260E780FF7CF697",
+        1
+      ],
+      [
+        "0260EAD9FF7CF935",
+        1
+      ],
+      [
+        "0260EE32FF7CFBD4",
+        1
+      ],
+      [
+        "0260F18BFF7CFE73",
+        1
+      ],
+      [
+        "0260F4E3FF7D0111",
+        1
+      ],
+      [
+        "0260F83CFF7D03B0",
+        1
+      ],
+      [
+        "0260FB95FF7D064F",
+        1
+      ],
+      [
+        "0260FEEEFF7D08ED",
+        1
+      ],
+      [
+        "02610246FF7D0B8C",
+        1
+      ],
+      [
+        "0261059FFF7D0E2B",
+        1
+      ],
+      [
+        "026108F8FF7D10C9",
+        1
+      ],
+      [
+        "02610C51FF7D1368",
+        1
+      ],
+      [
+        "02610FA9FF7D1607",
+        1
+      ],
+      [
+        "02611302FF7D18A5",
+        1
+      ],
+      [
+        "0261165BFF7D1B44",
+        1
+      ],
+      [
+        "026119B3FF7D1DE3",
+        1
+      ],
+      [
+        "02611D0CFF7D2081",
+        1
+      ],
+      [
+        "02612065FF7D2320",
+        1
+      ],
+      [
+        "026123BEFF7D25BF",
+        1
+      ],
+      [
+        "02612716FF7D285D",
+        1
+      ],
+      [
+        "02612A6FFF7D2AFC",
+        1
+      ],
+      [
+        "02612DC8FF7D2D9B",
+        1
+      ],
+      [
+        "02613121FF7D3039",
+        1
+      ],
+      [
+        "02613479FF7D32D8",
+        1
+      ],
+      [
+        "026137D2FF7D3577",
+        1
+      ],
+      [
+        "02613B2BFF7D3815",
+        1
+      ],
+      [
+        "02613E84FF7D3AB4",
+        1
+      ],
+      [
+        "026141DCFF7D3D53",
+        1
+      ],
+      [
+        "02614535FF7D3FF1",
+        1
+      ],
+      [
+        "0261488EFF7D4290",
+        1
+      ],
+      [
+        "02614BE6FF7D452F",
+        1
+      ],
+      [
+        "02614F3FFF7D47CD",
+        1
+      ],
+      [
+        "02615298FF7D4A6C",
+        1
+      ],
+      [
+        "026155F1FF7D4D0B",
+        1
+      ],
+      [
+        "02615949FF7D4FA9",
+        1
+      ],
+      [
+        "02615CA2FF7D5248",
+        1
+      ],
+      [
+        "02615FFBFF7D54E7",
+        1
+      ],
+      [
+        "02616354FF7D5785",
+        1
+      ],
+      [
+        "026166ACFF7D5A24",
+        1
+      ],
+      [
+        "02616A05FF7D5CC3",
+        1
+      ],
+      [
+        "02616D5EFF7D5F61",
+        1
+      ],
+      [
+        "026170B7FF7D6200",
+        1
+      ],
+      [
+        "0261740FFF7D649F",
+        1
+      ],
+      [
+        "02617768FF7D673D",
+        1
+      ],
+      [
+        "02617AC1FF7D69DC",
+        1
+      ],
+      [
+        "02617E19FF7D6C7B",
+        1
+      ],
+      [
+        "02618172FF7D6F19",
+        1
+      ],
+      [
+        "026184CBFF7D71B8",
+        1
+      ],
+      [
+        "02618824FF7D7457",
+        1
+      ],
+      [
+        "02618B7CFF7D76F5",
+        1
+      ],
+      [
+        "02618ED5FF7D7994",
+        1
+      ],
+      [
+        "0261922EFF7D7C33",
+        1
+      ],
+      [
+        "02619587FF7D7ED1",
+        1
+      ],
+      [
+        "026198DFFF7D8170",
+        1
+      ],
+      [
+        "02619C38FF7D840F",
+        1
+      ],
+      [
+        "02619F91FF7D86AD",
+        1
+      ],
+      [
+        "0261A2EAFF7D894C",
+        1
+      ],
+      [
+        "0261A642FF7D8BEB",
+        1
+      ],
+      [
+        "0261A99BFF7D8E89",
+        1
+      ],
+      [
+        "0261ACF4FF7D9128",
+        1
+      ],
+      [
+        "0261B04CFF7D93C7",
+        1
+      ],
+      [
+        "0261B3A5FF7D9665",
+        1
+      ],
+      [
+        "0261B6FEFF7D9904",
+        1
+      ],
+      [
+        "0261BA57FF7D9BA3",
+        1
+      ],
+      [
+        "0261BDAFFF7D9E41",
+        1
+      ],
+      [
+        "0261C108FF7DA0E0",
+        1
+      ],
+      [
+        "0261C461FF7DA37F",
+        1
+      ],
+      [
+        "0261C7BAFF7DA61D",
+        1
+      ],
+      [
+        "0261CB12FF7DA8BC",
+        1
+      ],
+      [
+        "0261CE6BFF7DAB5B",
+        1
+      ],
+      [
+        "0261D1C4FF7DADF9",
+        1
+      ],
+      [
+        "0261D51DFF7DB098",
+        1
+      ],
+      [
+        "0261D875FF7DB337",
+        1
+      ],
+      [
+        "0261DBCEFF7DB5D5",
+        1
+      ],
+      [
+        "0261DF27FF7DB874",
+        1
+      ],
+      [
+        "0261E27FFF7DBB13",
+        1
+      ],
+      [
+        "0261E5D8FF7DBDB1",
+        1
+      ],
+      [
+        "0261E931FF7DC050",
+        1
+      ],
+      [
+        "0261EC8AFF7DC2EF",
+        1
+      ],
+      [
+        "0261EFE2FF7DC58D",
+        1
+      ],
+      [
+        "0261F33BFF7DC82C",
+        1
+      ],
+      [
+        "0261F694FF7DCACB",
+        1
+      ],
+      [
+        "0261F9EDFF7DCD69",
+        1
+      ],
+      [
+        "0261FD45FF7DD008",
+        1
+      ],
+      [
+        "0262009EFF7DD2A7",
+        1
+      ],
+      [
+        "026203F7FF7DD545",
+        1
+      ],
+      [
+        "0262074FFF7DD7E4",
+        1
+      ],
+      [
+        "02620AA8FF7DDA83",
+        1
+      ],
+      [
+        "02620E01FF7DDD21",
+        1
+      ],
+      [
+        "0262115AFF7DDFC0",
+        1
+      ],
+      [
+        "026214B2FF7DE25F",
+        1
+      ],
+      [
+        "0262180BFF7DE4FD",
+        1
+      ],
+      [
+        "02621B64FF7DE79C",
+        1
+      ],
+      [
+        "02621EBDFF7DEA3B",
+        1
+      ],
+      [
+        "02622215FF7DECD9",
+        1
+      ],
+      [
+        "0262256EFF7DEF78",
+        1
+      ],
+      [
+        "026228C7FF7DF217",
+        1
+      ],
+      [
+        "02622C20FF7DF4B5",
+        1
+      ],
+      [
+        "02622F78FF7DF754",
+        1
+      ],
+      [
+        "026232D1FF7DF9F3",
+        1
+      ],
+      [
+        "0262362AFF7DFC91",
+        1
+      ],
+      [
+        "02623977FF7DFF27",
+        440
+      ]
+    ],
+    "gpsCoordinateRuns": 281,
+    "gpsBlockCount": 720
+  },
+  "dbc": {
+    "dbcFiles": [
+      "ford_fusion_2018_pt.dbc"
+    ],
+    "canFrames": [
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x165",
+        "messageName": "Cruise_Status"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x204",
+        "messageName": "EngineData_14"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x216",
+        "messageName": "WheelData"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x217",
+        "messageName": "WheelSpeed_CG1"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3b3",
+        "messageName": "Doors"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3c3",
+        "messageName": "BCM_to_HS_Body"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3ca",
+        "messageName": "Lane_Keep_Assist_Control"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3cc",
+        "messageName": "Lane_Keep_Assist_Status"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3d8",
+        "messageName": "Lane_Keep_Assist_Ui"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x76",
+        "messageName": "Steering_Wheel_Data_CG1"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x82",
+        "messageName": "EPAS_INFO"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x83",
+        "messageName": "Steering_Buttons"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x91",
+        "messageName": "Yaw_Data"
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x92",
+        "messageName": "Accel_Data"
+      }
+    ],
+    "selectedCanFrames": 14,
+    "resolvedCanIds": [
+      "0x165",
+      "0x204",
+      "0x216",
+      "0x217",
+      "0x3b3",
+      "0x3c3",
+      "0x3ca",
+      "0x3cc",
+      "0x3d8",
+      "0x76",
+      "0x82",
+      "0x83",
+      "0x91",
+      "0x92"
+    ],
+    "resolvedCanFrames": [
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x165",
+        "messageName": "Cruise_Status",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Cruise_Status",
+          "tx": "XXX",
+          "s": [
+            [
+              5,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Brake_Drv_Appl",
+              null,
+              null
+            ],
+            [
+              11,
+              4,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Cruise_State",
+              null,
+              null
+            ],
+            [
+              23,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Set_Speed",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x204",
+        "messageName": "EngineData_14",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "EngineData_14",
+          "tx": "XXX",
+          "s": [
+            [
+              1,
+              10,
+              0,
+              0,
+              0.1,
+              0,
+              0,
+              0,
+              "ApedPosScal_Pc_Actl",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x216",
+        "messageName": "WheelData",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "WheelData",
+          "tx": "XXX",
+          "s": [
+            [
+              23,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlRotatRr_No_Cnt",
+              null,
+              null
+            ],
+            [
+              33,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlDirRr_D_Actl",
+              null,
+              null
+            ],
+            [
+              39,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlDirRl_D_Actl",
+              null,
+              null
+            ],
+            [
+              37,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlDirFr_D_Actl",
+              null,
+              null
+            ],
+            [
+              35,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlDirFl_D_Actl",
+              null,
+              null
+            ],
+            [
+              31,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlRotatRl_No_Cnt",
+              null,
+              null
+            ],
+            [
+              7,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlRotatFr_No_Cnt",
+              null,
+              null
+            ],
+            [
+              15,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WhlRotatFl_No_Cnt",
+              null,
+              null
+            ],
+            [
+              47,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "WHEEL_ROLLING_TIMESTAMP",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x217",
+        "messageName": "WheelSpeed_CG1",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "WheelSpeed_CG1",
+          "tx": "XXX",
+          "s": [
+            [
+              55,
+              14,
+              0,
+              0,
+              0.04,
+              0,
+              0,
+              0,
+              "WhlRr_W_Meas",
+              null,
+              null
+            ],
+            [
+              39,
+              14,
+              0,
+              0,
+              0.04,
+              0,
+              0,
+              0,
+              "WhlRl_W_Meas",
+              null,
+              null
+            ],
+            [
+              23,
+              14,
+              0,
+              0,
+              0.04,
+              0,
+              0,
+              0,
+              "WhlFr_W_Meas",
+              null,
+              null
+            ],
+            [
+              7,
+              14,
+              0,
+              0,
+              0.04,
+              0,
+              0,
+              0,
+              "WhlFl_W_Meas",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3b3",
+        "messageName": "Doors",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Doors",
+          "tx": "XXX",
+          "s": [
+            [
+              61,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Door_FL_Open",
+              null,
+              null
+            ],
+            [
+              60,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Door_FR_Open",
+              null,
+              null
+            ],
+            [
+              48,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Door_RL_Open",
+              null,
+              null
+            ],
+            [
+              49,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Door_RR_Open",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3c3",
+        "messageName": "BCM_to_HS_Body",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "BCM_to_HS_Body",
+          "tx": "XXX",
+          "s": [
+            [
+              8,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Brake_Lights",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3ca",
+        "messageName": "Lane_Keep_Assist_Control",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Lane_Keep_Assist_Control",
+          "tx": "XXX",
+          "s": [
+            [
+              7,
+              4,
+              0,
+              0,
+              1,
+              0,
+              0,
+              15,
+              "Lkas_Action",
+              null,
+              null
+            ],
+            [
+              3,
+              4,
+              0,
+              0,
+              1,
+              0,
+              0,
+              15,
+              "Lkas_Alert",
+              null,
+              null
+            ],
+            [
+              15,
+              12,
+              0,
+              0,
+              0.000005,
+              -0.01,
+              0,
+              0,
+              "Lane_Curvature",
+              null,
+              null
+            ],
+            [
+              19,
+              12,
+              0,
+              0,
+              0.04297,
+              -88.00445,
+              0,
+              0,
+              "Steer_Angle_Req",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3cc",
+        "messageName": "Lane_Keep_Assist_Status",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Lane_Keep_Assist_Status",
+          "tx": "XXX",
+          "s": [
+            [
+              7,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "LaHandsOff_B_Actl",
+              null,
+              null
+            ],
+            [
+              6,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "LaActDeny_B_Actl",
+              null,
+              null
+            ],
+            [
+              5,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "LaActAvail_D_Actl",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x3d8",
+        "messageName": "Lane_Keep_Assist_Ui",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Lane_Keep_Assist_Ui",
+          "tx": "XXX",
+          "s": [
+            [
+              39,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              255,
+              "Set_Me_X80",
+              null,
+              null
+            ],
+            [
+              47,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              255,
+              "Set_Me_X45",
+              null,
+              null
+            ],
+            [
+              55,
+              4,
+              0,
+              0,
+              1,
+              0,
+              0,
+              15,
+              "Lines_Hud",
+              null,
+              null
+            ],
+            [
+              50,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1,
+              "Hands_Warning_W_Chime",
+              null,
+              null
+            ],
+            [
+              49,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1,
+              "Hands_Warning",
+              null,
+              null
+            ],
+            [
+              63,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              255,
+              "Set_Me_X30",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x76",
+        "messageName": "Steering_Wheel_Data_CG1",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Steering_Wheel_Data_CG1",
+          "tx": "XXX",
+          "s": [
+            [
+              6,
+              15,
+              0,
+              0,
+              0.1,
+              -1600,
+              0,
+              0,
+              "SteWhlRelInit_An_Sns",
+              null,
+              null
+            ],
+            [
+              23,
+              15,
+              0,
+              0,
+              0.1,
+              -1600,
+              0,
+              0,
+              "SteWhlRelCalib_An_Sns",
+              null,
+              null
+            ],
+            [
+              55,
+              16,
+              0,
+              0,
+              0.1,
+              -3200,
+              0,
+              0,
+              "SteWhlRelInit2_An_Sns",
+              null,
+              null
+            ],
+            [
+              39,
+              8,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SteWhlAn_No_Cs",
+              null,
+              null
+            ],
+            [
+              47,
+              4,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SteWhlAn_No_Cnt",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x82",
+        "messageName": "EPAS_INFO",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "EPAS_INFO",
+          "tx": "XXX",
+          "s": [
+            [
+              39,
+              8,
+              0,
+              0,
+              0.05,
+              6,
+              0,
+              0,
+              "SteMdule_U_Meas",
+              null,
+              null
+            ],
+            [
+              21,
+              12,
+              0,
+              0,
+              0.05,
+              -64,
+              0,
+              0,
+              "SteMdule_I_Est",
+              null,
+              null
+            ],
+            [
+              9,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "EPAS_FAILURE",
+              null,
+              null
+            ],
+            [
+              7,
+              8,
+              0,
+              0,
+              0.0625,
+              -8,
+              0,
+              0,
+              "SteeringColumnTorque",
+              null,
+              null
+            ],
+            [
+              15,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SAPPAngleControlStat6",
+              null,
+              null
+            ],
+            [
+              14,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SAPPAngleControlStat5",
+              null,
+              null
+            ],
+            [
+              13,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SAPPAngleControlStat4",
+              null,
+              null
+            ],
+            [
+              12,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SAPPAngleControlStat3",
+              null,
+              null
+            ],
+            [
+              11,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SAPPAngleControlStat2",
+              null,
+              null
+            ],
+            [
+              23,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "SAPPAngleControlStat1",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x83",
+        "messageName": "Steering_Buttons",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Steering_Buttons",
+          "tx": "XXX",
+          "s": [
+            [
+              5,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Right_Turn_Light",
+              null,
+              null
+            ],
+            [
+              4,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Left_Turn_Light",
+              null,
+              null
+            ],
+            [
+              12,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Dist_Decr",
+              null,
+              null
+            ],
+            [
+              11,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Dist_Incr",
+              null,
+              null
+            ],
+            [
+              8,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Cancel",
+              null,
+              null
+            ],
+            [
+              29,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Resume",
+              null,
+              null
+            ],
+            [
+              28,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Set",
+              null,
+              null
+            ],
+            [
+              38,
+              1,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "Main",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x91",
+        "messageName": "Yaw_Data",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Yaw_Data",
+          "tx": "XXX",
+          "s": [
+            [
+              39,
+              16,
+              0,
+              0,
+              0.0002,
+              -6.5,
+              0,
+              0,
+              "VehYaw_W_Actl",
+              null,
+              null
+            ],
+            [
+              23,
+              16,
+              0,
+              0,
+              0.0002,
+              -6.5,
+              0,
+              0,
+              "VehRol_W_Actl",
+              null,
+              null
+            ],
+            [
+              7,
+              16,
+              0,
+              0,
+              0.0002,
+              -6.5,
+              0,
+              0,
+              "VehPtch_W_Actl",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      },
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "canId": "0x92",
+        "messageName": "Accel_Data",
+        "idf": "standard",
+        "frame": {
+          "l": 8,
+          "n": "Accel_Data",
+          "tx": "XXX",
+          "s": [
+            [
+              38,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "VehVertAActl_D_Qf",
+              null,
+              null
+            ],
+            [
+              22,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "VehLongAActl_D_Qf",
+              null,
+              null
+            ],
+            [
+              6,
+              2,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              "VehLatAActl_D_Qf",
+              null,
+              null
+            ],
+            [
+              36,
+              13,
+              0,
+              0,
+              0.01,
+              -40,
+              0,
+              0,
+              "VehVert_A_Actl",
+              null,
+              null
+            ],
+            [
+              20,
+              13,
+              0,
+              0,
+              0.01,
+              -40,
+              0,
+              0,
+              "VehLong_A_Actl",
+              null,
+              null
+            ],
+            [
+              4,
+              13,
+              0,
+              0,
+              0.01,
+              -40,
+              0,
+              0,
+              "VehLat_A_Actl",
+              null,
+              null
+            ]
+          ],
+          "idf": "standard"
+        }
+      }
+    ],
+    "resolvedCanIdCount": 14,
+    "resolvedCanFrameCount": 14,
+    "missingCanIds": [],
+    "compiledSources": [
+      {
+        "dbcFile": "ford_fusion_2018_pt.dbc",
+        "compiledKey": "dbc-files/00000000/ford_fusion_2018_pt.json",
+        "selectedCanIds": [
+          "0x165",
+          "0x204",
+          "0x216",
+          "0x217",
+          "0x3b3",
+          "0x3c3",
+          "0x3ca",
+          "0x3cc",
+          "0x3d8",
+          "0x76",
+          "0x82",
+          "0x83",
+          "0x91",
+          "0x92"
+        ]
+      }
+    ],
+    "compiledDbc": {
+      "v": 2,
+      "f": [
+        "sb",
+        "bl",
+        "bo",
+        "sg",
+        "f",
+        "o",
+        "min",
+        "max",
+        "n",
+        "mx",
+        "mv"
+      ],
+      "m": {
+        "0x165": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x165",
+            "messageName": "Cruise_Status",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Cruise_Status",
+              "tx": "XXX",
+              "s": [
+                [
+                  5,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Brake_Drv_Appl",
+                  null,
+                  null
+                ],
+                [
+                  11,
+                  4,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Cruise_State",
+                  null,
+                  null
+                ],
+                [
+                  23,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Set_Speed",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x204": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x204",
+            "messageName": "EngineData_14",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "EngineData_14",
+              "tx": "XXX",
+              "s": [
+                [
+                  1,
+                  10,
+                  0,
+                  0,
+                  0.1,
+                  0,
+                  0,
+                  0,
+                  "ApedPosScal_Pc_Actl",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x216": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x216",
+            "messageName": "WheelData",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "WheelData",
+              "tx": "XXX",
+              "s": [
+                [
+                  23,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlRotatRr_No_Cnt",
+                  null,
+                  null
+                ],
+                [
+                  33,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlDirRr_D_Actl",
+                  null,
+                  null
+                ],
+                [
+                  39,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlDirRl_D_Actl",
+                  null,
+                  null
+                ],
+                [
+                  37,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlDirFr_D_Actl",
+                  null,
+                  null
+                ],
+                [
+                  35,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlDirFl_D_Actl",
+                  null,
+                  null
+                ],
+                [
+                  31,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlRotatRl_No_Cnt",
+                  null,
+                  null
+                ],
+                [
+                  7,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlRotatFr_No_Cnt",
+                  null,
+                  null
+                ],
+                [
+                  15,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WhlRotatFl_No_Cnt",
+                  null,
+                  null
+                ],
+                [
+                  47,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "WHEEL_ROLLING_TIMESTAMP",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x217": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x217",
+            "messageName": "WheelSpeed_CG1",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "WheelSpeed_CG1",
+              "tx": "XXX",
+              "s": [
+                [
+                  55,
+                  14,
+                  0,
+                  0,
+                  0.04,
+                  0,
+                  0,
+                  0,
+                  "WhlRr_W_Meas",
+                  null,
+                  null
+                ],
+                [
+                  39,
+                  14,
+                  0,
+                  0,
+                  0.04,
+                  0,
+                  0,
+                  0,
+                  "WhlRl_W_Meas",
+                  null,
+                  null
+                ],
+                [
+                  23,
+                  14,
+                  0,
+                  0,
+                  0.04,
+                  0,
+                  0,
+                  0,
+                  "WhlFr_W_Meas",
+                  null,
+                  null
+                ],
+                [
+                  7,
+                  14,
+                  0,
+                  0,
+                  0.04,
+                  0,
+                  0,
+                  0,
+                  "WhlFl_W_Meas",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x3b3": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x3b3",
+            "messageName": "Doors",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Doors",
+              "tx": "XXX",
+              "s": [
+                [
+                  61,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Door_FL_Open",
+                  null,
+                  null
+                ],
+                [
+                  60,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Door_FR_Open",
+                  null,
+                  null
+                ],
+                [
+                  48,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Door_RL_Open",
+                  null,
+                  null
+                ],
+                [
+                  49,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Door_RR_Open",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x3c3": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x3c3",
+            "messageName": "BCM_to_HS_Body",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "BCM_to_HS_Body",
+              "tx": "XXX",
+              "s": [
+                [
+                  8,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Brake_Lights",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x3ca": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x3ca",
+            "messageName": "Lane_Keep_Assist_Control",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Lane_Keep_Assist_Control",
+              "tx": "XXX",
+              "s": [
+                [
+                  7,
+                  4,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  15,
+                  "Lkas_Action",
+                  null,
+                  null
+                ],
+                [
+                  3,
+                  4,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  15,
+                  "Lkas_Alert",
+                  null,
+                  null
+                ],
+                [
+                  15,
+                  12,
+                  0,
+                  0,
+                  0.000005,
+                  -0.01,
+                  0,
+                  0,
+                  "Lane_Curvature",
+                  null,
+                  null
+                ],
+                [
+                  19,
+                  12,
+                  0,
+                  0,
+                  0.04297,
+                  -88.00445,
+                  0,
+                  0,
+                  "Steer_Angle_Req",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x3cc": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x3cc",
+            "messageName": "Lane_Keep_Assist_Status",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Lane_Keep_Assist_Status",
+              "tx": "XXX",
+              "s": [
+                [
+                  7,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "LaHandsOff_B_Actl",
+                  null,
+                  null
+                ],
+                [
+                  6,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "LaActDeny_B_Actl",
+                  null,
+                  null
+                ],
+                [
+                  5,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "LaActAvail_D_Actl",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x3d8": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x3d8",
+            "messageName": "Lane_Keep_Assist_Ui",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Lane_Keep_Assist_Ui",
+              "tx": "XXX",
+              "s": [
+                [
+                  39,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  255,
+                  "Set_Me_X80",
+                  null,
+                  null
+                ],
+                [
+                  47,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  255,
+                  "Set_Me_X45",
+                  null,
+                  null
+                ],
+                [
+                  55,
+                  4,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  15,
+                  "Lines_Hud",
+                  null,
+                  null
+                ],
+                [
+                  50,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  1,
+                  "Hands_Warning_W_Chime",
+                  null,
+                  null
+                ],
+                [
+                  49,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  1,
+                  "Hands_Warning",
+                  null,
+                  null
+                ],
+                [
+                  63,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  255,
+                  "Set_Me_X30",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x76": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x76",
+            "messageName": "Steering_Wheel_Data_CG1",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Steering_Wheel_Data_CG1",
+              "tx": "XXX",
+              "s": [
+                [
+                  6,
+                  15,
+                  0,
+                  0,
+                  0.1,
+                  -1600,
+                  0,
+                  0,
+                  "SteWhlRelInit_An_Sns",
+                  null,
+                  null
+                ],
+                [
+                  23,
+                  15,
+                  0,
+                  0,
+                  0.1,
+                  -1600,
+                  0,
+                  0,
+                  "SteWhlRelCalib_An_Sns",
+                  null,
+                  null
+                ],
+                [
+                  55,
+                  16,
+                  0,
+                  0,
+                  0.1,
+                  -3200,
+                  0,
+                  0,
+                  "SteWhlRelInit2_An_Sns",
+                  null,
+                  null
+                ],
+                [
+                  39,
+                  8,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SteWhlAn_No_Cs",
+                  null,
+                  null
+                ],
+                [
+                  47,
+                  4,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SteWhlAn_No_Cnt",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x82": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x82",
+            "messageName": "EPAS_INFO",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "EPAS_INFO",
+              "tx": "XXX",
+              "s": [
+                [
+                  39,
+                  8,
+                  0,
+                  0,
+                  0.05,
+                  6,
+                  0,
+                  0,
+                  "SteMdule_U_Meas",
+                  null,
+                  null
+                ],
+                [
+                  21,
+                  12,
+                  0,
+                  0,
+                  0.05,
+                  -64,
+                  0,
+                  0,
+                  "SteMdule_I_Est",
+                  null,
+                  null
+                ],
+                [
+                  9,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "EPAS_FAILURE",
+                  null,
+                  null
+                ],
+                [
+                  7,
+                  8,
+                  0,
+                  0,
+                  0.0625,
+                  -8,
+                  0,
+                  0,
+                  "SteeringColumnTorque",
+                  null,
+                  null
+                ],
+                [
+                  15,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SAPPAngleControlStat6",
+                  null,
+                  null
+                ],
+                [
+                  14,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SAPPAngleControlStat5",
+                  null,
+                  null
+                ],
+                [
+                  13,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SAPPAngleControlStat4",
+                  null,
+                  null
+                ],
+                [
+                  12,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SAPPAngleControlStat3",
+                  null,
+                  null
+                ],
+                [
+                  11,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SAPPAngleControlStat2",
+                  null,
+                  null
+                ],
+                [
+                  23,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "SAPPAngleControlStat1",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x83": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x83",
+            "messageName": "Steering_Buttons",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Steering_Buttons",
+              "tx": "XXX",
+              "s": [
+                [
+                  5,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Right_Turn_Light",
+                  null,
+                  null
+                ],
+                [
+                  4,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Left_Turn_Light",
+                  null,
+                  null
+                ],
+                [
+                  12,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Dist_Decr",
+                  null,
+                  null
+                ],
+                [
+                  11,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Dist_Incr",
+                  null,
+                  null
+                ],
+                [
+                  8,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Cancel",
+                  null,
+                  null
+                ],
+                [
+                  29,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Resume",
+                  null,
+                  null
+                ],
+                [
+                  28,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Set",
+                  null,
+                  null
+                ],
+                [
+                  38,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "Main",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x91": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x91",
+            "messageName": "Yaw_Data",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Yaw_Data",
+              "tx": "XXX",
+              "s": [
+                [
+                  39,
+                  16,
+                  0,
+                  0,
+                  0.0002,
+                  -6.5,
+                  0,
+                  0,
+                  "VehYaw_W_Actl",
+                  null,
+                  null
+                ],
+                [
+                  23,
+                  16,
+                  0,
+                  0,
+                  0.0002,
+                  -6.5,
+                  0,
+                  0,
+                  "VehRol_W_Actl",
+                  null,
+                  null
+                ],
+                [
+                  7,
+                  16,
+                  0,
+                  0,
+                  0.0002,
+                  -6.5,
+                  0,
+                  0,
+                  "VehPtch_W_Actl",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ],
+        "0x92": [
+          {
+            "dbcFile": "ford_fusion_2018_pt.dbc",
+            "canId": "0x92",
+            "messageName": "Accel_Data",
+            "idf": "standard",
+            "frame": {
+              "l": 8,
+              "n": "Accel_Data",
+              "tx": "XXX",
+              "s": [
+                [
+                  38,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "VehVertAActl_D_Qf",
+                  null,
+                  null
+                ],
+                [
+                  22,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "VehLongAActl_D_Qf",
+                  null,
+                  null
+                ],
+                [
+                  6,
+                  2,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  "VehLatAActl_D_Qf",
+                  null,
+                  null
+                ],
+                [
+                  36,
+                  13,
+                  0,
+                  0,
+                  0.01,
+                  -40,
+                  0,
+                  0,
+                  "VehVert_A_Actl",
+                  null,
+                  null
+                ],
+                [
+                  20,
+                  13,
+                  0,
+                  0,
+                  0.01,
+                  -40,
+                  0,
+                  0,
+                  "VehLong_A_Actl",
+                  null,
+                  null
+                ],
+                [
+                  4,
+                  13,
+                  0,
+                  0,
+                  0.01,
+                  -40,
+                  0,
+                  0,
+                  "VehLat_A_Actl",
+                  null,
+                  null
+                ]
+              ],
+              "idf": "standard"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "vehicles": [
+    {
+      "vin": "AAAAAA000001BBBBB",
+      "type": "car"
+    }
+  ],
+  "sqs": {
+    "queueUrl": "https://sqs.us-east-1.amazonaws.com/366493038898/sqs-trackster-vehicles-creation",
+    "messageSizeBytes": 13916
+  }
+}

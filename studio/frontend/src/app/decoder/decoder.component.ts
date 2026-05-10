@@ -12,6 +12,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
+import { parseTracksterBin } from './parser/decoder.bin.parser';
+
 interface S3TreeNode {
   name: string;
   key: string;
@@ -49,23 +51,18 @@ export class DecoderComponent implements OnInit {
   isDecoderFilterOpen = false;
   decoderFilterText = '';
 
-  jsonPreviewText = `{
-    "block": 0,
-    "timestampNs": 0,
-    "frames": []
-  }`;
-
-  hexPreviewText = `00000000  54 52 4B 53 01 00 00 00  -- -- -- -- -- -- -- --
-  00000010  -- -- -- -- -- -- -- --  -- -- -- -- -- -- -- --`;
-
-  csvPreviewText = `timestampNs,blockIndex,canId,dlc,payload
-  0,0,0x000,8,-- -- -- -- -- -- -- --`;
-
   isLoadingBinCatalog = false;
 
   selectedS3Key: string | null = null;
 
   selectedBinKeys: string[] = [];
+
+  payloadViewer = {
+    fileName: '',
+    summary: [] as any[],
+    headerFields: [] as any[],
+    blocks: [] as any[]
+  };
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
     node => node.children ?? []
@@ -73,7 +70,9 @@ export class DecoderComponent implements OnInit {
 
   readonly s3TreeDataSource = new MatTreeNestedDataSource<S3TreeNode>();
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService
+  ) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadS3GeneratedFilesTree();
@@ -87,8 +86,18 @@ export class DecoderComponent implements OnInit {
     return node.key;
   };
 
-  selectS3Node(node: S3TreeNode): void {
+  async selectS3Node(node: S3TreeNode): Promise<void> {
     this.selectedS3Key = node.key;
+
+    if (!this.isBinFile(node)) {
+      return;
+    }
+
+    if (this.selectedViewerMode !== 'trackster-bin') {
+      return;
+    }
+
+    await this.loadTracksterBinForViewer(node);
   }
 
   isBinFile(node: S3TreeNode): boolean {
@@ -189,10 +198,303 @@ export class DecoderComponent implements OnInit {
     return value.toLowerCase().includes(filter);
   }
 
-  private getBinKeysFromFolder(node: S3TreeNode): string[] {
+  toggleFrame(frame: any): void {
+    frame.expanded = !frame.expanded;
+  }
+
+  toggleBlock(block: any): void {
+    block.expanded = !block.expanded;
+  }
+
+  private async loadTracksterBinForViewer(
+    node: S3TreeNode
+  ): Promise<void> {
+    try {
+      const buffer = await this.loadTracksterBinBuffer(node);
+      const manifest = await this.loadRunManifest(node);
+
+      console.log('RUN MANIFEST LOADED');
+      console.log(manifest);
+
+      const parsed = parseTracksterBin(
+        buffer,
+        manifest
+      );
+
+      console.log('TRACKSTER BIN PARSED');
+      console.log(parsed);
+
+      const firstTimestampNs =
+        parsed.blocks[0]?.timestampNs ?? '0';
+
+      const secondTimestampNs =
+        parsed.blocks[1]?.timestampNs ?? firstTimestampNs;
+
+      const lastBlock =
+        parsed.blocks[parsed.blocks.length - 1];
+
+      const lastTimestampNs =
+        lastBlock?.timestampNs ?? firstTimestampNs;
+
+      this.payloadViewer = {
+        fileName: node.name,
+
+        summary: [
+          {
+            label: 'Blocks',
+            value: parsed.blockCount.toLocaleString()
+          },
+          {
+            label: 'Frames',
+            value: parsed.totalFrameCount.toLocaleString()
+          },
+          {
+            label: 'Interval',
+            value: this.formatBlockDuration(
+              firstTimestampNs,
+              secondTimestampNs
+            )
+          },
+          {
+            label: 'Duration',
+            value: this.formatBlockDuration(
+              firstTimestampNs,
+              lastTimestampNs
+            )
+          },
+          {
+            label: 'Size',
+            value: this.formatBytes(parsed.totalBytes)
+          }
+        ],
+
+        headerFields: [
+          {
+            label: 'Magic',
+            value: parsed.magic
+          },
+          {
+            label: 'Version',
+            value: `${parsed.versionMajor}.${parsed.versionMinor}`
+          },
+          {
+            label: 'Header bytes',
+            value: parsed.headerBytes
+          },
+          {
+            label: 'Block header',
+            value: parsed.blockHeaderBytes
+          },
+          {
+            label: 'Frame header',
+            value: parsed.frameFixedHeaderBytes
+          },
+          {
+            label: 'Blocks',
+            value: parsed.blockCount
+          },
+          {
+            label: 'Frames',
+            value: parsed.totalFrameCount
+          },
+          {
+            label: 'Payload bytes',
+            value: parsed.totalPayloadBytes.toLocaleString()
+          },
+          {
+            label: 'File bytes',
+            value: parsed.totalBytes.toLocaleString()
+          }
+        ],
+
+        blocks: parsed.blocks.slice(0, 50).map((block: any) => {
+          const startNs = BigInt(block.timestampNs);
+
+          const nextBlock =
+            parsed.blocks[block.blockIndex + 1];
+
+          const endNs =
+            nextBlock
+              ? BigInt(nextBlock.timestampNs)
+              : startNs;
+
+          return {
+            index: block.blockIndex,
+
+            expanded: block.blockIndex === 0,
+
+            startNs: this.formatRelativeTimeNs(
+              firstTimestampNs,
+              startNs.toString()
+            ),
+
+            endNs: this.formatRelativeTimeNs(
+              firstTimestampNs,
+              endNs.toString()
+            ),
+
+            duration: this.formatBlockDuration(
+              startNs.toString(),
+              endNs.toString()
+            ),
+
+            frameCount: block.frameCount,
+
+            frames: block.frames.map((frame: any) => {
+              const signals = Array.isArray(frame.signals)
+                ? frame.signals.map((signal: any) => ({
+                    name: signal.name,
+                    value: signal.value,
+                    raw: signal.raw,
+                    unit: signal.unit,
+                    searchText: [
+                      frame.canIdHex,
+                      frame.messageName,
+                      signal.name
+                    ].join(' ')
+                  }))
+                : [];
+
+              return {
+                expanded: false,
+
+                searchText: [
+                  frame.canIdHex,
+                  frame.messageName,
+                  frame.payloadBytes,
+                  ...signals.map((signal: any) => signal.name)
+                ].join(' '),
+
+                canId: frame.canIdHex,
+
+                messageName:
+                  frame.messageName ||
+                  `CAN_${frame.canIdHex}`,
+
+                time: `${frame.timestampDeltaNs} ns`,
+
+                dlc: frame.payloadLength,
+
+                decodedSignals:
+                  Number(frame.decodedSignals ?? signals.length),
+
+                payloadHex:
+                  frame.payloadBytes,
+
+                signals
+              };
+            })
+          };
+        })
+      };
+
+      console.log('TRACKSTER PAYLOAD VIEWER MODEL');
+      console.log(this.payloadViewer);
+
+    } catch (error) {
+      console.error(
+        'Failed to parse Trackster BIN',
+        error
+      );
+    }
+  }
+
+  private formatRelativeTimeNs(
+    baseNs: string,
+    valueNs: string
+  ): string {
+    const diffNs =
+      BigInt(valueNs) - BigInt(baseNs);
+
+    const seconds =
+      Number(diffNs) / 1_000_000_000;
+
+    return `${seconds.toFixed(3)} s`;
+  }
+
+  private formatBlockDuration(
+    startNs: string,
+    endNs: string
+  ): string {
+    const diffNs =
+      Number(BigInt(endNs) - BigInt(startNs));
+
+    const seconds =
+      diffNs / 1_000_000_000;
+
+    return `${seconds.toFixed(2)} s`;
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
+    }
+
+    return `${bytes} B`;
+  }
+
+  private async loadTracksterBinBuffer(
+    node: S3TreeNode
+  ): Promise<ArrayBuffer> {
+    if (this.shouldUseLocalMock()) {
+      const response =
+        await fetch('assets/mock/sample.bin');
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to load local mock BIN. HTTP ${response.status}`
+        );
+      }
+
+      return await response.arrayBuffer();
+    }
+
+    throw new Error(
+      `Production BIN download is not implemented yet. Selected key: ${node.key}`
+    );
+  }
+
+  private async loadRunManifest(
+    node: S3TreeNode
+  ): Promise<any> {
+    if (this.shouldUseLocalMock()) {
+      const response =
+        await fetch('assets/mock/run-manifest.json');
+
+      if (!response.ok) {
+        console.warn(
+          `Local run-manifest.json not found. Decoder will show raw frames only. HTTP ${response.status}`
+        );
+
+        return null;
+      }
+
+      return await response.json();
+    }
+
+    const manifestKey =
+      node.key.replace(
+        /\/[^/]+\.bin$/i,
+        '/run-manifest.json'
+      );
+
+    throw new Error(
+      `Production run-manifest download is not implemented yet. Selected manifest key: ${manifestKey}`
+    );
+  }
+
+  private getBinKeysFromFolder(
+    node: S3TreeNode
+  ): string[] {
     const result: string[] = [];
 
-    const walk = (currentNode: S3TreeNode): void => {
+    const walk = (
+      currentNode: S3TreeNode
+    ): void => {
       if (this.isBinFile(currentNode)) {
         result.push(currentNode.key);
         return;
@@ -212,16 +514,25 @@ export class DecoderComponent implements OnInit {
     this.isLoadingBinCatalog = true;
 
     try {
-      const config = await this.loadRuntimeConfig();
-      const clientId = this.resolveClientId(config);
+      const config =
+        await this.loadRuntimeConfig();
+
+      const clientId =
+        this.resolveClientId(config);
 
       if (this.shouldUseLocalMock()) {
-        this.setTreeData(this.buildLocalMockTree());
+        this.setTreeData(
+          this.buildLocalMockTree()
+        );
+
         return;
       }
 
-      const catalogUrl = config.decoderApi?.binFilesCatalogUrl;
-      const bucket = config.s3Default;
+      const catalogUrl =
+        config.decoderApi?.binFilesCatalogUrl;
+
+      const bucket =
+        config.s3Default;
 
       if (!catalogUrl) {
         throw new Error(
@@ -235,7 +546,8 @@ export class DecoderComponent implements OnInit {
         );
       }
 
-      const token = await this.authService.getIdToken();
+      const token =
+        await this.authService.getIdToken();
 
       const url =
         `${catalogUrl}` +
@@ -250,18 +562,25 @@ export class DecoderComponent implements OnInit {
       });
 
       if (!response.ok) {
-        const text = await response.text();
+        const text =
+          await response.text();
 
         throw new Error(
           `Failed to load BIN files catalog. HTTP ${response.status}. ${text}`
         );
       }
 
-      const payload = await response.json();
-      const keys = this.extractS3Keys(payload);
-      const tree = this.buildTreeFromS3Keys(keys, clientId);
+      const payload =
+        await response.json();
+
+      const keys =
+        this.extractS3Keys(payload);
+
+      const tree =
+        this.buildTreeFromS3Keys(keys, clientId);
 
       this.setTreeData(tree);
+
     } finally {
       this.isLoadingBinCatalog = false;
     }
@@ -269,22 +588,32 @@ export class DecoderComponent implements OnInit {
 
   private setTreeData(data: S3TreeNode[]): void {
     this.s3TreeControl.expansionModel.clear();
+
     this.s3TreeControl.expansionModel.select(...data);
 
     this.s3TreeDataSource.data = data;
+
     this.s3TreeControl.dataNodes = data;
 
-    this.selectedBinKeys = this.selectedBinKeys
-      .filter(key => this.treeContainsKey(data, key));
+    this.selectedBinKeys =
+      this.selectedBinKeys.filter(key =>
+        this.treeContainsKey(data, key)
+      );
   }
 
-  private treeContainsKey(nodes: S3TreeNode[], key: string): boolean {
+  private treeContainsKey(
+    nodes: S3TreeNode[],
+    key: string
+  ): boolean {
     for (const node of nodes) {
       if (node.key === key) {
         return true;
       }
 
-      if (node.children && this.treeContainsKey(node.children, key)) {
+      if (
+        node.children &&
+        this.treeContainsKey(node.children, key)
+      ) {
         return true;
       }
     }
@@ -296,34 +625,45 @@ export class DecoderComponent implements OnInit {
     keys: string[],
     clientId: string
   ): S3TreeNode[] {
-    const runs = new Map<string, S3TreeNode>();
-    const prefix = `${clientId}/`;
+    const runs =
+      new Map<string, S3TreeNode>();
+
+    const prefix =
+      `${clientId}/`;
 
     for (const rawKey of keys) {
-      const key = rawKey.replace(/^generated-files\//, '');
+      const key =
+        rawKey.replace(/^generated-files\//, '');
 
       if (!key.startsWith(prefix)) {
         continue;
       }
 
-      const relativeKey = key.slice(prefix.length);
+      const relativeKey =
+        key.slice(prefix.length);
 
-      const parts = relativeKey
-        .split('/')
-        .filter(Boolean);
+      const parts =
+        relativeKey
+          .split('/')
+          .filter(Boolean);
 
       if (parts.length < 2) {
         continue;
       }
 
       const runId = parts[0];
-      const fileName = parts[parts.length - 1];
 
-      if (!fileName.toLowerCase().endsWith('.bin')) {
+      const fileName =
+        parts[parts.length - 1];
+
+      if (
+        !fileName.toLowerCase().endsWith('.bin')
+      ) {
         continue;
       }
 
-      let runNode = runs.get(runId);
+      let runNode =
+        runs.get(runId);
 
       if (!runNode) {
         runNode = {
@@ -341,12 +681,18 @@ export class DecoderComponent implements OnInit {
       });
     }
 
-    const runNodes = [...runs.values()]
-      .sort((a, b) => b.name.localeCompare(a.name));
+    const runNodes =
+      [...runs.values()]
+        .sort((a, b) =>
+          b.name.localeCompare(a.name)
+        );
 
     for (const runNode of runNodes) {
-      runNode.children = [...(runNode.children ?? [])]
-        .sort((a, b) => a.name.localeCompare(b.name));
+      runNode.children =
+        [...(runNode.children ?? [])]
+          .sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
     }
 
     return runNodes;
@@ -354,11 +700,16 @@ export class DecoderComponent implements OnInit {
 
   private extractS3Keys(payload: unknown): string[] {
     if (Array.isArray(payload)) {
-      return payload
-        .filter((item): item is string => typeof item === 'string');
+      return payload.filter(
+        (item): item is string =>
+          typeof item === 'string'
+      );
     }
 
-    if (!payload || typeof payload !== 'object') {
+    if (
+      !payload ||
+      typeof payload !== 'object'
+    ) {
       return [];
     }
 
@@ -368,7 +719,10 @@ export class DecoderComponent implements OnInit {
       objects?: unknown;
     };
 
-    const source = data.keys ?? data.files ?? data.objects;
+    const source =
+      data.keys ??
+      data.files ??
+      data.objects;
 
     if (!Array.isArray(source)) {
       return [];
@@ -380,10 +734,17 @@ export class DecoderComponent implements OnInit {
           return item;
         }
 
-        if (item && typeof item === 'object' && 'key' in item) {
-          const key = (item as { key?: unknown }).key;
+        if (
+          item &&
+          typeof item === 'object' &&
+          'key' in item
+        ) {
+          const key =
+            (item as { key?: unknown }).key;
 
-          return typeof key === 'string' ? key : '';
+          return typeof key === 'string'
+            ? key
+            : '';
         }
 
         return '';
@@ -392,7 +753,10 @@ export class DecoderComponent implements OnInit {
   }
 
   private async loadRuntimeConfig(): Promise<RuntimeConfig> {
-    const response = await fetch(`assets/config.json?t=${Date.now()}`);
+    const response =
+      await fetch(
+        `assets/config.json?t=${Date.now()}`
+      );
 
     if (!response.ok) {
       throw new Error(
@@ -403,7 +767,9 @@ export class DecoderComponent implements OnInit {
     return await response.json() as RuntimeConfig;
   }
 
-  private resolveClientId(config: RuntimeConfig): string {
+  private resolveClientId(
+    config: RuntimeConfig
+  ): string {
     const clientId =
       config.clientId ||
       config.customerId ||
@@ -414,18 +780,24 @@ export class DecoderComponent implements OnInit {
       '00000000';
 
     if (!/^[a-zA-Z0-9]{8}$/.test(clientId)) {
-      throw new Error(`Invalid clientId: ${clientId}`);
+      throw new Error(
+        `Invalid clientId: ${clientId}`
+      );
     }
 
     return clientId;
   }
 
   private shouldUseLocalMock(): boolean {
-    const hostname = window.location.hostname;
+    const hostname =
+      window.location.hostname;
 
     return (
       environment.disableAuth === true &&
-      (hostname === 'localhost' || hostname === '127.0.0.1')
+      (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1'
+      )
     );
   }
 
@@ -438,103 +810,64 @@ export class DecoderComponent implements OnInit {
           {
             name: 'VINKDT000001KADUT.bin',
             key: '00000000/20260508183000/VIN000001KADUT.bin'
-          },
-          {
-            name: 'VINKDT000002KADUT.bin',
-            key: '00000000/20260508183000/VIN000002KADUT.bin'
-          },
-          {
-            name: 'VINKDT000003KADUT.bin',
-            key: '00000000/20260508183000/VIN000003KADUT.bin'
-          },
-          {
-            name: 'VINKDT000004KADUT.bin',
-            key: '00000000/20260508183000/VIN000004KADUT.bin'
-          },
-          {
-            name: 'VINKDT000005KADUT.bin',
-            key: '00000000/20260508183000/VIN000005KADUT.bin'
-          },
-          {
-            name: 'VINKDT000006KADUT.bin',
-            key: '00000000/20260508183000/VIN000006KADUT.bin'
-          }
-        ]
-      },
-      {
-        name: '20260508191542',
-        key: '00000000/20260508191542',
-        children: [
-          {
-            name: 'VINTRACKSTER001.bin',
-            key: '00000000/20260508191542/VINTRACKSTER001.bin'
-          },
-          {
-            name: 'VINTRACKSTER002.bin',
-            key: '00000000/20260508191542/VINTRACKSTER002.bin'
-          },
-          {
-            name: 'VINTRACKSTER003.bin',
-            key: '00000000/20260508191542/VINTRACKSTER003.bin'
-          },
-          {
-            name: 'VINTRACKSTER004.bin',
-            key: '00000000/20260508191542/VINTRACKSTER004.bin'
-          }
-        ]
-      },
-      {
-        name: '20260509000211',
-        key: '00000000/20260509000211',
-        children: [
-          {
-            name: 'TESLAMODELY0001.bin',
-            key: '00000000/20260509000211/TESLAMODELY0001.bin'
-          },
-          {
-            name: 'TESLAMODELY0002.bin',
-            key: '00000000/20260509000211/TESLAMODELY0002.bin'
-          },
-          {
-            name: 'TESLAMODELY0003.bin',
-            key: '00000000/20260509000211/TESLAMODELY0003.bin'
-          },
-          {
-            name: 'TESLAMODELY0004.bin',
-            key: '00000000/20260509000211/TESLAMODELY0004.bin'
-          },
-          {
-            name: 'TESLAMODELY0005.bin',
-            key: '00000000/20260509000211/TESLAMODELY0005.bin'
-          },
-          {
-            name: 'TESLAMODELY0006.bin',
-            key: '00000000/20260509000211/TESLAMODELY0006.bin'
-          },
-          {
-            name: 'TESLAMODELY0007.bin',
-            key: '00000000/20260509000211/TESLAMODELY0007.bin'
-          }
-        ]
-      },
-      {
-        name: '20260509013055',
-        key: '00000000/20260509013055',
-        children: [
-          {
-            name: 'BMWISO4SIM0001.bin',
-            key: '00000000/20260509013055/BMWISO4SIM0001.bin'
-          },
-          {
-            name: 'BMWISO4SIM0002.bin',
-            key: '00000000/20260509013055/BMWISOSIM0002.bin'
-          },
-          {
-            name: 'BMWISO4SIM0003.bin',
-            key: '00000000/20260509013055/BMWISO4SIM0003.bin'
           }
         ]
       }
     ];
+  }
+
+  async copyHeaderToClipboard(): Promise<void> {
+    const rows = [
+      ['Field', 'Value'],
+      ...this.payloadViewer.headerFields.map((field: any) => [
+        field.label,
+        field.value
+      ])
+    ];
+
+    await this.copyRowsToClipboard(rows);
+  }
+
+  async copyBlocksToClipboard(): Promise<void> {
+    const rows = [
+      ['Block', 'Start', 'End', 'Duration', 'Frames'],
+      ...this.payloadViewer.blocks.map((block: any) => [
+        block.index,
+        block.startNs,
+        block.endNs,
+        block.duration,
+        block.frameCount
+      ])
+    ];
+
+    await this.copyRowsToClipboard(rows);
+  }
+
+  async copyPayloadViewerToClipboard(): Promise<void> {
+    const rows = [
+      ['Block', 'CAN ID', 'Message', 'Time', 'DLC', 'Payload'],
+      ...this.payloadViewer.blocks.flatMap((block: any) =>
+        block.frames.map((frame: any) => [
+          block.index,
+          frame.canId,
+          frame.messageName,
+          frame.time,
+          frame.dlc,
+          frame.payloadHex
+        ])
+      )
+    ];
+
+    await this.copyRowsToClipboard(rows);
+  }
+
+  private async copyRowsToClipboard(
+    rows: Array<Array<string | number>>
+  ): Promise<void> {
+    const text = rows
+      .map(row => row.join('\t'))
+      .join('\n');
+
+    await navigator.clipboard.writeText(text);
   }
 }

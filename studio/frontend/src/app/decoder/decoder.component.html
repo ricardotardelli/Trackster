@@ -111,7 +111,7 @@
                   <h3>Payload Viewer</h3>
 
                   <span class="decoder-selected-file">
-                    VINTRACKSTER001.bin
+                    {{ payloadViewer.fileName }}
                   </span>
                 </div>
 
@@ -203,29 +203,11 @@
               </div>
 
               <div class="decoder-summary-grid">
-                <div class="decoder-summary-box">
-                  <span>Blocks</span>
-                  <strong>180</strong>
-                </div>
-
-                <div class="decoder-summary-box">
-                  <span>Frames</span>
-                  <strong>18,000</strong>
-                </div>
-
-                <div class="decoder-summary-box">
-                  <span>Interval</span>
-                  <strong>100 ms</strong>
-                </div>
-
-                <div class="decoder-summary-box">
-                  <span>Duration</span>
-                  <strong>18.0 s</strong>
-                </div>
-
-                <div class="decoder-summary-box">
-                  <span>Size</span>
-                  <strong>18.3 MB</strong>
+                <div
+                  class="decoder-summary-box"
+                  *ngFor="let item of payloadViewer.summary">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
                 </div>
               </div>
 
@@ -239,7 +221,8 @@
                   <button
                     type="button"
                     class="decoder-copy-icon-button"
-                    title="Copy visible structure">
+                    title="Copy visible structure"
+                    (click)="copyPayloadViewerToClipboard()">
                     <mat-icon>content_copy</mat-icon>
                   </button>
                 </div>
@@ -256,40 +239,16 @@
                       <button
                         type="button"
                         class="decoder-copy-icon-button"
-                        title="Copy header">
+                        title="Copy header"
+                        (click)="copyHeaderToClipboard()">
                         <mat-icon>content_copy</mat-icon>
                       </button>
                     </div>
 
                     <div class="decoder-hierarchy-grid">
-                      <div>
-                        <span>Magic</span>
-                        <strong>TRKS</strong>
-                      </div>
-
-                      <div>
-                        <span>Version</span>
-                        <strong>1</strong>
-                      </div>
-
-                      <div>
-                        <span>Endian</span>
-                        <strong>Little</strong>
-                      </div>
-
-                      <div>
-                        <span>Block interval</span>
-                        <strong>100,000,000 ns</strong>
-                      </div>
-
-                      <div>
-                        <span>Unique CAN IDs</span>
-                        <strong>1,024</strong>
-                      </div>
-
-                      <div>
-                        <span>Rolling counters</span>
-                        <strong>Enabled</strong>
+                      <div *ngFor="let field of payloadViewer.headerFields">
+                        <span>{{ field.label }}</span>
+                        <strong>{{ field.value }}</strong>
                       </div>
                     </div>
                   </div>
@@ -304,175 +263,113 @@
                       <button
                         type="button"
                         class="decoder-copy-icon-button"
-                        title="Copy blocks">
+                        title="Copy blocks"
+                        (click)="copyBlocksToClipboard()">
                         <mat-icon>content_copy</mat-icon>
                       </button>
                     </div>
 
                     <div class="decoder-block-list">
 
-                      <div class="decoder-block-card decoder-block-card-expanded">
+                      <div
+                        class="decoder-block-card"
+                        *ngFor="let block of payloadViewer.blocks"
+                        [class.decoder-block-card-expanded]="block.expanded">
+
                         <div class="decoder-block-header">
-                          <button type="button" class="decoder-expand-button">
-                            <mat-icon>expand_more</mat-icon>
+                          <button type="button" class="decoder-expand-button" (click)="toggleBlock(block); $event.stopPropagation()">
+                            <mat-icon>
+                              {{ block.expanded ? 'expand_more' : 'chevron_right' }}
+                            </mat-icon>
                           </button>
 
                           <div class="decoder-block-title">
-                            <strong>Block 0</strong>
-                            <span>0 ns → 100,000,000 ns</span>
+                            <strong>Block {{ block.index }}</strong>
+                            <span>{{ block.startNs }} → {{ block.endNs }}</span>
                           </div>
 
                           <div class="decoder-block-meta">
-                            <span>100 frames</span>
-                            <span>100 ms</span>
+                            <span>{{ block.frameCount }} frames</span>
+                            <span>{{ block.duration }}</span>
                           </div>
                         </div>
 
-                        <div class="decoder-frame-list">
+                        <div
+                          class="decoder-frame-list"
+                          *ngIf="block.expanded">
 
                           <div
                             class="decoder-frame-card"
-                            *ngIf="matchesDecoderFilter('0x082 EPS_STATUS')">
+                            *ngFor="let frame of block.frames"
+                            [class.decoder-frame-card-expanded]="frame.expanded"
+                            [hidden]="!matchesDecoderFilter(frame.searchText)">
+
                             <div class="decoder-frame-header">
-                              <button type="button" class="decoder-expand-button">
-                                <mat-icon>chevron_right</mat-icon>
+                              <button
+                                type="button"
+                                class="decoder-expand-button"
+                                (click)="toggleFrame(frame); $event.stopPropagation()">
+                                <mat-icon>
+                                  {{ frame.expanded ? 'expand_more' : 'chevron_right' }}
+                                </mat-icon>
                               </button>
 
                               <div class="decoder-frame-title">
-                                <strong>0x082 · EPS_STATUS</strong>
-                                <span>Time 0 ms · DLC 8 · 2 decoded signals</span>
+                                <strong>{{ frame.canId }} · {{ frame.messageName }}</strong>
+                                <span>
+                                  Time {{ frame.time }} · DLC {{ frame.dlc }} · {{ frame.decodedSignals }} decoded signals
+                                </span>
                               </div>
 
-                              <code>1A 00 4C 20 00 00 7F 11</code>
-                            </div>
-                          </div>
-
-                          <div
-                            class="decoder-frame-card"
-                            *ngIf="matchesDecoderFilter('0x130 EPAS_INFO')">
-                            <div class="decoder-frame-header">
-                              <button type="button" class="decoder-expand-button">
-                                <mat-icon>chevron_right</mat-icon>
-                              </button>
-
-                              <div class="decoder-frame-title">
-                                <strong>0x130 · EPAS_INFO</strong>
-                                <span>Time 10 ms · DLC 8 · 2 decoded signals</span>
-                              </div>
-
-                              <code>02 91 00 38 11 00 00 8A</code>
-                            </div>
-                          </div>
-
-                          <div
-                            class="decoder-frame-card decoder-frame-card-expanded"
-                            *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedFL WheelSpeedFR WheelSpeedRL WheelSpeedRR')">
-                            <div class="decoder-frame-header">
-                              <button type="button" class="decoder-expand-button">
-                                <mat-icon>expand_more</mat-icon>
-                              </button>
-
-                              <div class="decoder-frame-title">
-                                <strong>0x220 · WHEEL_SPEEDS</strong>
-                                <span>Time 20 ms · DLC 8 · 4 decoded signals</span>
-                              </div>
-
-                              <code>4B 10 4B 0F 4A F8 4B 02</code>
+                              <code>{{ frame.payloadHex }}</code>
                             </div>
 
-                            <div class="decoder-signal-list">
-                              <div
-                                class="decoder-signal-row"
-                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedFL')">
-                                <span>WheelSpeedFL</span>
-                                <strong>48.04</strong>
-                                <span>raw: 19216</span>
-                                <span>unit: km/h</span>
-                              </div>
+                            <div
+                              class="decoder-signal-list"
+                              *ngIf="frame.expanded && frame.signals.length > 0">
 
                               <div
                                 class="decoder-signal-row"
-                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedFR')">
-                                <span>WheelSpeedFR</span>
-                                <strong>48.02</strong>
-                                <span>raw: 19208</span>
-                                <span>unit: km/h</span>
-                              </div>
+                                *ngFor="let signal of frame.signals"
+                                [hidden]="!matchesDecoderFilter(signal.searchText)">
 
-                              <div
-                                class="decoder-signal-row"
-                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedRL')">
-                                <span>WheelSpeedRL</span>
-                                <strong>47.96</strong>
-                                <span>raw: 19184</span>
-                                <span>unit: km/h</span>
-                              </div>
+                                <div class="decoder-signal-name">
+                                  <span>{{ signal.name }}</span>
+                                </div>
 
-                              <div
-                                class="decoder-signal-row"
-                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedRR')">
-                                <span>WheelSpeedRR</span>
-                                <strong>48.01</strong>
-                                <span>raw: 19204</span>
-                                <span>unit: km/h</span>
+                                <div class="decoder-signal-value">
+                                  <strong>{{ signal.value }}</strong>
+                                </div>
+
+                                <div class="decoder-signal-meta">
+                                  <span>raw: {{ signal.raw }}</span>
+                                  <span>unit: {{ signal.unit || '-' }}</span>
+                                </div>
                               </div>
                             </div>
+
+                            <div
+                              class="decoder-signal-list"
+                              *ngIf="frame.expanded && frame.signals.length === 0">
+
+                              <div class="decoder-signal-row decoder-signal-row-empty">
+                                <div class="decoder-signal-name">
+                                  <span>No decoded signals</span>
+                                </div>
+
+                                <div class="decoder-signal-value">
+                                  <strong>{{ frame.payloadHex }}</strong>
+                                </div>
+
+                                <div class="decoder-signal-meta">
+                                  <span>raw payload</span>
+                                  <span>manifest/runtime not matched</span>
+                                </div>
+                              </div>
+                            </div>
+
                           </div>
 
-                        </div>
-                      </div>
-
-                      <div class="decoder-block-card">
-                        <div class="decoder-block-header">
-                          <button type="button" class="decoder-expand-button">
-                            <mat-icon>chevron_right</mat-icon>
-                          </button>
-
-                          <div class="decoder-block-title">
-                            <strong>Block 1</strong>
-                            <span>100,000,000 ns → 200,000,000 ns</span>
-                          </div>
-
-                          <div class="decoder-block-meta">
-                            <span>100 frames</span>
-                            <span>100 ms</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="decoder-block-card">
-                        <div class="decoder-block-header">
-                          <button type="button" class="decoder-expand-button">
-                            <mat-icon>chevron_right</mat-icon>
-                          </button>
-
-                          <div class="decoder-block-title">
-                            <strong>Block 2</strong>
-                            <span>200,000,000 ns → 300,000,000 ns</span>
-                          </div>
-
-                          <div class="decoder-block-meta">
-                            <span>100 frames</span>
-                            <span>100 ms</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="decoder-block-card">
-                        <div class="decoder-block-header">
-                          <button type="button" class="decoder-expand-button">
-                            <mat-icon>chevron_right</mat-icon>
-                          </button>
-
-                          <div class="decoder-block-title">
-                            <strong>Block 3</strong>
-                            <span>300,000,000 ns → 400,000,000 ns</span>
-                          </div>
-
-                          <div class="decoder-block-meta">
-                            <span>100 frames</span>
-                            <span>100 ms</span>
-                          </div>
                         </div>
                       </div>
 
@@ -562,7 +459,7 @@
               <div class="decoder-export-menu-preview">
                 <button type="button">Current file</button>
                 <button type="button">Selected files</button>
-                <button type="button">Entire run</button>
+                <button type="button">Entire folder</button>
               </div>
 
               <div class="decoder-section-title">
