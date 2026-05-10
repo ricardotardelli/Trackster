@@ -2,71 +2,76 @@
   <div class="module-stage-shell">
     <div class="workspace-grid">
 
-      <aside class="workspace-sidebar status-panel">
-        <h2>CAN Files Explorer</h2>
+      <aside class="workspace-sidebar">
+        <div class="status-panel">
+          <h2>CAN Files Explorer</h2>
 
-        <div class="tree-shell">
-          <div class="tree-loading" *ngIf="isLoadingBinCatalog"> Loading BIN catalog...</div>
-          <mat-tree
-            [dataSource]="s3TreeDataSource"
-            [treeControl]="s3TreeControl"
-            class="trackster-tree">
+          <div class="tree-shell">
+            <div class="tree-loading" *ngIf="isLoadingBinCatalog">
+              Loading BIN catalog...
+            </div>
 
-            <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild">
-              <div class="tree-node tree-node-folder">
-                <button
-                  type="button"
-                  class="tree-toggle"
-                  matTreeNodeToggle>
-                  <mat-icon>
-                    {{ s3TreeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
-                  </mat-icon>
-                </button>
+            <mat-tree
+              [dataSource]="s3TreeDataSource"
+              [treeControl]="s3TreeControl"
+              class="trackster-tree">
 
-                <button
-                  type="button"
-                  class="tree-label"
-                  (click)="selectS3Node(node)">
-                  <mat-icon class="tree-icon">
-                    {{ s3TreeControl.isExpanded(node) ? 'folder_open' : 'folder' }}
-                  </mat-icon>
+              <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild">
+                <div class="tree-node tree-node-folder">
+                  <button
+                    type="button"
+                    class="tree-toggle"
+                    matTreeNodeToggle>
+                    <mat-icon>
+                      {{ s3TreeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+                    </mat-icon>
+                  </button>
 
-                  <span class="tree-text">
-                    {{ node.name }}
-                  </span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    class="tree-label"
+                    (click)="selectS3Node(node)">
+                    <mat-icon class="tree-icon">
+                      {{ s3TreeControl.isExpanded(node) ? 'folder_open' : 'folder' }}
+                    </mat-icon>
 
-              <div
-                class="tree-children"
-                [class.tree-children-hidden]="!s3TreeControl.isExpanded(node)">
-                <ng-container matTreeNodeOutlet></ng-container>
-              </div>
-            </mat-nested-tree-node>
+                    <span class="tree-text">
+                      {{ node.name }}
+                    </span>
+                  </button>
+                </div>
 
-            <mat-tree-node *matTreeNodeDef="let node">
-              <div class="tree-node tree-node-file">
-                <span class="tree-indent"></span>
+                <div
+                  class="tree-children"
+                  [class.tree-children-hidden]="!s3TreeControl.isExpanded(node)">
+                  <ng-container matTreeNodeOutlet></ng-container>
+                </div>
+              </mat-nested-tree-node>
 
-                <button
-                  type="button"
-                  class="tree-label"
-                  [class.tree-label-selected]="selectedS3Node === node"
-                  [class.tree-label-bin]="node.name.endsWith('.bin')"
-                  [class.tree-label-json]="node.name.endsWith('.json')"
-                  (click)="selectS3Node(node)">
-                  <mat-icon class="tree-icon">
-                    {{ node.name.endsWith('.json') ? 'data_object' : 'description' }}
-                  </mat-icon>
+              <mat-tree-node *matTreeNodeDef="let node">
+                <div class="tree-node tree-node-file">
+                  <span class="tree-indent"></span>
 
-                  <span class="tree-text">
-                    {{ node.name }}
-                  </span>
-                </button>
-              </div>
-            </mat-tree-node>
+                  <button
+                    type="button"
+                    class="tree-label"
+                    [class.tree-label-selected]="selectedS3Key === node.key"
+                    [class.tree-label-bin]="isBinFile(node)"
+                    [class.tree-label-json]="isJsonFile(node)"
+                    (click)="selectS3Node(node)">
+                    <mat-icon class="tree-icon">
+                      {{ node.name.endsWith('.json') ? 'data_object' : 'description' }}
+                    </mat-icon>
 
-          </mat-tree>
+                    <span class="tree-text">
+                      {{ node.name }}
+                    </span>
+                  </button>
+                </div>
+              </mat-tree-node>
+
+            </mat-tree>
+          </div>
         </div>
       </aside>
 
@@ -82,27 +87,482 @@
         <div class="workspace-body-content">
           <div class="module-card-grid">
 
-            <section class="module-card placeholder-card">
-              <div class="card-header-row">
-                <h3>Explorer</h3>
+            <section class="module-card decoder-payload-card">
+              <div class="card-header-row decoder-work-card-header">
+                <div class="decoder-title-stack">
+                  <h3>Payload Viewer</h3>
+
+                  <span class="decoder-selected-file">
+                    VINTRACKSTER001.bin
+                  </span>
+                </div>
+
+                <div class="decoder-toolbar">
+                  <mat-form-field
+                    class="decoder-view-field"
+                    appearance="outline"
+                    subscriptSizing="dynamic">
+                    <mat-select
+                      [(ngModel)]="selectedViewerMode"
+                      panelClass="trackster-select-panel">
+                      <mat-option value="trackster-bin">Trackster BIN</mat-option>
+                      <mat-option value="decoded-signals">Decoded Signals</mat-option>
+                      <mat-option value="json">JSON</mat-option>
+                      <mat-option value="csv">CSV</mat-option>
+                      <mat-option value="hex-dump">HEX Dump</mat-option>
+                      <mat-option value="vector-asc">Vector ASC</mat-option>
+                      <mat-option value="candump">candump</mat-option>
+                      <mat-option value="blf">BLF</mat-option>
+                      <mat-option value="mf4">MF4</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <button
+                    type="button"
+                    class="decoder-filter-button"
+                    [class.decoder-filter-button-active]="isDecoderFilterOpen"
+                    (click)="toggleDecoderFilter()"
+                    title="Filter payload structure">
+                    <mat-icon>filter_list</mat-icon>
+                    <span>Filter</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="decoder-export-button"
+                    [matMenuTriggerFor]="decoderExportMenu">
+                    <span>Export</span>
+                    <mat-icon>expand_more</mat-icon>
+                  </button>
+
+                  <mat-menu #decoderExportMenu="matMenu" class="decoder-export-menu">
+                    <button mat-menu-item>
+                      <span>Current file</span>
+                    </button>
+
+                    <button mat-menu-item>
+                      <span>Selected files</span>
+                    </button>
+
+                    <button mat-menu-item>
+                      <span>Entire run</span>
+                    </button>
+                  </mat-menu>
+                </div>
               </div>
 
-              <div class="placeholder-body">
-                <p>
-                  S3 treeview placeholder.
-                </p>
+              <div
+                class="decoder-filter-bar"
+                *ngIf="isDecoderFilterOpen">
+                <div class="decoder-filter-input-shell">
+                  <mat-icon>search</mat-icon>
+
+                  <input
+                    type="text"
+                    [(ngModel)]="decoderFilterText"
+                    placeholder="Search CAN ID, message or signal..."
+                    autocomplete="off">
+
+                  <button
+                    type="button"
+                    class="decoder-filter-clear-button"
+                    *ngIf="decoderFilterText"
+                    (click)="clearDecoderFilter()"
+                    title="Clear filter">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <span
+                  class="decoder-filter-status"
+                  *ngIf="decoderFilterText">
+                  Filtering by "{{ decoderFilterText }}"
+                </span>
+              </div>
+
+              <div class="decoder-summary-grid">
+                <div class="decoder-summary-box">
+                  <span>Blocks</span>
+                  <strong>180</strong>
+                </div>
+
+                <div class="decoder-summary-box">
+                  <span>Frames</span>
+                  <strong>18,000</strong>
+                </div>
+
+                <div class="decoder-summary-box">
+                  <span>Interval</span>
+                  <strong>100 ms</strong>
+                </div>
+
+                <div class="decoder-summary-box">
+                  <span>Duration</span>
+                  <strong>18.0 s</strong>
+                </div>
+
+                <div class="decoder-summary-box">
+                  <span>Size</span>
+                  <strong>18.3 MB</strong>
+                </div>
+              </div>
+
+              <div class="decoder-structure-panel">
+                <div class="decoder-structure-header">
+                  <div>
+                    <h4>Payload Structure</h4>
+                    <span>Collapsed block and frame inspection. Expand only what you need.</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="decoder-copy-icon-button"
+                    title="Copy visible structure">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </div>
+
+                <div class="decoder-structure-scroll">
+
+                  <div class="decoder-hierarchy-card">
+                    <div class="decoder-hierarchy-card-header">
+                      <div>
+                        <span class="decoder-card-kicker">Header</span>
+                        <strong>Trackster Header</strong>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="decoder-copy-icon-button"
+                        title="Copy header">
+                        <mat-icon>content_copy</mat-icon>
+                      </button>
+                    </div>
+
+                    <div class="decoder-hierarchy-grid">
+                      <div>
+                        <span>Magic</span>
+                        <strong>TRKS</strong>
+                      </div>
+
+                      <div>
+                        <span>Version</span>
+                        <strong>1</strong>
+                      </div>
+
+                      <div>
+                        <span>Endian</span>
+                        <strong>Little</strong>
+                      </div>
+
+                      <div>
+                        <span>Block interval</span>
+                        <strong>100,000,000 ns</strong>
+                      </div>
+
+                      <div>
+                        <span>Unique CAN IDs</span>
+                        <strong>1,024</strong>
+                      </div>
+
+                      <div>
+                        <span>Rolling counters</span>
+                        <strong>Enabled</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="decoder-hierarchy-card">
+                    <div class="decoder-hierarchy-card-header">
+                      <div>
+                        <span class="decoder-card-kicker">Blocks</span>
+                        <strong>Timeline</strong>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="decoder-copy-icon-button"
+                        title="Copy blocks">
+                        <mat-icon>content_copy</mat-icon>
+                      </button>
+                    </div>
+
+                    <div class="decoder-block-list">
+
+                      <div class="decoder-block-card decoder-block-card-expanded">
+                        <div class="decoder-block-header">
+                          <button type="button" class="decoder-expand-button">
+                            <mat-icon>expand_more</mat-icon>
+                          </button>
+
+                          <div class="decoder-block-title">
+                            <strong>Block 0</strong>
+                            <span>0 ns → 100,000,000 ns</span>
+                          </div>
+
+                          <div class="decoder-block-meta">
+                            <span>100 frames</span>
+                            <span>100 ms</span>
+                          </div>
+                        </div>
+
+                        <div class="decoder-frame-list">
+
+                          <div
+                            class="decoder-frame-card"
+                            *ngIf="matchesDecoderFilter('0x082 EPS_STATUS')">
+                            <div class="decoder-frame-header">
+                              <button type="button" class="decoder-expand-button">
+                                <mat-icon>chevron_right</mat-icon>
+                              </button>
+
+                              <div class="decoder-frame-title">
+                                <strong>0x082 · EPS_STATUS</strong>
+                                <span>Time 0 ms · DLC 8 · 2 decoded signals</span>
+                              </div>
+
+                              <code>1A 00 4C 20 00 00 7F 11</code>
+                            </div>
+                          </div>
+
+                          <div
+                            class="decoder-frame-card"
+                            *ngIf="matchesDecoderFilter('0x130 EPAS_INFO')">
+                            <div class="decoder-frame-header">
+                              <button type="button" class="decoder-expand-button">
+                                <mat-icon>chevron_right</mat-icon>
+                              </button>
+
+                              <div class="decoder-frame-title">
+                                <strong>0x130 · EPAS_INFO</strong>
+                                <span>Time 10 ms · DLC 8 · 2 decoded signals</span>
+                              </div>
+
+                              <code>02 91 00 38 11 00 00 8A</code>
+                            </div>
+                          </div>
+
+                          <div
+                            class="decoder-frame-card decoder-frame-card-expanded"
+                            *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedFL WheelSpeedFR WheelSpeedRL WheelSpeedRR')">
+                            <div class="decoder-frame-header">
+                              <button type="button" class="decoder-expand-button">
+                                <mat-icon>expand_more</mat-icon>
+                              </button>
+
+                              <div class="decoder-frame-title">
+                                <strong>0x220 · WHEEL_SPEEDS</strong>
+                                <span>Time 20 ms · DLC 8 · 4 decoded signals</span>
+                              </div>
+
+                              <code>4B 10 4B 0F 4A F8 4B 02</code>
+                            </div>
+
+                            <div class="decoder-signal-list">
+                              <div
+                                class="decoder-signal-row"
+                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedFL')">
+                                <span>WheelSpeedFL</span>
+                                <strong>48.04</strong>
+                                <span>raw: 19216</span>
+                                <span>unit: km/h</span>
+                              </div>
+
+                              <div
+                                class="decoder-signal-row"
+                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedFR')">
+                                <span>WheelSpeedFR</span>
+                                <strong>48.02</strong>
+                                <span>raw: 19208</span>
+                                <span>unit: km/h</span>
+                              </div>
+
+                              <div
+                                class="decoder-signal-row"
+                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedRL')">
+                                <span>WheelSpeedRL</span>
+                                <strong>47.96</strong>
+                                <span>raw: 19184</span>
+                                <span>unit: km/h</span>
+                              </div>
+
+                              <div
+                                class="decoder-signal-row"
+                                *ngIf="matchesDecoderFilter('0x220 WHEEL_SPEEDS WheelSpeedRR')">
+                                <span>WheelSpeedRR</span>
+                                <strong>48.01</strong>
+                                <span>raw: 19204</span>
+                                <span>unit: km/h</span>
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+
+                      <div class="decoder-block-card">
+                        <div class="decoder-block-header">
+                          <button type="button" class="decoder-expand-button">
+                            <mat-icon>chevron_right</mat-icon>
+                          </button>
+
+                          <div class="decoder-block-title">
+                            <strong>Block 1</strong>
+                            <span>100,000,000 ns → 200,000,000 ns</span>
+                          </div>
+
+                          <div class="decoder-block-meta">
+                            <span>100 frames</span>
+                            <span>100 ms</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="decoder-block-card">
+                        <div class="decoder-block-header">
+                          <button type="button" class="decoder-expand-button">
+                            <mat-icon>chevron_right</mat-icon>
+                          </button>
+
+                          <div class="decoder-block-title">
+                            <strong>Block 2</strong>
+                            <span>200,000,000 ns → 300,000,000 ns</span>
+                          </div>
+
+                          <div class="decoder-block-meta">
+                            <span>100 frames</span>
+                            <span>100 ms</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="decoder-block-card">
+                        <div class="decoder-block-header">
+                          <button type="button" class="decoder-expand-button">
+                            <mat-icon>chevron_right</mat-icon>
+                          </button>
+
+                          <div class="decoder-block-title">
+                            <strong>Block 3</strong>
+                            <span>300,000,000 ns → 400,000,000 ns</span>
+                          </div>
+
+                          <div class="decoder-block-meta">
+                            <span>100 frames</span>
+                            <span>100 ms</span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
               </div>
             </section>
 
-            <section class="module-card placeholder-card">
-              <div class="card-header-row">
-                <h3>Decoder / Replay</h3>
+            <section class="module-card decoder-manifest-card">
+              <div class="card-header-row decoder-work-card-header">
+                <div class="decoder-title-block">
+                  <h3>Run Manifest</h3>
+                  <p>run-manifest.json</p>
+                </div>
+
+                <span class="decoder-status-pill decoder-status-loaded">
+                  Loaded
+                </span>
               </div>
 
-              <div class="placeholder-body">
-                <p>
-                  Decoder workspace placeholder.
-                </p>
+              <div class="decoder-manifest-summary">
+                <div class="decoder-manifest-icon">
+                  <mat-icon>data_object</mat-icon>
+                </div>
+
+                <div>
+                  <strong>Generation package resolved</strong>
+                  <span>20260508191542 · worker-1.0.0</span>
+                  <p>
+                    Runtime metadata and DBC package used to generate the selected BIN.
+                  </p>
+                </div>
+              </div>
+
+              <div class="decoder-report-grid">
+                <div>
+                  <span>DBCs</span>
+                  <strong>2</strong>
+                </div>
+
+                <div>
+                  <span>Messages</span>
+                  <strong>400</strong>
+                </div>
+
+                <div>
+                  <span>Signals</span>
+                  <strong>3,349</strong>
+                </div>
+
+                <div>
+                  <span>CAN IDs</span>
+                  <strong>1,024</strong>
+                </div>
+              </div>
+
+              <div class="decoder-section-title">
+                DBC Package
+              </div>
+
+              <div class="decoder-dbc-list">
+                <div class="decoder-dbc-row">
+                  <mat-icon>data_object</mat-icon>
+
+                  <div>
+                    <strong>tesla_model3.dbc</strong>
+                    <span>214 messages · 1,842 signals · validated</span>
+                  </div>
+                </div>
+
+                <div class="decoder-dbc-row">
+                  <mat-icon>data_object</mat-icon>
+
+                  <div>
+                    <strong>bmw_i4.dbc</strong>
+                    <span>186 messages · 1,507 signals · validated</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="decoder-section-title">
+                Export Target
+              </div>
+
+              <div class="decoder-export-menu-preview">
+                <button type="button">Current file</button>
+                <button type="button">Selected files</button>
+                <button type="button">Entire run</button>
+              </div>
+
+              <div class="decoder-section-title">
+                Manifest Log
+              </div>
+
+              <div class="decoder-log-list">
+                <div class="decoder-log-card decoder-log-success-card">
+                  <div class="decoder-log-head">
+                    <span class="decoder-log-level decoder-log-success">
+                      SUCCESS
+                    </span>
+
+                    <strong>DBC_PACKAGE_READY</strong>
+                  </div>
+
+                  <p>
+                    2 compiled DBC files were linked to this generation package.
+                  </p>
+
+                  <span>rollingCounters: enabled</span>
+                </div>
               </div>
             </section>
 

@@ -3,13 +3,17 @@ import { Component, OnInit } from '@angular/core';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
+import { FormsModule } from '@angular/forms';
 
 import { environment } from '../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
 
 interface S3TreeNode {
   name: string;
-  key?: string;
+  key: string;
   children?: S3TreeNode[];
 }
 
@@ -28,18 +32,39 @@ interface RuntimeConfig {
   imports: [
     CommonModule,
     MatTreeModule,
-    MatIconModule
+    MatIconModule,
+    FormsModule,
+    MatMenuModule,
+    MatFormFieldModule,
+    MatSelectModule
   ],
   templateUrl: './decoder.component.html',
-  styleUrl: './decoder.component.css'
+  styleUrl: './decoder.component.css',
 })
 export class DecoderComponent implements OnInit {
+  selectedViewerMode = 'trackster-bin';
+
+  isDecoderFilterOpen = false;
+  decoderFilterText = '';
+
+  jsonPreviewText = `{
+    "block": 0,
+    "timestampNs": 0,
+    "frames": []
+  }`;
+
+  hexPreviewText = `00000000  54 52 4B 53 01 00 00 00  -- -- -- -- -- -- -- --
+  00000010  -- -- -- -- -- -- -- --  -- -- -- -- -- -- -- --`;
+
+  csvPreviewText = `timestampNs,blockIndex,canId,dlc,payload
+  0,0,0x000,8,-- -- -- -- -- -- -- --`;
+
   isLoadingBinCatalog = false;
 
-  selectedS3Node: S3TreeNode | null = null;
+  selectedS3Key: string | null = null;
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
-    node => node.children
+    node => node.children ?? []
   );
 
   readonly s3TreeDataSource = new MatTreeNestedDataSource<S3TreeNode>();
@@ -54,16 +79,48 @@ export class DecoderComponent implements OnInit {
     return !!node.children && node.children.length > 0;
   };
 
+  trackByS3Node = (_: number, node: S3TreeNode): string => {
+    return node.key;
+  };
+
   selectS3Node(node: S3TreeNode): void {
-    this.selectedS3Node = node;
+    this.selectedS3Key = node.key;
+  }
+
+  isBinFile(node: S3TreeNode): boolean {
+    return node.name.toLowerCase().endsWith('.bin');
+  }
+
+  isJsonFile(node: S3TreeNode): boolean {
+    return node.name.toLowerCase().endsWith('.json');
+  }
+
+  toggleDecoderFilter(): void {
+    this.isDecoderFilterOpen = !this.isDecoderFilterOpen;
+
+    if (!this.isDecoderFilterOpen) {
+      this.decoderFilterText = '';
+    }
+  }
+
+  clearDecoderFilter(): void {
+    this.decoderFilterText = '';
+  }
+
+  matchesDecoderFilter(value: string): boolean {
+    const filter = this.decoderFilterText.trim().toLowerCase();
+
+    if (!filter) {
+      return true;
+    }
+
+    return value.toLowerCase().includes(filter);
   }
 
   private async loadS3GeneratedFilesTree(): Promise<void> {
-
     this.isLoadingBinCatalog = true;
 
     try {
-
       const config = await this.loadRuntimeConfig();
       const clientId = this.resolveClientId(config);
 
@@ -110,17 +167,21 @@ export class DecoderComponent implements OnInit {
       }
 
       const payload = await response.json();
-
       const keys = this.extractS3Keys(payload);
       const tree = this.buildTreeFromS3Keys(keys, clientId);
 
       this.setTreeData(tree);
-
-    } 
-    finally {
-
+    } finally {
       this.isLoadingBinCatalog = false;
     }
+  }
+
+  private setTreeData(data: S3TreeNode[]): void {
+    this.s3TreeControl.expansionModel.clear();
+    this.s3TreeControl.expansionModel.select(...data);
+
+    this.s3TreeDataSource.data = data;
+    this.s3TreeControl.dataNodes = data;
   }
 
   private buildTreeFromS3Keys(
@@ -220,18 +281,6 @@ export class DecoderComponent implements OnInit {
         return '';
       })
       .filter(key => key.length > 0);
-  }
-
-  private setTreeData(data: S3TreeNode[]): void {
-    this.s3TreeDataSource.data = data;
-    this.s3TreeControl.dataNodes = data;
-    this.expandInitialTree(data);
-  }
-
-  private expandInitialTree(data: S3TreeNode[]): void {
-    for (const runNode of data) {
-      this.s3TreeControl.expand(runNode);
-    }
   }
 
   private async loadRuntimeConfig(): Promise<RuntimeConfig> {

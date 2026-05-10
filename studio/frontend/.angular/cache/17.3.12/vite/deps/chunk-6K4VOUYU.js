@@ -300,6 +300,9 @@ function hasModifierKey(event, ...modifiers) {
 }
 
 // node_modules/@angular/cdk/fesm2022/coercion.mjs
+function coerceBooleanProperty(value) {
+  return value != null && `${value}` !== "false";
+}
 function coerceNumberProperty(value, fallbackValue = 0) {
   return _isNumberValue(value) ? Number(value) : fallbackValue;
 }
@@ -1336,6 +1339,17 @@ var ListKeyManager = class {
       if (newIndex > -1 && newIndex !== this._activeItemIndex) {
         this._activeItemIndex = newIndex;
       }
+    }
+  }
+};
+var ActiveDescendantKeyManager = class extends ListKeyManager {
+  setActiveItem(index) {
+    if (this.activeItem) {
+      this.activeItem.setInactiveStyles();
+    }
+    super.setActiveItem(index);
+    if (this.activeItem) {
+      this.activeItem.setActiveStyles();
     }
   }
 };
@@ -3100,6 +3114,161 @@ function _checkCdkVersionMatch() {
     console.warn("The Angular Material version (" + VERSION2.full + ") does not match the Angular CDK version (" + VERSION.full + ").\nPlease ensure the versions of these two packages exactly match.");
   }
 }
+function mixinDisabled(base) {
+  return class extends base {
+    get disabled() {
+      return this._disabled;
+    }
+    set disabled(value) {
+      this._disabled = coerceBooleanProperty(value);
+    }
+    constructor(...args) {
+      super(...args);
+      this._disabled = false;
+    }
+  };
+}
+function mixinColor(base, defaultColor) {
+  return class extends base {
+    get color() {
+      return this._color;
+    }
+    set color(value) {
+      const colorPalette = value || this.defaultColor;
+      if (colorPalette !== this._color) {
+        if (this._color) {
+          this._elementRef.nativeElement.classList.remove(`mat-${this._color}`);
+        }
+        if (colorPalette) {
+          this._elementRef.nativeElement.classList.add(`mat-${colorPalette}`);
+        }
+        this._color = colorPalette;
+      }
+    }
+    constructor(...args) {
+      super(...args);
+      this.defaultColor = defaultColor;
+      this.color = defaultColor;
+    }
+  };
+}
+function mixinDisableRipple(base) {
+  return class extends base {
+    /** Whether the ripple effect is disabled or not. */
+    get disableRipple() {
+      return this._disableRipple;
+    }
+    set disableRipple(value) {
+      this._disableRipple = coerceBooleanProperty(value);
+    }
+    constructor(...args) {
+      super(...args);
+      this._disableRipple = false;
+    }
+  };
+}
+function mixinTabIndex(base, defaultTabIndex = 0) {
+  return class extends base {
+    get tabIndex() {
+      return this.disabled ? -1 : this._tabIndex;
+    }
+    set tabIndex(value) {
+      this._tabIndex = value != null ? coerceNumberProperty(value) : this.defaultTabIndex;
+    }
+    constructor(...args) {
+      super(...args);
+      this._tabIndex = defaultTabIndex;
+      this.defaultTabIndex = defaultTabIndex;
+    }
+  };
+}
+var _ErrorStateTracker = class {
+  constructor(_defaultMatcher, ngControl, _parentFormGroup, _parentForm, _stateChanges) {
+    this._defaultMatcher = _defaultMatcher;
+    this.ngControl = ngControl;
+    this._parentFormGroup = _parentFormGroup;
+    this._parentForm = _parentForm;
+    this._stateChanges = _stateChanges;
+    this.errorState = false;
+  }
+  /** Updates the error state based on the provided error state matcher. */
+  updateErrorState() {
+    const oldState = this.errorState;
+    const parent = this._parentFormGroup || this._parentForm;
+    const matcher = this.matcher || this._defaultMatcher;
+    const control = this.ngControl ? this.ngControl.control : null;
+    const newState = matcher?.isErrorState(control, parent) ?? false;
+    if (newState !== oldState) {
+      this.errorState = newState;
+      this._stateChanges.next();
+    }
+  }
+};
+function mixinErrorState(base) {
+  return class extends base {
+    /** Whether the component is in an error state. */
+    get errorState() {
+      return this._getTracker().errorState;
+    }
+    set errorState(value) {
+      this._getTracker().errorState = value;
+    }
+    /** An object used to control the error state of the component. */
+    get errorStateMatcher() {
+      return this._getTracker().matcher;
+    }
+    set errorStateMatcher(value) {
+      this._getTracker().matcher = value;
+    }
+    /** Updates the error state based on the provided error state matcher. */
+    updateErrorState() {
+      this._getTracker().updateErrorState();
+    }
+    _getTracker() {
+      if (!this._tracker) {
+        this._tracker = new _ErrorStateTracker(this._defaultErrorStateMatcher, this.ngControl, this._parentFormGroup, this._parentForm, this.stateChanges);
+      }
+      return this._tracker;
+    }
+    constructor(...args) {
+      super(...args);
+    }
+  };
+}
+function mixinInitialized(base) {
+  return class extends base {
+    constructor(...args) {
+      super(...args);
+      this._isInitialized = false;
+      this._pendingSubscribers = [];
+      this.initialized = new Observable((subscriber) => {
+        if (this._isInitialized) {
+          this._notifySubscriber(subscriber);
+        } else {
+          this._pendingSubscribers.push(subscriber);
+        }
+      });
+    }
+    /**
+     * Marks the state as initialized and notifies pending subscribers. Should be called at the end
+     * of ngOnInit.
+     * @docs-private
+     */
+    _markInitialized() {
+      if (this._isInitialized && (typeof ngDevMode === "undefined" || ngDevMode)) {
+        throw Error("This directive has already been marked as initialized and should not be called twice.");
+      }
+      this._isInitialized = true;
+      this._pendingSubscribers.forEach(this._notifySubscriber);
+      this._pendingSubscribers = null;
+    }
+    /** Emits and completes the subscriber stream (should only emit once). */
+    _notifySubscriber(subscriber) {
+      subscriber.next();
+      subscriber.complete();
+    }
+  };
+}
 var MAT_DATE_LOCALE = new InjectionToken("MAT_DATE_LOCALE", {
   providedIn: "root",
   factory: MAT_DATE_LOCALE_FACTORY
@@ -3560,6 +3729,23 @@ var MatLine = class _MatLine {
     }]
   }], null, null);
 })();
+function setLines(lines, element, prefix = "mat") {
+  lines.changes.pipe(startWith(lines)).subscribe(({
+    length
+  }) => {
+    setClass(element, `${prefix}-2-line`, false);
+    setClass(element, `${prefix}-3-line`, false);
+    setClass(element, `${prefix}-multi-line`, false);
+    if (length === 2 || length === 3) {
+      setClass(element, `${prefix}-${length}-line`, true);
+    } else if (length > 3) {
+      setClass(element, `${prefix}-multi-line`, true);
+    }
+  });
+}
+function setClass(element, className, isAdd) {
+  element.nativeElement.classList.toggle(className, isAdd);
+}
 var MatLineModule = class _MatLineModule {
   static {
     this.ɵfac = function MatLineModule_Factory(t) {
@@ -4674,6 +4860,29 @@ var MatOption = class _MatOption {
     }]
   });
 })();
+function _countGroupLabelsBeforeOption(optionIndex, options, optionGroups) {
+  if (optionGroups.length) {
+    let optionsArray = options.toArray();
+    let groups = optionGroups.toArray();
+    let groupCounter = 0;
+    for (let i = 0; i < optionIndex + 1; i++) {
+      if (optionsArray[i].group && optionsArray[i].group === groups[groupCounter]) {
+        groupCounter++;
+      }
+    }
+    return groupCounter;
+  }
+  return 0;
+}
+function _getOptionScrollPosition(optionOffset, optionHeight, currentScrollPosition, panelHeight) {
+  if (optionOffset < currentScrollPosition) {
+    return optionOffset;
+  }
+  if (optionOffset + optionHeight > currentScrollPosition + panelHeight) {
+    return Math.max(0, optionOffset - panelHeight + optionHeight);
+  }
+  return currentScrollPosition;
+}
 var MatOptionModule = class _MatOptionModule {
   static {
     this.ɵfac = function MatOptionModule_Factory(t) {
@@ -4910,30 +5119,80 @@ export {
   _getFocusedElementPierceShadowDom,
   _getEventTarget,
   _isTestEnvironment,
-  ENTER,
-  ESCAPE,
-  SPACE,
-  hasModifierKey,
+  coerceBooleanProperty,
   coerceNumberProperty,
   _isNumberValue,
   coerceArray,
   coerceCssPixelValue,
   coerceElement,
   CdkObserveContent,
+  ObserversModule,
+  ENTER,
+  ESCAPE,
+  SPACE,
+  LEFT_ARROW,
+  UP_ARROW,
+  RIGHT_ARROW,
+  DOWN_ARROW,
+  A,
+  hasModifierKey,
+  addAriaReferencedId,
+  removeAriaReferencedId,
   AriaDescriber,
+  ActiveDescendantKeyManager,
   FocusKeyManager,
   InteractivityChecker,
   FocusTrapFactory,
+  isFakeMousedownFromScreenReader,
+  isFakeTouchstartFromScreenReader,
+  LiveAnnouncer,
   FocusMonitor,
   CdkMonitorFocus,
   A11yModule,
+  VERSION2 as VERSION,
   AnimationCurves,
   AnimationDurations,
+  MATERIAL_SANITY_CHECKS,
   MatCommonModule,
+  mixinDisabled,
+  mixinColor,
+  mixinDisableRipple,
+  mixinTabIndex,
+  _ErrorStateTracker,
+  mixinErrorState,
+  mixinInitialized,
+  MAT_DATE_LOCALE,
+  MAT_DATE_LOCALE_FACTORY,
+  DateAdapter,
+  MAT_DATE_FORMATS,
+  NativeDateAdapter,
+  MAT_NATIVE_DATE_FORMATS,
+  NativeDateModule,
+  MatNativeDateModule,
+  provideNativeDateAdapter,
+  ShowOnDirtyErrorStateMatcher,
+  ErrorStateMatcher,
+  MatLine,
+  setLines,
+  MatLineModule,
+  RippleState,
+  RippleRef,
+  defaultRippleAnimationConfig,
+  RippleRenderer,
   MAT_RIPPLE_GLOBAL_OPTIONS,
   MatRipple,
   MatRippleModule,
+  MatPseudoCheckbox,
+  MatPseudoCheckboxModule,
+  MAT_OPTION_PARENT_COMPONENT,
+  MAT_OPTGROUP,
+  MatOptgroup,
+  MatOptionSelectionChange,
+  MatOption,
+  _countGroupLabelsBeforeOption,
+  _getOptionScrollPosition,
+  MatOptionModule,
   MatRippleLoader,
   _MatInternalFormField
 };
-//# sourceMappingURL=chunk-BWL6YN4B.js.map
+//# sourceMappingURL=chunk-6K4VOUYU.js.map
