@@ -5,6 +5,9 @@ import { AppComponent } from './app/app.component';
 import { AuthService, configureAuth } from './app/auth/auth.service';
 import { environment } from './environments/environment';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { Buffer } from 'buffer';
+
+(window as any).Buffer = Buffer;
 
 async function start(): Promise<void> {
   const isLocalhost =
