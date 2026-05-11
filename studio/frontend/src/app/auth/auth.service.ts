@@ -32,6 +32,7 @@ export function configureAuth(): void {
       Cognito: {
         userPoolId: cognitoConfig.userPoolId,
         userPoolClientId: cognitoConfig.userPoolClientId,
+        identityPoolId: cognitoConfig.identityPoolId,
         loginWith: {
           oauth: {
             domain: cognitoConfig.domain,
