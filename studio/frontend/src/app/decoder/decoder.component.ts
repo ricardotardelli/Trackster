@@ -6,14 +6,17 @@ import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
 import { FormsModule } from '@angular/forms';
 
 import { environment } from '../../environments/environment';
-import { AuthService } from '../auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client
+} from '@aws-sdk/client-s3';
 
 import { parseTracksterBin } from './parser/decoder.bin.parser';
 
@@ -84,10 +87,6 @@ export class DecoderComponent implements OnInit {
   );
 
   readonly s3TreeDataSource = new MatTreeNestedDataSource<S3TreeNode>();
-
-  constructor(
-    private readonly authService: AuthService
-  ) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadS3GeneratedFilesTree();
@@ -544,12 +543,10 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    const object = await this.getS3ObjectBuffer(
+    return await this.getS3ObjectBuffer(
       bucket,
       key
     );
-
-    return object;
   }
 
   private async loadRunManifest(node: S3TreeNode): Promise<any> {
@@ -603,10 +600,7 @@ export class DecoderComponent implements OnInit {
     }
   }
 
-  private async getS3ObjectBuffer(
-    bucket: string,
-    key: string
-  ): Promise<ArrayBuffer> {
+  private async getS3Client(): Promise<S3Client> {
     const config = await this.loadRuntimeConfig();
 
     const region =
@@ -622,10 +616,17 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    const s3Client = new S3Client({
+    return new S3Client({
       region,
       credentials: session.credentials
     });
+  }
+
+  private async getS3ObjectBuffer(
+    bucket: string,
+    key: string
+  ): Promise<ArrayBuffer> {
+    const s3Client = await this.getS3Client();
 
     const response = await s3Client.send(
       new GetObjectCommand({
@@ -643,14 +644,45 @@ export class DecoderComponent implements OnInit {
     return await this.s3BodyToArrayBuffer(response.Body);
   }
 
+  private async listS3KeysFromBucket(
+    bucket: string,
+    prefix: string
+  ): Promise<string[]> {
+    const s3Client = await this.getS3Client();
+
+    const keys: string[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const response = await s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken
+        })
+      );
+
+      for (const item of response.Contents ?? []) {
+        if (item.Key) {
+          keys.push(item.Key);
+        }
+      }
+
+      continuationToken = response.NextContinuationToken;
+
+    } while (continuationToken);
+
+    return keys;
+  }
+
   private async s3BodyToArrayBuffer(body: any): Promise<ArrayBuffer> {
     if (typeof body.transformToByteArray === 'function') {
       const bytes = await body.transformToByteArray();
 
-      return bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength
-      );
+      const output = new Uint8Array(bytes.byteLength);
+      output.set(bytes);
+
+      return output.buffer;
     }
 
     if (typeof body.arrayBuffer === 'function') {
@@ -738,14 +770,7 @@ export class DecoderComponent implements OnInit {
         return;
       }
 
-      const catalogUrl = config.decoderApi?.binFilesCatalogUrl;
-      const bucket = config.s3Default;
-
-      if (!catalogUrl) {
-        throw new Error(
-          'Missing decoderApi.binFilesCatalogUrl in assets/config.json'
-        );
-      }
+      const bucket = config.s3Default?.trim();
 
       if (!bucket) {
         throw new Error(
@@ -753,31 +778,17 @@ export class DecoderComponent implements OnInit {
         );
       }
 
-      const token = await this.authService.getIdToken();
+      const prefix = `${clientId}/`;
 
-      const url =
-        `${catalogUrl}` +
-        `?clientId=${encodeURIComponent(clientId)}` +
-        `&bucket=${encodeURIComponent(bucket)}`;
+      const keys = await this.listS3KeysFromBucket(
+        bucket,
+        prefix
+      );
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-
-        throw new Error(
-          `Failed to load BIN files catalog. HTTP ${response.status}. ${text}`
-        );
-      }
-
-      const payload = await response.json();
-      const keys = this.extractS3Keys(payload);
-      const tree = this.buildTreeFromS3Keys(keys, clientId);
+      const tree = this.buildTreeFromS3Keys(
+        keys,
+        clientId
+      );
 
       this.setTreeData(tree);
 
@@ -872,58 +883,6 @@ export class DecoderComponent implements OnInit {
     }
 
     return runNodes;
-  }
-
-  private extractS3Keys(payload: unknown): string[] {
-    if (Array.isArray(payload)) {
-      return payload.filter(
-        (item): item is string => typeof item === 'string'
-      );
-    }
-
-    if (
-      !payload ||
-      typeof payload !== 'object'
-    ) {
-      return [];
-    }
-
-    const data = payload as {
-      keys?: unknown;
-      files?: unknown;
-      objects?: unknown;
-    };
-
-    const source =
-      data.keys ??
-      data.files ??
-      data.objects;
-
-    if (!Array.isArray(source)) {
-      return [];
-    }
-
-    return source
-      .map(item => {
-        if (typeof item === 'string') {
-          return item;
-        }
-
-        if (
-          item &&
-          typeof item === 'object' &&
-          'key' in item
-        ) {
-          const key = (item as { key?: unknown }).key;
-
-          return typeof key === 'string'
-            ? key
-            : '';
-        }
-
-        return '';
-      })
-      .filter(key => key.length > 0);
   }
 
   private async loadRuntimeConfig(): Promise<RuntimeConfig> {
