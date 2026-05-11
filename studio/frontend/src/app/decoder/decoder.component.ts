@@ -12,6 +12,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
 import { parseTracksterBin } from './parser/decoder.bin.parser';
 
 interface S3TreeNode {
@@ -22,6 +25,7 @@ interface S3TreeNode {
 
 interface RuntimeConfig {
   s3Default?: string;
+  s3Region?: string;
   customerId?: string;
   clientId?: string;
   decoderApi?: {
@@ -315,12 +319,7 @@ export class DecoderComponent implements OnInit {
       this.currentBlockPage = 1;
       this.blockPageInput = 1;
 
-      const buffer = await this.loadTracksterBinBuffer(
-        node,
-        this.currentBlockPage,
-        this.currentBlockPage
-      );
-
+      const buffer = await this.loadTracksterBinBuffer(node);
       const manifest = await this.loadRunManifest(node);
 
       const parsed = parseTracksterBin(buffer, manifest);
@@ -515,11 +514,7 @@ export class DecoderComponent implements OnInit {
     return `${bytes} B`;
   }
 
-  private async loadTracksterBinBuffer(
-    node: S3TreeNode,
-    pageStart: number,
-    pageEnd: number
-  ): Promise<ArrayBuffer> {
+  private async loadTracksterBinBuffer(node: S3TreeNode): Promise<ArrayBuffer> {
     if (this.shouldUseLocalMock()) {
       const response = await fetch('assets/mock/sample.bin');
 
@@ -534,16 +529,8 @@ export class DecoderComponent implements OnInit {
 
     const config = await this.loadRuntimeConfig();
 
-    const binGetFilesUrl = config.decoderApi?.binGetFiles?.trim();
     const bucket = config.s3Default?.trim();
-    const clientId = this.resolveClientId(config);
-    const runId = this.getRunIdFromKey(node.key);
-
-    if (!binGetFilesUrl) {
-      throw new Error(
-        'Missing decoderApi.binGetFiles in assets/config.json'
-      );
-    }
+    const key = node.key;
 
     if (!bucket) {
       throw new Error(
@@ -551,59 +538,18 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    if (!runId) {
+    if (!key) {
       throw new Error(
-        `Unable to resolve runId from selected key: ${node.key}`
+        'Selected BIN node does not contain a valid S3 key.'
       );
     }
 
-    const safePageStart = this.normalizeBlockPage(pageStart);
-    const safePageEnd = this.normalizeBlockPage(pageEnd);
+    const object = await this.getS3ObjectBuffer(
+      bucket,
+      key
+    );
 
-    const blockStart = (safePageStart - 1) * this.blocksPerPage;
-    const blockEnd = (safePageEnd * this.blocksPerPage) - 1;
-
-    const token = await this.authService.getIdToken();
-
-    const url =
-      `${binGetFilesUrl}` +
-      `?action=get-bin-files` +
-      `&bucket=${encodeURIComponent(bucket)}` +
-      `&clientId=${encodeURIComponent(clientId)}` +
-      `&runId=${encodeURIComponent(runId)}` +
-      `&binFiles=${encodeURIComponent(node.name)}` +
-      `&pageStart=${encodeURIComponent(String(safePageStart))}` +
-      `&pageEnd=${encodeURIComponent(String(safePageEnd))}` +
-      `&pageSize=${encodeURIComponent(String(this.blocksPerPage))}` +
-      `&blockStart=${encodeURIComponent(String(blockStart))}` +
-      `&blockEnd=${encodeURIComponent(String(blockEnd))}`;
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-
-      throw new Error(
-        `Failed to load BIN file from decoder API. HTTP ${response.status}. ${text}`
-      );
-    }
-
-    const payload = await response.json();
-
-    const contentBase64 = payload?.files?.[0]?.contentBase64;
-
-    if (!contentBase64 || typeof contentBase64 !== 'string') {
-      throw new Error(
-        'Decoder API response does not contain files[0].contentBase64.'
-      );
-    }
-
-    return this.base64ToArrayBuffer(contentBase64);
+    return object;
   }
 
   private async loadRunManifest(node: S3TreeNode): Promise<any> {
@@ -623,16 +569,9 @@ export class DecoderComponent implements OnInit {
 
     const config = await this.loadRuntimeConfig();
 
-    const binGetManifestUrl = config.decoderApi?.binGetManifest?.trim();
     const bucket = config.s3Default?.trim();
     const clientId = this.resolveClientId(config);
     const runId = this.getRunIdFromKey(node.key);
-
-    if (!binGetManifestUrl) {
-      throw new Error(
-        'Missing decoderApi.binGetManifest in assets/config.json'
-      );
-    }
 
     if (!bucket) {
       throw new Error(
@@ -646,50 +585,111 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    const token = await this.authService.getIdToken();
+    const manifestKey = `${clientId}/${runId}/run-manifest.json`;
 
-    const url =
-      `${binGetManifestUrl}` +
-      `?action=get-run-manifest` +
-      `&bucket=${encodeURIComponent(bucket)}` +
-      `&clientId=${encodeURIComponent(clientId)}` +
-      `&runId=${encodeURIComponent(runId)}`;
+    const buffer = await this.getS3ObjectBuffer(
+      bucket,
+      manifestKey
+    );
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+    const manifestText = new TextDecoder('utf-8').decode(buffer);
 
-    if (!response.ok) {
-      const text = await response.text();
-
+    try {
+      return JSON.parse(manifestText);
+    } catch {
       throw new Error(
-        `Failed to load run manifest from decoder API. HTTP ${response.status}. ${text}`
+        `Invalid run-manifest.json at S3 key: ${manifestKey}`
       );
     }
-
-    const payload = await response.json();
-
-    if (!payload?.manifest) {
-      throw new Error(
-        'Decoder API response does not contain manifest.'
-      );
-    }
-
-    return payload.manifest;
   }
 
-  private base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
+  private async getS3ObjectBuffer(
+    bucket: string,
+    key: string
+  ): Promise<ArrayBuffer> {
+    const config = await this.loadRuntimeConfig();
 
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
+    const region =
+      config.s3Region?.trim() ||
+      'us-east-1';
+
+    const session =
+      await fetchAuthSession();
+
+    if (!session.credentials) {
+      throw new Error(
+        'Cognito Identity Pool credentials are not available. Check Amplify configuration for identityPoolId.'
+      );
     }
 
-    return bytes.buffer;
+    const s3Client = new S3Client({
+      region,
+      credentials: session.credentials
+    });
+
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key
+      })
+    );
+
+    if (!response.Body) {
+      throw new Error(
+        `S3 object body is empty. Bucket: ${bucket}. Key: ${key}`
+      );
+    }
+
+    return await this.s3BodyToArrayBuffer(response.Body);
+  }
+
+  private async s3BodyToArrayBuffer(body: any): Promise<ArrayBuffer> {
+    if (typeof body.transformToByteArray === 'function') {
+      const bytes = await body.transformToByteArray();
+
+      return bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      );
+    }
+
+    if (typeof body.arrayBuffer === 'function') {
+      return await body.arrayBuffer();
+    }
+
+    if (body instanceof ReadableStream) {
+      const reader = body.getReader();
+      const chunks: Uint8Array[] = [];
+
+      let totalLength = 0;
+
+      while (true) {
+        const result = await reader.read();
+
+        if (result.done) {
+          break;
+        }
+
+        if (result.value) {
+          chunks.push(result.value);
+          totalLength += result.value.length;
+        }
+      }
+
+      const merged = new Uint8Array(totalLength);
+      let offset = 0;
+
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      return merged.buffer;
+    }
+
+    throw new Error(
+      'Unsupported S3 response body type in browser.'
+    );
   }
 
   private getRunIdFromKey(key: string): string {

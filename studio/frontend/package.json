@@ -20,6 +20,7 @@
     "@angular/platform-browser": "17.3.12",
     "@angular/platform-browser-dynamic": "17.3.12",
     "@angular/router": "17.3.12",
+    "@aws-sdk/client-s3": "^3.1045.0",
     "@jean-merelis/ngx-monaco-editor": "^17.3.4",
     "@ngx-dropzone/cdk": "^17.3.0",
     "aws-amplify": "^6.16.3",
