@@ -26,6 +26,8 @@ interface RuntimeConfig {
   clientId?: string;
   decoderApi?: {
     binFilesCatalogUrl?: string;
+    binGetFiles?: string;
+    binGetManifest?: string;
   };
 }
 
@@ -453,9 +455,77 @@ export class DecoderComponent implements OnInit {
       return await response.arrayBuffer();
     }
 
-    throw new Error(
-      `Production BIN download is not implemented yet. Selected key: ${node.key}`
-    );
+    const config =
+      await this.loadRuntimeConfig();
+
+    const binGetFilesUrl =
+      config.decoderApi?.binGetFiles?.trim();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(node.key);
+
+    if (!binGetFilesUrl) {
+      throw new Error(
+        'Missing decoderApi.binGetFiles in assets/config.json'
+      );
+    }
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    if (!runId) {
+      throw new Error(
+        `Unable to resolve runId from selected key: ${node.key}`
+      );
+    }
+
+    const token =
+      await this.authService.getIdToken();
+
+    const url =
+      `${binGetFilesUrl}` +
+      `?action=get-bin-files` +
+      `&bucket=${encodeURIComponent(bucket)}` +
+      `&clientId=${encodeURIComponent(clientId)}` +
+      `&runId=${encodeURIComponent(runId)}` +
+      `&binFiles=${encodeURIComponent(node.name)}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+
+      throw new Error(
+        `Failed to load BIN file from decoder API. HTTP ${response.status}. ${text}`
+      );
+    }
+
+    const payload = await response.json();
+
+    const contentBase64 =
+      payload?.files?.[0]?.contentBase64;
+
+    if (!contentBase64 || typeof contentBase64 !== 'string') {
+      throw new Error(
+        'Decoder API response does not contain files[0].contentBase64.'
+      );
+    }
+
+    return this.base64ToArrayBuffer(contentBase64);
   }
 
   private async loadRunManifest(
@@ -476,15 +546,97 @@ export class DecoderComponent implements OnInit {
       return await response.json();
     }
 
-    const manifestKey =
-      node.key.replace(
-        /\/[^/]+\.bin$/i,
-        '/run-manifest.json'
-      );
+    const config =
+      await this.loadRuntimeConfig();
 
-    throw new Error(
-      `Production run-manifest download is not implemented yet. Selected manifest key: ${manifestKey}`
-    );
+    const binGetManifestUrl =
+      config.decoderApi?.binGetManifest?.trim();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(node.key);
+
+    if (!binGetManifestUrl) {
+      throw new Error(
+        'Missing decoderApi.binGetManifest in assets/config.json'
+      );
+    }
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    if (!runId) {
+      throw new Error(
+        `Unable to resolve runId from selected key: ${node.key}`
+      );
+    }
+
+    const token =
+      await this.authService.getIdToken();
+
+    const url =
+      `${binGetManifestUrl}` +
+      `?action=get-run-manifest` +
+      `&bucket=${encodeURIComponent(bucket)}` +
+      `&clientId=${encodeURIComponent(clientId)}` +
+      `&runId=${encodeURIComponent(runId)}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+
+      throw new Error(
+        `Failed to load run manifest from decoder API. HTTP ${response.status}. ${text}`
+      );
+    }
+
+    const payload = await response.json();
+
+    if (!payload?.manifest) {
+      throw new Error(
+        'Decoder API response does not contain manifest.'
+      );
+    }
+
+    return payload.manifest;
+  }
+
+  private base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return bytes.buffer;
+  }
+
+  private getRunIdFromKey(key: string): string {
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length < 2) {
+      return '';
+    }
+
+    return parts[1];
   }
 
   private getBinKeysFromFolder(

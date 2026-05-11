@@ -12,7 +12,10 @@
       "getDbcCanIds": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-signals"
    },
    "decoderApi": {
-      "binFilesCatalogUrl": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/bin-files/catalog"
+      "binFilesCatalogUrl": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/bin-files/catalog",
+      "binGetFiles": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/get-bin-files",
+      "binGetManifest": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/get-run-manifest"
+
    },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
