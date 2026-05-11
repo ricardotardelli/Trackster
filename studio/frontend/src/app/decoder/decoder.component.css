@@ -81,7 +81,10 @@
   border-radius: 999px;
 }
 
-.tree-shell::-webkit-scrollbar-thumb:hover {
+.tree-shell::-webkit-scrollbar-thumb:hover,
+.decoder-structure-scroll::-webkit-scrollbar-thumb:hover,
+.decoder-manifest-card::-webkit-scrollbar-thumb:hover,
+.decoder-log-list::-webkit-scrollbar-thumb:hover {
   background: rgba(96, 165, 250, 0.95);
 }
 
@@ -744,8 +747,11 @@
 
 .decoder-structure-scroll {
   height: calc(100% - 44px);
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
+  padding-bottom: 14px;
+  box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: rgba(147, 197, 253, 0.95) transparent;
 }
@@ -756,6 +762,7 @@
   border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 12px;
   background: #f8fbff;
+  overflow: visible;
 }
 
 .decoder-hierarchy-card-header {
@@ -810,8 +817,135 @@
   text-align: right;
 }
 
+.decoder-block-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  margin-top: 10px;
+  padding: 7px 8px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  border-radius: 10px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.decoder-block-pagination-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.decoder-block-pagination-info strong {
+  color: #102349;
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.decoder-block-pagination-info span {
+  color: #5a6b82;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.decoder-block-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.decoder-pagination-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 24px;
+  min-width: 72px;
+  padding: 0 8px;
+  border: 1px solid rgba(147, 197, 253, 0.82);
+  border-radius: 7px;
+  background: #f8fbff;
+  color: #0f3b67;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.decoder-pagination-button mat-icon {
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+  line-height: 13px;
+}
+
+.decoder-pagination-button:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: rgba(96, 165, 250, 0.9);
+  color: #0284c7;
+}
+
+.decoder-pagination-button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.decoder-page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #5a6b82;
+  font-size: 0.68rem;
+  font-weight: 750;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.decoder-page-jump input {
+  width: 38px;
+  height: 18px;
+  padding: 0 3px;
+  border: 1px solid rgba(147, 197, 253, 0.78);
+  border-radius: 5px;
+  outline: none;
+  background: #f8fbff;
+  color: #102349;
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.decoder-page-jump input:focus {
+  border-color: rgba(37, 99, 235, 0.78);
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.18);
+}
+
+.decoder-page-jump input:disabled {
+  opacity: 0.55;
+}
+
+.decoder-page-jump input::-webkit-outer-spin-button,
+.decoder-page-jump input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.decoder-page-jump input[type='number'] {
+  appearance: textfield;
+}
+
 .decoder-block-list,
-.decoder-frame-list,
 .decoder-dbc-list,
 .decoder-log-list {
   display: grid;
@@ -827,10 +961,12 @@
   border-radius: 11px;
   border: 1px solid rgba(191, 219, 254, 0.62);
   background: #ffffff;
+  overflow: visible;
 }
 
 .decoder-block-card-expanded {
   background: #f6faff;
+  border-color: rgba(96, 165, 250, 0.62);
 }
 
 .decoder-block-header,
@@ -894,9 +1030,25 @@
 }
 
 .decoder-frame-list {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 9px;
-  padding-left: 4px;
+  margin-top: 10px;
+  padding: 8px 0 0 22px;
+  border-top: 1px solid rgba(191, 219, 254, 0.58);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.decoder-frame-loading,
+.decoder-frame-empty {
+  padding: 8px 9px;
+  border: 1px dashed rgba(147, 197, 253, 0.72);
+  border-radius: 9px;
+  background: rgba(248, 251, 255, 0.82);
+  color: #5a6b82;
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 .decoder-frame-card {

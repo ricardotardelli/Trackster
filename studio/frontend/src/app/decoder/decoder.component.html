@@ -263,10 +263,61 @@
                       <button
                         type="button"
                         class="decoder-copy-icon-button"
-                        title="Copy blocks"
+                        title="Copy current block page"
                         (click)="copyBlocksToClipboard()">
                         <mat-icon>content_copy</mat-icon>
                       </button>
+                    </div>
+
+                    <div class="decoder-block-pagination-bar">
+                      <div class="decoder-block-pagination-info">
+                        <strong>Blocks</strong>
+                        <span>
+                          {{ getBlockPageStart() }}-{{ getBlockPageEnd() }}
+                          of {{ getTotalBlockCount() }}
+                        </span>
+                      </div>
+
+                      <div class="decoder-block-pagination-actions">
+                        <button
+                          type="button"
+                          class="decoder-pagination-button"
+                          [disabled]="isFirstBlockPage() || isLoadingBlockPage"
+                          (click)="loadPreviousBlockPage()">
+                          <mat-icon>chevron_left</mat-icon>
+                          <span>Previous</span>
+                        </button>
+
+                        <div class="decoder-page-jump">
+                          <span>Page</span>
+
+                          <input
+                            type="number"
+                            min="1"
+                            [max]="getTotalBlockPages()"
+                            [(ngModel)]="blockPageInput"
+                            (keyup.enter)="goToBlockPageFromInput()"
+                            (blur)="goToBlockPageFromInput()"
+                            [disabled]="isLoadingBlockPage">
+
+                          <span>of {{ getTotalBlockPages() }}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          class="decoder-pagination-button"
+                          [disabled]="isLastBlockPage() || isLoadingBlockPage"
+                          (click)="loadNextBlockPage()">
+                          <span>Next</span>
+                          <mat-icon>chevron_right</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      class="decoder-frame-loading"
+                      *ngIf="isLoadingBlockPage">
+                      Loading blocks...
                     </div>
 
                     <div class="decoder-block-list">
@@ -277,7 +328,10 @@
                         [class.decoder-block-card-expanded]="block.expanded">
 
                         <div class="decoder-block-header">
-                          <button type="button" class="decoder-expand-button" (click)="toggleBlock(block); $event.stopPropagation()">
+                          <button
+                            type="button"
+                            class="decoder-expand-button"
+                            (click)="toggleBlock(block); $event.stopPropagation()">
                             <mat-icon>
                               {{ block.expanded ? 'expand_more' : 'chevron_right' }}
                             </mat-icon>
@@ -297,6 +351,12 @@
                         <div
                           class="decoder-frame-list"
                           *ngIf="block.expanded">
+
+                          <div
+                            class="decoder-frame-empty"
+                            *ngIf="block.frames.length === 0">
+                            No frames loaded for this block.
+                          </div>
 
                           <div
                             class="decoder-frame-card"

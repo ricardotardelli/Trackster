@@ -54,10 +54,19 @@ export class DecoderComponent implements OnInit {
   decoderFilterText = '';
 
   isLoadingBinCatalog = false;
+  isLoadingBlockPage = false;
 
   selectedS3Key: string | null = null;
-
   selectedBinKeys: string[] = [];
+
+  currentBlockPage = 1;
+  blockPageInput = 1;
+
+  readonly blocksPerPage = 50;
+
+  totalBlockCount = 0;
+
+  private fullParsedBlocks: any[] = [];
 
   payloadViewer = {
     fileName: '',
@@ -208,35 +217,120 @@ export class DecoderComponent implements OnInit {
     block.expanded = !block.expanded;
   }
 
-  private async loadTracksterBinForViewer(
-    node: S3TreeNode
-  ): Promise<void> {
+  getTotalBlockCount(): number {
+    return this.totalBlockCount;
+  }
+
+  getTotalBlockPages(): number {
+    return Math.max(
+      1,
+      Math.ceil(this.totalBlockCount / this.blocksPerPage)
+    );
+  }
+
+  getBlockPageStart(): number {
+    if (this.totalBlockCount === 0) {
+      return 0;
+    }
+
+    return ((this.currentBlockPage - 1) * this.blocksPerPage) + 1;
+  }
+
+  getBlockPageEnd(): number {
+    return Math.min(
+      this.currentBlockPage * this.blocksPerPage,
+      this.totalBlockCount
+    );
+  }
+
+  isFirstBlockPage(): boolean {
+    return this.currentBlockPage <= 1;
+  }
+
+  isLastBlockPage(): boolean {
+    return this.currentBlockPage >= this.getTotalBlockPages();
+  }
+
+  async loadPreviousBlockPage(): Promise<void> {
+    if (this.isFirstBlockPage()) {
+      return;
+    }
+
+    await this.goToBlockPage(this.currentBlockPage - 1);
+  }
+
+  async loadNextBlockPage(): Promise<void> {
+    if (this.isLastBlockPage()) {
+      return;
+    }
+
+    await this.goToBlockPage(this.currentBlockPage + 1);
+  }
+
+  async goToBlockPageFromInput(): Promise<void> {
+    await this.goToBlockPage(this.blockPageInput);
+  }
+
+  private async goToBlockPage(page: number): Promise<void> {
+    const safePage = this.normalizeBlockPage(page);
+
+    this.currentBlockPage = safePage;
+    this.blockPageInput = safePage;
+
+    await this.refreshCurrentBlockPage();
+  }
+
+  private normalizeBlockPage(page: number): number {
+    const totalPages = this.getTotalBlockPages();
+
+    if (!Number.isFinite(page)) {
+      return this.currentBlockPage;
+    }
+
+    const integerPage = Math.trunc(page);
+
+    return Math.min(
+      Math.max(integerPage, 1),
+      totalPages
+    );
+  }
+
+  private async refreshCurrentBlockPage(): Promise<void> {
+    this.isLoadingBlockPage = true;
+
     try {
-      const buffer = await this.loadTracksterBinBuffer(node);
-      const manifest = await this.loadRunManifest(node);
+      const start = (this.currentBlockPage - 1) * this.blocksPerPage;
+      const end = start + this.blocksPerPage;
 
-      console.log('RUN MANIFEST LOADED');
-      console.log(manifest);
+      this.payloadViewer.blocks = this.fullParsedBlocks.slice(start, end);
+    } finally {
+      this.isLoadingBlockPage = false;
+    }
+  }
 
-      const parsed = parseTracksterBin(
-        buffer,
-        manifest
+  private async loadTracksterBinForViewer(node: S3TreeNode): Promise<void> {
+    try {
+      this.isLoadingBlockPage = true;
+
+      this.currentBlockPage = 1;
+      this.blockPageInput = 1;
+
+      const buffer = await this.loadTracksterBinBuffer(
+        node,
+        this.currentBlockPage,
+        this.currentBlockPage
       );
 
-      console.log('TRACKSTER BIN PARSED');
-      console.log(parsed);
+      const manifest = await this.loadRunManifest(node);
 
-      const firstTimestampNs =
-        parsed.blocks[0]?.timestampNs ?? '0';
+      const parsed = parseTracksterBin(buffer, manifest);
 
-      const secondTimestampNs =
-        parsed.blocks[1]?.timestampNs ?? firstTimestampNs;
+      this.totalBlockCount = parsed.blockCount;
 
-      const lastBlock =
-        parsed.blocks[parsed.blocks.length - 1];
-
-      const lastTimestampNs =
-        lastBlock?.timestampNs ?? firstTimestampNs;
+      const firstTimestampNs = parsed.blocks[0]?.timestampNs ?? '0';
+      const secondTimestampNs = parsed.blocks[1]?.timestampNs ?? firstTimestampNs;
+      const lastBlock = parsed.blocks[parsed.blocks.length - 1];
+      const lastTimestampNs = lastBlock?.timestampNs ?? firstTimestampNs;
 
       this.payloadViewer = {
         fileName: node.name,
@@ -252,17 +346,11 @@ export class DecoderComponent implements OnInit {
           },
           {
             label: 'Interval',
-            value: this.formatBlockDuration(
-              firstTimestampNs,
-              secondTimestampNs
-            )
+            value: this.formatBlockDuration(firstTimestampNs, secondTimestampNs)
           },
           {
             label: 'Duration',
-            value: this.formatBlockDuration(
-              firstTimestampNs,
-              lastTimestampNs
-            )
+            value: this.formatBlockDuration(firstTimestampNs, lastTimestampNs)
           },
           {
             label: 'Size',
@@ -309,120 +397,108 @@ export class DecoderComponent implements OnInit {
           }
         ],
 
-        blocks: parsed.blocks.slice(0, 50).map((block: any) => {
-          const startNs = BigInt(block.timestampNs);
-
-          const nextBlock =
-            parsed.blocks[block.blockIndex + 1];
-
-          const endNs =
-            nextBlock
-              ? BigInt(nextBlock.timestampNs)
-              : startNs;
-
-          return {
-            index: block.blockIndex,
-
-            expanded: block.blockIndex === 0,
-
-            startNs: this.formatRelativeTimeNs(
-              firstTimestampNs,
-              startNs.toString()
-            ),
-
-            endNs: this.formatRelativeTimeNs(
-              firstTimestampNs,
-              endNs.toString()
-            ),
-
-            duration: this.formatBlockDuration(
-              startNs.toString(),
-              endNs.toString()
-            ),
-
-            frameCount: block.frameCount,
-
-            frames: block.frames.map((frame: any) => {
-              const signals = Array.isArray(frame.signals)
-                ? frame.signals.map((signal: any) => ({
-                    name: signal.name,
-                    value: signal.value,
-                    raw: signal.raw,
-                    unit: signal.unit,
-                    searchText: [
-                      frame.canIdHex,
-                      frame.messageName,
-                      signal.name
-                    ].join(' ')
-                  }))
-                : [];
-
-              return {
-                expanded: false,
-
-                searchText: [
-                  frame.canIdHex,
-                  frame.messageName,
-                  frame.payloadBytes,
-                  ...signals.map((signal: any) => signal.name)
-                ].join(' '),
-
-                canId: frame.canIdHex,
-
-                messageName:
-                  frame.messageName ||
-                  `CAN_${frame.canIdHex}`,
-
-                time: `${frame.timestampDeltaNs} ns`,
-
-                dlc: frame.payloadLength,
-
-                decodedSignals:
-                  Number(frame.decodedSignals ?? signals.length),
-
-                payloadHex:
-                  frame.payloadBytes,
-
-                signals
-              };
-            })
-          };
-        })
+        blocks: []
       };
 
-      console.log('TRACKSTER PAYLOAD VIEWER MODEL');
-      console.log(this.payloadViewer);
+      this.fullParsedBlocks = parsed.blocks.map((block: any) => {
+        const startNs = BigInt(block.timestampNs);
+        const nextBlock = parsed.blocks[block.blockIndex + 1];
+
+        const endNs = nextBlock
+          ? BigInt(nextBlock.timestampNs)
+          : startNs;
+
+        return {
+          index: block.blockIndex,
+
+          expanded: block.blockIndex === 0,
+
+          startNs: this.formatRelativeTimeNs(
+            firstTimestampNs,
+            startNs.toString()
+          ),
+
+          endNs: this.formatRelativeTimeNs(
+            firstTimestampNs,
+            endNs.toString()
+          ),
+
+          duration: this.formatBlockDuration(
+            startNs.toString(),
+            endNs.toString()
+          ),
+
+          frameCount: block.frameCount,
+
+          frames: block.frames.map((frame: any) => {
+            const signals = Array.isArray(frame.signals)
+              ? frame.signals.map((signal: any) => ({
+                  name: signal.name,
+                  value: signal.value,
+                  raw: signal.raw,
+                  unit: signal.unit,
+                  searchText: [
+                    frame.canIdHex,
+                    frame.messageName,
+                    signal.name
+                  ].join(' ')
+                }))
+              : [];
+
+            return {
+              expanded: false,
+
+              searchText: [
+                frame.canIdHex,
+                frame.messageName,
+                frame.payloadBytes,
+                ...signals.map((signal: any) => signal.name)
+              ].join(' '),
+
+              canId: frame.canIdHex,
+
+              messageName:
+                frame.messageName ||
+                `CAN_${frame.canIdHex}`,
+
+              time: `${frame.timestampDeltaNs} ns`,
+
+              dlc: frame.payloadLength,
+
+              decodedSignals: Number(
+                frame.decodedSignals ?? signals.length
+              ),
+
+              payloadHex: frame.payloadBytes,
+
+              signals
+            };
+          })
+        };
+      });
+
+      await this.refreshCurrentBlockPage();
 
     } catch (error) {
       console.error(
         'Failed to parse Trackster BIN',
         error
       );
+    } finally {
+      this.isLoadingBlockPage = false;
     }
   }
 
-  private formatRelativeTimeNs(
-    baseNs: string,
-    valueNs: string
-  ): string {
-    const diffNs =
-      BigInt(valueNs) - BigInt(baseNs);
-
-    const seconds =
-      Number(diffNs) / 1_000_000_000;
+  private formatRelativeTimeNs(baseNs: string, valueNs: string): string {
+    const diffNs = BigInt(valueNs) - BigInt(baseNs);
+    const seconds = Number(diffNs) / 1_000_000_000;
 
     return `${seconds.toFixed(3)} s`;
   }
 
-  private formatBlockDuration(
-    startNs: string,
-    endNs: string
-  ): string {
-    const diffNs =
-      Number(BigInt(endNs) - BigInt(startNs));
-
-    const seconds =
-      diffNs / 1_000_000_000;
+  private formatBlockDuration(startNs: string, endNs: string): string {
+    const diffNs = Number(BigInt(endNs) - BigInt(startNs));
+    const seconds = diffNs / 1_000_000_000;
 
     return `${seconds.toFixed(2)} s`;
   }
@@ -440,11 +516,12 @@ export class DecoderComponent implements OnInit {
   }
 
   private async loadTracksterBinBuffer(
-    node: S3TreeNode
+    node: S3TreeNode,
+    pageStart: number,
+    pageEnd: number
   ): Promise<ArrayBuffer> {
     if (this.shouldUseLocalMock()) {
-      const response =
-        await fetch('assets/mock/sample.bin');
+      const response = await fetch('assets/mock/sample.bin');
 
       if (!response.ok) {
         throw new Error(
@@ -455,20 +532,12 @@ export class DecoderComponent implements OnInit {
       return await response.arrayBuffer();
     }
 
-    const config =
-      await this.loadRuntimeConfig();
+    const config = await this.loadRuntimeConfig();
 
-    const binGetFilesUrl =
-      config.decoderApi?.binGetFiles?.trim();
-
-    const bucket =
-      config.s3Default?.trim();
-
-    const clientId =
-      this.resolveClientId(config);
-
-    const runId =
-      this.getRunIdFromKey(node.key);
+    const binGetFilesUrl = config.decoderApi?.binGetFiles?.trim();
+    const bucket = config.s3Default?.trim();
+    const clientId = this.resolveClientId(config);
+    const runId = this.getRunIdFromKey(node.key);
 
     if (!binGetFilesUrl) {
       throw new Error(
@@ -488,8 +557,13 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    const token =
-      await this.authService.getIdToken();
+    const safePageStart = this.normalizeBlockPage(pageStart);
+    const safePageEnd = this.normalizeBlockPage(pageEnd);
+
+    const blockStart = (safePageStart - 1) * this.blocksPerPage;
+    const blockEnd = (safePageEnd * this.blocksPerPage) - 1;
+
+    const token = await this.authService.getIdToken();
 
     const url =
       `${binGetFilesUrl}` +
@@ -497,7 +571,12 @@ export class DecoderComponent implements OnInit {
       `&bucket=${encodeURIComponent(bucket)}` +
       `&clientId=${encodeURIComponent(clientId)}` +
       `&runId=${encodeURIComponent(runId)}` +
-      `&binFiles=${encodeURIComponent(node.name)}`;
+      `&binFiles=${encodeURIComponent(node.name)}` +
+      `&pageStart=${encodeURIComponent(String(safePageStart))}` +
+      `&pageEnd=${encodeURIComponent(String(safePageEnd))}` +
+      `&pageSize=${encodeURIComponent(String(this.blocksPerPage))}` +
+      `&blockStart=${encodeURIComponent(String(blockStart))}` +
+      `&blockEnd=${encodeURIComponent(String(blockEnd))}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -516,8 +595,7 @@ export class DecoderComponent implements OnInit {
 
     const payload = await response.json();
 
-    const contentBase64 =
-      payload?.files?.[0]?.contentBase64;
+    const contentBase64 = payload?.files?.[0]?.contentBase64;
 
     if (!contentBase64 || typeof contentBase64 !== 'string') {
       throw new Error(
@@ -528,12 +606,9 @@ export class DecoderComponent implements OnInit {
     return this.base64ToArrayBuffer(contentBase64);
   }
 
-  private async loadRunManifest(
-    node: S3TreeNode
-  ): Promise<any> {
+  private async loadRunManifest(node: S3TreeNode): Promise<any> {
     if (this.shouldUseLocalMock()) {
-      const response =
-        await fetch('assets/mock/run-manifest.json');
+      const response = await fetch('assets/mock/run-manifest.json');
 
       if (!response.ok) {
         console.warn(
@@ -546,20 +621,12 @@ export class DecoderComponent implements OnInit {
       return await response.json();
     }
 
-    const config =
-      await this.loadRuntimeConfig();
+    const config = await this.loadRuntimeConfig();
 
-    const binGetManifestUrl =
-      config.decoderApi?.binGetManifest?.trim();
-
-    const bucket =
-      config.s3Default?.trim();
-
-    const clientId =
-      this.resolveClientId(config);
-
-    const runId =
-      this.getRunIdFromKey(node.key);
+    const binGetManifestUrl = config.decoderApi?.binGetManifest?.trim();
+    const bucket = config.s3Default?.trim();
+    const clientId = this.resolveClientId(config);
+    const runId = this.getRunIdFromKey(node.key);
 
     if (!binGetManifestUrl) {
       throw new Error(
@@ -579,8 +646,7 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    const token =
-      await this.authService.getIdToken();
+    const token = await this.authService.getIdToken();
 
     const url =
       `${binGetManifestUrl}` +
@@ -627,10 +693,9 @@ export class DecoderComponent implements OnInit {
   }
 
   private getRunIdFromKey(key: string): string {
-    const parts =
-      key
-        .split('/')
-        .filter(Boolean);
+    const parts = key
+      .split('/')
+      .filter(Boolean);
 
     if (parts.length < 2) {
       return '';
@@ -639,14 +704,10 @@ export class DecoderComponent implements OnInit {
     return parts[1];
   }
 
-  private getBinKeysFromFolder(
-    node: S3TreeNode
-  ): string[] {
+  private getBinKeysFromFolder(node: S3TreeNode): string[] {
     const result: string[] = [];
 
-    const walk = (
-      currentNode: S3TreeNode
-    ): void => {
+    const walk = (currentNode: S3TreeNode): void => {
       if (this.isBinFile(currentNode)) {
         result.push(currentNode.key);
         return;
@@ -666,11 +727,8 @@ export class DecoderComponent implements OnInit {
     this.isLoadingBinCatalog = true;
 
     try {
-      const config =
-        await this.loadRuntimeConfig();
-
-      const clientId =
-        this.resolveClientId(config);
+      const config = await this.loadRuntimeConfig();
+      const clientId = this.resolveClientId(config);
 
       if (this.shouldUseLocalMock()) {
         this.setTreeData(
@@ -680,11 +738,8 @@ export class DecoderComponent implements OnInit {
         return;
       }
 
-      const catalogUrl =
-        config.decoderApi?.binFilesCatalogUrl;
-
-      const bucket =
-        config.s3Default;
+      const catalogUrl = config.decoderApi?.binFilesCatalogUrl;
+      const bucket = config.s3Default;
 
       if (!catalogUrl) {
         throw new Error(
@@ -698,8 +753,7 @@ export class DecoderComponent implements OnInit {
         );
       }
 
-      const token =
-        await this.authService.getIdToken();
+      const token = await this.authService.getIdToken();
 
       const url =
         `${catalogUrl}` +
@@ -714,22 +768,16 @@ export class DecoderComponent implements OnInit {
       });
 
       if (!response.ok) {
-        const text =
-          await response.text();
+        const text = await response.text();
 
         throw new Error(
           `Failed to load BIN files catalog. HTTP ${response.status}. ${text}`
         );
       }
 
-      const payload =
-        await response.json();
-
-      const keys =
-        this.extractS3Keys(payload);
-
-      const tree =
-        this.buildTreeFromS3Keys(keys, clientId);
+      const payload = await response.json();
+      const keys = this.extractS3Keys(payload);
+      const tree = this.buildTreeFromS3Keys(keys, clientId);
 
       this.setTreeData(tree);
 
@@ -747,16 +795,12 @@ export class DecoderComponent implements OnInit {
 
     this.s3TreeControl.dataNodes = data;
 
-    this.selectedBinKeys =
-      this.selectedBinKeys.filter(key =>
-        this.treeContainsKey(data, key)
-      );
+    this.selectedBinKeys = this.selectedBinKeys.filter(key =>
+      this.treeContainsKey(data, key)
+    );
   }
 
-  private treeContainsKey(
-    nodes: S3TreeNode[],
-    key: string
-  ): boolean {
+  private treeContainsKey(nodes: S3TreeNode[], key: string): boolean {
     for (const node of nodes) {
       if (node.key === key) {
         return true;
@@ -773,49 +817,35 @@ export class DecoderComponent implements OnInit {
     return false;
   }
 
-  private buildTreeFromS3Keys(
-    keys: string[],
-    clientId: string
-  ): S3TreeNode[] {
-    const runs =
-      new Map<string, S3TreeNode>();
-
-    const prefix =
-      `${clientId}/`;
+  private buildTreeFromS3Keys(keys: string[], clientId: string): S3TreeNode[] {
+    const runs = new Map<string, S3TreeNode>();
+    const prefix = `${clientId}/`;
 
     for (const rawKey of keys) {
-      const key =
-        rawKey.replace(/^generated-files\//, '');
+      const key = rawKey.replace(/^generated-files\//, '');
 
       if (!key.startsWith(prefix)) {
         continue;
       }
 
-      const relativeKey =
-        key.slice(prefix.length);
+      const relativeKey = key.slice(prefix.length);
 
-      const parts =
-        relativeKey
-          .split('/')
-          .filter(Boolean);
+      const parts = relativeKey
+        .split('/')
+        .filter(Boolean);
 
       if (parts.length < 2) {
         continue;
       }
 
       const runId = parts[0];
+      const fileName = parts[parts.length - 1];
 
-      const fileName =
-        parts[parts.length - 1];
-
-      if (
-        !fileName.toLowerCase().endsWith('.bin')
-      ) {
+      if (!fileName.toLowerCase().endsWith('.bin')) {
         continue;
       }
 
-      let runNode =
-        runs.get(runId);
+      let runNode = runs.get(runId);
 
       if (!runNode) {
         runNode = {
@@ -833,18 +863,12 @@ export class DecoderComponent implements OnInit {
       });
     }
 
-    const runNodes =
-      [...runs.values()]
-        .sort((a, b) =>
-          b.name.localeCompare(a.name)
-        );
+    const runNodes = [...runs.values()]
+      .sort((a, b) => b.name.localeCompare(a.name));
 
     for (const runNode of runNodes) {
-      runNode.children =
-        [...(runNode.children ?? [])]
-          .sort((a, b) =>
-            a.name.localeCompare(b.name)
-          );
+      runNode.children = [...(runNode.children ?? [])]
+        .sort((a, b) => a.name.localeCompare(b.name));
     }
 
     return runNodes;
@@ -853,8 +877,7 @@ export class DecoderComponent implements OnInit {
   private extractS3Keys(payload: unknown): string[] {
     if (Array.isArray(payload)) {
       return payload.filter(
-        (item): item is string =>
-          typeof item === 'string'
+        (item): item is string => typeof item === 'string'
       );
     }
 
@@ -891,8 +914,7 @@ export class DecoderComponent implements OnInit {
           typeof item === 'object' &&
           'key' in item
         ) {
-          const key =
-            (item as { key?: unknown }).key;
+          const key = (item as { key?: unknown }).key;
 
           return typeof key === 'string'
             ? key
@@ -905,10 +927,9 @@ export class DecoderComponent implements OnInit {
   }
 
   private async loadRuntimeConfig(): Promise<RuntimeConfig> {
-    const response =
-      await fetch(
-        `assets/config.json?t=${Date.now()}`
-      );
+    const response = await fetch(
+      `assets/config.json?t=${Date.now()}`
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -916,12 +937,12 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    return await response.json() as RuntimeConfig;
+    const config = await response.json();
+
+    return config as RuntimeConfig;
   }
 
-  private resolveClientId(
-    config: RuntimeConfig
-  ): string {
+  private resolveClientId(config: RuntimeConfig): string {
     const clientId =
       config.clientId ||
       config.customerId ||
@@ -941,8 +962,7 @@ export class DecoderComponent implements OnInit {
   }
 
   private shouldUseLocalMock(): boolean {
-    const hostname =
-      window.location.hostname;
+    const hostname = window.location.hostname;
 
     return (
       environment.disableAuth === true &&
