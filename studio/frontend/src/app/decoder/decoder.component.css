@@ -355,6 +355,9 @@
 .decoder-work-card-header {
   min-height: 38px;
   margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: center;
 }
 
 .decoder-payload-card,
@@ -378,6 +381,7 @@
   flex-direction: column;
   justify-content: center;
   gap: 2px;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -413,12 +417,13 @@
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .decoder-view-field {
-  width: 140px;
+  width: 132px;
   height: 32px;
-  flex: 0 0 140px;
+  flex: 0 0 132px;
   margin: 0;
 }
 
