@@ -1,0 +1,454 @@
+<div class="decoder-summary-grid">
+
+  <div
+    class="decoder-summary-box"
+    *ngFor="let item of payloadViewer.summary">
+
+    <span>
+      {{ item.label }}
+    </span>
+
+    <strong>
+      {{ item.value }}
+    </strong>
+
+  </div>
+</div>
+
+<div class="decoder-structure-panel">
+
+  <div class="decoder-structure-header">
+
+    <div>
+
+      <h4>
+        Payload Structure
+      </h4>
+
+      <span>
+        Collapsed block and frame inspection.
+        Expand only what you need.
+      </span>
+
+    </div>
+
+    <button
+      type="button"
+      class="decoder-copy-icon-button"
+      title="Copy visible structure"
+      (click)="copyPayloadViewerToClipboard()">
+
+      <mat-icon>
+        content_copy
+      </mat-icon>
+
+    </button>
+
+  </div>
+
+  <div class="decoder-structure-scroll">
+
+    <div class="decoder-hierarchy-card">
+
+      <div class="decoder-hierarchy-card-header">
+
+        <div>
+
+          <span class="decoder-card-kicker">
+            Header
+          </span>
+
+          <strong>
+            Trackster Header
+          </strong>
+
+        </div>
+
+        <button
+          type="button"
+          class="decoder-copy-icon-button"
+          title="Copy header"
+          (click)="copyHeaderToClipboard()">
+
+          <mat-icon>
+            content_copy
+          </mat-icon>
+
+        </button>
+
+      </div>
+
+      <div class="decoder-hierarchy-grid">
+
+        <div
+          *ngFor="let field of payloadViewer.headerFields">
+
+          <span>
+            {{ field.label }}
+          </span>
+
+          <strong>
+            {{ field.value }}
+          </strong>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="decoder-hierarchy-card">
+
+      <div class="decoder-hierarchy-card-header">
+
+        <div>
+
+          <span class="decoder-card-kicker">
+            Blocks
+          </span>
+
+          <strong>
+            Timeline
+          </strong>
+
+        </div>
+
+        <button
+          type="button"
+          class="decoder-copy-icon-button"
+          title="Copy current block page"
+          (click)="copyBlocksToClipboard()">
+
+          <mat-icon>
+            content_copy
+          </mat-icon>
+
+        </button>
+
+      </div>
+
+      <div class="decoder-block-pagination-bar">
+
+        <div class="decoder-block-pagination-info">
+
+          <strong>
+            Blocks
+          </strong>
+
+          <span>
+            {{
+              getBlockPageStart()
+            }}-{{
+              getBlockPageEnd()
+            }}
+            of
+            {{
+              getTotalBlockCount()
+            }}
+          </span>
+
+        </div>
+
+        <div class="decoder-block-pagination-actions">
+
+          <button
+            type="button"
+            class="decoder-pagination-button"
+            [disabled]="
+              isFirstBlockPage() ||
+              isLoadingBlockPage
+            "
+            (click)="loadPreviousBlockPage()">
+
+            <mat-icon>
+              chevron_left
+            </mat-icon>
+
+            <span>
+              Previous
+            </span>
+
+          </button>
+
+          <div class="decoder-page-jump">
+
+            <span>
+              Page
+            </span>
+
+            <input
+              type="number"
+              min="1"
+              [max]="getTotalBlockPages()"
+              [(ngModel)]="blockPageInput"
+              (keyup.enter)="goToBlockPageFromInput()"
+              (blur)="goToBlockPageFromInput()"
+              [disabled]="isLoadingBlockPage">
+
+            <span>
+              of
+              {{
+                getTotalBlockPages()
+              }}
+            </span>
+
+          </div>
+
+          <button
+            type="button"
+            class="decoder-pagination-button"
+            [disabled]="
+              isLastBlockPage() ||
+              isLoadingBlockPage
+            "
+            (click)="loadNextBlockPage()">
+
+            <span>
+              Next
+            </span>
+
+            <mat-icon>
+              chevron_right
+            </mat-icon>
+
+          </button>
+
+        </div>
+      </div>
+
+      <div
+        class="decoder-frame-loading"
+        *ngIf="isLoadingBlockPage">
+
+        Loading blocks...
+      </div>
+
+      <div class="decoder-block-list">
+
+        <div
+          class="decoder-block-card"
+          *ngFor="let block of payloadViewer.blocks"
+          [class.decoder-block-card-expanded]="block.expanded">
+
+          <div class="decoder-block-header">
+
+            <button
+              type="button"
+              class="decoder-expand-button"
+              (click)="toggleBlock(block)">
+
+              <mat-icon>
+                {{
+                  block.expanded
+                    ? 'expand_more'
+                    : 'chevron_right'
+                }}
+              </mat-icon>
+
+            </button>
+
+            <div class="decoder-block-title">
+
+              <strong>
+                Block {{ block.index }}
+              </strong>
+
+              <span>
+                {{
+                  block.startNs
+                }}
+                →
+                {{
+                  block.endNs
+                }}
+              </span>
+
+            </div>
+
+            <div class="decoder-block-meta">
+
+              <span>
+                {{
+                  block.frameCount
+                }}
+                frames
+              </span>
+
+              <span>
+                {{
+                  block.duration
+                }}
+              </span>
+
+            </div>
+          </div>
+
+          <div
+            class="decoder-frame-list"
+            *ngIf="block.expanded">
+
+            <div
+              class="decoder-frame-empty"
+              *ngIf="block.frames.length === 0">
+
+              No frames loaded for this block.
+            </div>
+
+            <div
+              class="decoder-frame-card"
+              *ngFor="let frame of block.frames"
+              [class.decoder-frame-card-expanded]="frame.expanded"
+              [hidden]="!matchesDecoderFilter(frame.searchText)">
+
+              <div class="decoder-frame-header">
+
+                <button
+                  type="button"
+                  class="decoder-expand-button"
+                  (click)="toggleFrame(frame)">
+
+                  <mat-icon>
+                    {{
+                      frame.expanded
+                        ? 'expand_more'
+                        : 'chevron_right'
+                    }}
+                  </mat-icon>
+
+                </button>
+
+                <div class="decoder-frame-title">
+
+                  <strong>
+                    {{
+                      frame.canId
+                    }}
+                    ·
+                    {{
+                      frame.messageName
+                    }}
+                  </strong>
+
+                  <span>
+                    Time
+                    {{
+                      frame.time
+                    }}
+                    · DLC
+                    {{
+                      frame.dlc
+                    }}
+                    ·
+                    {{
+                      frame.decodedSignals
+                    }}
+                    decoded signals
+                  </span>
+
+                </div>
+
+                <code>
+                  {{
+                    frame.payloadHex
+                  }}
+                </code>
+
+              </div>
+
+              <div
+                class="decoder-signal-list"
+                *ngIf="
+                  frame.expanded &&
+                  frame.signals.length > 0
+                ">
+
+                <div
+                  class="decoder-signal-row"
+                  *ngFor="let signal of frame.signals"
+                  [hidden]="!matchesDecoderFilter(signal.searchText)">
+
+                  <div class="decoder-signal-name">
+
+                    <span>
+                      {{ signal.name }}
+                    </span>
+
+                  </div>
+
+                  <div class="decoder-signal-value">
+
+                    <strong>
+                      {{ signal.value }}
+                    </strong>
+
+                  </div>
+
+                  <div class="decoder-signal-meta">
+
+                    <span>
+                      raw:
+                      {{ signal.raw }}
+                    </span>
+
+                    <span>
+                      unit:
+                      {{
+                        signal.unit || '-'
+                      }}
+                    </span>
+
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="decoder-signal-list"
+                *ngIf="
+                  frame.expanded &&
+                  frame.signals.length === 0
+                ">
+
+                <div
+                  class="decoder-signal-row decoder-signal-row-empty">
+
+                  <div class="decoder-signal-name">
+
+                    <span>
+                      No decoded signals
+                    </span>
+
+                  </div>
+
+                  <div class="decoder-signal-value">
+
+                    <strong>
+                      {{
+                        frame.payloadHex
+                      }}
+                    </strong>
+
+                  </div>
+
+                  <div class="decoder-signal-meta">
+
+                    <span>
+                      raw payload
+                    </span>
+
+                    <span>
+                      manifest/runtime not matched
+                    </span>
+
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>

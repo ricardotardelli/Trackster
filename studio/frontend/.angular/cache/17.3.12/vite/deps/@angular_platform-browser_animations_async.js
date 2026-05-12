@@ -1,10 +1,10 @@
 import {
   DomRendererFactory2
-} from "./chunk-UGKKEBQS.js";
-import "./chunk-PODF26YN.js";
+} from "./chunk-MV4LETSD.js";
+import "./chunk-Q5KFSLBI.js";
 import {
   DOCUMENT
-} from "./chunk-SGGKWWNI.js";
+} from "./chunk-2ZOLE4XR.js";
 import {
   ANIMATION_MODULE_TYPE,
   ChangeDetectionScheduler,
@@ -18,9 +18,10 @@ import {
   setClassMetadata,
   ɵɵdefineInjectable,
   ɵɵinvalidFactory
-} from "./chunk-QLT4PYNM.js";
-import "./chunk-WQJEAQSM.js";
-import "./chunk-MF5NBIAP.js";
+} from "./chunk-N2QXCUN4.js";
+import "./chunk-T5YBCJCS.js";
+import "./chunk-ZA2DQWUL.js";
+import "./chunk-JHTNPNKS.js";
 
 // node_modules/@angular/platform-browser/fesm2022/animations/async.mjs
 var ANIMATION_PREFIX = "@";
@@ -48,7 +49,7 @@ var AsyncAnimationRendererFactory = class _AsyncAnimationRendererFactory {
    * @internal
    */
   loadImpl() {
-    const moduleImpl = this.moduleImpl ?? import("./browser-S3EAV2E7.js");
+    const moduleImpl = this.moduleImpl ?? import("./browser-YWR6HM5T.js");
     return moduleImpl.catch((e) => {
       throw new RuntimeError(5300, (typeof ngDevMode === "undefined" || ngDevMode) && "Async loading for animations package was enabled, but loading failed. Angular falls back to using regular rendering. No animations will be displayed and their styles won't be applied.");
     }).then(({

@@ -1,0 +1,551 @@
+<div class="workspace-view">
+  <div class="module-stage-shell">
+    <div class="workspace-grid">
+
+      <aside class="workspace-sidebar">
+        <div class="status-panel">
+          <h2>CAN Files Explorer</h2>
+
+          <div class="tree-shell">
+            <div class="tree-loading" *ngIf="isLoadingBinCatalog">
+              Loading BIN catalog...
+            </div>
+
+            <mat-tree
+              [dataSource]="s3TreeDataSource"
+              [treeControl]="s3TreeControl"
+              class="trackster-tree">
+
+              <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild">
+                <div class="tree-node tree-node-folder">
+                  <button
+                    type="button"
+                    class="tree-toggle"
+                    matTreeNodeToggle>
+                    <mat-icon>
+                      {{ s3TreeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+                    </mat-icon>
+                  </button>
+
+                  <mat-checkbox
+                    class="tree-folder-checkbox"
+                    [checked]="isFolderFullySelected(node)"
+                    [indeterminate]="isFolderPartiallySelected(node)"
+                    (click)="$event.stopPropagation()"
+                    (change)="toggleFolderSelection(node, $event.checked)">
+                  </mat-checkbox>
+
+                  <button
+                    type="button"
+                    class="tree-label"
+                    [class.tree-label-folder-selected]="isFolderFullySelected(node)"
+                    [class.tree-label-folder-partial]="isFolderPartiallySelected(node)"
+                    (click)="selectS3Node(node)">
+                    <mat-icon class="tree-icon">
+                      {{ s3TreeControl.isExpanded(node) ? 'folder_open' : 'folder' }}
+                    </mat-icon>
+
+                    <span class="tree-text">
+                      {{ node.name }}
+                    </span>
+                  </button>
+                </div>
+
+                <div
+                  class="tree-children"
+                  [class.tree-children-hidden]="!s3TreeControl.isExpanded(node)">
+                  <ng-container matTreeNodeOutlet></ng-container>
+                </div>
+              </mat-nested-tree-node>
+
+              <mat-tree-node *matTreeNodeDef="let node">
+                <div class="tree-node tree-node-file">
+                  <span class="tree-indent"></span>
+
+                  <mat-checkbox
+                    *ngIf="isBinFile(node)"
+                    class="tree-file-checkbox"
+                    [checked]="isBinSelected(node)"
+                    (click)="$event.stopPropagation()"
+                    (change)="toggleBinSelection(node, $event.checked)">
+                  </mat-checkbox>
+
+                  <button
+                    type="button"
+                    class="tree-label"
+                    [class.tree-label-selected]="selectedS3Key === node.key"
+                    [class.tree-label-bin]="isBinFile(node)"
+                    [class.tree-label-json]="isJsonFile(node)"
+                    (click)="selectS3Node(node)">
+                    <mat-icon class="tree-icon">
+                      {{ node.name.endsWith('.json') ? 'data_object' : 'description' }}
+                    </mat-icon>
+
+                    <span class="tree-text">
+                      {{ node.name }}
+                    </span>
+                  </button>
+                </div>
+              </mat-tree-node>
+
+            </mat-tree>
+          </div>
+        </div>
+      </aside>
+
+      <section class="workspace-body">
+        <div class="workspace-body-header">
+          <h2>Decoder Workspace</h2>
+          <p>
+            Inspect generated files, decode CAN payloads, replay sessions,
+            and prepare export workflows.
+          </p>
+        </div>
+
+        <div class="workspace-body-content">
+          <div class="module-card-grid">
+
+            <section class="module-card decoder-payload-card">
+              <div class="card-header-row decoder-work-card-header">
+                <div class="decoder-title-stack">
+                  <h3>Payload Viewer</h3>
+
+                  <span class="decoder-selected-file">
+                    {{ payloadViewer.fileName }}
+                  </span>
+                </div>
+
+                <div class="decoder-toolbar">
+                  <mat-form-field
+                    class="decoder-view-field"
+                    appearance="outline"
+                    subscriptSizing="dynamic">
+                    <mat-select
+                      [(ngModel)]="selectedViewerMode"
+                      panelClass="trackster-select-panel">
+                      <mat-option value="trackster-bin">Trackster BIN</mat-option>
+                      <mat-option value="decoded-signals">Decoded Signals</mat-option>
+                      <mat-option value="json">JSON</mat-option>
+                      <mat-option value="csv">CSV</mat-option>
+                      <mat-option value="hex-dump">HEX Dump</mat-option>
+                      <mat-option value="vector-asc">Vector ASC</mat-option>
+                      <mat-option value="candump">CANdump</mat-option>
+                      <mat-option value="blf">BLF</mat-option>
+                      <mat-option value="mf4">MF4</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <button
+                    type="button"
+                    class="decoder-filter-button"
+                    [class.decoder-filter-button-active]="isDecoderFilterOpen"
+                    (click)="toggleDecoderFilter()"
+                    title="Filter payload structure">
+                    <mat-icon>filter_list</mat-icon>
+                    <span>Filter</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="decoder-export-button"
+                    [matMenuTriggerFor]="decoderExportMenu">
+                    <span>Export</span>
+                    <mat-icon>expand_more</mat-icon>
+                  </button>
+
+                  <mat-menu #decoderExportMenu="matMenu" class="decoder-export-menu">
+                    <button mat-menu-item>
+                      <span>Current file</span>
+                    </button>
+
+                    <button mat-menu-item>
+                      <span>Selected files</span>
+                    </button>
+
+                    <button mat-menu-item>
+                      <span>Entire folder</span>
+                    </button>
+
+                  </mat-menu>
+                </div>
+              </div>
+
+              <div
+                class="decoder-filter-bar"
+                *ngIf="isDecoderFilterOpen">
+                <div class="decoder-filter-input-shell">
+                  <mat-icon>search</mat-icon>
+
+                  <input
+                    type="text"
+                    [(ngModel)]="decoderFilterText"
+                    placeholder="Search CAN ID, message or signal..."
+                    autocomplete="off">
+
+                  <button
+                    type="button"
+                    class="decoder-filter-clear-button"
+                    *ngIf="decoderFilterText"
+                    (click)="clearDecoderFilter()"
+                    title="Clear filter">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <span
+                  class="decoder-filter-status"
+                  *ngIf="decoderFilterText">
+                  Filtering by "{{ decoderFilterText }}"
+                </span>
+              </div>
+
+              <div class="decoder-summary-grid">
+                <div
+                  class="decoder-summary-box"
+                  *ngFor="let item of payloadViewer.summary">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+
+              <div class="decoder-structure-panel">
+                <div class="decoder-structure-header">
+                  <div>
+                    <h4>Payload Structure</h4>
+                    <span>Collapsed block and frame inspection. Expand only what you need.</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="decoder-copy-icon-button"
+                    title="Copy visible structure"
+                    (click)="copyPayloadViewerToClipboard()">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </div>
+
+                <div class="decoder-structure-scroll">
+
+                  <div class="decoder-hierarchy-card">
+                    <div class="decoder-hierarchy-card-header">
+                      <div>
+                        <span class="decoder-card-kicker">Header</span>
+                        <strong>Trackster Header</strong>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="decoder-copy-icon-button"
+                        title="Copy header"
+                        (click)="copyHeaderToClipboard()">
+                        <mat-icon>content_copy</mat-icon>
+                      </button>
+                    </div>
+
+                    <div class="decoder-hierarchy-grid">
+                      <div *ngFor="let field of payloadViewer.headerFields">
+                        <span>{{ field.label }}</span>
+                        <strong>{{ field.value }}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="decoder-hierarchy-card">
+                    <div class="decoder-hierarchy-card-header">
+                      <div>
+                        <span class="decoder-card-kicker">Blocks</span>
+                        <strong>Timeline</strong>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="decoder-copy-icon-button"
+                        title="Copy current block page"
+                        (click)="copyBlocksToClipboard()">
+                        <mat-icon>content_copy</mat-icon>
+                      </button>
+                    </div>
+
+                    <div class="decoder-block-pagination-bar">
+                      <div class="decoder-block-pagination-info">
+                        <strong>Blocks</strong>
+                        <span>
+                          {{ getBlockPageStart() }}-{{ getBlockPageEnd() }}
+                          of {{ getTotalBlockCount() }}
+                        </span>
+                      </div>
+
+                      <div class="decoder-block-pagination-actions">
+                        <button
+                          type="button"
+                          class="decoder-pagination-button"
+                          [disabled]="isFirstBlockPage() || isLoadingBlockPage"
+                          (click)="loadPreviousBlockPage()">
+                          <mat-icon>chevron_left</mat-icon>
+                          <span>Previous</span>
+                        </button>
+
+                        <div class="decoder-page-jump">
+                          <span>Page</span>
+
+                          <input
+                            type="number"
+                            min="1"
+                            [max]="getTotalBlockPages()"
+                            [(ngModel)]="blockPageInput"
+                            (keyup.enter)="goToBlockPageFromInput()"
+                            (blur)="goToBlockPageFromInput()"
+                            [disabled]="isLoadingBlockPage">
+
+                          <span>of {{ getTotalBlockPages() }}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          class="decoder-pagination-button"
+                          [disabled]="isLastBlockPage() || isLoadingBlockPage"
+                          (click)="loadNextBlockPage()">
+                          <span>Next</span>
+                          <mat-icon>chevron_right</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      class="decoder-frame-loading"
+                      *ngIf="isLoadingBlockPage">
+                      Loading blocks...
+                    </div>
+
+                    <div class="decoder-block-list">
+
+                      <div
+                        class="decoder-block-card"
+                        *ngFor="let block of payloadViewer.blocks"
+                        [class.decoder-block-card-expanded]="block.expanded">
+
+                        <div class="decoder-block-header">
+                          <button
+                            type="button"
+                            class="decoder-expand-button"
+                            (click)="toggleBlock(block); $event.stopPropagation()">
+                            <mat-icon>
+                              {{ block.expanded ? 'expand_more' : 'chevron_right' }}
+                            </mat-icon>
+                          </button>
+
+                          <div class="decoder-block-title">
+                            <strong>Block {{ block.index }}</strong>
+                            <span>{{ block.startNs }} → {{ block.endNs }}</span>
+                          </div>
+
+                          <div class="decoder-block-meta">
+                            <span>{{ block.frameCount }} frames</span>
+                            <span>{{ block.duration }}</span>
+                          </div>
+                        </div>
+
+                        <div
+                          class="decoder-frame-list"
+                          *ngIf="block.expanded">
+
+                          <div
+                            class="decoder-frame-empty"
+                            *ngIf="block.frames.length === 0">
+                            No frames loaded for this block.
+                          </div>
+
+                          <div
+                            class="decoder-frame-card"
+                            *ngFor="let frame of block.frames"
+                            [class.decoder-frame-card-expanded]="frame.expanded"
+                            [hidden]="!matchesDecoderFilter(frame.searchText)">
+
+                            <div class="decoder-frame-header">
+                              <button
+                                type="button"
+                                class="decoder-expand-button"
+                                (click)="toggleFrame(frame); $event.stopPropagation()">
+                                <mat-icon>
+                                  {{ frame.expanded ? 'expand_more' : 'chevron_right' }}
+                                </mat-icon>
+                              </button>
+
+                              <div class="decoder-frame-title">
+                                <strong>{{ frame.canId }} · {{ frame.messageName }}</strong>
+                                <span>
+                                  Time {{ frame.time }} · DLC {{ frame.dlc }} · {{ frame.decodedSignals }} decoded signals
+                                </span>
+                              </div>
+
+                              <code>{{ frame.payloadHex }}</code>
+                            </div>
+
+                            <div
+                              class="decoder-signal-list"
+                              *ngIf="frame.expanded && frame.signals.length > 0">
+
+                              <div
+                                class="decoder-signal-row"
+                                *ngFor="let signal of frame.signals"
+                                [hidden]="!matchesDecoderFilter(signal.searchText)">
+
+                                <div class="decoder-signal-name">
+                                  <span>{{ signal.name }}</span>
+                                </div>
+
+                                <div class="decoder-signal-value">
+                                  <strong>{{ signal.value }}</strong>
+                                </div>
+
+                                <div class="decoder-signal-meta">
+                                  <span>raw: {{ signal.raw }}</span>
+                                  <span>unit: {{ signal.unit || '-' }}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              class="decoder-signal-list"
+                              *ngIf="frame.expanded && frame.signals.length === 0">
+
+                              <div class="decoder-signal-row decoder-signal-row-empty">
+                                <div class="decoder-signal-name">
+                                  <span>No decoded signals</span>
+                                </div>
+
+                                <div class="decoder-signal-value">
+                                  <strong>{{ frame.payloadHex }}</strong>
+                                </div>
+
+                                <div class="decoder-signal-meta">
+                                  <span>raw payload</span>
+                                  <span>manifest/runtime not matched</span>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </section>
+
+            <section class="module-card decoder-manifest-card">
+              <div class="card-header-row decoder-work-card-header">
+                <div class="decoder-title-block">
+                  <h3>Run Manifest</h3>
+                  <p>run-manifest.json</p>
+                </div>
+
+                <span class="decoder-status-pill decoder-status-loaded">
+                  Loaded
+                </span>
+              </div>
+
+              <div class="decoder-manifest-summary">
+                <div class="decoder-manifest-icon">
+                  <mat-icon>data_object</mat-icon>
+                </div>
+
+                <div>
+                  <strong>Generation package resolved</strong>
+                  <span>20260508191542 · worker-1.0.0</span>
+                  <p>
+                    Runtime metadata and DBC package used to generate the selected BIN.
+                  </p>
+                </div>
+              </div>
+
+              <div class="decoder-report-grid">
+                <div>
+                  <span>DBCs</span>
+                  <strong>2</strong>
+                </div>
+
+                <div>
+                  <span>Messages</span>
+                  <strong>400</strong>
+                </div>
+
+                <div>
+                  <span>Signals</span>
+                  <strong>3,349</strong>
+                </div>
+
+                <div>
+                  <span>CAN IDs</span>
+                  <strong>1,024</strong>
+                </div>
+              </div>
+
+              <div class="decoder-section-title">
+                DBC Package
+              </div>
+
+              <div class="decoder-dbc-list">
+                <div class="decoder-dbc-row">
+                  <mat-icon>data_object</mat-icon>
+
+                  <div>
+                    <strong>tesla_model3.dbc</strong>
+                    <span>214 messages · 1,842 signals · validated</span>
+                  </div>
+                </div>
+
+                <div class="decoder-dbc-row">
+                  <mat-icon>data_object</mat-icon>
+
+                  <div>
+                    <strong>bmw_i4.dbc</strong>
+                    <span>186 messages · 1,507 signals · validated</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="decoder-section-title">
+                Export Target
+              </div>
+
+              <div class="decoder-export-menu-preview">
+                <button type="button">Current file</button>
+                <button type="button">Selected files</button>
+                <button type="button">Entire folder</button>
+              </div>
+
+              <div class="decoder-section-title">
+                Manifest Log
+              </div>
+
+              <div class="decoder-log-list">
+                <div class="decoder-log-card decoder-log-success-card">
+                  <div class="decoder-log-head">
+                    <span class="decoder-log-level decoder-log-success">
+                      SUCCESS
+                    </span>
+
+                    <strong>DBC_PACKAGE_READY</strong>
+                  </div>
+
+                  <p>
+                    2 compiled DBC files were linked to this generation package.
+                  </p>
+
+                  <span>rollingCounters: enabled</span>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>

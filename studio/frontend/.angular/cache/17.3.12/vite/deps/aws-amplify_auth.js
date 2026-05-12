@@ -34,7 +34,7 @@ import {
   updateUserAttribute,
   updateUserAttributes,
   verifyTOTPSetup
-} from "./chunk-GSTMTGK7.js";
+} from "./chunk-CZB23PDS.js";
 import {
   Amplify,
   AuthAction,
@@ -52,12 +52,15 @@ import {
   getAuthUserAgentValue,
   getCurrentUser,
   getRegionFromUserPoolId
-} from "./chunk-5KMNRBIN.js";
-import "./chunk-WQJEAQSM.js";
+} from "./chunk-6CQBSRAS.js";
+import "./chunk-Z2DDE6C6.js";
+import "./chunk-F6RSW7MC.js";
+import "./chunk-T5YBCJCS.js";
+import "./chunk-ZA2DQWUL.js";
 import {
   __async,
   __spreadValues
-} from "./chunk-MF5NBIAP.js";
+} from "./chunk-JHTNPNKS.js";
 
 // node_modules/@aws-amplify/auth/dist/esm/client/utils/passkey/errors/handlePasskeyRegistrationError.mjs
 var handlePasskeyRegistrationError = (err) => {
