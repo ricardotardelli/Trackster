@@ -1,0 +1,236 @@
+<div class="decoded-summary-grid">
+
+  <div
+    class="decoded-summary-box"
+    *ngFor="let item of summary">
+
+    <span>
+      {{ item.label }}
+    </span>
+
+    <strong>
+      {{ item.value }}
+    </strong>
+
+  </div>
+</div>
+
+<div class="decoded-panel">
+
+  <div class="decoded-topbar">
+
+    <div class="decoded-title-block">
+
+      <h4>
+        Decoded Signals
+      </h4>
+
+      <span>
+        Shift + click for multi-column sorting.
+      </span>
+
+    </div>
+
+    <div class="decoded-filter-field">
+
+      <mat-icon>
+        search
+      </mat-icon>
+
+      <input
+        type="text"
+        [(ngModel)]="filterText"
+        placeholder="Filter CAN ID, message, signal, value, min, max, avg...">
+
+    </div>
+
+    <div class="decoded-result-count">
+
+      <strong>
+        {{ getVisibleRows().length }}
+      </strong>
+
+      <span>
+        rows
+      </span>
+
+    </div>
+
+    <button
+      type="button"
+      class="decoded-copy-button"
+      title="Copy visible table"
+      (click)="copySignalCatalogToClipboard()">
+
+      <mat-icon>
+        content_copy
+      </mat-icon>
+
+    </button>
+
+  </div>
+
+  <div
+    class="decoded-loading"
+    *ngIf="isLoading">
+
+    Loading decoded signals...
+  </div>
+
+  <div
+    class="decoded-empty"
+    *ngIf="
+      !isLoading &&
+      signalCatalog.length === 0
+    ">
+
+    No decoded signals were found for this BIN.
+  </div>
+
+  <div
+    class="decoded-table-shell"
+    *ngIf="
+      !isLoading &&
+      signalCatalog.length > 0
+    ">
+
+    <div class="decoded-table-header">
+
+      <span class="decoded-expand-header"></span>
+
+      <button type="button" (click)="onSortColumn($event, 'canId')">
+        <span>CAN ID</span>
+        <strong>{{ getSortIndicator('canId') }}</strong>
+      </button>
+
+      <button type="button" (click)="onSortColumn($event, 'messageName')">
+        <span>Message</span>
+        <strong>{{ getSortIndicator('messageName') }}</strong>
+      </button>
+
+      <button type="button" (click)="onSortColumn($event, 'signalName')">
+        <span>Signal</span>
+        <strong>{{ getSortIndicator('signalName') }}</strong>
+      </button>
+
+      <button type="button" (click)="onSortColumn($event, 'value')">
+        <span>Value</span>
+        <strong>{{ getSortIndicator('value') }}</strong>
+      </button>
+
+      <button type="button" (click)="onSortColumn($event, 'min')">
+        <span>Min</span>
+        <strong>{{ getSortIndicator('min') }}</strong>
+      </button>
+
+      <button type="button" (click)="onSortColumn($event, 'max')">
+        <span>Max</span>
+        <strong>{{ getSortIndicator('max') }}</strong>
+      </button>
+
+      <button type="button" (click)="onSortColumn($event, 'avg')">
+        <span>Avg</span>
+        <strong>{{ getSortIndicator('avg') }}</strong>
+      </button>
+
+    </div>
+
+    <div class="decoded-table-scroll">
+
+      <div
+        class="decoded-row-group"
+        *ngFor="let row of getVisibleRows()">
+
+        <div
+          class="decoded-table-row"
+          [class.decoded-table-row-expanded]="isDecodedSignalExpanded(row)">
+
+          <button
+            type="button"
+            class="decoded-expand-button"
+            title="Show signal details"
+            (click)="toggleDecodedSignalRow(row)">
+
+            <mat-icon>
+              {{ isDecodedSignalExpanded(row) ? 'expand_more' : 'chevron_right' }}
+            </mat-icon>
+
+          </button>
+
+          <span class="decoded-cell decoded-cell-id">
+            {{ row.canId }}
+          </span>
+
+          <span class="decoded-cell decoded-cell-message">
+            {{ row.messageName }}
+          </span>
+
+          <span class="decoded-cell decoded-signal-name">
+            {{ row.signalName }}
+          </span>
+
+          <strong class="decoded-cell decoded-cell-value">
+            {{ row.value }}
+          </strong>
+
+          <span class="decoded-cell decoded-cell-number">
+            {{ row.min }}
+          </span>
+
+          <span class="decoded-cell decoded-cell-number">
+            {{ row.max }}
+          </span>
+
+          <span class="decoded-cell decoded-cell-number">
+            {{ row.avg }}
+          </span>
+
+        </div>
+
+        <div
+          class="decoded-signal-detail"
+          *ngIf="isDecodedSignalExpanded(row)">
+
+          <div class="decoded-signal-detail-grid">
+
+            <div class="decoded-signal-detail-item">
+              <span>First value</span>
+              <strong>{{ $any(row).firstValue || row.min }}</strong>
+            </div>
+
+            <div class="decoded-signal-detail-item">
+              <span>Last value</span>
+              <strong>{{ $any(row).lastValue || row.value }}</strong>
+            </div>
+
+            <div class="decoded-signal-detail-item">
+              <span>Changes</span>
+              <strong>{{ $any(row).changes || 0 }}</strong>
+            </div>
+
+            <div class="decoded-signal-detail-item">
+              <span>Changed</span>
+              <strong>{{ getSignalChangedPercent(row) }}</strong>
+            </div>
+
+            <div class="decoded-signal-detail-item">
+              <span>First block</span>
+              <strong>{{ $any(row).firstBlockIndex || 0 }}</strong>
+            </div>
+
+            <div class="decoded-signal-detail-item">
+              <span>Last block</span>
+              <strong>{{ $any(row).lastBlockIndex || 0 }}</strong>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>

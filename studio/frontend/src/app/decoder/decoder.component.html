@@ -76,9 +76,7 @@
                   class="tree-children"
                   [class.tree-children-hidden]="!s3TreeControl.isExpanded(node)">
 
-                  <ng-container
-                    matTreeNodeOutlet>
-                  </ng-container>
+                  <ng-container matTreeNodeOutlet></ng-container>
 
                 </div>
               </mat-nested-tree-node>
@@ -209,6 +207,17 @@
                         MF4
                       </mat-option>
 
+                      <mat-option
+                        disabled
+                        class="decoder-select-group-label">
+
+                        Manifest
+                      </mat-option>
+
+                      <mat-option value="run-manifest">
+                        Run Manifest
+                      </mat-option>
+
                     </mat-select>
                   </mat-form-field>
 
@@ -272,182 +281,29 @@
                 [selectedNode]="selectedBinNode">
               </app-trackster-bin-viewer>
 
-            </section>
+              <app-decodedsignals-viewer
+                *ngIf="
+                  selectedViewerMode === 'decoded-signals'
+                  && selectedBinNode
+                "
+                [selectedNode]="selectedBinNode">
+              </app-decodedsignals-viewer>
 
-            <section class="module-card decoder-manifest-card">
+              <div
+                class="decoder-placeholder-view"
+                *ngIf="
+                  selectedViewerMode !== 'trackster-bin'
+                  && selectedViewerMode !== 'decoded-signals'
+                ">
 
-              <div class="card-header-row decoder-work-card-header">
+                <strong>
+                  {{ selectedViewerMode }}
+                </strong>
 
-                <div class="decoder-title-block">
-
-                  <h3>
-                    Run Manifest
-                  </h3>
-
-                  <p>
-                    run-manifest.json
-                  </p>
-
-                </div>
-
-                <span
-                  class="decoder-status-pill decoder-status-loaded">
-
-                  Loaded
+                <span>
+                  Viewer not implemented yet.
                 </span>
 
-              </div>
-
-              <div class="decoder-manifest-summary">
-
-                <div class="decoder-manifest-icon">
-
-                  <mat-icon>
-                    data_object
-                  </mat-icon>
-
-                </div>
-
-                <div>
-
-                  <strong>
-                    Generation package resolved
-                  </strong>
-
-                  <span>
-                    20260508191542 · worker-1.0.0
-                  </span>
-
-                  <p>
-                    Runtime metadata and DBC package used
-                    to generate the selected BIN.
-                  </p>
-
-                </div>
-              </div>
-
-              <div class="decoder-report-grid">
-
-                <div>
-                  <span>DBCs</span>
-                  <strong>2</strong>
-                </div>
-
-                <div>
-                  <span>Messages</span>
-                  <strong>400</strong>
-                </div>
-
-                <div>
-                  <span>Signals</span>
-                  <strong>3,349</strong>
-                </div>
-
-                <div>
-                  <span>CAN IDs</span>
-                  <strong>1,024</strong>
-                </div>
-
-              </div>
-
-              <div class="decoder-section-title">
-                DBC Package
-              </div>
-
-              <div class="decoder-dbc-list">
-
-                <div class="decoder-dbc-row">
-
-                  <mat-icon>
-                    data_object
-                  </mat-icon>
-
-                  <div>
-
-                    <strong>
-                      tesla_model3.dbc
-                    </strong>
-
-                    <span>
-                      214 messages · 1,842 signals · validated
-                    </span>
-
-                  </div>
-                </div>
-
-                <div class="decoder-dbc-row">
-
-                  <mat-icon>
-                    data_object
-                  </mat-icon>
-
-                  <div>
-
-                    <strong>
-                      bmw_i4.dbc
-                    </strong>
-
-                    <span>
-                      186 messages · 1,507 signals · validated
-                    </span>
-
-                  </div>
-                </div>
-              </div>
-
-              <div class="decoder-section-title">
-                Export Target
-              </div>
-
-              <div class="decoder-export-menu-preview">
-
-                <button type="button">
-                  Current file
-                </button>
-
-                <button type="button">
-                  Selected files
-                </button>
-
-                <button type="button">
-                  Entire folder
-                </button>
-
-              </div>
-
-              <div class="decoder-section-title">
-                Manifest Log
-              </div>
-
-              <div class="decoder-log-list">
-
-                <div
-                  class="decoder-log-card decoder-log-success-card">
-
-                  <div class="decoder-log-head">
-
-                    <span
-                      class="decoder-log-level decoder-log-success">
-
-                      SUCCESS
-                    </span>
-
-                    <strong>
-                      DBC_PACKAGE_READY
-                    </strong>
-
-                  </div>
-
-                  <p>
-                    2 compiled DBC files were linked
-                    to this generation package.
-                  </p>
-
-                  <span>
-                    rollingCounters: enabled
-                  </span>
-
-                </div>
               </div>
 
             </section>

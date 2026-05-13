@@ -19,6 +19,8 @@ import {
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
+import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
+import { MatDividerModule } from '@angular/material/divider';
 
 export interface S3TreeNode {
   name: string;
@@ -45,7 +47,9 @@ interface RuntimeConfig {
     MatFormFieldModule,
     MatSelectModule,
     MatCheckboxModule,
-    TracksterBinViewerComponent
+    TracksterBinViewerComponent,
+    DecodedSignalsViewerComponent,
+    MatDividerModule
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'

@@ -31,7 +31,7 @@ import {
   eventStreamSerdeProvider2 as eventStreamSerdeProvider,
   fromBase64,
   fromHex,
-  fromUtf8,
+  fromUtf8 as fromUtf82,
   generateIdempotencyToken,
   getAwsChunkedEncodingStream,
   getContentLengthPlugin,
@@ -66,7 +66,7 @@ import {
 } from "./chunk-Z2DDE6C6.js";
 import {
   convertToBuffer,
-  fromUtf8 as fromUtf82,
+  fromUtf8,
   isEmptyData,
   numToUint8,
   uint32ArrayFrom
@@ -1881,7 +1881,7 @@ var HeaderFormatter = class {
   format(headers) {
     const chunks = [];
     for (const headerName of Object.keys(headers)) {
-      const bytes = fromUtf8(headerName);
+      const bytes = fromUtf82(headerName);
       chunks.push(Uint8Array.from([bytes.byteLength]), bytes, this.formatHeaderValue(headers[headerName]));
     }
     const out = new Uint8Array(chunks.reduce((carry, bytes) => carry + bytes.byteLength, 0));
@@ -1921,7 +1921,7 @@ var HeaderFormatter = class {
         binBytes.set(header.value, 3);
         return binBytes;
       case "string":
-        const utf8Bytes = fromUtf8(header.value);
+        const utf8Bytes = fromUtf82(header.value);
         const strView = new DataView(new ArrayBuffer(3 + utf8Bytes.byteLength));
         strView.setUint8(0, 7);
         strView.setUint16(1, utf8Bytes.byteLength, false);
@@ -13039,7 +13039,7 @@ var Sha1 = (
 );
 function convertToBuffer2(data2) {
   if (typeof data2 === "string") {
-    return fromUtf82(data2);
+    return fromUtf8(data2);
   }
   if (ArrayBuffer.isView(data2)) {
     return new Uint8Array(data2.buffer, data2.byteOffset, data2.byteLength / Uint8Array.BYTES_PER_ELEMENT);
@@ -13693,7 +13693,7 @@ function isEmptyData3(data2) {
 }
 function convertToBuffer3(data2) {
   if (typeof data2 === "string") {
-    return fromUtf8(data2);
+    return fromUtf82(data2);
   }
   if (ArrayBuffer.isView(data2)) {
     return new Uint8Array(data2.buffer, data2.byteOffset, data2.byteLength / Uint8Array.BYTES_PER_ELEMENT);
@@ -13768,7 +13768,7 @@ var getRuntimeConfig = (config) => {
     signingEscapePath: config?.signingEscapePath ?? false,
     urlParser: config?.urlParser ?? parseUrl,
     useArnRegion: config?.useArnRegion ?? void 0,
-    utf8Decoder: config?.utf8Decoder ?? fromUtf8,
+    utf8Decoder: config?.utf8Decoder ?? fromUtf82,
     utf8Encoder: config?.utf8Encoder ?? toUtf8
   };
 };
