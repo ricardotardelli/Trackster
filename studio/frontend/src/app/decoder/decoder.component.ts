@@ -22,6 +22,8 @@ import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trac
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
 import { MatDividerModule } from '@angular/material/divider';
 
+import { JsonViewerComponent } from './viewers/json-viewer/json-viewer.component';
+
 export interface S3TreeNode {
   name: string;
   key: string;
@@ -49,7 +51,8 @@ interface RuntimeConfig {
     MatCheckboxModule,
     TracksterBinViewerComponent,
     DecodedSignalsViewerComponent,
-    MatDividerModule
+    MatDividerModule,
+    JsonViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'

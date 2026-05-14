@@ -1,0 +1,143 @@
+<div class="json-viewer-layout">
+
+  <div class="json-viewer-main">
+
+    <div class="json-viewer-panel">
+
+      <div class="json-viewer-header">
+
+        <div class="json-viewer-title">
+
+          <h4>
+            Decoded Frames JSON
+          </h4>
+
+          <span>
+            Read-only Monaco JSON viewer
+          </span>
+
+        </div>
+
+        <div class="json-viewer-actions">
+          <input
+            type="text"
+            class="json-search-input"
+            placeholder="Search JSON..."
+            [(ngModel)]="jsonSearchText"
+            (input)="applyEditorSearch()">
+          <button
+            type="button"
+            class="json-action-button"
+            [class.json-action-button-active]="jsonViewMode === 'pretty'"
+            (click)="setJsonViewMode('pretty')">
+
+            Pretty
+
+          </button>
+
+          <button
+            type="button"
+            class="json-action-button"
+            [class.json-action-button-active]="jsonViewMode === 'raw'"
+            (click)="setJsonViewMode('raw')">
+
+            Raw
+
+          </button>
+
+          <button
+            type="button"
+            class="json-action-button json-action-button-primary"
+            (click)="copyFullJsonToClipboard()">
+
+            Copy JSON
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="json-loading"
+        *ngIf="isLoadingJson">
+
+        Decoding BIN file as JSON...
+
+      </div>
+
+      <div
+        class="json-error"
+        *ngIf="
+          !isLoadingJson &&
+          jsonErrorMessage
+        ">
+
+        {{ jsonErrorMessage }}
+
+      </div>
+
+      <div
+        class="json-empty-state"
+        *ngIf="
+          !isLoadingJson &&
+          !jsonErrorMessage &&
+          !displayJsonText
+        ">
+
+        No JSON content available.
+
+      </div>
+
+      <!-- <ngx-monaco-editor
+        *ngIf="
+          !isLoadingJson &&
+          !jsonErrorMessage &&
+          displayJsonText
+        "
+        class="json-monaco-editor"
+        [options]="editorOptions"
+        [ngModel]="displayJsonText">
+      </ngx-monaco-editor> -->
+
+      <div class="json-monaco-test-shell">
+
+        <ngx-monaco-editor
+          *ngIf="
+            !isLoadingJson &&
+            !jsonErrorMessage &&
+            displayJsonText
+          "
+          class="json-monaco-editor"
+          [options]="editorOptions"
+          [ngModel]="displayJsonText">
+        </ngx-monaco-editor>
+
+      </div>
+
+
+
+
+    </div>
+
+  </div>
+
+  <aside class="json-summary-sidebar">
+
+    <div
+      class="json-summary-box"
+      *ngFor="let item of jsonViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>

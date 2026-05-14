@@ -273,29 +273,12 @@
                 </div>
               </div>
 
-              <app-trackster-bin-viewer
-                *ngIf="
-                  selectedViewerMode === 'trackster-bin'
-                  && selectedBinNode
-                "
-                [selectedNode]="selectedBinNode">
-              </app-trackster-bin-viewer>
+              <app-trackster-bin-viewer *ngIf=" selectedViewerMode === 'trackster-bin' && selectedBinNode" [selectedNode]="selectedBinNode"></app-trackster-bin-viewer>
+              <app-decodedsignals-viewer *ngIf=" selectedViewerMode === 'decoded-signals' && selectedBinNode"  [selectedNode]="selectedBinNode"></app-decodedsignals-viewer>
+              <app-json-viewer *ngIf="selectedViewerMode === 'json' && selectedBinNode" [selectedNode]="selectedBinNode"></app-json-viewer>
 
-              <app-decodedsignals-viewer
-                *ngIf="
-                  selectedViewerMode === 'decoded-signals'
-                  && selectedBinNode
-                "
-                [selectedNode]="selectedBinNode">
-              </app-decodedsignals-viewer>
-
-              <div
-                class="decoder-placeholder-view"
-                *ngIf="
-                  selectedViewerMode !== 'trackster-bin'
-                  && selectedViewerMode !== 'decoded-signals'
-                ">
-
+              <div class="decoder-placeholder-view" 
+                *ngIf="selectedViewerMode !== 'trackster-bin' && selectedViewerMode !== 'decoded-signals' && selectedViewerMode !== 'json'">
                 <strong>
                   {{ selectedViewerMode }}
                 </strong>
