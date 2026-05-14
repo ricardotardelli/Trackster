@@ -1,0 +1,185 @@
+<div class="csv-viewer-layout">
+
+  <div class="csv-viewer-main">
+
+    <div class="csv-viewer-panel">
+
+      <div class="csv-viewer-header">
+
+        <div class="csv-viewer-title">
+
+          <h4>
+            Decoded Frames CSV
+          </h4>
+
+          <span>
+            Read-only decoded CSV table
+          </span>
+
+        </div>
+
+        <div class="csv-viewer-actions">
+
+          <div class="csv-find-box">
+
+            <input
+              type="text"
+              class="csv-search-input"
+              placeholder="Filter rows"
+              [(ngModel)]="csvSearchText"
+              (input)="applyCsvSearch()">
+
+            <button
+              type="button"
+              class="csv-search-button csv-search-button-close"
+              title="Clear search"
+              [disabled]="!csvSearchText"
+              (click)="clearCsvSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
+          <button
+            type="button"
+            class="csv-action-button csv-action-button-primary"
+            [disabled]="filteredRows.length === 0"
+            (click)="copyCsvToClipboard()">
+
+            Copy CSV
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="csv-loading"
+        *ngIf="isLoadingCsv">
+
+        Decoding BIN file as CSV...
+
+      </div>
+
+      <div
+        class="csv-error"
+        *ngIf="
+          !isLoadingCsv &&
+          csvErrorMessage
+        ">
+
+        {{ csvErrorMessage }}
+
+      </div>
+
+      <div
+        class="csv-empty-state"
+        *ngIf="
+          !isLoadingCsv &&
+          !csvErrorMessage &&
+          rows.length === 0
+        ">
+
+        No CSV content available.
+
+      </div>
+
+      <div
+        class="csv-table-shell"
+        *ngIf="
+          !isLoadingCsv &&
+          !csvErrorMessage &&
+          rows.length > 0
+        ">
+
+        <table class="csv-table">
+
+          <thead>
+
+            <tr>
+
+              <th
+                *ngFor="let column of columns"
+                (click)="sortBy(column.key)">
+
+                <span>
+                  {{ column.label }}
+                </span>
+
+                <strong>
+                  {{ getSortIndicator(column.key) }}
+                </strong>
+
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            <tr
+              *ngFor="let row of filteredRows">
+
+              <td>
+                {{ row.timestamp }}
+              </td>
+
+              <td>
+                {{ row.canId }}
+              </td>
+
+              <td>
+                {{ row.name }}
+              </td>
+
+              <td>
+                {{ row.dlc }}
+              </td>
+
+              <td class="csv-data-cell">
+                {{ row.data }}
+              </td>
+
+              <td>
+                {{ row.signal }}
+              </td>
+
+              <td>
+                {{ row.value }}
+              </td>
+
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <aside class="csv-summary-sidebar">
+
+    <div
+      class="csv-summary-box"
+      *ngFor="let item of csvViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>

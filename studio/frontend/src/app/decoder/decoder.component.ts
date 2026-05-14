@@ -23,6 +23,7 @@ import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/d
 import { MatDividerModule } from '@angular/material/divider';
 
 import { JsonViewerComponent } from './viewers/json-viewer/json-viewer.component';
+import { CsvViewerComponent } from './viewers/csv-viewer/csv-viewer.component';
 
 export interface S3TreeNode {
   name: string;
@@ -52,7 +53,8 @@ interface RuntimeConfig {
     TracksterBinViewerComponent,
     DecodedSignalsViewerComponent,
     MatDividerModule,
-    JsonViewerComponent
+    JsonViewerComponent,
+    CsvViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'
