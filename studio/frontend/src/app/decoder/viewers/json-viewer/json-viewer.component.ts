@@ -2,7 +2,8 @@ import {
   Component,
   Input,
   OnChanges,
-  SimpleChanges
+  SimpleChanges,
+  OnDestroy
 } from '@angular/core';
 
 import { CommonModule } from '@angular/common';
@@ -42,6 +43,11 @@ interface RuntimeConfig {
   clientId?: string;
 }
 
+interface MonacoEditorInitializedEvent {
+  editor?: monaco.editor.IStandaloneCodeEditor;
+  monaco?: typeof monaco;
+}
+
 @Component({
   selector: 'app-json-viewer',
   standalone: true,
@@ -60,7 +66,7 @@ interface RuntimeConfig {
   styleUrl: './json-viewer.component.css'
 })
 export class JsonViewerComponent
-implements OnChanges {
+implements OnChanges, OnDestroy {
 
   @Input()
   selectedNode!: S3TreeNode;
@@ -78,6 +84,21 @@ implements OnChanges {
   prettyJsonText = '';
 
   readonly maxRenderedBlocks = 50;
+
+  searchMatchCount = 0;
+
+  private currentSearchIndex = -1;
+
+  private lastSearchText = '';
+
+  private editor?:
+    monaco.editor.IStandaloneCodeEditor;
+
+  private searchDecorations?:
+    monaco.editor.IEditorDecorationsCollection;
+
+  private searchTimer:
+    ReturnType<typeof setTimeout> | null = null;
 
   editorOptions:
     monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -155,6 +176,28 @@ implements OnChanges {
     }>
   };
 
+  get searchMatchLabel(): string {
+
+    if (!this.jsonSearchText.trim()) {
+      return '0 / 0';
+    }
+
+    if (this.searchMatchCount === 0) {
+      return '0 / 0';
+    }
+
+    return `${this.currentSearchIndex + 1} / ${this.searchMatchCount}`;
+  }
+
+  ngOnDestroy(): void {
+
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+    }
+
+    this.searchDecorations?.clear();
+  }
+
   async ngOnChanges(
     changes: SimpleChanges
   ): Promise<void> {
@@ -167,6 +210,33 @@ implements OnChanges {
         this.selectedNode
       );
     }
+  }
+
+  onEditorInitialized(
+    event: unknown
+  ): void {
+
+    const payload =
+      event as MonacoEditorInitializedEvent;
+
+    const editor =
+      payload.editor;
+
+    if (!editor) {
+      return;
+    }
+
+    this.editor = editor;
+
+    this.searchDecorations =
+      editor.createDecorationsCollection();
+
+    this.syncEditorValue();
+
+    setTimeout(() => {
+      this.editor?.layout();
+      this.applyEditorSearch(true);
+    }, 0);
   }
 
   get displayJsonText(): string {
@@ -186,6 +256,15 @@ implements OnChanges {
   ): void {
 
     this.jsonViewMode = mode;
+
+    this.currentSearchIndex = -1;
+    this.lastSearchText = '';
+
+    setTimeout(() => {
+      this.syncEditorValue();
+      this.editor?.layout();
+      this.applyEditorSearch(true);
+    }, 0);
   }
 
   async copyFullJsonToClipboard():
@@ -196,21 +275,191 @@ implements OnChanges {
     );
   }
 
-  applyEditorSearch(): void {
+  applyEditorSearch(
+    resetIndex = false
+  ): void {
 
-    if (!this.jsonSearchText?.trim()) {
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+    }
+
+    this.searchTimer =
+      setTimeout(() => {
+        this.executeEditorSearch(
+          resetIndex
+        );
+      }, 40);
+  }
+
+  searchNextOccurrence(): void {
+
+    this.executeEditorSearch(false);
+  }
+
+  searchPreviousOccurrence(): void {
+
+    this.executeEditorSearch(false, true);
+  }
+
+  clearEditorSearch(): void {
+
+    this.jsonSearchText = '';
+
+    this.currentSearchIndex = -1;
+
+    this.lastSearchText = '';
+
+    this.searchMatchCount = 0;
+
+    this.searchDecorations?.clear();
+  }
+
+  private syncEditorValue(): void {
+
+    if (!this.editor) {
       return;
     }
 
+    const model =
+      this.editor.getModel();
+
+    if (!model) {
+      return;
+    }
+
+    const currentValue =
+      model.getValue();
+
+    const expectedValue =
+      this.displayJsonText;
+
+    if (currentValue !== expectedValue) {
+      model.setValue(expectedValue);
+    }
+  }
+
+  private executeEditorSearch(
+    resetIndex = false,
+    reverse = false
+  ): void {
+
     const editor =
-      monaco.editor.getEditors()[0];
+      this.editor;
 
     if (!editor) {
       return;
     }
 
-    editor.getAction('actions.find')
-      ?.run();
+    this.syncEditorValue();
+
+    const model =
+      editor.getModel();
+
+    if (!model) {
+      return;
+    }
+
+    const searchText =
+      this.jsonSearchText.trim();
+
+    if (!searchText) {
+
+      this.currentSearchIndex = -1;
+
+      this.lastSearchText = '';
+
+      this.searchMatchCount = 0;
+
+      this.searchDecorations?.clear();
+
+      return;
+    }
+
+    const matches =
+      model.findMatches(
+        searchText,
+        true,
+        false,
+        false,
+        null,
+        false,
+        5000
+      );
+
+    this.searchMatchCount =
+      matches.length;
+
+    if (!matches.length) {
+
+      this.currentSearchIndex = -1;
+
+      this.searchDecorations?.clear();
+
+      return;
+    }
+
+    const isSameSearch =
+      searchText === this.lastSearchText;
+
+    if (
+      resetIndex ||
+      !isSameSearch ||
+      this.currentSearchIndex < 0
+    ) {
+
+      this.currentSearchIndex = 0;
+
+    } else if (reverse) {
+
+      this.currentSearchIndex =
+        (
+          this.currentSearchIndex - 1 +
+          matches.length
+        ) % matches.length;
+
+    } else {
+
+      this.currentSearchIndex =
+        (
+          this.currentSearchIndex + 1
+        ) % matches.length;
+    }
+
+    this.lastSearchText =
+      searchText;
+
+    if (!this.searchDecorations) {
+
+      this.searchDecorations =
+        editor.createDecorationsCollection();
+    }
+
+    this.searchDecorations.set(
+      matches.map((match, index) => ({
+        range: match.range,
+        options: {
+          inlineClassName:
+            index ===
+            this.currentSearchIndex
+              ? 'json-search-inline-current'
+              : 'json-search-inline'
+        }
+      }))
+    );
+
+    const selectedMatch =
+      matches[
+        this.currentSearchIndex
+      ].range;
+
+    editor.setSelection(
+      selectedMatch
+    );
+
+    editor.revealRangeInCenter(
+      selectedMatch,
+      monaco.editor.ScrollType.Immediate
+    );
   }
 
   private async loadBinAsJson(
@@ -228,6 +477,14 @@ implements OnChanges {
     this.jsonViewer = {
       summary: []
     };
+
+    this.currentSearchIndex = -1;
+
+    this.lastSearchText = '';
+
+    this.searchMatchCount = 0;
+
+    this.searchDecorations?.clear();
 
     try {
 
@@ -317,6 +574,12 @@ implements OnChanges {
     } finally {
 
       this.isLoadingJson = false;
+
+      setTimeout(() => {
+        this.syncEditorValue();
+        this.editor?.layout();
+        this.applyEditorSearch(true);
+      }, 0);
     }
   }
 

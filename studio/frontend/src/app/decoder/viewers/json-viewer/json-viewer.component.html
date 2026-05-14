@@ -19,12 +19,57 @@
         </div>
 
         <div class="json-viewer-actions">
-          <input
-            type="text"
-            class="json-search-input"
-            placeholder="Search JSON..."
-            [(ngModel)]="jsonSearchText"
-            (input)="applyEditorSearch()">
+
+          <div class="json-find-box">
+
+            <input
+              type="text"
+              class="json-search-input"
+              placeholder="Find"
+              [(ngModel)]="jsonSearchText"
+              (input)="applyEditorSearch(true)"
+              (keydown.enter)="searchNextOccurrence()"
+              (keydown.shift.enter)="searchPreviousOccurrence()">
+
+            <span class="json-search-count">
+              {{ searchMatchLabel }}
+            </span>
+
+            <button
+              type="button"
+              class="json-search-button"
+              title="Previous match"
+              [disabled]="searchMatchCount === 0"
+              (click)="searchPreviousOccurrence()">
+
+              ‹
+
+            </button>
+
+            <button
+              type="button"
+              class="json-search-button"
+              title="Next match"
+              [disabled]="searchMatchCount === 0"
+              (click)="searchNextOccurrence()">
+
+              ›
+
+            </button>
+
+            <button
+              type="button"
+              class="json-search-button json-search-button-close"
+              title="Clear search"
+              [disabled]="!jsonSearchText"
+              (click)="clearEditorSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
           <button
             type="button"
             class="json-action-button"
@@ -89,18 +134,7 @@
 
       </div>
 
-      <!-- <ngx-monaco-editor
-        *ngIf="
-          !isLoadingJson &&
-          !jsonErrorMessage &&
-          displayJsonText
-        "
-        class="json-monaco-editor"
-        [options]="editorOptions"
-        [ngModel]="displayJsonText">
-      </ngx-monaco-editor> -->
-
-      <div class="json-monaco-test-shell">
+      <div class="json-monaco-container-shell">
 
         <ngx-monaco-editor
           *ngIf="
@@ -110,13 +144,11 @@
           "
           class="json-monaco-editor"
           [options]="editorOptions"
-          [ngModel]="displayJsonText">
+          [ngModel]="displayJsonText"
+          (editorInitialized)="onEditorInitialized($event)">
         </ngx-monaco-editor>
 
       </div>
-
-
-
 
     </div>
 
