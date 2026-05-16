@@ -24,6 +24,8 @@ import { MatDividerModule } from '@angular/material/divider';
 
 import { JsonViewerComponent } from './viewers/json-viewer/json-viewer.component';
 import { CsvViewerComponent } from './viewers/csv-viewer/csv-viewer.component';
+import { HexDumpViewerComponent } from './viewers/hex-dump-viewer/hex-dump-viewer.component';
+import { VectorAscViewerComponent } from './viewers/vector-asc-viewer/vector-asc-viewer.component';
 
 export interface S3TreeNode {
   name: string;
@@ -54,7 +56,9 @@ interface RuntimeConfig {
     DecodedSignalsViewerComponent,
     MatDividerModule,
     JsonViewerComponent,
-    CsvViewerComponent
+    CsvViewerComponent,
+    HexDumpViewerComponent,
+    VectorAscViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'
@@ -188,11 +192,6 @@ export class DecoderComponent implements OnInit {
 
     this.selectedBinKeys = this.selectedBinKeys
       .filter(key => !folderKeys.has(key));
-  }
-
-  toggleDecoderFilter(): void {
-    this.isDecoderFilterOpen =
-      !this.isDecoderFilterOpen;
   }
 
   private getBinKeysFromFolder(

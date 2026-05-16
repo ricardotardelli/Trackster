@@ -223,24 +223,12 @@
 
                   <button
                     type="button"
-                    class="decoder-filter-button"
-                    [class.decoder-filter-button-active]="isDecoderFilterOpen"
-                    (click)="toggleDecoderFilter()">
-
-                    <mat-icon>
-                      filter_list
-                    </mat-icon>
-
-                    <span>
-                      Filter
-                    </span>
-
-                  </button>
-
-                  <button
-                    type="button"
                     class="decoder-export-button"
                     [matMenuTriggerFor]="decoderExportMenu">
+
+                    <mat-icon>
+                      download
+                    </mat-icon>
 
                     <span>
                       Export
@@ -277,9 +265,16 @@
               <app-decodedsignals-viewer *ngIf=" selectedViewerMode === 'decoded-signals' && selectedBinNode"  [selectedNode]="selectedBinNode"></app-decodedsignals-viewer>
               <app-json-viewer *ngIf="selectedViewerMode === 'json' && selectedBinNode" [selectedNode]="selectedBinNode"></app-json-viewer>
               <app-csv-viewer *ngIf="selectedViewerMode === 'csv' && selectedBinNode" [selectedNode]="selectedBinNode"></app-csv-viewer>
+              <app-hex-dump-viewer *ngIf="selectedViewerMode === 'hex-dump' && selectedBinNode" [selectedNode]="selectedBinNode"></app-hex-dump-viewer>
+              <app-vector-asc-viewer *ngIf="selectedViewerMode === 'vector-asc' && selectedBinNode" [selectedNode]="selectedBinNode"></app-vector-asc-viewer>
 
               <div class="decoder-placeholder-view" 
-                *ngIf="selectedViewerMode !== 'trackster-bin' && selectedViewerMode !== 'decoded-signals' && selectedViewerMode !== 'json' && selectedViewerMode !== 'csv'">
+                *ngIf="selectedViewerMode !== 'trackster-bin' && 
+                        selectedViewerMode !== 'decoded-signals' && 
+                        selectedViewerMode !== 'json' && 
+                        selectedViewerMode !== 'csv' &&
+                        selectedViewerMode !== 'hex-dump' &&
+                        selectedViewerMode !== 'vector-asc'">
                 <strong>
                   {{ selectedViewerMode }}
                 </strong>

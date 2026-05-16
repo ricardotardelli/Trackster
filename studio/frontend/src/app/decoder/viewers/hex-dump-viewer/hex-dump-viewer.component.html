@@ -1,0 +1,233 @@
+<div class="hex-dump-viewer-layout">
+
+  <div class="hex-dump-viewer-main">
+
+    <div class="hex-dump-viewer-panel">
+
+      <div class="hex-dump-viewer-header">
+
+        <div class="hex-dump-viewer-title">
+
+          <h4>
+            HEX Dump
+          </h4>
+
+        </div>
+
+        <div class="hex-dump-viewer-actions">
+
+          <div class="hex-dump-offset-box">
+
+            <input
+              type="text"
+              class="hex-dump-offset-input"
+              placeholder="Go to offset"
+              [(ngModel)]="offsetInputText"
+              (keyup.enter)="goToOffset()">
+
+          </div>
+
+          <button
+            type="button"
+            class="hex-dump-action-button hex-dump-action-button-primary"
+            [disabled]="rows.length === 0"
+            (click)="goToOffset()">
+
+            <mat-icon>
+              my_location
+            </mat-icon>
+
+            Go
+
+          </button>
+
+          <div class="hex-dump-find-box">
+
+            <input
+              type="text"
+              class="hex-dump-search-input"
+              placeholder="Filter page"
+              [(ngModel)]="hexSearchText"
+              (input)="applyHexSearch()">
+
+            <button
+              type="button"
+              class="hex-dump-search-button hex-dump-search-button-close"
+              title="Clear search"
+              [disabled]="!hexSearchText"
+              (click)="clearHexSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
+          <button
+            type="button"
+            class="hex-dump-action-button hex-dump-action-button-primary"
+            [disabled]="currentPageIndex === 0"
+            (click)="previousPage()">
+
+            <mat-icon>
+              chevron_left
+            </mat-icon>
+
+            Previous
+
+          </button>
+
+          <button
+            type="button"
+            class="hex-dump-action-button hex-dump-action-button-primary"
+            [disabled]="currentPageIndex >= totalPages - 1"
+            (click)="nextPage()">
+
+            Next
+
+            <mat-icon>
+              chevron_right
+            </mat-icon>
+
+          </button>
+
+          <button
+            type="button"
+            class="hex-dump-action-button hex-dump-action-button-primary hex-dump-action-button-copy"
+            [disabled]="filteredRows.length === 0"
+            (click)="copyHexDumpPageToClipboard()">
+
+            <mat-icon>
+              content_copy
+            </mat-icon>
+
+            Copy Page
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="hex-dump-page-strip"
+        *ngIf="
+          !isLoadingHexDump &&
+          !hexDumpErrorMessage &&
+          rows.length > 0
+        ">
+
+        Page {{ currentPageIndex + 1 }} of {{ totalPages }}
+        · Offset {{ currentPageStartOffsetLabel }} to {{ currentPageEndOffsetLabel }}
+
+      </div>
+
+      <div
+        class="hex-dump-loading"
+        *ngIf="isLoadingHexDump">
+
+        Loading BIN file as HEX dump...
+
+      </div>
+
+      <div
+        class="hex-dump-error"
+        *ngIf="
+          !isLoadingHexDump &&
+          hexDumpErrorMessage
+        ">
+
+        {{ hexDumpErrorMessage }}
+
+      </div>
+
+      <div
+        class="hex-dump-empty-state"
+        *ngIf="
+          !isLoadingHexDump &&
+          !hexDumpErrorMessage &&
+          rows.length === 0
+        ">
+
+        No HEX dump content available.
+
+      </div>
+
+      <div
+        class="hex-dump-table-shell"
+        *ngIf="
+          !isLoadingHexDump &&
+          !hexDumpErrorMessage &&
+          rows.length > 0
+        ">
+
+        <table class="hex-dump-table">
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Offset
+              </th>
+
+              <th>
+                HEX Bytes
+              </th>
+
+              <th>
+                ASCII
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            <tr
+              *ngFor="let row of filteredRows">
+
+              <td class="hex-dump-offset-cell">
+                {{ row.offset }}
+              </td>
+
+              <td class="hex-dump-hex-cell">
+                {{ row.hex }}
+              </td>
+
+              <td class="hex-dump-ascii-cell">
+                {{ row.ascii }}
+              </td>
+
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <aside class="hex-dump-summary-sidebar">
+
+    <div
+      class="hex-dump-summary-box"
+      *ngFor="let item of hexDumpViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>

@@ -1,0 +1,329 @@
+<div class="vector-asc-viewer-layout">
+
+  <div class="vector-asc-viewer-main">
+
+    <div class="vector-asc-viewer-panel">
+
+      <div class="vector-asc-viewer-header">
+
+        <div class="vector-asc-viewer-title">
+
+          <h4>
+            Vector ASC
+          </h4>
+
+        </div>
+
+        <div class="vector-asc-viewer-actions">
+
+          <div class="vector-asc-mode-toggle">
+
+            <button
+              type="button"
+              class="vector-asc-mode-button"
+              [class.vector-asc-mode-button-active]="viewerMode === 'table'"
+              (click)="setViewerMode('table')">
+
+              Table
+
+            </button>
+
+            <button
+              type="button"
+              class="vector-asc-mode-button"
+              [class.vector-asc-mode-button-active]="viewerMode === 'raw'"
+              (click)="setViewerMode('raw')">
+
+              Raw ASC
+
+            </button>
+
+          </div>
+
+          <div class="vector-asc-find-box">
+
+            <input
+              type="text"
+              class="vector-asc-search-input"
+              placeholder="Filter page"
+              [(ngModel)]="searchText"
+              (input)="applySearch()">
+
+            <button
+              type="button"
+              class="vector-asc-search-button vector-asc-search-button-close"
+              title="Clear search"
+              [disabled]="!searchText"
+              (click)="clearSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
+          <button
+            type="button"
+            class="vector-asc-action-button vector-asc-action-button-primary"
+            [disabled]="filteredRows.length === 0"
+            (click)="copyCurrentPageToClipboard()">
+
+            <mat-icon>
+              content_copy
+            </mat-icon>
+
+            Copy Page
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="vector-asc-page-strip"
+        *ngIf="
+          !isLoadingAsc &&
+          !ascErrorMessage &&
+          allRows.length > 0
+        ">
+
+        <div class="vector-asc-page-info">
+
+          Page {{ currentPageIndex + 1 }} of {{ totalPages }}
+          · Rows {{ currentPageStartRow }} to {{ currentPageEndRow }}
+
+        </div>
+
+        <div class="vector-asc-page-controls">
+
+          <button
+            type="button"
+            class="vector-asc-action-button vector-asc-action-button-primary"
+            [disabled]="currentPageIndex === 0"
+            (click)="previousPage()">
+
+            <mat-icon>
+              chevron_left
+            </mat-icon>
+
+            Previous
+
+          </button>
+
+          <div class="vector-asc-page-jump-box">
+
+            <input
+              type="number"
+              class="vector-asc-page-input"
+              placeholder="Page"
+              min="1"
+              [max]="totalPages"
+              [(ngModel)]="pageInputText"
+              (keyup.enter)="goToPage()">
+
+          </div>
+
+          <button
+            type="button"
+            class="vector-asc-action-button vector-asc-action-button-primary"
+            [disabled]="totalPages <= 0"
+            (click)="goToPage()">
+
+            <mat-icon>
+              my_location
+            </mat-icon>
+
+            Go
+
+          </button>
+
+          <button
+            type="button"
+            class="vector-asc-action-button vector-asc-action-button-primary"
+            [disabled]="currentPageIndex >= totalPages - 1"
+            (click)="nextPage()">
+
+            Next
+
+            <mat-icon>
+              chevron_right
+            </mat-icon>
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="vector-asc-loading"
+        *ngIf="isLoadingAsc">
+
+        Generating Vector ASC from BIN...
+
+      </div>
+
+      <div
+        class="vector-asc-error"
+        *ngIf="
+          !isLoadingAsc &&
+          ascErrorMessage
+        ">
+
+        {{ ascErrorMessage }}
+
+      </div>
+
+      <div
+        class="vector-asc-empty-state"
+        *ngIf="
+          !isLoadingAsc &&
+          !ascErrorMessage &&
+          allRows.length === 0
+        ">
+
+        No ASC content available.
+
+      </div>
+
+      <div
+        class="vector-asc-table-shell"
+        *ngIf="
+          !isLoadingAsc &&
+          !ascErrorMessage &&
+          allRows.length > 0 &&
+          viewerMode === 'table'
+        ">
+
+        <table class="vector-asc-table">
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Time
+              </th>
+
+              <th>
+                Ch
+              </th>
+
+              <th>
+                CAN ID
+              </th>
+
+              <th>
+                Dir
+              </th>
+
+              <th>
+                Type
+              </th>
+
+              <th>
+                DLC
+              </th>
+
+              <th>
+                Len
+              </th>
+
+              <th>
+                Data
+              </th>
+
+              <th>
+                Message
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            <tr
+              *ngFor="let row of filteredRows">
+
+              <td>
+                {{ row.timestamp }}
+              </td>
+
+              <td>
+                {{ row.channel }}
+              </td>
+
+              <td class="vector-asc-mono-cell">
+                {{ row.canId }}
+              </td>
+
+              <td>
+                {{ row.direction }}
+              </td>
+
+              <td>
+                {{ row.frameType }}
+              </td>
+
+              <td>
+                {{ row.dlc }}
+              </td>
+
+              <td>
+                {{ row.dataLength }}
+              </td>
+
+              <td class="vector-asc-data-cell">
+                {{ row.data }}
+              </td>
+
+              <td>
+                {{ row.name }}
+              </td>
+
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      <div
+        class="vector-asc-raw-shell"
+        *ngIf="
+          !isLoadingAsc &&
+          !ascErrorMessage &&
+          allRows.length > 0 &&
+          viewerMode === 'raw'
+        ">
+
+        <pre>{{ buildRawPageText(filteredRows) }}</pre>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <aside class="vector-asc-summary-sidebar">
+
+    <div
+      class="vector-asc-summary-box"
+      *ngFor="let item of ascViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>
