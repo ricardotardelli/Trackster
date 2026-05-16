@@ -26,6 +26,7 @@ import { JsonViewerComponent } from './viewers/json-viewer/json-viewer.component
 import { CsvViewerComponent } from './viewers/csv-viewer/csv-viewer.component';
 import { HexDumpViewerComponent } from './viewers/hex-dump-viewer/hex-dump-viewer.component';
 import { VectorAscViewerComponent } from './viewers/vector-asc-viewer/vector-asc-viewer.component';
+import { CandumpViewerComponent } from './viewers/candump-viewer/candump-viewer.component';
 
 export interface S3TreeNode {
   name: string;
@@ -58,7 +59,8 @@ interface RuntimeConfig {
     JsonViewerComponent,
     CsvViewerComponent,
     HexDumpViewerComponent,
-    VectorAscViewerComponent
+    VectorAscViewerComponent,
+    CandumpViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'

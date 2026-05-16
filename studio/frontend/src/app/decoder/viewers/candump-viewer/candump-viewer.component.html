@@ -1,0 +1,185 @@
+<div class="candump-viewer-layout">
+
+  <div class="candump-viewer-main">
+
+    <div class="candump-viewer-panel">
+
+      <div class="candump-viewer-header">
+
+        <div class="candump-viewer-title">
+
+          <div>
+
+            <h4>
+              CANdump
+            </h4>
+
+            <span>
+              Read-only CAN frame dump
+            </span>
+
+          </div>
+
+        </div>
+
+        <div class="candump-viewer-actions">
+
+          <div class="candump-find-box">
+
+            <input
+              type="text"
+              class="candump-search-input"
+              placeholder="Filter rows"
+              [(ngModel)]="candumpSearchText"
+              (input)="applyCandumpSearch()">
+
+            <button
+              type="button"
+              class="candump-search-button candump-search-button-close"
+              title="Clear search"
+              [disabled]="!candumpSearchText"
+              (click)="clearCandumpSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
+          <button
+            type="button"
+            class="candump-action-button candump-action-button-primary"
+            [disabled]="filteredRows.length === 0"
+            (click)="copyCandumpToClipboard()">
+
+            <mat-icon>
+              content_copy
+            </mat-icon>
+
+            Copy CANdump
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="candump-loading"
+        *ngIf="isLoadingCandump">
+
+        Decoding BIN file as CANdump...
+
+      </div>
+
+      <div
+        class="candump-error"
+        *ngIf="
+          !isLoadingCandump &&
+          candumpErrorMessage
+        ">
+
+        {{ candumpErrorMessage }}
+
+      </div>
+
+      <div
+        class="candump-empty-state"
+        *ngIf="
+          !isLoadingCandump &&
+          !candumpErrorMessage &&
+          rows.length === 0
+        ">
+
+        No CANdump content available.
+
+      </div>
+
+      <div
+        class="candump-table-shell"
+        *ngIf="
+          !isLoadingCandump &&
+          !candumpErrorMessage &&
+          rows.length > 0
+        ">
+
+        <table class="candump-table">
+
+          <thead>
+
+            <tr>
+
+              <th
+                *ngFor="let column of columns"
+                (click)="sortBy(column.key)">
+
+                <span>
+                  {{ column.label }}
+                </span>
+
+                <strong>
+                  {{ getSortIndicator(column.key) }}
+                </strong>
+
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            <tr
+              *ngFor="let row of filteredRows">
+
+              <td>
+                {{ row.timestamp }}
+              </td>
+
+              <td>
+                {{ row.canId }}
+              </td>
+
+              <td>
+                {{ row.dlc }}
+              </td>
+
+              <td class="candump-data-cell">
+                {{ row.data }}
+              </td>
+
+              <td class="candump-line-cell">
+                {{ row.line }}
+              </td>
+
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <aside class="candump-summary-sidebar">
+
+    <div
+      class="candump-summary-box"
+      *ngFor="let item of candumpViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>
