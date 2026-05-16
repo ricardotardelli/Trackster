@@ -76,33 +76,30 @@
           </div>
         </div>
       </div>
-
       <div class="workspace-shell">
-        <mat-tab-group class="trackster-tabs" 
-            [selectedIndex]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)" 
-            animationDuration="0ms" mat-stretch-tabs="false" mat-align-tabs="start" >
+        <mat-tab-group
+          class="trackster-tabs"
+          [selectedIndex]="selectedTabIndex"
+          (selectedIndexChange)="onTabChange($event)"
+          animationDuration="0ms"
+          mat-stretch-tabs="false"
+          mat-align-tabs="start">
+
           <mat-tab label="Simulation Generator">
-            <!-- Simulator -->
-            <ng-template matTabContent>
-              <app-simulator></app-simulator>
-            </ng-template>
-          </mat-tab>
-          <!-- DBC Workspace -->
-          <mat-tab label="DBC Workspace">
-            <ng-template matTabContent>
-              <app-dbcworkspace></app-dbcworkspace>
-            </ng-template>
+            <app-simulator></app-simulator>
           </mat-tab>
 
-          <!-- DECODER -->
+          <mat-tab label="DBC Workspace">
+            <app-dbcworkspace></app-dbcworkspace>
+          </mat-tab>
+
           <mat-tab label="Decoder / Exporter">
-            <ng-template matTabContent>
-              <app-decoder></app-decoder >
-            </ng-template>
+            <app-decoder></app-decoder>
           </mat-tab>
 
         </mat-tab-group>
       </div>
+      
     </section>
   </main>
 </div>
