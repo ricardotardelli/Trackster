@@ -9,11 +9,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import {
-  DefaultMonacoLoader,
-  NGX_MONACO_LOADER_PROVIDER,
-  NgxMonacoEditorComponent
-} from '@jean-merelis/ngx-monaco-editor';
+import { NgxMonacoEditorComponent } from '@jean-merelis/ngx-monaco-editor';
 
 import * as monaco from 'monaco-editor';
 
@@ -29,12 +25,6 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { parseTracksterBin } from '../../parser/decoder.bin.parser';
 
 import { S3TreeNode } from '../../decoder.component';
-
-const monacoLoader = new DefaultMonacoLoader({
-  paths: {
-    vs: '/vs'
-  }
-});
 
 interface RuntimeConfig {
   s3Default?: string;
@@ -55,12 +45,6 @@ interface MonacoEditorInitializedEvent {
     CommonModule,
     FormsModule,
     NgxMonacoEditorComponent
-  ],
-  providers: [
-    {
-      provide: NGX_MONACO_LOADER_PROVIDER,
-      useValue: monacoLoader
-    }
   ],
   templateUrl: './json-viewer.component.html',
   styleUrl: './json-viewer.component.css'
