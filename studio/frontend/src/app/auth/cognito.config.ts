@@ -5,5 +5,5 @@ export const cognitoConfig = {
   domain: 'us-east-1rzmuaolzz.auth.us-east-1.amazoncognito.com',
   redirectSignIn: 'https://studio.trackster.pt',
   redirectSignOut: 'https://studio.trackster.pt',
-  scopes: ['openid', 'email']
+  scopes: ['openid', 'email', 'profile']
 };
