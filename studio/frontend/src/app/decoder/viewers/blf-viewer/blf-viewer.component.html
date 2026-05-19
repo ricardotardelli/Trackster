@@ -1,0 +1,362 @@
+<div class="blf-viewer-shell">
+
+  <div
+    class="blf-loading-card"
+    *ngIf="isLoading">
+
+    Loading BLF file...
+  </div>
+
+  <div
+    class="blf-error-card"
+    *ngIf="!isLoading && loadError">
+
+    {{ loadError }}
+
+  </div>
+
+  <ng-container *ngIf="!isLoading && !loadError">
+
+    <div class="blf-summary-grid">
+
+      <div
+        class="blf-summary-box"
+        *ngFor="let item of blfViewer.summary">
+
+        <span>
+          {{ item.label }}
+        </span>
+
+        <strong>
+          {{ item.value }}
+        </strong>
+
+      </div>
+    </div>
+
+    <div class="blf-structure-panel">
+
+      <div class="blf-structure-header">
+
+        <div>
+
+          <h4>
+            BLF Structure
+          </h4>
+
+          <span>
+            Parsed Vector BLF header, objects, and CAN message records.
+          </span>
+
+        </div>
+
+        <button
+          type="button"
+          class="blf-copy-icon-button"
+          title="Copy BLF header"
+          (click)="copyHeaderToClipboard()">
+
+          <mat-icon>
+            content_copy
+          </mat-icon>
+
+        </button>
+
+      </div>
+
+      <div class="blf-structure-scroll">
+
+        <div class="blf-hierarchy-card">
+
+          <div class="blf-hierarchy-card-header">
+
+            <div>
+
+              <span class="blf-card-kicker">
+                Header
+              </span>
+
+              <strong>
+                {{ blfViewer.fileName }}
+              </strong>
+
+            </div>
+
+          </div>
+
+          <div class="blf-hierarchy-grid">
+
+            <div
+              *ngFor="let field of blfViewer.headerFields">
+
+              <span>
+                {{ field.label }}
+              </span>
+
+              <strong>
+                {{ field.value }}
+              </strong>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="blf-hierarchy-card">
+
+          <div class="blf-hierarchy-card-header">
+
+            <div>
+
+              <span class="blf-card-kicker">
+                Messages
+              </span>
+
+              <strong>
+                CAN / CAN FD Records
+              </strong>
+
+            </div>
+
+            <button
+              type="button"
+              class="blf-copy-icon-button"
+              title="Copy visible messages"
+              (click)="copyVisibleMessagesToClipboard()">
+
+              <mat-icon>
+                content_copy
+              </mat-icon>
+
+            </button>
+
+          </div>
+
+          <div class="blf-message-toolbar">
+
+            <div class="blf-message-pagination-info">
+
+              <strong>
+                Messages
+              </strong>
+
+              <span>
+                {{
+                  getMessagePageStart()
+                }}-{{
+                  getMessagePageEnd()
+                }}
+                of
+                {{
+                  getTotalMessageCount()
+                }}
+              </span>
+
+            </div>
+
+            <div class="blf-filter-box">
+
+              <mat-icon>
+                search
+              </mat-icon>
+
+              <input
+                type="text"
+                placeholder="Filter messages"
+                [(ngModel)]="filterText">
+
+            </div>
+
+            <div class="blf-message-pagination-actions">
+
+              <button
+                type="button"
+                class="blf-pagination-button"
+                [disabled]="isFirstMessagePage()"
+                (click)="loadPreviousMessagePage()">
+
+                <mat-icon>
+                  chevron_left
+                </mat-icon>
+
+                <span>
+                  Previous
+                </span>
+
+              </button>
+
+              <div class="blf-page-jump">
+
+                <span>
+                  Page
+                </span>
+
+                <input
+                  type="number"
+                  min="1"
+                  [max]="getTotalMessagePages()"
+                  [(ngModel)]="messagePageInput"
+                  (keyup.enter)="goToMessagePageFromInput()"
+                  (blur)="goToMessagePageFromInput()">
+
+                <span>
+                  of
+                  {{
+                    getTotalMessagePages()
+                  }}
+                </span>
+
+              </div>
+
+              <button
+                type="button"
+                class="blf-pagination-button"
+                [disabled]="isLastMessagePage()"
+                (click)="loadNextMessagePage()">
+
+                <span>
+                  Next
+                </span>
+
+                <mat-icon>
+                  chevron_right
+                </mat-icon>
+
+              </button>
+
+            </div>
+          </div>
+
+          <div class="blf-message-table">
+
+            <div class="blf-message-table-header">
+
+              <span>
+                Time
+              </span>
+
+              <span>
+                Type
+              </span>
+
+              <span>
+                Ch
+              </span>
+
+              <span>
+                CAN ID
+              </span>
+
+              <span>
+                DLC
+              </span>
+
+              <span>
+                Payload
+              </span>
+
+              <span>
+                Flags
+              </span>
+
+            </div>
+
+            <div
+              class="blf-message-row"
+              *ngFor="let message of blfViewer.messages"
+              [hidden]="!matchesFilter(message.searchText)">
+
+              <span>
+                {{ message.timestamp }}
+              </span>
+
+              <span>
+                {{ message.objectType }}
+              </span>
+
+              <span>
+                {{ message.channel }}
+              </span>
+
+              <span>
+                {{ message.canId }}
+              </span>
+
+              <span>
+                {{ message.dlc }}
+              </span>
+
+              <code>
+                {{ message.payload }}
+              </code>
+
+              <span>
+                {{ message.flags }}
+              </span>
+
+            </div>
+
+            <div
+              class="blf-empty-card"
+              *ngIf="blfViewer.messages.length === 0">
+
+              No CAN messages parsed from this BLF file.
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="blf-hierarchy-card">
+
+          <div class="blf-hierarchy-card-header">
+
+            <div>
+
+              <span class="blf-card-kicker">
+                Objects
+              </span>
+
+              <strong>
+                Parsed object inventory
+              </strong>
+
+            </div>
+
+          </div>
+
+          <div class="blf-object-list">
+
+            <div
+              class="blf-object-row"
+              *ngFor="let object of blfViewer.objects.slice(0, 80)">
+
+              <span>
+                #{{ object.index }}
+              </span>
+
+              <strong>
+                {{ object.type }}
+              </strong>
+
+              <span>
+                offset {{ object.offset }}
+              </span>
+
+              <span>
+                {{ object.size }} bytes
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </ng-container>
+
+</div>
