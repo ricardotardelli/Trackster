@@ -399,7 +399,9 @@ export class BlfViewerComponent implements OnChanges {
             inputBucketName,
             outputBucketName,
             clientId,
-            inputKey: node.key
+            inputKeys: [
+              node.key
+            ]
           })
         }
       );
