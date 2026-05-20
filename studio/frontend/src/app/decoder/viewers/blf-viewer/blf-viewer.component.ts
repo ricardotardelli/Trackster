@@ -299,33 +299,16 @@ export class BlfViewerComponent implements OnChanges {
 
     try {
 
-      let buffer: ArrayBuffer;
-
-      try {
-
-        buffer =
-          await this.loadBlfBuffer(
-            this.selectedNode
-          );
-
-      } catch (error: any) {
-
-        if (
-          this.shouldUseLocalMock() ||
-          !this.isMissingS3ObjectError(error)
-        ) {
-          throw error;
-        }
-
+      if (!this.shouldUseLocalMock()) {
         await this.generateBlfFile(
           this.selectedNode
         );
-
-        buffer =
-          await this.loadBlfBuffer(
-            this.selectedNode
-          );
       }
+
+      const buffer =
+        await this.loadBlfBuffer(
+          this.selectedNode
+        );
 
       await this.parseBlf(
         buffer,
@@ -1984,46 +1967,6 @@ export class BlfViewerComponent implements OnChanges {
     }
 
     return clientId;
-  }
-
-  private isMissingS3ObjectError(
-    error: any
-  ): boolean {
-
-    const name =
-      String(
-        error?.name ||
-        ''
-      );
-
-    const code =
-      String(
-        error?.Code ||
-        error?.code ||
-        ''
-      );
-
-    const message =
-      String(
-        error?.message ||
-        ''
-      );
-
-    const status =
-      Number(
-        error?.$metadata?.httpStatusCode ||
-        error?.statusCode ||
-        error?.status ||
-        0
-      );
-
-    return (
-      status === 404 ||
-      name === 'NoSuchKey' ||
-      code === 'NoSuchKey' ||
-      message.includes('NoSuchKey') ||
-      message.includes('The specified key does not exist')
-    );
   }
 
   private formatBytes(
