@@ -21,10 +21,15 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { S3TreeNode } from '../../decoder.component';
 
 interface RuntimeConfig {
+  s3Default?: string;
   s3BlfBucket?: string;
   s3Region?: string;
   clientId?: string;
   customerId?: string;
+
+  decoderApi?: {
+    blfExportUrl?: string;
+  };
 }
 
 interface BlfMessageRow {
@@ -294,10 +299,33 @@ export class BlfViewerComponent implements OnChanges {
 
     try {
 
-      const buffer =
-        await this.loadBlfBuffer(
+      let buffer: ArrayBuffer;
+
+      try {
+
+        buffer =
+          await this.loadBlfBuffer(
+            this.selectedNode
+          );
+
+      } catch (error: any) {
+
+        if (
+          this.shouldUseLocalMock() ||
+          !this.isMissingS3ObjectError(error)
+        ) {
+          throw error;
+        }
+
+        await this.generateBlfFile(
           this.selectedNode
         );
+
+        buffer =
+          await this.loadBlfBuffer(
+            this.selectedNode
+          );
+      }
 
       await this.parseBlf(
         buffer,
@@ -322,6 +350,96 @@ export class BlfViewerComponent implements OnChanges {
     } finally {
 
       this.isLoading = false;
+    }
+  }
+
+  private async generateBlfFile(
+    node: S3TreeNode
+  ): Promise<void> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const apiUrl =
+      config.decoderApi?.blfExportUrl?.trim();
+
+    if (!apiUrl) {
+      throw new Error(
+        'Missing decoderApi.blfExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    const outputBucketName =
+      config.s3BlfBucket?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3BlfBucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const session =
+      await fetchAuthSession();
+
+    const token =
+      session.tokens?.idToken?.toString() ||
+      session.tokens?.accessToken?.toString();
+
+    if (!token) {
+      throw new Error(
+        'Cognito token unavailable.'
+      );
+    }
+
+    const response =
+      await fetch(
+        apiUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
+            clientId,
+            inputKey: node.key
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    let payload: any = null;
+
+    if (responseText) {
+      try {
+        payload = JSON.parse(responseText);
+      } catch {
+        payload = responseText;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.error ||
+        payload?.message ||
+        `BLF generation failed. HTTP ${response.status}`
+      );
     }
   }
 
@@ -1844,6 +1962,68 @@ export class BlfViewerComponent implements OnChanges {
     }
 
     return await response.json();
+  }
+
+  private resolveClientId(
+    config: RuntimeConfig
+  ): string {
+
+    const clientId =
+      config.clientId ||
+      config.customerId ||
+      localStorage.getItem('clientId') ||
+      localStorage.getItem('customerId') ||
+      '00000000';
+
+    if (
+      !/^[a-zA-Z0-9]{8}$/.test(clientId)
+    ) {
+      throw new Error(
+        `Invalid clientId: ${clientId}`
+      );
+    }
+
+    return clientId;
+  }
+
+  private isMissingS3ObjectError(
+    error: any
+  ): boolean {
+
+    const name =
+      String(
+        error?.name ||
+        ''
+      );
+
+    const code =
+      String(
+        error?.Code ||
+        error?.code ||
+        ''
+      );
+
+    const message =
+      String(
+        error?.message ||
+        ''
+      );
+
+    const status =
+      Number(
+        error?.$metadata?.httpStatusCode ||
+        error?.statusCode ||
+        error?.status ||
+        0
+      );
+
+    return (
+      status === 404 ||
+      name === 'NoSuchKey' ||
+      code === 'NoSuchKey' ||
+      message.includes('NoSuchKey') ||
+      message.includes('The specified key does not exist')
+    );
   }
 
   private formatBytes(
