@@ -9,7 +9,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { NgxMonacoEditorComponent } from '@jean-merelis/ngx-monaco-editor';
+import { DefaultMonacoLoader, NGX_MONACO_LOADER_PROVIDER, NgxMonacoEditorComponent } from '@jean-merelis/ngx-monaco-editor';
 
 import * as monaco from 'monaco-editor';
 
@@ -44,7 +44,15 @@ interface MonacoEditorInitializedEvent {
   imports: [
     CommonModule,
     FormsModule,
+    CommonModule,
+    FormsModule,
     NgxMonacoEditorComponent
+  ],
+  providers: [
+    {
+      provide: NGX_MONACO_LOADER_PROVIDER,
+      useClass: DefaultMonacoLoader
+    }
   ],
   templateUrl: './json-viewer.component.html',
   styleUrl: './json-viewer.component.css'
