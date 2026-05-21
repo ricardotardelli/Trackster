@@ -28,6 +28,7 @@ import { HexDumpViewerComponent } from './viewers/hex-dump-viewer/hex-dump-viewe
 import { VectorAscViewerComponent } from './viewers/vector-asc-viewer/vector-asc-viewer.component';
 import { CandumpViewerComponent } from './viewers/candump-viewer/candump-viewer.component';
 import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
+import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 
 export interface S3TreeNode {
   name: string;
@@ -62,7 +63,8 @@ interface RuntimeConfig {
     HexDumpViewerComponent,
     VectorAscViewerComponent,
     CandumpViewerComponent,
-    BlfViewerComponent
+    BlfViewerComponent,
+    Mf4ViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'

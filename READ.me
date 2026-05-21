@@ -42,8 +42,14 @@ https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-upload?customerId=000
 "fileName": "vw_pq.dbc",
  "contentBase64": ""
 
- - API DBC messages canid list
+- API Export CAN-BLF
+https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-blf
+
+- API DBC messages canid list
  https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-signals?customerId=00000000
+
+- Docker
+  -login AWS ECR aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 366493038898.dkr.ecr.us-east-1.amazonaws.com
 
 - Headers
    - GLOBAL HEADER 40 bytes
@@ -67,3 +73,5 @@ OK - Rolling counters - coincide with block#
 - Replay engine
 - Physical coherence AI
 - AI-assisted checksum metadata for compiled DBC files (DBC Studio)
+
+

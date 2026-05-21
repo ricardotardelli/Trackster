@@ -269,6 +269,7 @@
               <app-vector-asc-viewer *ngIf="selectedViewerMode === 'vector-asc' && selectedBinNode" [selectedNode]="selectedBinNode"></app-vector-asc-viewer>
               <app-candump-viewer *ngIf="selectedViewerMode === 'candump' && selectedBinNode" [selectedNode]="selectedBinNode"></app-candump-viewer>
               <app-blf-viewer *ngIf="selectedViewerMode === 'blf' && selectedBinNode" [selectedNode]="selectedBinNode"></app-blf-viewer>
+              <app-mf4-viewer *ngIf="selectedViewerMode === 'mf4' && selectedBinNode" [selectedNode]="selectedBinNode"></app-mf4-viewer>
 
               <div class="decoder-placeholder-view" 
                 *ngIf="selectedViewerMode !== 'trackster-bin' && 
@@ -278,7 +279,8 @@
                         selectedViewerMode !== 'hex-dump' &&
                         selectedViewerMode !== 'vector-asc' &&
                         selectedViewerMode !== 'candump' &&
-                        selectedViewerMode !== 'blf'">
+                        selectedViewerMode !== 'blf' &&
+                        selectedViewerMode !== 'mf4'">
                 <strong>
                   {{ selectedViewerMode }}
                 </strong>

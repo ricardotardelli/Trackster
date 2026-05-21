@@ -1,0 +1,264 @@
+<div class="mf4-viewer-shell">
+
+  <div
+    class="mf4-loading-card"
+    *ngIf="isLoading">
+
+    Loading MF4 file...
+  </div>
+
+  <div
+    class="mf4-error-card"
+    *ngIf="!isLoading && loadError">
+
+    {{ loadError }}
+
+  </div>
+
+  <ng-container *ngIf="!isLoading && !loadError">
+
+    <div class="mf4-summary-grid">
+
+      <div
+        class="mf4-summary-box"
+        *ngFor="let item of mf4Viewer.summary">
+
+        <span>
+          {{ item.label }}
+        </span>
+
+        <strong>
+          {{ item.value }}
+        </strong>
+
+      </div>
+    </div>
+
+    <div class="mf4-structure-panel">
+
+      <div class="mf4-structure-header">
+
+        <div>
+
+          <h4>
+            MF4 Structure
+          </h4>
+
+          <span>
+            Parsed Trackster MF4 manifest, channels, and CAN message preview.
+          </span>
+
+        </div>
+
+        <button
+          type="button"
+          class="mf4-copy-icon-button"
+          title="Copy MF4 header"
+          (click)="copyHeaderToClipboard()">
+
+          <mat-icon>
+            content_copy
+          </mat-icon>
+
+        </button>
+
+      </div>
+
+      <div class="mf4-structure-scroll">
+
+        <div class="mf4-hierarchy-card">
+
+          <div class="mf4-hierarchy-card-header">
+
+            <div>
+
+              <span class="mf4-card-kicker">
+                Header
+              </span>
+
+              <strong>
+                {{ mf4Viewer.fileName }}
+              </strong>
+
+            </div>
+
+          </div>
+
+          <div class="mf4-hierarchy-grid">
+
+            <div
+              *ngFor="let field of mf4Viewer.headerFields">
+
+              <span>
+                {{ field.label }}
+              </span>
+
+              <strong>
+                {{ field.value }}
+              </strong>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="mf4-hierarchy-card">
+
+          <div class="mf4-hierarchy-card-header">
+
+            <div>
+
+              <span class="mf4-card-kicker">
+                Channels
+              </span>
+
+              <strong>
+                MF4 Channels
+              </strong>
+
+            </div>
+
+          </div>
+
+          <div class="mf4-object-list">
+
+            <div
+              class="mf4-object-row"
+              *ngFor="let channel of mf4Viewer.channels">
+
+              <span>
+                {{ channel.type }}
+              </span>
+
+              <strong>
+                {{ channel.name }}
+              </strong>
+
+              <span>
+                {{ channel.unit || '-' }}
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="mf4-hierarchy-card">
+
+          <div class="mf4-hierarchy-card-header">
+
+            <div>
+
+              <span class="mf4-card-kicker">
+                Messages
+              </span>
+
+              <strong>
+                CAN Preview
+              </strong>
+
+            </div>
+
+            <button
+              type="button"
+              class="mf4-copy-icon-button"
+              title="Copy visible messages"
+              (click)="copyVisibleMessagesToClipboard()">
+
+              <mat-icon>
+                content_copy
+              </mat-icon>
+
+            </button>
+
+          </div>
+
+          <div class="mf4-message-toolbar">
+
+            <div class="mf4-message-pagination-info">
+
+              <strong>
+                Messages
+              </strong>
+
+              <span>
+                {{ getMessagePageStart() }}-{{ getMessagePageEnd() }} of {{ getTotalMessageCount() }}
+              </span>
+
+            </div>
+
+            <div class="mf4-filter-box">
+
+              <mat-icon>
+                search
+              </mat-icon>
+
+              <input
+                type="text"
+                placeholder="Filter messages"
+                [(ngModel)]="filterText">
+
+            </div>
+
+          </div>
+
+          <div class="mf4-message-table">
+
+            <div class="mf4-message-table-header">
+
+              <span>Time</span>
+              <span>Type</span>
+              <span>Bus</span>
+              <span>CAN ID</span>
+              <span>DLC</span>
+              <span>Payload</span>
+              <span>Flags</span>
+
+            </div>
+
+            <div
+              class="mf4-message-row"
+              *ngFor="let message of mf4Viewer.messages"
+              [hidden]="!matchesFilter(message.searchText)">
+
+              <span>
+                {{ message.time }}
+              </span>
+
+              <span>
+                {{ message.type }}
+              </span>
+
+              <span>
+                {{ message.bus }}
+              </span>
+
+              <span>
+                {{ message.canId }}
+              </span>
+
+              <span>
+                {{ message.dlc }}
+              </span>
+
+              <code>
+                {{ message.payload }}
+              </code>
+
+              <span>
+                {{ message.flags }}
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </ng-container>
+
+</div>
