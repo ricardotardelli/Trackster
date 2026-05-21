@@ -9,6 +9,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 
+import { environment } from '../../../../environments/environment';
+
 import {
   GetObjectCommand,
   S3Client
@@ -17,6 +19,18 @@ import {
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 import { S3TreeNode } from '../../decoder.component';
+
+interface RuntimeConfig {
+  s3Default?: string;
+  s3Mf4Bucket?: string;
+  s3Region?: string;
+  clientId?: string;
+  customerId?: string;
+
+  decoderApi?: {
+    mf4ExportUrl?: string;
+  };
+}
 
 @Component({
   selector: 'app-mf4-viewer',
@@ -56,11 +70,13 @@ export class Mf4ViewerComponent implements OnChanges {
       changes['selectedNode'] &&
       this.selectedNode
     ) {
-      await this.loadMf4Manifest();
+      await this.loadMf4ForViewer();
     }
   }
 
-  matchesFilter(value: string): boolean {
+  matchesFilter(
+    value: string
+  ): boolean {
 
     const filter =
       this.filterText
@@ -81,14 +97,17 @@ export class Mf4ViewerComponent implements OnChanges {
   }
 
   getMessagePageStart(): number {
-    return this.mf4Viewer.messages.length ? 1 : 0;
+    return this.mf4Viewer.messages.length
+      ? 1
+      : 0;
   }
 
   getMessagePageEnd(): number {
     return this.mf4Viewer.messages.length;
   }
 
-  async copyVisibleMessagesToClipboard(): Promise<void> {
+  async copyVisibleMessagesToClipboard():
+    Promise<void> {
 
     const rows = [
       [
@@ -114,10 +133,13 @@ export class Mf4ViewerComponent implements OnChanges {
       )
     ];
 
-    await this.copyRowsToClipboard(rows);
+    await this.copyRowsToClipboard(
+      rows
+    );
   }
 
-  async copyHeaderToClipboard(): Promise<void> {
+  async copyHeaderToClipboard():
+    Promise<void> {
 
     const rows = [
       ['Field', 'Value'],
@@ -130,85 +152,48 @@ export class Mf4ViewerComponent implements OnChanges {
       )
     ];
 
-    await this.copyRowsToClipboard(rows);
+    await this.copyRowsToClipboard(
+      rows
+    );
   }
 
-  private async loadMf4Manifest(): Promise<void> {
+  private async loadMf4ForViewer():
+    Promise<void> {
 
     this.isLoading = true;
 
     this.loadError = '';
 
+    this.resetViewer();
+
     try {
 
-      const manifest =
-        await this.loadManifest();
+      let manifest: any | null = null;
 
-      this.mf4Viewer = {
-        fileName: this.buildMf4FileName(this.selectedNode.name),
+      try {
 
-        summary: [
-          {
-            label: 'Frames',
-            value: manifest.summary.frameCount.toLocaleString()
-          },
-          {
-            label: 'CAN',
-            value: manifest.summary.canMessageCount.toLocaleString()
-          },
-          {
-            label: 'CAN FD',
-            value: manifest.summary.canFdMessageCount.toLocaleString()
-          },
-          {
-            label: 'Channels',
-            value: manifest.channels.length.toLocaleString()
-          },
-          {
-            label: 'Duration',
-            value: `${manifest.summary.durationSeconds.toFixed(3)} s`
-          }
-        ],
+        manifest =
+          await this.loadMf4Manifest();
 
-        headerFields: [
-          {
-            label: 'MF4 Version',
-            value: manifest.mf4Version
-          },
-          {
-            label: 'Frames',
-            value: manifest.summary.frameCount
-          },
-          {
-            label: 'Buses',
-            value: manifest.summary.busCount
-          },
-          {
-            label: 'Unique CAN IDs',
-            value: manifest.summary.uniqueCanIdCount
-          },
-          {
-            label: 'Preview Messages',
-            value: manifest.summary.previewCount
-          }
-        ],
+      } catch (error) {
 
-        channels: manifest.channels,
+        if (
+          this.shouldUseLocalMock()
+        ) {
+          throw error;
+        }
 
-        messages:
-          manifest.messagesPreview.map(
-            (message: any) => ({
-              ...message,
-              searchText: [
-                message.time,
-                message.type,
-                message.canId,
-                message.payload,
-                message.flags
-              ].join(' ')
-            })
-          )
-      };
+        await this.generateMf4File(
+          this.selectedNode
+        );
+
+        manifest =
+          await this.loadMf4Manifest();
+      }
+
+      this.populateViewerFromManifest(
+        manifest
+      );
 
     } catch (error: any) {
 
@@ -221,13 +206,126 @@ export class Mf4ViewerComponent implements OnChanges {
         error?.message ||
         'Failed to load MF4 manifest.';
 
+      this.resetViewer();
+
     } finally {
 
       this.isLoading = false;
     }
   }
 
-  private async loadManifest(): Promise<any> {
+  private async generateMf4File(
+    node: S3TreeNode
+  ): Promise<void> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const apiUrl =
+      config.decoderApi?.mf4ExportUrl?.trim();
+
+    if (!apiUrl) {
+      throw new Error(
+        'Missing decoderApi.mf4ExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    const outputBucketName =
+      config.s3Mf4Bucket?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3Mf4Bucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const session =
+      await fetchAuthSession();
+
+    const token =
+      session.tokens?.idToken?.toString() ||
+      session.tokens?.accessToken?.toString();
+
+    if (!token) {
+      throw new Error(
+        'Cognito token unavailable.'
+      );
+    }
+
+    const response =
+      await fetch(
+        apiUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
+            clientId,
+            inputKeys: [
+              node.key
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    let payload: any = null;
+
+    if (responseText) {
+      try {
+        payload = JSON.parse(responseText);
+      } catch {
+        payload = responseText;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.error ||
+        payload?.message ||
+        `MF4 generation failed. HTTP ${response.status}`
+      );
+    }
+  }
+
+  private async loadMf4Manifest():
+    Promise<any> {
+
+    if (
+      this.shouldUseLocalMock()
+    ) {
+
+      const response =
+        await fetch(
+          '/assets/mock/sample.mf4.json'
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `Local MF4 manifest mock not found. HTTP ${response.status}`
+        );
+      }
+
+      return await response.json();
+    }
 
     const config =
       await this.loadRuntimeConfig();
@@ -235,36 +333,222 @@ export class Mf4ViewerComponent implements OnChanges {
     const bucket =
       config.s3Mf4Bucket?.trim();
 
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Mf4Bucket in assets/config.json'
+      );
+    }
+
     const buffer =
       await this.getS3ObjectBuffer(
         bucket,
-        this.buildManifestKey(this.selectedNode.key)
+        this.buildMf4ManifestKey(
+          this.selectedNode.key
+        )
       );
 
-    return JSON.parse(
-      new TextDecoder().decode(buffer)
-    );
+    const text =
+      new TextDecoder()
+        .decode(buffer);
+
+    return JSON.parse(text);
   }
 
-  private buildManifestKey(key: string): string {
+  private populateViewerFromManifest(
+    manifest: any
+  ): void {
+
+    const summary =
+      manifest.summary || {};
+
+    const channels =
+      Array.isArray(manifest.channels)
+        ? manifest.channels
+        : [];
+
+    const messages =
+      Array.isArray(manifest.messagesPreview)
+        ? manifest.messagesPreview
+        : [];
+
+    this.mf4Viewer = {
+      fileName:
+        this.buildMf4FileName(
+          this.selectedNode.name
+        ),
+
+      summary: [
+        {
+          label: 'Frames',
+          value:
+            this.formatNumber(
+              summary.frameCount
+            )
+        },
+        {
+          label: 'CAN',
+          value:
+            this.formatNumber(
+              summary.canMessageCount
+            )
+        },
+        {
+          label: 'CAN FD',
+          value:
+            this.formatNumber(
+              summary.canFdMessageCount
+            )
+        },
+        {
+          label: 'Channels',
+          value:
+            this.formatNumber(
+              channels.length
+            )
+        },
+        {
+          label: 'Size',
+          value:
+            this.formatBytes(
+              manifest.outputFileSize || 0
+            )
+        }
+      ],
+
+      headerFields: [
+        {
+          label: 'MF4 version',
+          value:
+            manifest.mf4Version || '-'
+        },
+        {
+          label: 'Manifest version',
+          value:
+            manifest.manifestVersion || '-'
+        },
+        {
+          label: 'Input file',
+          value:
+            manifest.inputKey || '-'
+        },
+        {
+          label: 'Output file',
+          value:
+            manifest.outputKey || '-'
+        },
+        {
+          label: 'Manifest file',
+          value:
+            manifest.manifestKey || '-'
+        },
+        {
+          label: 'Frames',
+          value:
+            this.formatNumber(
+              summary.frameCount
+            )
+        },
+        {
+          label: 'Buses',
+          value:
+            this.formatNumber(
+              summary.busCount
+            )
+        },
+        {
+          label: 'Unique CAN IDs',
+          value:
+            this.formatNumber(
+              summary.uniqueCanIdCount
+            )
+        },
+        {
+          label: 'Duration',
+          value:
+            this.formatDuration(
+              summary.durationSeconds
+            )
+        },
+        {
+          label: 'Preview messages',
+          value:
+            `${this.formatNumber(summary.previewCount)} / ${this.formatNumber(summary.previewLimit)}`
+        }
+      ],
+
+      channels,
+
+      messages:
+        messages.map(
+          (message: any) => ({
+            ...message,
+            searchText: [
+              message.time,
+              message.type,
+              message.bus,
+              message.canId,
+              message.dlc,
+              message.payload,
+              message.flags
+            ].join(' ')
+          })
+        )
+    };
+  }
+
+  private buildMf4ManifestKey(
+    key: string
+  ): string {
+
+    if (
+      !key
+        .toLowerCase()
+        .endsWith('.bin')
+    ) {
+      return `${key}.json`;
+    }
+
     return `${key.slice(0, -4)}.mf4.json`;
   }
 
-  private buildMf4FileName(fileName: string): string {
+  private buildMf4FileName(
+    fileName: string
+  ): string {
+
+    if (
+      !fileName
+        .toLowerCase()
+        .endsWith('.bin')
+    ) {
+      return fileName;
+    }
+
     return `${fileName.slice(0, -4)}.mf4`;
   }
 
-  private async getS3Client(): Promise<S3Client> {
+  private async getS3Client():
+    Promise<S3Client> {
 
     const config =
       await this.loadRuntimeConfig();
 
+    const region =
+      config.s3Region?.trim() ||
+      'us-east-1';
+
     const session =
       await fetchAuthSession();
 
+    if (!session.credentials) {
+      throw new Error(
+        'Cognito credentials unavailable.'
+      );
+    }
+
     return new S3Client({
-      region: config.s3Region || 'us-east-1',
-      credentials: session.credentials
+      region,
+      credentials:
+        session.credentials
     });
   }
 
@@ -284,25 +568,177 @@ export class Mf4ViewerComponent implements OnChanges {
         })
       );
 
-    const bytes =
-      await response.Body?.transformToByteArray();
+    if (!response.Body) {
+      throw new Error(
+        `S3 body empty. ${key}`
+      );
+    }
 
-    const output =
-      new Uint8Array(bytes.byteLength);
-
-    output.set(bytes);
-
-    return output.buffer;
+    return await this.s3BodyToArrayBuffer(
+      response.Body
+    );
   }
 
-  private async loadRuntimeConfig(): Promise<any> {
+  private async s3BodyToArrayBuffer(
+    body: any
+  ): Promise<ArrayBuffer> {
+
+    if (
+      typeof body.transformToByteArray ===
+      'function'
+    ) {
+
+      const bytes =
+        await body.transformToByteArray();
+
+      const output =
+        new Uint8Array(
+          bytes.byteLength
+        );
+
+      output.set(bytes);
+
+      return output.buffer;
+    }
+
+    if (
+      typeof body.arrayBuffer ===
+      'function'
+    ) {
+
+      return await body.arrayBuffer();
+    }
+
+    throw new Error(
+      'Unsupported S3 body.'
+    );
+  }
+
+  private async loadRuntimeConfig():
+    Promise<RuntimeConfig> {
 
     const response =
       await fetch(
         `assets/config.json?t=${Date.now()}`
       );
 
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load config.json. HTTP ${response.status}`
+      );
+    }
+
     return await response.json();
+  }
+
+  private resolveClientId(
+    config: RuntimeConfig
+  ): string {
+
+    const clientId =
+      config.clientId ||
+      config.customerId ||
+      localStorage.getItem('clientId') ||
+      localStorage.getItem('customerId') ||
+      '00000000';
+
+    if (
+      !/^[a-zA-Z0-9]{8}$/.test(clientId)
+    ) {
+      throw new Error(
+        `Invalid clientId: ${clientId}`
+      );
+    }
+
+    return clientId;
+  }
+
+  private formatBytes(
+    bytes: number
+  ): string {
+
+    if (
+      !Number.isFinite(bytes) ||
+      bytes <= 0
+    ) {
+      return '-';
+    }
+
+    if (
+      bytes >=
+      1024 * 1024
+    ) {
+      return `${(
+        bytes /
+        (
+          1024 * 1024
+        )
+      ).toFixed(2)} MB`;
+    }
+
+    if (
+      bytes >= 1024
+    ) {
+      return `${(
+        bytes / 1024
+      ).toFixed(2)} KB`;
+    }
+
+    return `${bytes} B`;
+  }
+
+  private formatDuration(
+    value: number
+  ): string {
+
+    if (
+      !Number.isFinite(value)
+    ) {
+      return '-';
+    }
+
+    return `${value.toFixed(3)} s`;
+  }
+
+  private formatNumber(
+    value: number
+  ): string {
+
+    if (
+      !Number.isFinite(value)
+    ) {
+      return '0';
+    }
+
+    return value
+      .toLocaleString();
+  }
+
+  private shouldUseLocalMock():
+    boolean {
+
+    const hostname =
+      window.location.hostname;
+
+    return (
+      environment.disableAuth === true &&
+      (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1'
+      )
+    );
+  }
+
+  private resetViewer():
+    void {
+
+    this.mf4Viewer = {
+      fileName: '',
+      summary: [],
+      headerFields: [],
+      channels: [],
+      messages: []
+    };
   }
 
   private async copyRowsToClipboard(
@@ -311,9 +747,12 @@ export class Mf4ViewerComponent implements OnChanges {
 
     const text =
       rows
-        .map(row => row.join('\t'))
+        .map(
+          row => row.join('\t')
+        )
         .join('\n');
 
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard
+      .writeText(text);
   }
 }

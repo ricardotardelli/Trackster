@@ -1,7 +1,9 @@
 ﻿{  
    "workQueueUrl":  "https://sqs.us-east-1.amazonaws.com/366493038898/sqs-trackster-vehicles-creation",
+   "s3Region": "us-east-1",
    "s3Default":     "s3-trackster-can-bucket",
    "s3BlfBucket":    "s3-trackster-export-blf",
+   "s3Mf4Bucket": "s3-trackster-export-mf4",
    "engineURL":     "https://su90gxqchi.execute-api.us-east-1.amazonaws.com/Prod/generate",
    "dbcApi": {
       "folderCatalogUrl": "https://t8ghcakzma.execute-api.us-east-1.amazonaws.com/dbc-folder",
@@ -16,7 +18,8 @@
       "binFilesCatalogUrl": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/bin-files/catalog",
       "binGetFiles": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/get-bin-files",
       "binGetManifest": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/get-run-manifest",
-      "blfExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-blf"
+      "blfExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-blf",
+      "mf4ExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-mf4"
    },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
