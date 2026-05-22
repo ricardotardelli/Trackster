@@ -21,7 +21,7 @@
 
       <div
         class="mf4-summary-box"
-        *ngFor="let item of mf4Viewer.summary">
+        *ngFor="let item of mf4Viewer.summaryCards">
 
         <span>
           {{ item.label }}
@@ -32,6 +32,7 @@
         </strong>
 
       </div>
+
     </div>
 
     <div class="mf4-structure-panel">
@@ -45,7 +46,7 @@
           </h4>
 
           <span>
-            Parsed Trackster MF4 manifest, channels, and CAN message preview.
+            Parsed Trackster MF4 channels and CAN message preview.
           </span>
 
         </div>
@@ -86,56 +87,99 @@
 
           <div class="mf4-hierarchy-grid">
 
-            <div
-              *ngFor="let field of mf4Viewer.headerFields">
+            <div>
 
               <span>
-                {{ field.label }}
+                MF4 version
               </span>
 
               <strong>
-                {{ field.value }}
+                {{ mf4Viewer.header.mf4Version }}
               </strong>
 
             </div>
-          </div>
-        </div>
-
-        <div class="mf4-hierarchy-card">
-
-          <div class="mf4-hierarchy-card-header">
 
             <div>
 
-              <span class="mf4-card-kicker">
+              <span>
+                Frames
+              </span>
+
+              <strong>
+                {{ mf4Viewer.summary.totalFrames }}
+              </strong>
+
+            </div>
+
+            <div>
+
+              <span>
+                CAN messages
+              </span>
+
+              <strong>
+                {{ mf4Viewer.summary.canMessages }}
+              </strong>
+
+            </div>
+
+            <div>
+
+              <span>
+                CAN FD messages
+              </span>
+
+              <strong>
+                {{ mf4Viewer.summary.canFdMessages }}
+              </strong>
+
+            </div>
+
+            <div>
+
+              <span>
                 Channels
               </span>
 
               <strong>
-                MF4 Channels
+                {{ mf4Viewer.summary.channelCount }}
               </strong>
 
             </div>
 
-          </div>
-
-          <div class="mf4-object-list">
-
-            <div
-              class="mf4-object-row"
-              *ngFor="let channel of mf4Viewer.channels">
+            <div>
 
               <span>
-                {{ channel.type }}
+                Buses
               </span>
 
               <strong>
-                {{ channel.name }}
+                {{ mf4Viewer.summary.busCount }}
               </strong>
 
+            </div>
+
+            <div>
+
               <span>
-                {{ channel.unit || '-' }}
+                Unique CAN IDs
               </span>
+
+              <strong>
+                {{ mf4Viewer.summary.uniqueCanIds }}
+              </strong>
+
+            </div>
+
+            <div>
+
+              <span>
+                Duration
+              </span>
+
+              <strong>
+                {{ mf4Viewer.summary.duration }}
+              </strong>
 
             </div>
 
@@ -154,7 +198,7 @@
               </span>
 
               <strong>
-                CAN Preview
+                CAN / CAN FD Records
               </strong>
 
             </div>
@@ -182,7 +226,15 @@
               </strong>
 
               <span>
-                {{ getMessagePageStart() }}-{{ getMessagePageEnd() }} of {{ getTotalMessageCount() }}
+                {{
+                  getMessagePageStart()
+                }}-{{
+                  getMessagePageEnd()
+                }}
+                of
+                {{
+                  getTotalMessageCount()
+                }}
               </span>
 
             </div>
@@ -206,13 +258,33 @@
 
             <div class="mf4-message-table-header">
 
-              <span>Time</span>
-              <span>Type</span>
-              <span>Bus</span>
-              <span>CAN ID</span>
-              <span>DLC</span>
-              <span>Payload</span>
-              <span>Flags</span>
+              <span>
+                Time
+              </span>
+
+              <span>
+                Type
+              </span>
+
+              <span>
+                Ch
+              </span>
+
+              <span>
+                CAN ID
+              </span>
+
+              <span>
+                DLC
+              </span>
+
+              <span>
+                Payload
+              </span>
+
+              <span>
+                Flags
+              </span>
 
             </div>
 
@@ -222,7 +294,7 @@
               [hidden]="!matchesFilter(message.searchText)">
 
               <span>
-                {{ message.time }}
+                {{ message.timestamp }}
               </span>
 
               <span>
@@ -230,7 +302,7 @@
               </span>
 
               <span>
-                {{ message.bus }}
+                {{ message.channel }}
               </span>
 
               <span>
@@ -247,6 +319,56 @@
 
               <span>
                 {{ message.flags }}
+              </span>
+
+            </div>
+
+            <div
+              class="mf4-empty-card"
+              *ngIf="mf4Viewer.messages.length === 0">
+
+              No CAN messages parsed from this MF4 file.
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="mf4-hierarchy-card">
+
+          <div class="mf4-hierarchy-card-header">
+
+            <div>
+
+              <span class="mf4-card-kicker">
+                Channels
+              </span>
+
+              <strong>
+                Parsed MF4 channels
+              </strong>
+
+            </div>
+
+          </div>
+
+          <div class="mf4-object-list">
+
+            <div
+              class="mf4-object-row"
+              *ngFor="let channel of mf4Viewer.channels">
+
+              <span>
+                {{ channel.index }}
+              </span>
+
+              <strong>
+                {{ channel.name }}
+              </strong>
+
+              <span>
+                {{ channel.type }}
               </span>
 
             </div>
