@@ -68,6 +68,11 @@ interface CsvRow {
   frameType: string;
   dlc: string;
   payload: string;
+
+  name: string;
+  data: string;
+  signal: string;
+  value: string;
 }
 
 type CsvColumnKey =
@@ -77,7 +82,11 @@ type CsvColumnKey =
   | 'direction'
   | 'frameType'
   | 'dlc'
-  | 'payload';
+  | 'payload'
+  | 'name'
+  | 'data'
+  | 'signal'
+  | 'value';
 
 interface CsvColumn {
   key: CsvColumnKey;
@@ -112,28 +121,28 @@ implements OnChanges {
       label: 'Timestamp'
     },
     {
-      key: 'channel',
-      label: 'Channel'
-    },
-    {
       key: 'canId',
       label: 'CAN ID'
     },
     {
-      key: 'direction',
-      label: 'Direction'
-    },
-    {
-      key: 'frameType',
-      label: 'Type'
+      key: 'name',
+      label: 'Message'
     },
     {
       key: 'dlc',
       label: 'DLC'
     },
     {
-      key: 'payload',
-      label: 'Payload'
+      key: 'data',
+      label: 'Data'
+    },
+    {
+      key: 'signal',
+      label: 'Signal'
+    },
+    {
+      key: 'value',
+      label: 'Value'
     }
   ];
 
@@ -459,22 +468,40 @@ implements OnChanges {
     const rowsPreview =
       this.manifest?.rowsPreview ?? [];
 
-    return rowsPreview.map((row) => ({
-      timestamp:
-        String(row.timestamp ?? ''),
-      channel:
-        String(row.channel ?? ''),
-      canId:
-        String(row.canId ?? ''),
-      direction:
-        String(row.direction ?? ''),
-      frameType:
-        String(row.frameType ?? ''),
-      dlc:
-        String(row.dlc ?? ''),
-      payload:
-        String(row.payload ?? '')
-    }));
+    return rowsPreview.map((row) => {
+
+      const canId =
+        String(row.canId ?? '');
+
+      const payload =
+        String(row.payload ?? '');
+
+      return {
+        timestamp:
+          String(row.timestamp ?? ''),
+        channel:
+          String(row.channel ?? ''),
+        canId,
+        direction:
+          String(row.direction ?? ''),
+        frameType:
+          String(row.frameType ?? ''),
+        dlc:
+          String(row.dlc ?? ''),
+        payload,
+
+        name:
+          canId
+            ? `CAN_${canId}`
+            : '',
+        data:
+          payload,
+        signal:
+          '',
+        value:
+          ''
+      };
+    });
   }
 
   private updateSummary(): void {
@@ -485,21 +512,15 @@ implements OnChanges {
     this.csvViewer = {
       summary: [
         {
-          label: 'Frames',
-          value:
-            Number(summary?.frameCount ?? 0)
-              .toLocaleString()
-        },
-        {
-          label: 'Preview rows',
+          label: 'Rows',
           value:
             Number(summary?.previewCount ?? this.rows.length)
               .toLocaleString()
         },
         {
-          label: 'Preview limit',
+          label: 'Frames',
           value:
-            Number(summary?.previewLimit ?? this.rows.length)
+            Number(summary?.frameCount ?? 0)
               .toLocaleString()
         },
         {
@@ -512,6 +533,12 @@ implements OnChanges {
           label: 'Channels',
           value:
             Number(summary?.channelCount ?? 0)
+              .toLocaleString()
+        },
+        {
+          label: 'Preview limit',
+          value:
+            Number(summary?.previewLimit ?? this.rows.length)
               .toLocaleString()
         },
         {
