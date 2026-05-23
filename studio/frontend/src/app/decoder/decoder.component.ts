@@ -29,6 +29,7 @@ import { VectorAscViewerComponent } from './viewers/vector-asc-viewer/vector-asc
 import { CandumpViewerComponent } from './viewers/candump-viewer/candump-viewer.component';
 import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
+import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
 
 export interface S3TreeNode {
   name: string;
@@ -64,7 +65,8 @@ interface RuntimeConfig {
     VectorAscViewerComponent,
     CandumpViewerComponent,
     BlfViewerComponent,
-    Mf4ViewerComponent
+    Mf4ViewerComponent,
+    ParquetViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'
