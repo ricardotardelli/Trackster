@@ -20,7 +20,7 @@
       "binFilesCatalogUrl": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/bin-files/catalog",
       "binGetFiles": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/get-bin-files",
       "binGetManifest": "https://7aqst4dpqf.execute-api.us-east-1.amazonaws.com/get-run-manifest",
-      "csvExportUrl": "https://API_ID.execute-api.us-east-1.amazonaws.com/export-bin-csv",
+      "csvExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-csv",
       "vectorAscExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-vectorasc",
       "blfExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-blf",
       "mf4ExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-mf4"
