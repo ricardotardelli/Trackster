@@ -1,0 +1,185 @@
+<div class="parquet-viewer-layout">
+
+  <div class="parquet-viewer-main">
+
+    <div class="parquet-viewer-panel">
+
+      <div class="parquet-viewer-header">
+
+        <div class="parquet-viewer-title">
+
+          <h4>
+            Parquet Preview
+          </h4>
+
+          <span>
+            Read-only Parquet manifest preview
+          </span>
+
+        </div>
+
+        <div class="parquet-viewer-actions">
+
+          <div class="parquet-find-box">
+
+            <input
+              type="text"
+              class="parquet-search-input"
+              placeholder="Filter rows"
+              [(ngModel)]="parquetSearchText"
+              (input)="applyParquetSearch()">
+
+            <button
+              type="button"
+              class="parquet-search-button parquet-search-button-close"
+              title="Clear search"
+              [disabled]="!parquetSearchText"
+              (click)="clearParquetSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
+          <button
+            type="button"
+            class="parquet-action-button parquet-action-button-primary"
+            [disabled]="filteredRows.length === 0"
+            (click)="copyParquetToClipboard()">
+
+            Copy Preview
+
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        class="parquet-loading"
+        *ngIf="isLoadingParquet">
+
+        Exporting BIN file as Parquet...
+
+      </div>
+
+      <div
+        class="parquet-error"
+        *ngIf="
+          !isLoadingParquet &&
+          parquetErrorMessage
+        ">
+
+        {{ parquetErrorMessage }}
+
+      </div>
+
+      <div
+        class="parquet-empty-state"
+        *ngIf="
+          !isLoadingParquet &&
+          !parquetErrorMessage &&
+          rows.length === 0
+        ">
+
+        No Parquet preview available.
+
+      </div>
+
+      <div
+        class="parquet-table-shell"
+        *ngIf="
+          !isLoadingParquet &&
+          !parquetErrorMessage &&
+          rows.length > 0
+        ">
+
+        <table class="parquet-table">
+
+          <thead>
+
+            <tr>
+
+              <th
+                *ngFor="let column of columns"
+                (click)="sortBy(column.key)">
+
+                <span>
+                  {{ column.label }}
+                </span>
+
+                <strong>
+                  {{ getSortIndicator(column.key) }}
+                </strong>
+
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            <tr
+              *ngFor="let row of filteredRows">
+
+              <td>
+                {{ row.timestamp }}
+              </td>
+
+              <td>
+                {{ row.canId }}
+              </td>
+
+              <td>
+                {{ row.name }}
+              </td>
+
+              <td>
+                {{ row.dlc }}
+              </td>
+
+              <td class="parquet-data-cell">
+                {{ row.data }}
+              </td>
+
+              <td>
+                {{ row.signal }}
+              </td>
+
+              <td>
+                {{ row.value }}
+              </td>
+
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <aside class="parquet-summary-sidebar">
+
+    <div
+      class="parquet-summary-box"
+      *ngFor="let item of parquetViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>
