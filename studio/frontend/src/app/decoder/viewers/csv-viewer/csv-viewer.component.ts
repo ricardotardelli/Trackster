@@ -17,35 +17,67 @@ import {
 
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-import { parseTracksterBin } from '../../parser/decoder.bin.parser';
-
 import { S3TreeNode } from '../../decoder.component';
 
 interface RuntimeConfig {
   s3Default?: string;
   s3Region?: string;
+  s3CsvBucket?: string;
   customerId?: string;
   clientId?: string;
+  decoderApi?: {
+    csvExportUrl?: string;
+  };
+}
+
+interface CsvExportManifest {
+  manifestVersion: string;
+  format: string;
+  inputKey: string;
+  outputKey: string;
+  manifestKey: string;
+  inputFileSize: number;
+  outputFileSize: number;
+  summary: {
+    frameCount: number;
+    previewCount: number;
+    previewLimit: number;
+    uniqueCanIdCount: number;
+    channelCount: number;
+    durationSeconds: number;
+  };
+  columns: string[];
+  rowsPreview: CsvManifestRow[];
+}
+
+interface CsvManifestRow {
+  timestamp: string;
+  channel: string;
+  canId: string;
+  direction: string;
+  frameType: string;
+  dlc: string;
+  payload: string;
 }
 
 interface CsvRow {
   timestamp: string;
+  channel: string;
   canId: string;
-  name: string;
+  direction: string;
+  frameType: string;
   dlc: string;
-  data: string;
-  signal: string;
-  value: string;
+  payload: string;
 }
 
 type CsvColumnKey =
   | 'timestamp'
+  | 'channel'
   | 'canId'
-  | 'name'
+  | 'direction'
+  | 'frameType'
   | 'dlc'
-  | 'data'
-  | 'signal'
-  | 'value';
+  | 'payload';
 
 interface CsvColumn {
   key: CsvColumnKey;
@@ -74,36 +106,34 @@ implements OnChanges {
 
   csvSearchText = '';
 
-  readonly maxRenderedBlocks = 50;
-
   readonly columns: CsvColumn[] = [
     {
       key: 'timestamp',
       label: 'Timestamp'
     },
     {
+      key: 'channel',
+      label: 'Channel'
+    },
+    {
       key: 'canId',
       label: 'CAN ID'
     },
     {
-      key: 'name',
-      label: 'Message'
+      key: 'direction',
+      label: 'Direction'
+    },
+    {
+      key: 'frameType',
+      label: 'Type'
     },
     {
       key: 'dlc',
       label: 'DLC'
     },
     {
-      key: 'data',
-      label: 'Data'
-    },
-    {
-      key: 'signal',
-      label: 'Signal'
-    },
-    {
-      key: 'value',
-      label: 'Value'
+      key: 'payload',
+      label: 'Payload'
     }
   ];
 
@@ -114,6 +144,8 @@ implements OnChanges {
   sortColumn: CsvColumnKey = 'timestamp';
 
   sortDirection: 'asc' | 'desc' = 'asc';
+
+  private manifest: CsvExportManifest | null = null;
 
   csvViewer = {
     summary: [] as Array<{
@@ -130,7 +162,7 @@ implements OnChanges {
       changes['selectedNode'] &&
       this.selectedNode
     ) {
-      await this.loadBinAsCsv(
+      await this.loadCsvPreview(
         this.selectedNode
       );
     }
@@ -222,7 +254,7 @@ implements OnChanges {
     );
   }
 
-  private async loadBinAsCsv(
+  private async loadCsvPreview(
     node: S3TreeNode
   ): Promise<void> {
 
@@ -236,32 +268,31 @@ implements OnChanges {
 
     this.filteredRows = [];
 
+    this.manifest = null;
+
     this.csvViewer = {
       summary: []
     };
 
     try {
 
-      const buffer =
-        await this.loadTracksterBinBuffer(
+      if (this.shouldUseLocalMock()) {
+
+        await this.loadLocalMockCsvManifest();
+
+      } else {
+
+        await this.exportCsvWithLambda(
           node
         );
 
-      const manifest =
-        await this.loadRunManifest(
+        await this.loadCsvManifestFromS3(
           node
         );
-
-      const parsed =
-        parseTracksterBin(
-          buffer,
-          manifest
-        );
+      }
 
       this.rows =
-        this.buildDecodedCsvRows(
-          parsed
-        );
+        this.buildRowsFromManifest();
 
       this.filteredRows = [
         ...this.rows
@@ -269,57 +300,19 @@ implements OnChanges {
 
       this.applySort();
 
-      this.csvViewer = {
-        summary: [
-          {
-            label: 'Rows',
-            value:
-              this.rows.length
-                .toLocaleString()
-          },
-          {
-            label: 'Frames',
-            value:
-              parsed.totalFrameCount
-                .toLocaleString()
-          },
-          {
-            label: 'Blocks',
-            value:
-              parsed.blockCount
-                .toLocaleString()
-          },
-          {
-            label: 'Rendered',
-            value:
-              Math.min(
-                parsed.blocks.length,
-                this.maxRenderedBlocks
-              ).toLocaleString()
-          },
-          {
-            label: 'CSV size',
-            value:
-              this.formatBytes(
-                new Blob([
-                  this.buildCsvText(this.rows)
-                ]).size
-              )
-          }
-        ]
-      };
+      this.updateSummary();
 
     } catch (error) {
 
       console.error(
-        'Failed to decode BIN as CSV',
+        'Failed to load CSV preview',
         error
       );
 
       this.csvErrorMessage =
         error instanceof Error
           ? error.message
-          : 'Failed to decode BIN as CSV.';
+          : 'Failed to load CSV preview.';
 
     } finally {
 
@@ -327,88 +320,209 @@ implements OnChanges {
     }
   }
 
-  private buildDecodedCsvRows(
-    parsed: any
-  ): CsvRow[] {
+  private async exportCsvWithLambda(
+    node: S3TreeNode
+  ): Promise<void> {
 
-    const rows: CsvRow[] = [];
+    const config =
+      await this.loadRuntimeConfig();
 
-    const blocks =
-      Array.isArray(parsed.blocks)
-        ? parsed.blocks.slice(
-            0,
-            this.maxRenderedBlocks
-          )
-        : [];
+    const exportUrl =
+      config.decoderApi?.csvExportUrl?.trim();
 
-    const firstTimestampNs =
-      blocks[0]?.timestampNs ?? '0';
+    if (!exportUrl) {
 
-    for (const block of blocks) {
-
-      const blockTimestampNs =
-        block.timestampNs ?? firstTimestampNs;
-
-      for (
-        const frame of block.frames ?? []
-      ) {
-
-        const baseRow = {
-          timestamp:
-            this.calculateFrameTimestampSeconds(
-              firstTimestampNs,
-              blockTimestampNs,
-              frame.timestampDeltaNs
-            ).toFixed(6),
-
-          canId:
-            frame.canIdHex || '',
-
-          name:
-            frame.messageName ||
-            `CAN_${frame.canIdHex}`,
-
-          dlc:
-            String(
-              frame.payloadLength ?? ''
-            ),
-
-          data:
-            this.normalizePayloadHex(
-              frame.payloadBytes
-            )
-        };
-
-        const signals =
-          frame.signals ?? [];
-
-        if (!signals.length) {
-
-          rows.push({
-            ...baseRow,
-            signal: '',
-            value: ''
-          });
-
-          continue;
-        }
-
-        for (const signal of signals) {
-
-          rows.push({
-            ...baseRow,
-            signal:
-              signal.name || '',
-            value:
-              String(
-                signal.value ?? ''
-              )
-          });
-        }
-      }
+      throw new Error(
+        'Missing decoderApi.csvExportUrl in assets/config.json'
+      );
     }
 
-    return rows;
+    const inputBucketName =
+      config.s3Default?.trim() ||
+      's3-trackster-can-bucket';
+
+    const outputBucketName =
+      config.s3CsvBucket?.trim();
+
+    if (!outputBucketName) {
+
+      throw new Error(
+        'Missing s3CsvBucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(
+        config
+      );
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
+            clientId,
+            inputKeys: [
+              node.key
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok) {
+
+      throw new Error(
+        result.message ||
+        `CSV export failed. HTTP ${response.status}`
+      );
+    }
+  }
+
+  private async loadCsvManifestFromS3(
+    node: S3TreeNode
+  ): Promise<void> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3CsvBucket?.trim();
+
+    if (!bucket) {
+
+      throw new Error(
+        'Missing s3CsvBucket in assets/config.json'
+      );
+    }
+
+    const manifestKey =
+      this.buildCsvManifestKey(
+        node.key
+      );
+
+    const buffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        manifestKey
+      );
+
+    const manifestText =
+      new TextDecoder('utf-8')
+        .decode(buffer);
+
+    this.manifest =
+      JSON.parse(
+        manifestText
+      );
+  }
+
+  private async loadLocalMockCsvManifest():
+    Promise<void> {
+
+    const response =
+      await fetch(
+        'assets/mock/csv-export-manifest.json'
+      );
+
+    if (!response.ok) {
+
+      throw new Error(
+        `Failed to load local CSV mock manifest. HTTP ${response.status}`
+      );
+    }
+
+    this.manifest =
+      await response.json();
+  }
+
+  private buildRowsFromManifest():
+    CsvRow[] {
+
+    const rowsPreview =
+      this.manifest?.rowsPreview ?? [];
+
+    return rowsPreview.map((row) => ({
+      timestamp:
+        String(row.timestamp ?? ''),
+      channel:
+        String(row.channel ?? ''),
+      canId:
+        String(row.canId ?? ''),
+      direction:
+        String(row.direction ?? ''),
+      frameType:
+        String(row.frameType ?? ''),
+      dlc:
+        String(row.dlc ?? ''),
+      payload:
+        String(row.payload ?? '')
+    }));
+  }
+
+  private updateSummary(): void {
+
+    const summary =
+      this.manifest?.summary;
+
+    this.csvViewer = {
+      summary: [
+        {
+          label: 'Frames',
+          value:
+            Number(summary?.frameCount ?? 0)
+              .toLocaleString()
+        },
+        {
+          label: 'Preview rows',
+          value:
+            Number(summary?.previewCount ?? this.rows.length)
+              .toLocaleString()
+        },
+        {
+          label: 'Preview limit',
+          value:
+            Number(summary?.previewLimit ?? this.rows.length)
+              .toLocaleString()
+        },
+        {
+          label: 'CAN IDs',
+          value:
+            Number(summary?.uniqueCanIdCount ?? 0)
+              .toLocaleString()
+        },
+        {
+          label: 'Channels',
+          value:
+            Number(summary?.channelCount ?? 0)
+              .toLocaleString()
+        },
+        {
+          label: 'CSV size',
+          value:
+            this.formatBytes(
+              Number(this.manifest?.outputFileSize ?? 0)
+            )
+        }
+      ]
+    };
   }
 
   private applySort(): void {
@@ -508,157 +622,12 @@ implements OnChanges {
     return normalized;
   }
 
-  private calculateFrameTimestampSeconds(
-    firstTimestampNs: string,
-    blockTimestampNs: string,
-    frameDeltaNs: string | number
-  ): number {
-
-    const baseNs =
-      BigInt(
-        firstTimestampNs || '0'
-      );
-
-    const blockNs =
-      BigInt(
-        blockTimestampNs || '0'
-      );
-
-    const deltaNs =
-      BigInt(
-        frameDeltaNs ?? 0
-      );
-
-    const absoluteNs =
-      blockNs + deltaNs;
-
-    const relativeNs =
-      absoluteNs - baseNs;
-
-    return Number(relativeNs) /
-      1_000_000_000;
-  }
-
-  private normalizePayloadHex(
-    payload: string
+  private buildCsvManifestKey(
+    inputKey: string
   ): string {
 
-    if (!payload) {
-      return '';
-    }
-
-    return payload
-      .replace(/\s+/g, '')
-      .toUpperCase();
-  }
-
-  private async loadTracksterBinBuffer(
-    node: S3TreeNode
-  ): Promise<ArrayBuffer> {
-
-    if (this.shouldUseLocalMock()) {
-
-      const response =
-        await fetch(
-          'assets/mock/sample.bin'
-        );
-
-      if (!response.ok) {
-
-        throw new Error(
-          `Failed to load local mock BIN. HTTP ${response.status}`
-        );
-      }
-
-      return await response.arrayBuffer();
-    }
-
-    const config =
-      await this.loadRuntimeConfig();
-
-    const bucket =
-      config.s3Default?.trim();
-
-    if (!bucket) {
-
-      throw new Error(
-        'Missing s3Default in assets/config.json'
-      );
-    }
-
-    return await this.getS3ObjectBuffer(
-      bucket,
-      node.key
-    );
-  }
-
-  private async loadRunManifest(
-    node: S3TreeNode
-  ): Promise<any> {
-
-    if (this.shouldUseLocalMock()) {
-
-      const response =
-        await fetch(
-          'assets/mock/run-manifest.json'
-        );
-
-      if (!response.ok) {
-        return null;
-      }
-
-      return await response.json();
-    }
-
-    const config =
-      await this.loadRuntimeConfig();
-
-    const bucket =
-      config.s3Default?.trim();
-
-    if (!bucket) {
-
-      throw new Error(
-        'Missing s3Default in assets/config.json'
-      );
-    }
-
-    const clientId =
-      this.resolveClientId(config);
-
-    const runId =
-      this.getRunIdFromKey(
-        node.key
-      );
-
-    const manifestKey =
-      `${clientId}/${runId}/run-manifest.json`;
-
-    try {
-
-      const buffer =
-        await this.getS3ObjectBuffer(
-          bucket,
-          manifestKey
-        );
-
-      const manifestText =
-        new TextDecoder('utf-8')
-          .decode(buffer);
-
-      return JSON.parse(
-        manifestText
-      );
-
-    } catch (error) {
-
-      console.warn(
-        'Run manifest not available for CSV viewer',
-        error
-      );
-
-      return null;
-    }
+    return inputKey
+      .replace(/\.[^.]+$/, '.csv.json');
   }
 
   private async getS3Client():
@@ -751,22 +720,6 @@ implements OnChanges {
     );
   }
 
-  private getRunIdFromKey(
-    key: string
-  ): string {
-
-    const parts =
-      key
-        .split('/')
-        .filter(Boolean);
-
-    if (parts.length < 2) {
-      return '';
-    }
-
-    return parts[1];
-  }
-
   private async loadRuntimeConfig():
     Promise<RuntimeConfig> {
 
@@ -796,6 +749,25 @@ implements OnChanges {
       localStorage.getItem('customerId') ||
       '00000000'
     );
+  }
+
+  private async getIdToken():
+    Promise<string> {
+
+    const session =
+      await fetchAuthSession();
+
+    const token =
+      session.tokens?.idToken?.toString();
+
+    if (!token) {
+
+      throw new Error(
+        'Cognito ID token unavailable.'
+      );
+    }
+
+    return token;
   }
 
   private shouldUseLocalMock():
