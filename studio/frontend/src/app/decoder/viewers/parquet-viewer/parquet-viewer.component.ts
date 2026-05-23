@@ -253,16 +253,6 @@ implements OnChanges {
       : '↓';
   }
 
-  async copyParquetToClipboard():
-    Promise<void> {
-
-    await navigator.clipboard.writeText(
-      this.buildParquetPreviewText(
-        this.filteredRows
-      )
-    );
-  }
-
   private async loadParquetPreview(
     node: S3TreeNode
   ): Promise<void> {
