@@ -25,8 +25,12 @@ import { S3TreeNode } from '../../decoder.component';
 interface RuntimeConfig {
   s3Default?: string;
   s3Region?: string;
+  s3VectorAscBucket?: string;
   customerId?: string;
   clientId?: string;
+  decoderApi?: {
+    vectorAscExportUrl?: string;
+  };
 }
 
 type VectorAscViewerMode =
@@ -228,7 +232,154 @@ implements OnChanges {
     );
   }
 
-  exportAscFile(): void {
+  async exportAscFile(): Promise<void> {
+
+    if (this.shouldUseLocalMock()) {
+
+      this.exportAscFileLocally();
+
+      return;
+    }
+
+    this.isLoadingAsc = true;
+
+    this.ascErrorMessage = '';
+
+    try {
+
+      const config =
+        await this.loadRuntimeConfig();
+
+      const exportUrl =
+        config.decoderApi?.vectorAscExportUrl?.trim();
+
+      if (!exportUrl) {
+
+        throw new Error(
+          'Missing decoderApi.vectorAscExportUrl in assets/config.json'
+        );
+      }
+
+      const inputBucket =
+        config.s3Default?.trim();
+
+      if (!inputBucket) {
+
+        throw new Error(
+          'Missing s3Default in assets/config.json'
+        );
+      }
+
+      const outputBucket =
+        config.s3VectorAscBucket?.trim();
+
+      if (!outputBucket) {
+
+        throw new Error(
+          'Missing s3VectorAscBucket in assets/config.json'
+        );
+      }
+
+      const clientId =
+        this.resolveClientId(
+          config
+        );
+
+      const runId =
+        this.getRunIdFromKey(
+          this.selectedNode.key
+        );
+
+      const outputFileName =
+        this.buildAscFileName();
+
+      const outputKey =
+        `${clientId}/${runId}/${outputFileName}`;
+
+      const manifestKey =
+        `${clientId}/${runId}/run-manifest.json`;
+
+      const token =
+        await this.getIdToken();
+
+      const response =
+        await fetch(
+          exportUrl,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              clientId,
+              runId,
+              inputBucket,
+              inputKey: this.selectedNode.key,
+              manifestBucket: inputBucket,
+              manifestKey,
+              outputBucket,
+              outputKey,
+              outputFileName
+            })
+          }
+        );
+
+      const responseText =
+        await response.text();
+
+      const result =
+        responseText
+          ? JSON.parse(responseText)
+          : {};
+
+      if (!response.ok) {
+
+        throw new Error(
+          result.message ||
+          `Vector ASC export failed. HTTP ${response.status}`
+        );
+      }
+
+    } catch (error) {
+
+      console.error(
+        'Failed to export Vector ASC',
+        error
+      );
+
+      this.ascErrorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to export Vector ASC.';
+
+    } finally {
+
+      this.isLoadingAsc = false;
+    }
+  }
+
+  buildRawPageText(
+    rows: VectorAscRow[]
+  ): string {
+
+    const lines =
+      rows.map((row) =>
+        row.rawLine
+      );
+
+    if (this.currentPageIndex === 0) {
+
+      return [
+        ...this.ascHeaderLines,
+        ...lines
+      ].join('\n');
+    }
+
+    return lines.join('\n');
+  }
+
+  private exportAscFileLocally(): void {
 
     const fileName =
       this.buildAscFileName();
@@ -256,26 +407,6 @@ implements OnChanges {
     link.click();
 
     URL.revokeObjectURL(url);
-  }
-
-  buildRawPageText(
-    rows: VectorAscRow[]
-  ): string {
-
-    const lines =
-      rows.map((row) =>
-        row.rawLine
-      );
-
-    if (this.currentPageIndex === 0) {
-
-      return [
-        ...this.ascHeaderLines,
-        ...lines
-      ].join('\n');
-    }
-
-    return lines.join('\n');
   }
 
   private async loadBinAsVectorAsc(
@@ -1181,6 +1312,25 @@ implements OnChanges {
       localStorage.getItem('customerId') ||
       '00000000'
     );
+  }
+
+  private async getIdToken():
+    Promise<string> {
+
+    const session =
+      await fetchAuthSession();
+
+    const token =
+      session.tokens?.idToken?.toString();
+
+    if (!token) {
+
+      throw new Error(
+        'Cognito ID token unavailable.'
+      );
+    }
+
+    return token;
   }
 
   private shouldUseLocalMock():
