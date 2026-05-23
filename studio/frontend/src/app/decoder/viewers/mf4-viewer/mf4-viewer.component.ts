@@ -32,6 +32,43 @@ interface RuntimeConfig {
   };
 }
 
+interface Mf4SummaryCard {
+  label: string;
+  value: string;
+}
+
+interface Mf4Header {
+  mf4Version: string;
+  manifestVersion: string;
+  inputFileSize: string;
+  outputFileSize: string;
+}
+
+interface Mf4Summary {
+  totalFrames: string;
+  canMessages: string;
+  canFdMessages: string;
+  channelCount: string;
+  busCount: string;
+  uniqueCanIds: string;
+  duration: string;
+}
+
+interface Mf4HeaderField {
+  label: string;
+  value: string;
+}
+
+interface Mf4ViewerState {
+  fileName: string;
+  summaryCards: Mf4SummaryCard[];
+  header: Mf4Header;
+  summary: Mf4Summary;
+  headerFields: Mf4HeaderField[];
+  channels: any[];
+  messages: any[];
+}
+
 @Component({
   selector: 'app-mf4-viewer',
   standalone: true,
@@ -54,13 +91,8 @@ export class Mf4ViewerComponent implements OnChanges {
 
   filterText = '';
 
-  mf4Viewer = {
-    fileName: '',
-    summary: [] as any[],
-    headerFields: [] as any[],
-    channels: [] as any[],
-    messages: [] as any[]
-  };
+  mf4Viewer: Mf4ViewerState =
+    this.createEmptyViewer();
 
   async ngOnChanges(
     changes: SimpleChanges
@@ -371,103 +403,162 @@ export class Mf4ViewerComponent implements OnChanges {
         ? manifest.messagesPreview
         : [];
 
+    const frameCount =
+      this.formatNumber(
+        summary.frameCount
+      );
+
+    const canMessageCount =
+      this.formatNumber(
+        summary.canMessageCount
+      );
+
+    const canFdMessageCount =
+      this.formatNumber(
+        summary.canFdMessageCount
+      );
+
+    const channelCount =
+      this.formatNumber(
+        channels.length
+      );
+
+    const busCount =
+      this.formatNumber(
+        summary.busCount
+      );
+
+    const uniqueCanIdCount =
+      this.formatNumber(
+        summary.uniqueCanIdCount
+      );
+
+    const duration =
+      this.formatDuration(
+        summary.durationSeconds
+      );
+
+    const outputFileSize =
+      this.formatBytes(
+        manifest.outputFileSize || 0
+      );
+
+    const inputFileSize =
+      this.formatBytes(
+        manifest.inputFileSize || 0
+      );
+
     this.mf4Viewer = {
       fileName:
         this.buildMf4FileName(
           this.selectedNode.name
         ),
 
-      summary: [
+      summaryCards: [
         {
           label: 'Frames',
-          value:
-            this.formatNumber(
-              summary.frameCount
-            )
+          value: frameCount
         },
         {
           label: 'CAN',
-          value:
-            this.formatNumber(
-              summary.canMessageCount
-            )
+          value: canMessageCount
         },
         {
           label: 'CAN FD',
-          value:
-            this.formatNumber(
-              summary.canFdMessageCount
-            )
+          value: canFdMessageCount
         },
         {
           label: 'Channels',
-          value:
-            this.formatNumber(
-              channels.length
-            )
+          value: channelCount
         },
         {
           label: 'Size',
-          value:
-            this.formatBytes(
-              manifest.outputFileSize || 0
-            )
+          value: outputFileSize
         }
       ],
+
+      header: {
+        mf4Version:
+          String(
+            manifest.mf4Version || '-'
+          ),
+        manifestVersion:
+          String(
+            manifest.manifestVersion || '-'
+          ),
+        inputFileSize,
+        outputFileSize
+      },
+
+      summary: {
+        totalFrames: frameCount,
+        canMessages: canMessageCount,
+        canFdMessages: canFdMessageCount,
+        channelCount,
+        busCount,
+        uniqueCanIds: uniqueCanIdCount,
+        duration
+      },
 
       headerFields: [
         {
           label: 'MF4 version',
           value:
-            manifest.mf4Version || '-'
+            String(
+              manifest.mf4Version || '-'
+            )
         },
         {
           label: 'Manifest version',
           value:
-            manifest.manifestVersion || '-'
+            String(
+              manifest.manifestVersion || '-'
+            )
         },
         {
           label: 'Input file',
           value:
-            manifest.inputKey || '-'
+            String(
+              manifest.inputKey || '-'
+            )
         },
         {
           label: 'Output file',
           value:
-            manifest.outputKey || '-'
+            String(
+              manifest.outputKey || '-'
+            )
         },
         {
           label: 'Manifest file',
           value:
-            manifest.manifestKey || '-'
+            String(
+              manifest.manifestKey || '-'
+            )
+        },
+        {
+          label: 'Input size',
+          value: inputFileSize
+        },
+        {
+          label: 'Output size',
+          value: outputFileSize
         },
         {
           label: 'Frames',
-          value:
-            this.formatNumber(
-              summary.frameCount
-            )
+          value: frameCount
         },
         {
           label: 'Buses',
-          value:
-            this.formatNumber(
-              summary.busCount
-            )
+          value: busCount
         },
         {
           label: 'Unique CAN IDs',
-          value:
-            this.formatNumber(
-              summary.uniqueCanIdCount
-            )
+          value: uniqueCanIdCount
         },
         {
           label: 'Duration',
-          value:
-            this.formatDuration(
-              summary.durationSeconds
-            )
+          value: duration
         },
         {
           label: 'Preview messages',
@@ -732,9 +823,31 @@ export class Mf4ViewerComponent implements OnChanges {
   private resetViewer():
     void {
 
-    this.mf4Viewer = {
+    this.mf4Viewer =
+      this.createEmptyViewer();
+  }
+
+  private createEmptyViewer():
+    Mf4ViewerState {
+
+    return {
       fileName: '',
-      summary: [],
+      summaryCards: [],
+      header: {
+        mf4Version: '-',
+        manifestVersion: '-',
+        inputFileSize: '-',
+        outputFileSize: '-'
+      },
+      summary: {
+        totalFrames: '0',
+        canMessages: '0',
+        canFdMessages: '0',
+        channelCount: '0',
+        busCount: '0',
+        uniqueCanIds: '0',
+        duration: '-'
+      },
       headerFields: [],
       channels: [],
       messages: []
