@@ -2,7 +2,7 @@
    "workQueueUrl":  "https://sqs.us-east-1.amazonaws.com/366493038898/sqs-trackster-vehicles-creation",
    "s3Region": "us-east-1",
    "s3Default":     "s3-trackster-can-bucket",
-   "s3CsvBucket": "s3-trackster-export-csv",
+   "s3CsvBucket": "s3-trackster-export-bin-csv",
    "s3VectorAscBucket": "s3-trackster-export-vectorasc",
    "s3BlfBucket":    "s3-trackster-export-blf",
    "s3Mf4Bucket": "s3-trackster-export-mf4",
