@@ -58,6 +58,8 @@ interface ParquetManifestRow {
   frameType: string;
   dlc: string;
   payload: string;
+  signal?: string;
+  value?: string;
 }
 
 interface ParquetRow {
@@ -469,27 +471,40 @@ implements OnChanges {
       return {
         timestamp:
           String(row.timestamp ?? ''),
+
         channel:
           String(row.channel ?? ''),
+
         canId,
+
         direction:
           String(row.direction ?? ''),
+
         frameType:
           String(row.frameType ?? ''),
+
         dlc:
           String(row.dlc ?? ''),
+
         payload,
 
         name:
           canId
             ? `CAN_${canId}`
             : '',
+
         data:
           payload,
+
         signal:
-          '',
+          String(
+            (row as any).signal ?? ''
+          ),
+
         value:
-          ''
+          String(
+            (row as any).value ?? ''
+          )
       };
     });
   }
@@ -588,55 +603,6 @@ implements OnChanges {
             ) * direction;
         }
       );
-  }
-
-  private buildParquetPreviewText(
-    rows: ParquetRow[]
-  ): string {
-
-    const header =
-      this.columns
-        .map((column) =>
-          this.escapeTextValue(
-            column.label
-          )
-        )
-        .join(',');
-
-    const body =
-      rows.map((row) =>
-        this.columns
-          .map((column) =>
-            this.escapeTextValue(
-              row[column.key]
-            )
-          )
-          .join(',')
-      );
-
-    return [
-      header,
-      ...body
-    ].join('\n');
-  }
-
-  private escapeTextValue(
-    value: string
-  ): string {
-
-    const normalized =
-      String(value ?? '');
-
-    if (
-      normalized.includes(',') ||
-      normalized.includes('"') ||
-      normalized.includes('\n')
-    ) {
-
-      return `"${normalized.replace(/"/g, '""')}"`;
-    }
-
-    return normalized;
   }
 
   private buildParquetManifestKey(
