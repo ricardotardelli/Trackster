@@ -1,19 +1,19 @@
 {
   "manifestVersion": 1,
-  "createdAt": "2026-05-10T22:10:08.512Z",
-  "requestId": "da227a9b-958c-4f90-9e17-18deea0ed937",
-  "runId": "20260510221008",
-  "timestamp": "20260510221008",
+  "createdAt": "2026-05-21T15:23:01.403Z",
+  "requestId": "9802be99-33bd-4a7b-a777-37dc624d9eb2",
+  "runId": "20260521152301",
+  "timestamp": "20260521152301",
   "customerId": "00000000",
   "clientId": "00000000",
   "output": {
     "bucket": "s3-trackster-can-bucket",
-    "runFolder": "00000000/20260510221008",
-    "manifestKey": "00000000/20260510221008/run-manifest.json",
+    "runFolder": "00000000/20260521152301",
+    "manifestKey": "00000000/20260521152301/run-manifest.json",
     "outputFormat": "BIN"
   },
   "simulation": {
-    "amountOfVehicles": 1,
+    "amountOfVehicles": 100,
     "amountOfTime": 1,
     "generationType": "all_at_once",
     "requestedNumberOfBlocks": 0,
@@ -21,9 +21,9 @@
     "blocksSize": 7560,
     "intervalSec": 5,
     "durationSec": 3600,
-    "epochMs": 1778454540000,
-    "epochSec": 1778454540,
-    "initialDateTime": "2026-05-10T23:09",
+    "epochMs": 1779380040000,
+    "epochSec": 1779380040,
+    "initialDateTime": "2026-05-21T16:14",
     "speed": 80,
     "unity": "Km",
     "driverProfile": "Balanced"
@@ -31,1131 +31,1751 @@
   "gps": {
     "gpsCoordinates": [
       [
-        "025E4D46FF7C11A0",
+        "025EA479FF7A7B8D",
         1
       ],
       [
-        "025E5120FF7C126F",
+        "025EA836FF7A7D03",
         1
       ],
       [
-        "025E54FBFF7C133E",
+        "025EABF3FF7A7E79",
         1
       ],
       [
-        "025E58D5FF7C140E",
+        "025EAFB0FF7A7FF0",
         1
       ],
       [
-        "025E5CB0FF7C14DD",
+        "025EB36DFF7A8166",
         1
       ],
       [
-        "025E608AFF7C15AC",
+        "025EB72AFF7A82DC",
         1
       ],
       [
-        "025E6465FF7C167B",
+        "025EBAE7FF7A8452",
         1
       ],
       [
-        "025E683FFF7C174A",
+        "025EBEA4FF7A85C9",
         1
       ],
       [
-        "025E6C1AFF7C181A",
+        "025EC261FF7A873F",
         1
       ],
       [
-        "025E6FF4FF7C18E9",
+        "025EC61EFF7A88B5",
         1
       ],
       [
-        "025E73CFFF7C19B8",
+        "025EC9DBFF7A8A2B",
         1
       ],
       [
-        "025E77A9FF7C1A87",
+        "025ECD98FF7A8BA1",
         1
       ],
       [
-        "025E7B84FF7C1B56",
+        "025ED155FF7A8D18",
         1
       ],
       [
-        "025E7F5EFF7C1C26",
+        "025ED512FF7A8E8E",
         1
       ],
       [
-        "025E8339FF7C1CF5",
+        "025ED8CFFF7A9004",
         1
       ],
       [
-        "025E8713FF7C1DC4",
+        "025EDC8CFF7A917A",
         1
       ],
       [
-        "025E8AEEFF7C1E93",
+        "025EE049FF7A92F1",
         1
       ],
       [
-        "025E8EC8FF7C1F62",
+        "025EE406FF7A9467",
         1
       ],
       [
-        "025E92A3FF7C2032",
+        "025EE7C3FF7A95DD",
         1
       ],
       [
-        "025E967DFF7C2101",
+        "025EEB80FF7A9753",
         1
       ],
       [
-        "025E9A58FF7C21D0",
+        "025EEF3DFF7A98C9",
         1
       ],
       [
-        "025E9E32FF7C229F",
+        "025EF2FAFF7A9A40",
         1
       ],
       [
-        "025EA20DFF7C236E",
+        "025EF6B7FF7A9BB6",
         1
       ],
       [
-        "025EA5E7FF7C243E",
+        "025EFA74FF7A9D2C",
         1
       ],
       [
-        "025EA9C2FF7C250D",
+        "025EFE31FF7A9EA2",
         1
       ],
       [
-        "025EAD9CFF7C25DC",
+        "025F01EEFF7AA019",
         1
       ],
       [
-        "025EB177FF7C26AB",
+        "025F05ABFF7AA18F",
         1
       ],
       [
-        "025EB551FF7C277A",
+        "025F0968FF7AA305",
         1
       ],
       [
-        "025EB92CFF7C284A",
+        "025F0D25FF7AA47B",
         1
       ],
       [
-        "025EBD06FF7C2919",
+        "025F10E2FF7AA5F1",
         1
       ],
       [
-        "025EC0E1FF7C29E8",
+        "025F149FFF7AA768",
         1
       ],
       [
-        "025EC4BBFF7C2AB7",
+        "025F185DFF7AA8DE",
         1
       ],
       [
-        "025EC895FF7C2B87",
+        "025F1C1AFF7AAA54",
         1
       ],
       [
-        "025ECC70FF7C2C56",
+        "025F1FD7FF7AABCA",
         1
       ],
       [
-        "025ED04AFF7C2D25",
+        "025F2394FF7AAD41",
         1
       ],
       [
-        "025ED425FF7C2DF4",
+        "025F2751FF7AAEB7",
         1
       ],
       [
-        "025ED7FFFF7C2EC3",
+        "025F2B0EFF7AB02D",
         1
       ],
       [
-        "025EDBDAFF7C2F93",
+        "025F2ECBFF7AB1A3",
         1
       ],
       [
-        "025EDFB4FF7C3062",
+        "025F3288FF7AB319",
         1
       ],
       [
-        "025EE38FFF7C3131",
+        "025F3645FF7AB490",
         1
       ],
       [
-        "025EE769FF7C3200",
+        "025F3A02FF7AB606",
         1
       ],
       [
-        "025EEB44FF7C32CF",
+        "025F3DBFFF7AB77C",
         1
       ],
       [
-        "025EEF1EFF7C339F",
+        "025F417CFF7AB8F2",
         1
       ],
       [
-        "025EF2F9FF7C346E",
+        "025F4539FF7ABA69",
         1
       ],
       [
-        "025EF6D3FF7C353D",
+        "025F48F6FF7ABBDF",
         1
       ],
       [
-        "025EFAAEFF7C360C",
+        "025F4CB3FF7ABD55",
         1
       ],
       [
-        "025EFE88FF7C36DB",
+        "025F5070FF7ABECB",
         1
       ],
       [
-        "025F0263FF7C37AB",
+        "025F542DFF7AC041",
         1
       ],
       [
-        "025F063DFF7C387A",
+        "025F57EAFF7AC1B8",
         1
       ],
       [
-        "025F0A18FF7C3949",
+        "025F5BA7FF7AC32E",
         1
       ],
       [
-        "025F0DF2FF7C3A18",
+        "025F5F64FF7AC4A4",
         1
       ],
       [
-        "025F11CDFF7C3AE7",
+        "025F6321FF7AC61A",
         1
       ],
       [
-        "025F15A7FF7C3BB7",
+        "025F66DEFF7AC791",
         1
       ],
       [
-        "025F1982FF7C3C86",
+        "025F6A9BFF7AC907",
         1
       ],
       [
-        "025F1D5CFF7C3D55",
+        "025F6E58FF7ACA7D",
         1
       ],
       [
-        "025F2137FF7C3E24",
+        "025F7215FF7ACBF3",
         1
       ],
       [
-        "025F2511FF7C3EF3",
+        "025F75D2FF7ACD69",
         1
       ],
       [
-        "025F28ECFF7C3FC3",
+        "025F798FFF7ACEE0",
         1
       ],
       [
-        "025F2CC6FF7C4092",
+        "025F7D4CFF7AD056",
         1
       ],
       [
-        "025F30A1FF7C4161",
+        "025F8109FF7AD1CC",
         1
       ],
       [
-        "025F347BFF7C4230",
+        "025F84C6FF7AD342",
         1
       ],
       [
-        "025F3856FF7C42FF",
+        "025F8883FF7AD4B9",
         1
       ],
       [
-        "025F3C30FF7C43CF",
+        "025F8C40FF7AD62F",
         1
       ],
       [
-        "025F400BFF7C449E",
+        "025F8FFDFF7AD7A5",
         1
       ],
       [
-        "025F43E5FF7C456D",
+        "025F93BAFF7AD91B",
         1
       ],
       [
-        "025F47BFFF7C463C",
+        "025F9777FF7ADA91",
         1
       ],
       [
-        "025F4B9AFF7C470B",
+        "025F9B34FF7ADC08",
         1
       ],
       [
-        "025F4F74FF7C47DB",
+        "025F9EF1FF7ADD7E",
         1
       ],
       [
-        "025F534FFF7C48AA",
+        "025FA2AEFF7ADEF4",
         1
       ],
       [
-        "025F5729FF7C4979",
+        "025FA66BFF7AE06A",
         1
       ],
       [
-        "025F5B04FF7C4A48",
+        "025FAA28FF7AE1E1",
         1
       ],
       [
-        "025F5EDEFF7C4B17",
+        "025FADE5FF7AE357",
         1
       ],
       [
-        "025F62B9FF7C4BE7",
+        "025FB1A2FF7AE4CD",
         1
       ],
       [
-        "025F6693FF7C4CB6",
+        "025FB55FFF7AE643",
         1
       ],
       [
-        "025F6A6EFF7C4D85",
+        "025FB91CFF7AE7B9",
         1
       ],
       [
-        "025F6E48FF7C4E54",
+        "025FBCD9FF7AE930",
         1
       ],
       [
-        "025F7223FF7C4F23",
+        "025FC096FF7AEAA6",
         1
       ],
       [
-        "025F75FDFF7C4FF3",
+        "025FC453FF7AEC1C",
         1
       ],
       [
-        "025F79D8FF7C50C2",
+        "025FC810FF7AED92",
         1
       ],
       [
-        "025F7DB2FF7C5191",
+        "025FCBCDFF7AEF08",
         1
       ],
       [
-        "025F818DFF7C5260",
+        "025FCF8AFF7AF07F",
         1
       ],
       [
-        "025F8567FF7C532F",
+        "025FD347FF7AF1F5",
         1
       ],
       [
-        "025F8942FF7C53FF",
+        "025FD704FF7AF36B",
         1
       ],
       [
-        "025F8D1CFF7C54CE",
+        "025FDAC1FF7AF4E1",
         1
       ],
       [
-        "025F90F7FF7C559D",
+        "025FDE7EFF7AF658",
         1
       ],
       [
-        "025F94D1FF7C566C",
+        "025FE23BFF7AF7CE",
         1
       ],
       [
-        "025F98ACFF7C573C",
+        "025FE5F8FF7AF944",
         1
       ],
       [
-        "025F9C86FF7C580B",
+        "025FE9B5FF7AFABA",
         1
       ],
       [
-        "025FA061FF7C58DA",
+        "025FED72FF7AFC30",
         1
       ],
       [
-        "025FA43BFF7C59A9",
+        "025FF12FFF7AFDA7",
         1
       ],
       [
-        "025FA816FF7C5A78",
+        "025FF4ECFF7AFF1D",
         1
       ],
       [
-        "025FABF0FF7C5B48",
+        "025FF8AAFF7B0093",
         1
       ],
       [
-        "025FAFCBFF7C5C17",
+        "025FFC67FF7B0209",
         1
       ],
       [
-        "025FB3A5FF7C5CE6",
+        "02600024FF7B0380",
         1
       ],
       [
-        "025FB780FF7C5DB5",
+        "026003E1FF7B04F6",
         1
       ],
       [
-        "025FBB5AFF7C5E84",
+        "0260079EFF7B066C",
         1
       ],
       [
-        "025FBF34FF7C5F54",
+        "02600B5BFF7B07E2",
         1
       ],
       [
-        "025FC30FFF7C6023",
+        "02600F18FF7B0958",
         1
       ],
       [
-        "025FC6E9FF7C60F2",
+        "026012D5FF7B0ACF",
         1
       ],
       [
-        "025FCAC4FF7C61C1",
+        "02601692FF7B0C45",
         1
       ],
       [
-        "025FCE9EFF7C6290",
+        "02601A4FFF7B0DBB",
         1
       ],
       [
-        "025FD279FF7C6360",
+        "02601E0CFF7B0F31",
         1
       ],
       [
-        "025FD653FF7C642F",
+        "026021C9FF7B10A8",
         1
       ],
       [
-        "025FDA2EFF7C64FE",
+        "02602586FF7B121E",
         1
       ],
       [
-        "025FDE08FF7C65CD",
+        "02602943FF7B1394",
         1
       ],
       [
-        "025FE1E3FF7C669C",
+        "02602D00FF7B150A",
         1
       ],
       [
-        "025FE5BDFF7C676C",
+        "026030BDFF7B1680",
         1
       ],
       [
-        "025FE998FF7C683B",
+        "0260347AFF7B17F7",
         1
       ],
       [
-        "025FED72FF7C690A",
+        "02603837FF7B196D",
         1
       ],
       [
-        "025FF14DFF7C69D9",
+        "02603BF4FF7B1AE3",
         1
       ],
       [
-        "025FF527FF7C6AA8",
+        "02603FB1FF7B1C59",
         1
       ],
       [
-        "025FF902FF7C6B78",
+        "0260436EFF7B1DD0",
         1
       ],
       [
-        "025FFCDCFF7C6C47",
+        "0260472BFF7B1F46",
         1
       ],
       [
-        "026000B7FF7C6D16",
+        "02604AE8FF7B20BC",
         1
       ],
       [
-        "02600491FF7C6DE5",
+        "02604EA5FF7B2232",
         1
       ],
       [
-        "0260086CFF7C6EB4",
+        "02605262FF7B23A8",
         1
       ],
       [
-        "02600C46FF7C6F84",
+        "0260561FFF7B251F",
         1
       ],
       [
-        "02601021FF7C7053",
+        "026059DCFF7B2695",
         1
       ],
       [
-        "026013FBFF7C7122",
+        "02605D99FF7B280B",
         1
       ],
       [
-        "026017D6FF7C71F1",
+        "02606156FF7B2981",
         1
       ],
       [
-        "02601BB0FF7C72C0",
+        "02606513FF7B2AF8",
         1
       ],
       [
-        "02601F8BFF7C7390",
+        "026068D0FF7B2C6E",
         1
       ],
       [
-        "02602365FF7C745F",
+        "02606C8DFF7B2DE4",
         1
       ],
       [
-        "02602740FF7C752E",
+        "0260704AFF7B2F5A",
         1
       ],
       [
-        "02602B1AFF7C75FD",
+        "02607407FF7B30D0",
         1
       ],
       [
-        "02602EF5FF7C76CC",
+        "026077C4FF7B3247",
         1
       ],
       [
-        "026032CFFF7C779C",
+        "02607B81FF7B33BD",
         1
       ],
       [
-        "026036AAFF7C786B",
+        "02607F3EFF7B3533",
         1
       ],
       [
-        "02603A84FF7C793A",
+        "026082FBFF7B36A9",
         1
       ],
       [
-        "02603E5EFF7C7A09",
+        "026086B8FF7B3820",
         1
       ],
       [
-        "02604239FF7C7AD8",
+        "02608A75FF7B3996",
         1
       ],
       [
-        "02604613FF7C7BA8",
+        "02608E32FF7B3B0C",
         1
       ],
       [
-        "026049EEFF7C7C77",
+        "026091EFFF7B3C82",
         1
       ],
       [
-        "02604D8FFF7C7E14",
+        "02609567FF7B3ED1",
         1
       ],
       [
-        "026050E7FF7C80B3",
+        "026098D4FF7B4142",
         1
       ],
       [
-        "02605440FF7C8351",
+        "02609C41FF7B43B2",
         1
       ],
       [
-        "02605799FF7C85F0",
+        "02609FAEFF7B4623",
         1
       ],
       [
-        "02605AF2FF7C888F",
+        "0260A31BFF7B4894",
         1
       ],
       [
-        "02605E4AFF7C8B2D",
+        "0260A688FF7B4B05",
         1
       ],
       [
-        "026061A3FF7C8DCC",
+        "0260A9F5FF7B4D75",
         1
       ],
       [
-        "026064FCFF7C906B",
+        "0260AD62FF7B4FE6",
         1
       ],
       [
-        "02606855FF7C9309",
+        "0260B0CFFF7B5257",
         1
       ],
       [
-        "02606BADFF7C95A8",
+        "0260B43CFF7B54C8",
         1
       ],
       [
-        "02606F06FF7C9847",
+        "0260B7A9FF7B5738",
         1
       ],
       [
-        "0260725FFF7C9AE5",
+        "0260BB16FF7B59A9",
         1
       ],
       [
-        "026075B8FF7C9D84",
+        "0260BE83FF7B5C1A",
         1
       ],
       [
-        "02607910FF7CA023",
+        "0260C1F0FF7B5E8A",
         1
       ],
       [
-        "02607C69FF7CA2C1",
+        "0260C55DFF7B60FB",
         1
       ],
       [
-        "02607FC2FF7CA560",
+        "0260C8CAFF7B636C",
         1
       ],
       [
-        "0260831AFF7CA7FF",
+        "0260CC37FF7B65DD",
         1
       ],
       [
-        "02608673FF7CAA9D",
+        "0260CFA4FF7B684D",
         1
       ],
       [
-        "026089CCFF7CAD3C",
+        "0260D311FF7B6ABE",
         1
       ],
       [
-        "02608D25FF7CAFDB",
+        "0260D67EFF7B6D2F",
         1
       ],
       [
-        "0260907DFF7CB279",
+        "0260D9EBFF7B6FA0",
         1
       ],
       [
-        "026093D6FF7CB518",
+        "0260DD58FF7B7210",
         1
       ],
       [
-        "0260972FFF7CB7B7",
+        "0260E0C5FF7B7481",
         1
       ],
       [
-        "02609A88FF7CBA55",
+        "0260E432FF7B76F2",
         1
       ],
       [
-        "02609DE0FF7CBCF4",
+        "0260E79FFF7B7962",
         1
       ],
       [
-        "0260A139FF7CBF93",
+        "0260EB0CFF7B7BD3",
         1
       ],
       [
-        "0260A492FF7CC231",
+        "0260EE79FF7B7E44",
         1
       ],
       [
-        "0260A7EBFF7CC4D0",
+        "0260F1E6FF7B80B5",
         1
       ],
       [
-        "0260AB43FF7CC76F",
+        "0260F553FF7B8325",
         1
       ],
       [
-        "0260AE9CFF7CCA0D",
+        "0260F8C0FF7B8596",
         1
       ],
       [
-        "0260B1F5FF7CCCAC",
+        "0260FC2DFF7B8807",
         1
       ],
       [
-        "0260B54DFF7CCF4B",
+        "0260FF9AFF7B8A78",
         1
       ],
       [
-        "0260B8A6FF7CD1E9",
+        "02610307FF7B8CE8",
         1
       ],
       [
-        "0260BBFFFF7CD488",
+        "02610674FF7B8F59",
         1
       ],
       [
-        "0260BF58FF7CD727",
+        "026109E1FF7B91CA",
         1
       ],
       [
-        "0260C2B0FF7CD9C5",
+        "02610D4EFF7B943B",
         1
       ],
       [
-        "0260C609FF7CDC64",
+        "026110BBFF7B96AB",
         1
       ],
       [
-        "0260C962FF7CDF03",
+        "02611428FF7B991C",
         1
       ],
       [
-        "0260CCBBFF7CE1A1",
+        "02611795FF7B9B8D",
         1
       ],
       [
-        "0260D013FF7CE440",
+        "02611B02FF7B9DFD",
         1
       ],
       [
-        "0260D36CFF7CE6DF",
+        "02611E6FFF7BA06E",
         1
       ],
       [
-        "0260D6C5FF7CE97D",
+        "026121DCFF7BA2DF",
         1
       ],
       [
-        "0260DA1EFF7CEC1C",
+        "02612549FF7BA550",
         1
       ],
       [
-        "0260DD76FF7CEEBB",
+        "026128B6FF7BA7C0",
         1
       ],
       [
-        "0260E0CFFF7CF159",
+        "02612C23FF7BAA31",
         1
       ],
       [
-        "0260E428FF7CF3F8",
+        "02612F91FF7BACA2",
         1
       ],
       [
-        "0260E780FF7CF697",
+        "026132FEFF7BAF13",
         1
       ],
       [
-        "0260EAD9FF7CF935",
+        "0261366BFF7BB183",
         1
       ],
       [
-        "0260EE32FF7CFBD4",
+        "026139D8FF7BB3F4",
         1
       ],
       [
-        "0260F18BFF7CFE73",
+        "02613D45FF7BB665",
         1
       ],
       [
-        "0260F4E3FF7D0111",
+        "026140B2FF7BB8D5",
         1
       ],
       [
-        "0260F83CFF7D03B0",
+        "0261441FFF7BBB46",
         1
       ],
       [
-        "0260FB95FF7D064F",
+        "0261478CFF7BBDB7",
         1
       ],
       [
-        "0260FEEEFF7D08ED",
+        "02614AF9FF7BC028",
         1
       ],
       [
-        "02610246FF7D0B8C",
+        "02614E66FF7BC298",
         1
       ],
       [
-        "0261059FFF7D0E2B",
+        "026151D3FF7BC509",
         1
       ],
       [
-        "026108F8FF7D10C9",
+        "02615540FF7BC77A",
         1
       ],
       [
-        "02610C51FF7D1368",
+        "026158ADFF7BC9EB",
         1
       ],
       [
-        "02610FA9FF7D1607",
+        "02615C1AFF7BCC5B",
         1
       ],
       [
-        "02611302FF7D18A5",
+        "02615F87FF7BCECC",
         1
       ],
       [
-        "0261165BFF7D1B44",
+        "026162F4FF7BD13D",
         1
       ],
       [
-        "026119B3FF7D1DE3",
+        "02616661FF7BD3AD",
         1
       ],
       [
-        "02611D0CFF7D2081",
+        "026169CEFF7BD61E",
         1
       ],
       [
-        "02612065FF7D2320",
+        "02616D3BFF7BD88F",
         1
       ],
       [
-        "026123BEFF7D25BF",
+        "026170A8FF7BDB00",
         1
       ],
       [
-        "02612716FF7D285D",
+        "02617415FF7BDD70",
         1
       ],
       [
-        "02612A6FFF7D2AFC",
+        "02617782FF7BDFE1",
         1
       ],
       [
-        "02612DC8FF7D2D9B",
+        "02617AEFFF7BE252",
         1
       ],
       [
-        "02613121FF7D3039",
+        "02617E5CFF7BE4C3",
         1
       ],
       [
-        "02613479FF7D32D8",
+        "026181C9FF7BE733",
         1
       ],
       [
-        "026137D2FF7D3577",
+        "02618536FF7BE9A4",
         1
       ],
       [
-        "02613B2BFF7D3815",
+        "026188A3FF7BEC15",
         1
       ],
       [
-        "02613E84FF7D3AB4",
+        "02618C10FF7BEE86",
         1
       ],
       [
-        "026141DCFF7D3D53",
+        "02618F7DFF7BF0F6",
         1
       ],
       [
-        "02614535FF7D3FF1",
+        "026192EAFF7BF367",
         1
       ],
       [
-        "0261488EFF7D4290",
+        "02619657FF7BF5D8",
         1
       ],
       [
-        "02614BE6FF7D452F",
+        "026199C4FF7BF848",
         1
       ],
       [
-        "02614F3FFF7D47CD",
+        "02619D31FF7BFAB9",
         1
       ],
       [
-        "02615298FF7D4A6C",
+        "0261A09EFF7BFD2A",
         1
       ],
       [
-        "026155F1FF7D4D0B",
+        "0261A40BFF7BFF9B",
         1
       ],
       [
-        "02615949FF7D4FA9",
+        "0261A778FF7C020B",
         1
       ],
       [
-        "02615CA2FF7D5248",
+        "0261AAE5FF7C047C",
         1
       ],
       [
-        "02615FFBFF7D54E7",
+        "0261AE52FF7C06ED",
         1
       ],
       [
-        "02616354FF7D5785",
+        "0261B1BFFF7C095E",
         1
       ],
       [
-        "026166ACFF7D5A24",
+        "0261B52CFF7C0BCE",
         1
       ],
       [
-        "02616A05FF7D5CC3",
+        "0261B899FF7C0E3F",
         1
       ],
       [
-        "02616D5EFF7D5F61",
+        "0261BC06FF7C10B0",
         1
       ],
       [
-        "026170B7FF7D6200",
+        "0261BF73FF7C1320",
         1
       ],
       [
-        "0261740FFF7D649F",
+        "0261C2E0FF7C1591",
         1
       ],
       [
-        "02617768FF7D673D",
+        "0261C64DFF7C1802",
         1
       ],
       [
-        "02617AC1FF7D69DC",
+        "0261C9BAFF7C1A73",
         1
       ],
       [
-        "02617E19FF7D6C7B",
+        "0261CD27FF7C1CE3",
         1
       ],
       [
-        "02618172FF7D6F19",
+        "0261D094FF7C1F54",
         1
       ],
       [
-        "026184CBFF7D71B8",
+        "0261D401FF7C21C5",
         1
       ],
       [
-        "02618824FF7D7457",
+        "0261D76EFF7C2436",
         1
       ],
       [
-        "02618B7CFF7D76F5",
+        "0261DADBFF7C26A6",
         1
       ],
       [
-        "02618ED5FF7D7994",
+        "0261DE48FF7C2917",
         1
       ],
       [
-        "0261922EFF7D7C33",
+        "0261E1B5FF7C2B88",
         1
       ],
       [
-        "02619587FF7D7ED1",
+        "0261E522FF7C2DF8",
         1
       ],
       [
-        "026198DFFF7D8170",
+        "0261E88FFF7C3069",
         1
       ],
       [
-        "02619C38FF7D840F",
+        "0261EBFCFF7C32DA",
         1
       ],
       [
-        "02619F91FF7D86AD",
+        "0261EF69FF7C354B",
         1
       ],
       [
-        "0261A2EAFF7D894C",
+        "0261F2D6FF7C37BB",
         1
       ],
       [
-        "0261A642FF7D8BEB",
+        "0261F643FF7C3A2C",
         1
       ],
       [
-        "0261A99BFF7D8E89",
+        "0261F9B0FF7C3C9D",
         1
       ],
       [
-        "0261ACF4FF7D9128",
+        "0261FD1DFF7C3F0E",
         1
       ],
       [
-        "0261B04CFF7D93C7",
+        "0262008AFF7C417E",
         1
       ],
       [
-        "0261B3A5FF7D9665",
+        "026203F7FF7C43EF",
         1
       ],
       [
-        "0261B6FEFF7D9904",
+        "02620764FF7C4660",
         1
       ],
       [
-        "0261BA57FF7D9BA3",
+        "02620AD1FF7C48D0",
         1
       ],
       [
-        "0261BDAFFF7D9E41",
+        "02620E3EFF7C4B41",
         1
       ],
       [
-        "0261C108FF7DA0E0",
+        "026211ABFF7C4DB2",
         1
       ],
       [
-        "0261C461FF7DA37F",
+        "02621518FF7C5023",
         1
       ],
       [
-        "0261C7BAFF7DA61D",
+        "02621885FF7C5293",
         1
       ],
       [
-        "0261CB12FF7DA8BC",
+        "02621BF2FF7C5504",
         1
       ],
       [
-        "0261CE6BFF7DAB5B",
+        "02621F5FFF7C5775",
         1
       ],
       [
-        "0261D1C4FF7DADF9",
+        "026222CCFF7C59E6",
         1
       ],
       [
-        "0261D51DFF7DB098",
+        "02622639FF7C5C56",
         1
       ],
       [
-        "0261D875FF7DB337",
+        "026229A6FF7C5EC7",
         1
       ],
       [
-        "0261DBCEFF7DB5D5",
+        "02622D13FF7C6138",
         1
       ],
       [
-        "0261DF27FF7DB874",
+        "02623080FF7C63A9",
         1
       ],
       [
-        "0261E27FFF7DBB13",
+        "026233EDFF7C6619",
         1
       ],
       [
-        "0261E5D8FF7DBDB1",
+        "0262375AFF7C688A",
         1
       ],
       [
-        "0261E931FF7DC050",
+        "02623AC7FF7C6AFB",
         1
       ],
       [
-        "0261EC8AFF7DC2EF",
+        "02623E34FF7C6D6B",
         1
       ],
       [
-        "0261EFE2FF7DC58D",
+        "026241A1FF7C6FDC",
         1
       ],
       [
-        "0261F33BFF7DC82C",
+        "0262450EFF7C724D",
         1
       ],
       [
-        "0261F694FF7DCACB",
+        "0262487BFF7C74BE",
         1
       ],
       [
-        "0261F9EDFF7DCD69",
+        "02624BE8FF7C772E",
         1
       ],
       [
-        "0261FD45FF7DD008",
+        "02624F55FF7C799F",
         1
       ],
       [
-        "0262009EFF7DD2A7",
+        "026252C2FF7C7C10",
         1
       ],
       [
-        "026203F7FF7DD545",
+        "0262562FFF7C7E81",
         1
       ],
       [
-        "0262074FFF7DD7E4",
+        "0262599CFF7C80F1",
         1
       ],
       [
-        "02620AA8FF7DDA83",
+        "02625D09FF7C8362",
         1
       ],
       [
-        "02620E01FF7DDD21",
+        "02626076FF7C85D3",
         1
       ],
       [
-        "0262115AFF7DDFC0",
+        "026263E3FF7C8843",
         1
       ],
       [
-        "026214B2FF7DE25F",
+        "02626750FF7C8AB4",
         1
       ],
       [
-        "0262180BFF7DE4FD",
+        "02626ABDFF7C8D25",
         1
       ],
       [
-        "02621B64FF7DE79C",
+        "02626E2AFF7C8F96",
         1
       ],
       [
-        "02621EBDFF7DEA3B",
+        "02627197FF7C9206",
         1
       ],
       [
-        "02622215FF7DECD9",
+        "02627504FF7C9477",
         1
       ],
       [
-        "0262256EFF7DEF78",
+        "02627871FF7C96E8",
         1
       ],
       [
-        "026228C7FF7DF217",
+        "02627BDFFF7C9959",
         1
       ],
       [
-        "02622C20FF7DF4B5",
+        "02627F4CFF7C9BC9",
         1
       ],
       [
-        "02622F78FF7DF754",
+        "026282B9FF7C9E3A",
         1
       ],
       [
-        "026232D1FF7DF9F3",
+        "02628626FF7CA0AB",
         1
       ],
       [
-        "0262362AFF7DFC91",
+        "02628993FF7CA31B",
         1
       ],
       [
-        "02623977FF7DFF27",
-        440
+        "02628D00FF7CA58C",
+        1
+      ],
+      [
+        "0262906DFF7CA7FD",
+        1
+      ],
+      [
+        "026293DAFF7CAA6E",
+        1
+      ],
+      [
+        "02629747FF7CACDE",
+        1
+      ],
+      [
+        "02629AB4FF7CAF4F",
+        1
+      ],
+      [
+        "02629E21FF7CB1C0",
+        1
+      ],
+      [
+        "0262A18EFF7CB431",
+        1
+      ],
+      [
+        "0262A4FBFF7CB6A1",
+        1
+      ],
+      [
+        "0262A868FF7CB912",
+        1
+      ],
+      [
+        "0262ABD5FF7CBB83",
+        1
+      ],
+      [
+        "0262AF42FF7CBDF4",
+        1
+      ],
+      [
+        "0262B27DFF7CC0C8",
+        1
+      ],
+      [
+        "0262B591FF7CC3EA",
+        1
+      ],
+      [
+        "0262B8A6FF7CC70C",
+        1
+      ],
+      [
+        "0262BBBAFF7CCA2F",
+        1
+      ],
+      [
+        "0262BECFFF7CCD51",
+        1
+      ],
+      [
+        "0262C1E3FF7CD073",
+        1
+      ],
+      [
+        "0262C4F8FF7CD396",
+        1
+      ],
+      [
+        "0262C80CFF7CD6B8",
+        1
+      ],
+      [
+        "0262CB20FF7CD9DA",
+        1
+      ],
+      [
+        "0262CE35FF7CDCFD",
+        1
+      ],
+      [
+        "0262D149FF7CE01F",
+        1
+      ],
+      [
+        "0262D45EFF7CE341",
+        1
+      ],
+      [
+        "0262D772FF7CE664",
+        1
+      ],
+      [
+        "0262DA87FF7CE986",
+        1
+      ],
+      [
+        "0262DD9BFF7CECA8",
+        1
+      ],
+      [
+        "0262E0AFFF7CEFCB",
+        1
+      ],
+      [
+        "0262E3C4FF7CF2ED",
+        1
+      ],
+      [
+        "0262E6D8FF7CF60F",
+        1
+      ],
+      [
+        "0262E9EDFF7CF932",
+        1
+      ],
+      [
+        "0262ED01FF7CFC54",
+        1
+      ],
+      [
+        "0262F015FF7CFF76",
+        1
+      ],
+      [
+        "0262F32AFF7D0299",
+        1
+      ],
+      [
+        "0262F63EFF7D05BB",
+        1
+      ],
+      [
+        "0262F953FF7D08DD",
+        1
+      ],
+      [
+        "0262FC67FF7D0C00",
+        1
+      ],
+      [
+        "0262FF7CFF7D0F22",
+        1
+      ],
+      [
+        "02630290FF7D1244",
+        1
+      ],
+      [
+        "026305A4FF7D1567",
+        1
+      ],
+      [
+        "026308B9FF7D1889",
+        1
+      ],
+      [
+        "02630BCDFF7D1BAB",
+        1
+      ],
+      [
+        "02630EE2FF7D1ECE",
+        1
+      ],
+      [
+        "026311F6FF7D21F0",
+        1
+      ],
+      [
+        "0263150BFF7D2512",
+        1
+      ],
+      [
+        "0263181FFF7D2835",
+        1
+      ],
+      [
+        "02631B33FF7D2B57",
+        1
+      ],
+      [
+        "02631E48FF7D2E79",
+        1
+      ],
+      [
+        "0263215CFF7D319B",
+        1
+      ],
+      [
+        "02632471FF7D34BE",
+        1
+      ],
+      [
+        "02632785FF7D37E0",
+        1
+      ],
+      [
+        "02632A9AFF7D3B02",
+        1
+      ],
+      [
+        "02632DAEFF7D3E25",
+        1
+      ],
+      [
+        "026330C2FF7D4147",
+        1
+      ],
+      [
+        "026333D7FF7D4469",
+        1
+      ],
+      [
+        "026336EBFF7D478C",
+        1
+      ],
+      [
+        "02633A00FF7D4AAE",
+        1
+      ],
+      [
+        "02633D14FF7D4DD0",
+        1
+      ],
+      [
+        "02634029FF7D50F3",
+        1
+      ],
+      [
+        "0263433DFF7D5415",
+        1
+      ],
+      [
+        "02634651FF7D5737",
+        1
+      ],
+      [
+        "02634966FF7D5A5A",
+        1
+      ],
+      [
+        "02634C7AFF7D5D7C",
+        1
+      ],
+      [
+        "02634F8FFF7D609E",
+        1
+      ],
+      [
+        "026352A3FF7D63C1",
+        1
+      ],
+      [
+        "026355B8FF7D66E3",
+        1
+      ],
+      [
+        "026358CCFF7D6A05",
+        1
+      ],
+      [
+        "02635BE0FF7D6D28",
+        1
+      ],
+      [
+        "02635EF5FF7D704A",
+        1
+      ],
+      [
+        "02636209FF7D736C",
+        1
+      ],
+      [
+        "0263651EFF7D768F",
+        1
+      ],
+      [
+        "02636832FF7D79B1",
+        1
+      ],
+      [
+        "02636B46FF7D7CD3",
+        1
+      ],
+      [
+        "02636E5BFF7D7FF6",
+        1
+      ],
+      [
+        "0263716FFF7D8318",
+        1
+      ],
+      [
+        "02637484FF7D863A",
+        1
+      ],
+      [
+        "02637798FF7D895D",
+        1
+      ],
+      [
+        "02637AADFF7D8C7F",
+        1
+      ],
+      [
+        "02637DC1FF7D8FA1",
+        1
+      ],
+      [
+        "026380D5FF7D92C4",
+        1
+      ],
+      [
+        "026383EAFF7D95E6",
+        1
+      ],
+      [
+        "026386FEFF7D9908",
+        1
+      ],
+      [
+        "02638A13FF7D9C2B",
+        1
+      ],
+      [
+        "02638D27FF7D9F4D",
+        1
+      ],
+      [
+        "0263903CFF7DA26F",
+        1
+      ],
+      [
+        "02639350FF7DA592",
+        1
+      ],
+      [
+        "02639664FF7DA8B4",
+        1
+      ],
+      [
+        "02639979FF7DABD6",
+        1
+      ],
+      [
+        "02639C8DFF7DAEF8",
+        1
+      ],
+      [
+        "02639FA2FF7DB21B",
+        1
+      ],
+      [
+        "0263A2B6FF7DB53D",
+        1
+      ],
+      [
+        "0263A5CBFF7DB85F",
+        1
+      ],
+      [
+        "0263A8DFFF7DBB82",
+        1
+      ],
+      [
+        "0263ABF3FF7DBEA4",
+        1
+      ],
+      [
+        "0263AF08FF7DC1C6",
+        1
+      ],
+      [
+        "0263B21CFF7DC4E9",
+        1
+      ],
+      [
+        "0263B531FF7DC80B",
+        1
+      ],
+      [
+        "0263B845FF7DCB2D",
+        1
+      ],
+      [
+        "0263BB5AFF7DCE50",
+        1
+      ],
+      [
+        "0263BE6EFF7DD172",
+        1
+      ],
+      [
+        "0263C182FF7DD494",
+        1
+      ],
+      [
+        "0263C497FF7DD7B7",
+        1
+      ],
+      [
+        "0263C7ABFF7DDAD9",
+        1
+      ],
+      [
+        "0263CAC0FF7DDDFB",
+        1
+      ],
+      [
+        "0263CDD4FF7DE11E",
+        1
+      ],
+      [
+        "0263D0E8FF7DE440",
+        1
+      ],
+      [
+        "0263D3FDFF7DE762",
+        1
+      ],
+      [
+        "0263D711FF7DEA85",
+        1
+      ],
+      [
+        "0263DA26FF7DEDA7",
+        1
+      ],
+      [
+        "0263DD3AFF7DF0C9",
+        1
+      ],
+      [
+        "0263E04FFF7DF3EC",
+        1
+      ],
+      [
+        "0263E363FF7DF70E",
+        1
+      ],
+      [
+        "0263E677FF7DFA30",
+        1
+      ],
+      [
+        "0263E98CFF7DFD53",
+        1
+      ],
+      [
+        "0263ECA0FF7E0075",
+        1
+      ],
+      [
+        "0263EFB5FF7E0397",
+        1
+      ],
+      [
+        "0263F2C9FF7E06BA",
+        1
+      ],
+      [
+        "0263F5DEFF7E09DC",
+        1
+      ],
+      [
+        "0263F8F2FF7E0CFE",
+        1
+      ],
+      [
+        "0263FC06FF7E1021",
+        1
+      ],
+      [
+        "0263FF1BFF7E1343",
+        1
+      ],
+      [
+        "0264022FFF7E1665",
+        1
+      ],
+      [
+        "02640544FF7E1988",
+        1
+      ],
+      [
+        "02640858FF7E1CAA",
+        1
+      ],
+      [
+        "02640B6DFF7E1FCC",
+        1
+      ],
+      [
+        "02640E81FF7E22EF",
+        1
+      ],
+      [
+        "02641195FF7E2611",
+        1
+      ],
+      [
+        "026414AAFF7E2933",
+        1
+      ],
+      [
+        "026417BEFF7E2C55",
+        1
+      ],
+      [
+        "02641AD3FF7E2F78",
+        1
+      ],
+      [
+        "02641DE7FF7E329A",
+        1
+      ],
+      [
+        "026420FCFF7E35BC",
+        1
+      ],
+      [
+        "02642410FF7E38DF",
+        1
+      ],
+      [
+        "02642724FF7E3C01",
+        1
+      ],
+      [
+        "02642A39FF7E3F23",
+        1
+      ],
+      [
+        "02642D4DFF7E4246",
+        1
+      ],
+      [
+        "02643062FF7E4568",
+        1
+      ],
+      [
+        "02643376FF7E488A",
+        1
+      ],
+      [
+        "0264368AFF7E4BAD",
+        1
+      ],
+      [
+        "0264399FFF7E4ECF",
+        1
+      ],
+      [
+        "02643CB3FF7E51F1",
+        1
+      ],
+      [
+        "02643FC8FF7E5514",
+        1
+      ],
+      [
+        "026442DCFF7E5836",
+        1
+      ],
+      [
+        "026445F1FF7E5B58",
+        1
+      ],
+      [
+        "02644905FF7E5E7B",
+        1
+      ],
+      [
+        "02644C19FF7E619D",
+        1
+      ],
+      [
+        "02644F2EFF7E64BF",
+        1
+      ],
+      [
+        "02645242FF7E67E2",
+        1
+      ],
+      [
+        "02645557FF7E6B04",
+        1
+      ],
+      [
+        "0264586BFF7E6E26",
+        1
+      ],
+      [
+        "02645B80FF7E7149",
+        1
+      ],
+      [
+        "02645E94FF7E746B",
+        1
+      ],
+      [
+        "026461A8FF7E778D",
+        1
+      ],
+      [
+        "026464BDFF7E7AB0",
+        1
+      ],
+      [
+        "026467D1FF7E7DD2",
+        1
+      ],
+      [
+        "02646AE6FF7E80F4",
+        1
+      ],
+      [
+        "02646BA8FF7E81BA",
+        285
       ]
     ],
-    "gpsCoordinateRuns": 281,
+    "gpsCoordinateRuns": 436,
     "gpsBlockCount": 720
   },
   "dbc": {
@@ -3461,12 +4081,408 @@
   },
   "vehicles": [
     {
-      "vin": "AAAAAA000001BBBBB",
+      "vin": "CARKDT000001KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000002KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000003KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000004KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000005KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000006KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000007KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000008KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000009KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000010KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000011KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000012KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000013KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000014KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000015KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000016KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000017KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000018KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000019KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000020KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000021KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000022KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000023KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000024KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000025KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000026KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000027KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000028KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000029KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000030KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000031KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000032KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000033KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000034KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000035KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000036KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000037KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000038KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000039KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000040KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000041KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000042KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000043KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000044KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000045KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000046KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000047KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000048KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000049KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000050KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000051KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000052KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000053KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000054KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000055KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000056KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000057KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000058KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000059KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000060KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000061KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000062KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000063KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000064KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000065KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000066KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000067KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000068KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000069KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000070KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000071KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000072KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000073KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000074KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000075KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000076KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000077KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000078KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000079KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000080KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000081KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000082KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000083KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000084KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000085KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000086KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000087KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000088KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000089KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000090KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000091KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000092KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000093KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000094KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000095KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000096KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000097KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000098KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000099KADUT",
+      "type": "car"
+    },
+    {
+      "vin": "CARKDT000100KADUT",
       "type": "car"
     }
   ],
   "sqs": {
     "queueUrl": "https://sqs.us-east-1.amazonaws.com/366493038898/sqs-trackster-vehicles-creation",
-    "messageSizeBytes": 13916
+    "messageSizeBytes": 17481
   }
 }

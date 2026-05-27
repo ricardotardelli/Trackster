@@ -17,6 +17,7 @@ FRAME_FLAG_CAN_FD = 0x01
 FRAME_FLAG_EXTENDED_ID = 0x02
 
 PREVIEW_LIMIT = 2000
+PREVIEW_SCHEMA_VERSION = "2"
 
 CAN_FD_DLC_TO_BYTES = {
     9: 12,
@@ -29,14 +30,17 @@ CAN_FD_DLC_TO_BYTES = {
 }
 
 
-def can_dlc_to_payload_length(dlc):
-    if not isinstance(dlc, int) or dlc < 0 or dlc > 15:
-        return 0
-
-    if dlc <= 8:
-        return dlc
-
-    return CAN_FD_DLC_TO_BYTES.get(dlc, 0)
+def response(status_code, body):
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "content-type,authorization",
+            "Access-Control-Allow-Methods": "POST,OPTIONS"
+        },
+        "body": json.dumps(body, ensure_ascii=False)
+    }
 
 
 def get_payload(event):
@@ -54,6 +58,46 @@ def get_payload(event):
     return body
 
 
+def object_exists(bucket_name, key):
+    try:
+        s3.head_object(Bucket=bucket_name, Key=key)
+        return True
+    except Exception:
+        return False
+
+
+def read_json_from_s3(bucket_name, key):
+    obj = s3.get_object(Bucket=bucket_name, Key=key)
+    return json.loads(obj["Body"].read().decode("utf-8"))
+
+
+def upload_bytes(bucket_name, key, content, content_type):
+    s3.put_object(
+        Bucket=bucket_name,
+        Key=key,
+        Body=content,
+        ContentType=content_type
+    )
+    return len(content)
+
+
+def upload_json(bucket_name, key, value):
+    content = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":")
+    ).encode("utf-8")
+
+    s3.put_object(
+        Bucket=bucket_name,
+        Key=key,
+        Body=content,
+        ContentType="application/json; charset=utf-8"
+    )
+
+    return len(content)
+
+
 def validate_client_path(client_id, input_key):
     expected_prefix = f"{client_id}/"
 
@@ -63,6 +107,16 @@ def validate_client_path(client_id, input_key):
         )
 
 
+def can_dlc_to_payload_length(dlc):
+    if not isinstance(dlc, int) or dlc < 0 or dlc > 15:
+        return 0
+
+    if dlc <= 8:
+        return dlc
+
+    return CAN_FD_DLC_TO_BYTES.get(dlc, 0)
+
+
 def build_output_key(input_key):
     directory = os.path.dirname(input_key)
     file_name = os.path.basename(input_key)
@@ -70,16 +124,25 @@ def build_output_key(input_key):
     if not file_name.lower().endswith(".bin"):
         raise Exception("Input file must have .bin extension.")
 
-    output_file_name = f"{file_name[:-4]}.parquet"
+    output_name = f"{file_name[:-4]}.parquet"
 
     if directory:
-        return f"{directory}/{output_file_name}"
+        return f"{directory}/{output_name}"
 
-    return output_file_name
+    return output_name
 
 
-def build_manifest_key(output_key):
+def build_preview_key(output_key):
     return f"{output_key}.json"
+
+
+def build_run_manifest_key(input_key):
+    directory = os.path.dirname(input_key)
+
+    if directory:
+        return f"{directory}/run-manifest.json"
+
+    return "run-manifest.json"
 
 
 def format_can_id(can_id):
@@ -88,136 +151,28 @@ def format_can_id(can_id):
 
 def normalize_can_id_key(can_id):
     if isinstance(can_id, int):
-        return f"0x{can_id:X}"
+        return f"0x{can_id:X}".lower()
 
     value = str(can_id).strip()
 
     if value.startswith("0x") or value.startswith("0X"):
-        return f"0x{int(value, 16):X}"
+        return f"0x{int(value, 16):X}".lower()
 
-    return f"0x{int(value, 16):X}"
+    return f"0x{int(value, 16):X}".lower()
 
 
 def format_payload(payload):
     return " ".join(f"{byte:02X}" for byte in payload)
 
 
-def read_json_from_s3(bucket_name, key):
-    s3_object = s3.get_object(
-        Bucket=bucket_name,
-        Key=key
+def is_valid_cached_preview(preview):
+    summary = preview.get("summary", {})
+
+    return (
+        preview.get("previewSchemaVersion") == PREVIEW_SCHEMA_VERSION
+        and int(summary.get("decodedRowCount", 0)) > 0
+        and int(summary.get("decoderCanIdCount", 0)) > 0
     )
-
-    content = s3_object["Body"].read().decode("utf-8")
-    return json.loads(content)
-
-
-def resolve_run_manifest_key(input_key):
-    directory = os.path.dirname(input_key)
-    file_name = os.path.basename(input_key)
-
-    base_name = file_name[:-4] if file_name.lower().endswith(".bin") else file_name
-
-    candidates = [
-        f"{directory}/{base_name}.json" if directory else f"{base_name}.json",
-        f"{directory}/{base_name}.manifest.json" if directory else f"{base_name}.manifest.json",
-        f"{directory}/{base_name}.run-manifest.json" if directory else f"{base_name}.run-manifest.json",
-        f"{directory}/run-manifest.json" if directory else "run-manifest.json"
-    ]
-
-    return candidates
-
-
-def find_existing_manifest_key(bucket_name, input_key, explicit_key):
-    if explicit_key:
-        return explicit_key
-
-    for candidate in resolve_run_manifest_key(input_key):
-        try:
-            s3.head_object(
-                Bucket=bucket_name,
-                Key=candidate
-            )
-            return candidate
-        except Exception:
-            pass
-
-    return None
-
-
-def collect_compiled_dbc_keys(value):
-    keys = []
-
-    if isinstance(value, dict):
-        for key, nested_value in value.items():
-            lower_key = str(key).lower()
-
-            if lower_key in [
-                "compiledkey",
-                "compiledjsonkey",
-                "compileddbcjsonkey",
-                "compileddbcpath",
-                "compiledpath",
-                "jsonkey",
-                "key"
-            ]:
-                if isinstance(nested_value, str) and nested_value.lower().endswith(".json"):
-                    keys.append(nested_value)
-
-            keys.extend(collect_compiled_dbc_keys(nested_value))
-
-    elif isinstance(value, list):
-        for item in value:
-            keys.extend(collect_compiled_dbc_keys(item))
-
-    elif isinstance(value, str):
-        lower_value = value.lower()
-
-        if (
-            lower_value.endswith(".json")
-            and (
-                "dbc" in lower_value
-                or "compiled" in lower_value
-            )
-        ):
-            keys.append(value)
-
-    return list(dict.fromkeys(keys))
-
-
-def get_compiled_field_map(compiled_json):
-    fields = compiled_json.get("f")
-
-    if not isinstance(fields, list):
-        return {}
-
-    return {
-        field_name: index
-        for index, field_name in enumerate(fields)
-    }
-
-
-def get_signal_property(signal, field_map, name, default_value=None):
-    if isinstance(signal, dict):
-        return signal.get(name, default_value)
-
-    if isinstance(signal, list):
-        index = field_map.get(name)
-
-        if index is not None and index < len(signal):
-            return signal[index]
-
-    return default_value
-
-
-def extract_signal_name(signal, field_map, fallback_name):
-    for key in ["name", "n", "signal", "sg"]:
-        value = get_signal_property(signal, field_map, key)
-
-        if value is not None and value != "":
-            return str(value)
-
-    return fallback_name
 
 
 def unsigned_payload_value(payload):
@@ -261,7 +216,10 @@ def extract_big_endian_raw(payload, start_bit, bit_length):
         else:
             raw_bits += "0"
 
-    return int(raw_bits, 2) if raw_bits else 0
+    if not raw_bits:
+        return 0
+
+    return int(raw_bits, 2)
 
 
 def apply_signed(raw_value, bit_length):
@@ -273,13 +231,30 @@ def apply_signed(raw_value, bit_length):
     return raw_value
 
 
-def decode_signal(payload, signal, field_map):
-    start_bit = int(get_signal_property(signal, field_map, "sb", 0))
-    bit_length = int(get_signal_property(signal, field_map, "bl", 0))
-    byte_order = int(get_signal_property(signal, field_map, "bo", 0))
-    signed = int(get_signal_property(signal, field_map, "sg", 0))
-    factor = float(get_signal_property(signal, field_map, "f", 1))
-    offset = float(get_signal_property(signal, field_map, "o", 0))
+def field_value(signal, fields, name, default_value=None):
+    index = fields.get(name)
+
+    if index is None:
+        return default_value
+
+    if not isinstance(signal, list) or index >= len(signal):
+        return default_value
+
+    value = signal[index]
+
+    if value is None:
+        return default_value
+
+    return value
+
+
+def decode_signal_value(payload, signal, fields):
+    start_bit = int(field_value(signal, fields, "sb", 0))
+    bit_length = int(field_value(signal, fields, "bl", 0))
+    byte_order = int(field_value(signal, fields, "bo", 0))
+    signed = int(field_value(signal, fields, "sg", 0))
+    factor = float(field_value(signal, fields, "f", 1))
+    offset = float(field_value(signal, fields, "o", 0))
 
     if bit_length <= 0:
         return None
@@ -292,74 +267,72 @@ def decode_signal(payload, signal, field_map):
     if signed:
         raw_value = apply_signed(raw_value, bit_length)
 
-    return raw_value * factor + offset
+    physical_value = raw_value * factor + offset
+
+    if physical_value == int(physical_value):
+        return str(int(physical_value))
+
+    return str(round(physical_value, 6))
 
 
-def load_decoder_from_compiled_jsons(bucket_name, compiled_keys):
+def build_decoder_from_run_manifest(run_manifest):
+    compiled_dbc = run_manifest.get("dbc", {}).get("compiledDbc", {})
+    field_names = compiled_dbc.get("f", [])
+    messages = compiled_dbc.get("m", {})
+
+    if not isinstance(field_names, list) or not isinstance(messages, dict):
+        return {}
+
+    fields = {
+        field_name: index
+        for index, field_name in enumerate(field_names)
+    }
+
     decoder = {}
 
-    for compiled_key in compiled_keys:
-        compiled_json = read_json_from_s3(bucket_name, compiled_key)
-        field_map = get_compiled_field_map(compiled_json)
+    for can_id_key, entries in messages.items():
+        normalized_can_id = normalize_can_id_key(can_id_key)
 
-        messages = compiled_json.get("m", {})
+        if isinstance(entries, dict):
+            entries = [entries]
 
-        if not isinstance(messages, dict):
+        if not isinstance(entries, list):
             continue
 
-        for can_id_key, message in messages.items():
-            normalized_can_id = normalize_can_id_key(can_id_key)
-
-            if not isinstance(message, dict):
+        for entry in entries:
+            if not isinstance(entry, dict):
                 continue
 
-            signals = message.get("s", [])
+            message_name = str(
+                entry.get("messageName")
+                or entry.get("frame", {}).get("n")
+                or f"CAN_{can_id_key}"
+            )
+
+            frame = entry.get("frame", {})
+
+            if not isinstance(frame, dict):
+                continue
+
+            signals = frame.get("s", [])
 
             if not isinstance(signals, list):
                 continue
 
-            decoder.setdefault(normalized_can_id, [])
+            for signal in signals:
+                signal_name = field_value(signal, fields, "n", "")
 
-            for index, signal in enumerate(signals):
-                signal_name = extract_signal_name(
-                    signal,
-                    field_map,
-                    f"Signal_{index + 1}"
-                )
+                if not signal_name:
+                    continue
 
-                decoder[normalized_can_id].append({
-                    "name": signal_name,
-                    "definition": signal,
-                    "fieldMap": field_map,
-                    "sourceCompiledKey": compiled_key
+                decoder.setdefault(normalized_can_id, []).append({
+                    "messageName": message_name,
+                    "signalName": str(signal_name),
+                    "signal": signal,
+                    "fields": fields
                 })
 
     return decoder
-
-
-def decode_frame_signals(frame, decoder):
-    can_id_key = normalize_can_id_key(frame["can_id"])
-    signal_definitions = decoder.get(can_id_key, [])
-
-    decoded = []
-
-    for signal_definition in signal_definitions:
-        value = decode_signal(
-            frame["payload"],
-            signal_definition["definition"],
-            signal_definition["fieldMap"]
-        )
-
-        if value is None:
-            continue
-
-        decoded.append({
-            "signal": signal_definition["name"],
-            "value": value,
-            "sourceCompiledKey": signal_definition["sourceCompiledKey"]
-        })
-
-    return decoded
 
 
 def parse_trackster_bin(buffer):
@@ -470,11 +443,36 @@ def parse_trackster_bin(buffer):
     }
 
 
-def build_enriched_rows(frames, decoder):
+def decode_frame(frame, decoder):
+    can_id_key = normalize_can_id_key(frame["can_id"])
+    signal_definitions = decoder.get(can_id_key, [])
+
+    decoded = []
+
+    for signal_definition in signal_definitions:
+        value = decode_signal_value(
+            frame["payload"],
+            signal_definition["signal"],
+            signal_definition["fields"]
+        )
+
+        if value is None:
+            continue
+
+        decoded.append({
+            "message": signal_definition["messageName"],
+            "signal": signal_definition["signalName"],
+            "value": value
+        })
+
+    return decoded
+
+
+def build_rows(frames, decoder):
     rows = []
 
     for frame in frames:
-        decoded_signals = decode_frame_signals(frame, decoder)
+        decoded_signals = decode_frame(frame, decoder)
 
         base_row = {
             "timestamp": float(f"{frame['timestamp']:.6f}"),
@@ -489,52 +487,60 @@ def build_enriched_rows(frames, decoder):
 
         if not decoded_signals:
             row = dict(base_row)
+            row["message"] = f"CAN_{base_row['canId']}"
+            row["name"] = row["message"]
+            row["data"] = row["payload"]
             row["signal"] = ""
             row["value"] = ""
-            row["sourceCompiledKey"] = ""
             rows.append(row)
             continue
 
         for decoded_signal in decoded_signals:
             row = dict(base_row)
+            row["message"] = decoded_signal["message"]
+            row["name"] = decoded_signal["message"]
+            row["data"] = row["payload"]
             row["signal"] = decoded_signal["signal"]
-            row["value"] = str(decoded_signal["value"])
-            row["sourceCompiledKey"] = decoded_signal["sourceCompiledKey"]
+            row["value"] = decoded_signal["value"]
             rows.append(row)
 
     return rows
 
 
 def build_rows_preview(rows):
-    preview_rows = []
+    preview = []
 
     for row in rows[:PREVIEW_LIMIT]:
-        preview_rows.append({
-            "timestamp": f"{row['timestamp']:.6f}",
+        preview.append({
+            "timestamp": f"{float(row['timestamp']):.6f}",
             "channel": row["channel"],
             "canId": row["canId"],
             "direction": row["direction"],
             "frameType": row["frameType"],
             "dlc": str(row["dlc"]),
             "payload": row["payload"],
+            "isExtendedId": bool(row["isExtendedId"]),
+            "message": row["message"],
+            "name": row["name"],
+            "data": row["data"],
             "signal": row["signal"],
             "value": row["value"]
         })
 
-    return preview_rows
+    return preview
 
 
-def build_manifest(
+def build_preview_json(
     input_key,
     output_key,
-    manifest_key,
+    preview_key,
     run_manifest_key,
-    compiled_dbc_keys,
     input_file_size,
     output_file_size,
     frames,
     rows,
-    duration_seconds
+    duration_seconds,
+    decoder
 ):
     unique_can_ids = {
         frame["can_id"]
@@ -552,14 +558,20 @@ def build_manifest(
         if row.get("signal")
     ]
 
+    decoder_signal_count = sum(
+        len(signals)
+        for signals in decoder.values()
+    )
+
     return {
         "manifestVersion": "1",
+        "previewSchemaVersion": PREVIEW_SCHEMA_VERSION,
         "format": "parquet",
         "inputKey": input_key,
         "outputKey": output_key,
-        "manifestKey": manifest_key,
+        "manifestKey": preview_key,
+        "previewKey": preview_key,
         "runManifestKey": run_manifest_key,
-        "compiledDbcKeys": compiled_dbc_keys,
         "inputFileSize": input_file_size,
         "outputFileSize": output_file_size,
         "summary": {
@@ -570,7 +582,9 @@ def build_manifest(
             "previewLimit": PREVIEW_LIMIT,
             "uniqueCanIdCount": len(unique_can_ids),
             "channelCount": len(channels),
-            "durationSeconds": duration_seconds
+            "durationSeconds": duration_seconds,
+            "decoderCanIdCount": len(decoder),
+            "decoderSignalCount": decoder_signal_count
         },
         "columns": [
             "timestamp",
@@ -581,9 +595,9 @@ def build_manifest(
             "dlc",
             "payload",
             "isExtendedId",
+            "message",
             "signal",
-            "value",
-            "sourceCompiledKey"
+            "value"
         ],
         "rowsPreview": build_rows_preview(rows)
     }
@@ -599,15 +613,14 @@ def build_parquet_bytes(rows):
         ("dlc", pa.int32()),
         ("payload", pa.string()),
         ("isExtendedId", pa.bool_()),
+        ("message", pa.string()),
+        ("name", pa.string()),
+        ("data", pa.string()),
         ("signal", pa.string()),
-        ("value", pa.string()),
-        ("sourceCompiledKey", pa.string())
+        ("value", pa.string())
     ])
 
-    table = pa.Table.from_pylist(
-        rows,
-        schema=schema
-    )
+    table = pa.Table.from_pylist(rows, schema=schema)
 
     output = io.BytesIO()
 
@@ -620,35 +633,10 @@ def build_parquet_bytes(rows):
     return output.getvalue()
 
 
-def upload_bytes(bucket_name, key, content, content_type):
-    s3.put_object(
-        Bucket=bucket_name,
-        Key=key,
-        Body=content,
-        ContentType=content_type
-    )
-
-    return len(content)
-
-
-def upload_text(bucket_name, key, text, content_type):
-    encoded = text.encode("utf-8")
-
-    s3.put_object(
-        Bucket=bucket_name,
-        Key=key,
-        Body=encoded,
-        ContentType=content_type
-    )
-
-    return len(encoded)
-
-
 def export_single_parquet(
     input_bucket_name,
     output_bucket_name,
     manifest_bucket_name,
-    dbc_bucket_name,
     client_id,
     input_key,
     explicit_run_manifest_key
@@ -656,7 +644,28 @@ def export_single_parquet(
     validate_client_path(client_id, input_key)
 
     output_key = build_output_key(input_key)
-    manifest_key = build_manifest_key(output_key)
+    preview_key = build_preview_key(output_key)
+
+    parquet_exists = object_exists(output_bucket_name, output_key)
+    preview_exists = object_exists(output_bucket_name, preview_key)
+
+    if parquet_exists and preview_exists:
+        cached_preview = read_json_from_s3(output_bucket_name, preview_key)
+
+        if is_valid_cached_preview(cached_preview):
+            return {
+                "inputKey": input_key,
+                "outputKey": output_key,
+                "manifestKey": preview_key,
+                "previewKey": preview_key,
+                "frameCount": int(cached_preview.get("summary", {}).get("frameCount", 0)),
+                "rowCount": int(cached_preview.get("summary", {}).get("rowCount", 0)),
+                "decodedRowCount": int(cached_preview.get("summary", {}).get("decodedRowCount", 0)),
+                "fileSize": int(cached_preview.get("outputFileSize", 0)),
+                "manifestFileSize": 0,
+                "preview": cached_preview,
+                "status": "cached"
+            }
 
     s3_object = s3.get_object(
         Bucket=input_bucket_name,
@@ -671,30 +680,44 @@ def export_single_parquet(
     frames = parsed["frames"]
     duration_seconds = parsed["durationSeconds"]
 
-    run_manifest_key = find_existing_manifest_key(
-        manifest_bucket_name,
-        input_key,
-        explicit_run_manifest_key
-    )
+    run_manifest_key = explicit_run_manifest_key or build_run_manifest_key(input_key)
 
-    compiled_dbc_keys = []
-    decoder = {}
-
-    if run_manifest_key:
-        run_manifest = read_json_from_s3(
-            manifest_bucket_name,
-            run_manifest_key
+    if not object_exists(manifest_bucket_name, run_manifest_key):
+        raise Exception(
+            f"Run manifest not found. Expected: s3://{manifest_bucket_name}/{run_manifest_key}"
         )
 
-        compiled_dbc_keys = collect_compiled_dbc_keys(run_manifest)
+    run_manifest = read_json_from_s3(
+        manifest_bucket_name,
+        run_manifest_key
+    )
 
-        if compiled_dbc_keys:
-            decoder = load_decoder_from_compiled_jsons(
-                dbc_bucket_name,
-                compiled_dbc_keys
-            )
+    decoder = build_decoder_from_run_manifest(run_manifest)
 
-    rows = build_enriched_rows(frames, decoder)
+    if not decoder:
+        raise Exception(
+            "Run manifest was found, but dbc.compiledDbc did not produce a decoder."
+        )
+
+    rows = build_rows(frames, decoder)
+
+    preview = build_preview_json(
+        input_key,
+        output_key,
+        preview_key,
+        run_manifest_key,
+        input_file_size,
+        0,
+        frames,
+        rows,
+        duration_seconds,
+        decoder
+    )
+
+    if int(preview["summary"]["decodedRowCount"]) <= 0:
+        raise Exception(
+            "Decoder was built, but no frame was decoded. Check CAN IDs between BIN and run-manifest."
+        )
 
     parquet_bytes = build_parquet_bytes(rows)
 
@@ -705,61 +728,29 @@ def export_single_parquet(
         "application/octet-stream"
     )
 
-    manifest = build_manifest(
-        input_key,
-        output_key,
-        manifest_key,
-        run_manifest_key,
-        compiled_dbc_keys,
-        input_file_size,
-        output_file_size,
-        frames,
-        rows,
-        duration_seconds
-    )
+    preview["outputFileSize"] = output_file_size
 
-    manifest_text = json.dumps(
-        manifest,
-        ensure_ascii=False,
-        separators=(",", ":")
-    )
-
-    manifest_file_size = upload_text(
+    preview_file_size = upload_json(
         output_bucket_name,
-        manifest_key,
-        manifest_text,
-        "application/json; charset=utf-8"
+        preview_key,
+        preview
     )
 
     return {
         "inputKey": input_key,
         "outputKey": output_key,
-        "manifestKey": manifest_key,
+        "manifestKey": preview_key,
+        "previewKey": preview_key,
         "runManifestKey": run_manifest_key,
-        "compiledDbcKeys": compiled_dbc_keys,
         "frameCount": len(frames),
         "rowCount": len(rows),
-        "decodedRowCount": len([
-            row
-            for row in rows
-            if row.get("signal")
-        ]),
+        "decodedRowCount": int(preview["summary"]["decodedRowCount"]),
+        "decoderCanIdCount": int(preview["summary"]["decoderCanIdCount"]),
+        "decoderSignalCount": int(preview["summary"]["decoderSignalCount"]),
         "fileSize": output_file_size,
-        "manifestFileSize": manifest_file_size,
+        "manifestFileSize": preview_file_size,
+        "preview": preview,
         "status": "exported"
-    }
-
-
-def response(status_code, body):
-    return {
-        "statusCode": status_code,
-        "headers": {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "content-type,authorization",
-            "Access-Control-Allow-Methods": "POST,OPTIONS"
-        },
-        "body": json.dumps(body)
     }
 
 
@@ -780,12 +771,11 @@ def lambda_handler(event, context):
             input_bucket_name
         )
 
-        dbc_bucket_name = payload.get(
-            "dbcBucketName",
-            manifest_bucket_name
+        client_id = payload.get(
+            "clientId",
+            "00000000"
         )
 
-        client_id = payload.get("clientId", "00000000")
         input_keys = payload["inputKeys"]
         run_manifest_key = payload.get("runManifestKey")
 
@@ -801,7 +791,6 @@ def lambda_handler(event, context):
                     input_bucket_name,
                     output_bucket_name,
                     manifest_bucket_name,
-                    dbc_bucket_name,
                     client_id,
                     input_key,
                     run_manifest_key
@@ -822,7 +811,6 @@ def lambda_handler(event, context):
                 "inputBucketName": input_bucket_name,
                 "outputBucketName": output_bucket_name,
                 "manifestBucketName": manifest_bucket_name,
-                "dbcBucketName": dbc_bucket_name,
                 "clientId": client_id,
                 "exportedCount": len(results),
                 "failedCount": len(errors),
@@ -835,7 +823,6 @@ def lambda_handler(event, context):
             "inputBucketName": input_bucket_name,
             "outputBucketName": output_bucket_name,
             "manifestBucketName": manifest_bucket_name,
-            "dbcBucketName": dbc_bucket_name,
             "clientId": client_id,
             "exportedCount": len(results),
             "failedCount": 0,
