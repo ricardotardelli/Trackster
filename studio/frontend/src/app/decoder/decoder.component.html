@@ -270,6 +270,7 @@
               <app-blf-viewer *ngIf="selectedViewerMode === 'blf' && selectedBinNode" [selectedNode]="selectedBinNode"></app-blf-viewer>
               <app-mf4-viewer *ngIf="selectedViewerMode === 'mf4' && selectedBinNode" [selectedNode]="selectedBinNode"></app-mf4-viewer>
               <app-parquet-viewer *ngIf="selectedViewerMode === 'parquet' && selectedBinNode" [selectedNode]="selectedBinNode"></app-parquet-viewer>
+              <app-runmanifest-viewer *ngIf="selectedViewerMode === 'run-manifest' && selectedBinNode" [selectedNode]="selectedBinNode"></app-runmanifest-viewer>
 
               <div class="decoder-placeholder-view" 
                 *ngIf="selectedViewerMode !== 'trackster-bin' && 
@@ -281,7 +282,8 @@
                         selectedViewerMode !== 'candump' &&
                         selectedViewerMode !== 'blf' &&
                         selectedViewerMode !== 'mf4' &&
-                        selectedViewerMode !== 'parquet'">
+                        selectedViewerMode !== 'parquet' &&
+                        selectedViewerMode !== 'run-manifest'">
                 <strong>
                   {{ selectedViewerMode }}
                 </strong>

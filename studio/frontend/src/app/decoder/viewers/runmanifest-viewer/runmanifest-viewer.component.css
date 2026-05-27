@@ -1,0 +1,233 @@
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.runmanifest-viewer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.runmanifest-viewer-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.runmanifest-viewer-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  border-radius: 13px;
+  background: #ffffff;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.runmanifest-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.4);
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.runmanifest-viewer-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.runmanifest-viewer-title h4 {
+  margin: 0;
+  color: #102349;
+  font-size: 0.88rem;
+  font-weight: 850;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.runmanifest-viewer-title span {
+  display: none;
+}
+
+.runmanifest-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.runmanifest-find-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 4px;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  border-radius: 9px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.runmanifest-search-input {
+  width: 180px;
+  height: 26px;
+  padding: 0 7px;
+  border: 0;
+  background: transparent;
+  color: #102349;
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.runmanifest-search-input:focus {
+  outline: none;
+}
+
+.runmanifest-search-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(191, 219, 254, 0.75);
+  border-radius: 7px;
+  background: #f8fbff;
+  color: #102349;
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.runmanifest-search-button:hover:not(:disabled) {
+  background: #eaf4ff;
+}
+
+.runmanifest-search-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.runmanifest-search-button-close {
+  font-size: 1.05rem;
+}
+
+.runmanifest-loading,
+.runmanifest-error,
+.runmanifest-empty-state {
+  flex: 0 0 auto;
+  padding: 12px;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.runmanifest-loading,
+.runmanifest-empty-state {
+  color: #5a6b82;
+}
+
+.runmanifest-error {
+  color: #991b1b;
+  background: #fff1f2;
+  border-bottom: 1px solid rgba(254, 202, 202, 0.95);
+}
+
+.runmanifest-json-shell {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+  box-sizing: border-box;
+}
+
+.runmanifest-json-shell::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.runmanifest-json-shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.runmanifest-json-shell::-webkit-scrollbar-thumb {
+  border-radius: 6px;
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.runmanifest-json-shell::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.55);
+}
+
+.runmanifest-json-content {
+  min-width: 960px;
+  min-height: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  color: #102349;
+  background: #ffffff;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre;
+  box-sizing: border-box;
+}
+
+.runmanifest-summary-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.runmanifest-summary-box {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+  box-sizing: border-box;
+}
+
+.runmanifest-summary-box span {
+  display: block;
+  margin-bottom: 4px;
+  color: #5a6b82;
+  font-size: 0.66rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runmanifest-summary-box strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #102349;
+  font-size: 0.9rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

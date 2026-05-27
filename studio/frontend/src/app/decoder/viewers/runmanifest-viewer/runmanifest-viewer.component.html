@@ -1,0 +1,114 @@
+<div class="runmanifest-viewer-layout">
+
+  <div class="runmanifest-viewer-main">
+
+    <div class="runmanifest-viewer-panel">
+
+      <div class="runmanifest-viewer-header">
+
+        <div class="runmanifest-viewer-title">
+
+          <h4>
+            Run Manifest
+          </h4>
+
+          <span>
+            Read-only BIN run manifest preview
+          </span>
+
+        </div>
+
+        <div class="runmanifest-viewer-actions">
+
+          <div class="runmanifest-find-box">
+
+            <input
+              type="text"
+              class="runmanifest-search-input"
+              placeholder="Filter manifest"
+              [(ngModel)]="runManifestSearchText"
+              (input)="applyRunManifestSearch()">
+
+            <button
+              type="button"
+              class="runmanifest-search-button runmanifest-search-button-close"
+              title="Clear search"
+              [disabled]="!runManifestSearchText"
+              (click)="clearRunManifestSearch()">
+
+              ×
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div
+        class="runmanifest-loading"
+        *ngIf="isLoadingRunManifest">
+
+        Loading run manifest...
+
+      </div>
+
+      <div
+        class="runmanifest-error"
+        *ngIf="
+          !isLoadingRunManifest &&
+          runManifestErrorMessage
+        ">
+
+        {{ runManifestErrorMessage }}
+
+      </div>
+
+      <div
+        class="runmanifest-empty-state"
+        *ngIf="
+          !isLoadingRunManifest &&
+          !runManifestErrorMessage &&
+          !filteredManifestText
+        ">
+
+        No run manifest available.
+
+      </div>
+
+      <div
+        class="runmanifest-json-shell"
+        *ngIf="
+          !isLoadingRunManifest &&
+          !runManifestErrorMessage &&
+          filteredManifestText
+        ">
+
+        <pre class="runmanifest-json-content">{{ filteredManifestText }}</pre>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <aside class="runmanifest-summary-sidebar">
+
+    <div
+      class="runmanifest-summary-box"
+      *ngFor="let item of runManifestViewer.summary">
+
+      <span>
+        {{ item.label }}
+      </span>
+
+      <strong>
+        {{ item.value }}
+      </strong>
+
+    </div>
+
+  </aside>
+
+</div>

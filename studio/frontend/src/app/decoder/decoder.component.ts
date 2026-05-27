@@ -30,6 +30,7 @@ import { CandumpViewerComponent } from './viewers/candump-viewer/candump-viewer.
 import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
+import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
 
 export interface S3TreeNode {
   name: string;
@@ -66,7 +67,8 @@ interface RuntimeConfig {
     CandumpViewerComponent,
     BlfViewerComponent,
     Mf4ViewerComponent,
-    ParquetViewerComponent
+    ParquetViewerComponent,
+    RunmanifestViewerComponent
   ],
   templateUrl: './decoder.component.html',
   styleUrl: './decoder.component.css'
