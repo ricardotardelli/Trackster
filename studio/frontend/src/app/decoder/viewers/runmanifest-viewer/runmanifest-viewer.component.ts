@@ -26,6 +26,20 @@ interface RuntimeConfig {
   clientId?: string;
 }
 
+interface ViewerCard {
+  label: string;
+  value: string;
+  detail?: string;
+}
+
+interface CanFrameRow {
+  canId: string;
+  messageName: string;
+  dbcFile: string;
+  idf: string;
+  signalCount: string;
+}
+
 @Component({
   selector: 'app-runmanifest-viewer',
   standalone: true,
@@ -48,17 +62,28 @@ implements OnChanges {
 
   runManifestSearchText = '';
 
+  showRawManifest = false;
+
   manifestText = '';
 
   filteredManifestText = '';
 
+  overviewCards: ViewerCard[] = [];
+
+  simulationCards: ViewerCard[] = [];
+
+  outputCards: ViewerCard[] = [];
+
+  dbcCards: ViewerCard[] = [];
+
+  canFrameRows: CanFrameRow[] = [];
+
+  filteredCanFrameRows: CanFrameRow[] = [];
+
   private manifest: any = null;
 
   runManifestViewer = {
-    summary: [] as Array<{
-      label: string;
-      value: string;
-    }>
+    summary: [] as ViewerCard[]
   };
 
   async ngOnChanges(
@@ -84,18 +109,29 @@ implements OnChanges {
 
     if (!searchText) {
 
+      this.filteredCanFrameRows = [
+        ...this.canFrameRows
+      ];
+
       this.filteredManifestText =
         this.manifestText;
 
       return;
     }
 
-    const lines =
-      this.manifestText
-        .split('\n');
+    this.filteredCanFrameRows =
+      this.canFrameRows.filter((row) =>
+        Object.values(row)
+          .some((value) =>
+            String(value)
+              .toLowerCase()
+              .includes(searchText)
+          )
+      );
 
     this.filteredManifestText =
-      lines
+      this.manifestText
+        .split('\n')
         .filter((line) =>
           line
             .toLowerCase()
@@ -108,8 +144,18 @@ implements OnChanges {
 
     this.runManifestSearchText = '';
 
+    this.filteredCanFrameRows = [
+      ...this.canFrameRows
+    ];
+
     this.filteredManifestText =
       this.manifestText;
+  }
+
+  toggleRawManifest(): void {
+
+    this.showRawManifest =
+      !this.showRawManifest;
   }
 
   private async loadRunManifest(
@@ -122,11 +168,25 @@ implements OnChanges {
 
     this.runManifestSearchText = '';
 
+    this.showRawManifest = false;
+
     this.manifest = null;
 
     this.manifestText = '';
 
     this.filteredManifestText = '';
+
+    this.overviewCards = [];
+
+    this.simulationCards = [];
+
+    this.outputCards = [];
+
+    this.dbcCards = [];
+
+    this.canFrameRows = [];
+
+    this.filteredCanFrameRows = [];
 
     this.runManifestViewer = {
       summary: []
@@ -155,7 +215,7 @@ implements OnChanges {
       this.filteredManifestText =
         this.manifestText;
 
-      this.updateSummary();
+      this.buildViewModel();
 
     } catch (error) {
 
@@ -226,84 +286,266 @@ implements OnChanges {
       await response.json();
   }
 
-  private updateSummary(): void {
+  private buildViewModel(): void {
 
     const simulation =
       this.manifest?.simulation ?? {};
 
+    const output =
+      this.manifest?.output ?? {};
+
     const dbc =
       this.manifest?.dbc ?? {};
 
-    const output =
-      this.manifest?.output ?? {};
+    const gps =
+      this.manifest?.gps ?? {};
+
+    const dbcFiles =
+      Array.isArray(dbc.dbcFiles)
+        ? dbc.dbcFiles
+        : [];
+
+    this.overviewCards = [
+      {
+        label: 'Run ID',
+        value: String(
+          this.manifest?.runId ??
+          this.manifest?.timestamp ??
+          '-'
+        ),
+        detail: 'Generated simulation run'
+      },
+      {
+        label: 'Client',
+        value: String(
+          this.manifest?.clientId ??
+          this.manifest?.customerId ??
+          '-'
+        ),
+        detail: 'Tenant isolation key'
+      },
+      {
+        label: 'Format',
+        value: String(
+          output.outputFormat ??
+          '-'
+        ),
+        detail: 'Generated output format'
+      },
+      {
+        label: 'Created at',
+        value: this.formatDateTime(
+          this.manifest?.createdAt
+        ),
+        detail: 'Manifest creation time'
+      }
+    ];
+
+    this.simulationCards = [
+      {
+        label: 'Vehicles',
+        value: this.formatNumber(
+          simulation.amountOfVehicles
+        ),
+        detail: 'Synthetic vehicles'
+      },
+      {
+        label: 'Duration',
+        value: `${this.formatNumber(simulation.durationSec)} s`,
+        detail: `${this.formatNumber(simulation.amountOfTime)} hour(s)`
+      },
+      {
+        label: 'Blocks',
+        value: this.formatNumber(
+          simulation.numberOfBlocks
+        ),
+        detail: `${this.formatNumber(simulation.blocksSize)} bytes each`
+      },
+      {
+        label: 'Interval',
+        value: `${this.formatNumber(simulation.intervalSec)} s`,
+        detail: 'Block interval'
+      },
+      {
+        label: 'Speed',
+        value: `${this.formatNumber(simulation.speed)} ${simulation.unity ?? ''}`.trim(),
+        detail: 'Requested simulation speed'
+      },
+      {
+        label: 'Driver profile',
+        value: String(
+          simulation.driverProfile ??
+          '-'
+        ),
+        detail: 'Behavior model'
+      }
+    ];
+
+    this.outputCards = [
+      {
+        label: 'Bucket',
+        value: String(
+          output.bucket ??
+          '-'
+        ),
+        detail: 'Storage target'
+      },
+      {
+        label: 'Run folder',
+        value: String(
+          output.runFolder ??
+          '-'
+        ),
+        detail: 'S3 folder'
+      },
+      {
+        label: 'Manifest key',
+        value: String(
+          output.manifestKey ??
+          '-'
+        ),
+        detail: 'Current JSON source'
+      },
+      {
+        label: 'GPS blocks',
+        value: this.formatNumber(
+          gps.gpsBlockCount
+        ),
+        detail: `${this.formatNumber(gps.gpsCoordinateRuns)} coordinate runs`
+      }
+    ];
+
+    this.dbcCards = [
+      {
+        label: 'DBC files',
+        value: this.formatNumber(
+          dbcFiles.length
+        ),
+        detail: dbcFiles.join(', ') || '-'
+      },
+      {
+        label: 'Selected CAN frames',
+        value: this.formatNumber(
+          dbc.selectedCanFrames
+        ),
+        detail: 'Requested from simulation'
+      },
+      {
+        label: 'Resolved CAN IDs',
+        value: this.formatNumber(
+          dbc.resolvedCanIdCount
+        ),
+        detail: 'Ready for decode'
+      },
+      {
+        label: 'Missing CAN IDs',
+        value: this.formatNumber(
+          Array.isArray(dbc.missingCanIds)
+            ? dbc.missingCanIds.length
+            : 0
+        ),
+        detail: 'Unresolved messages'
+      }
+    ];
+
+    this.canFrameRows =
+      this.buildCanFrameRows();
+
+    this.filteredCanFrameRows = [
+      ...this.canFrameRows
+    ];
 
     this.runManifestViewer = {
       summary: [
         {
           label: 'Run ID',
-          value:
-            String(
-              this.manifest?.runId ??
-              this.manifest?.timestamp ??
-              '-'
-            )
-        },
-        {
-          label: 'Client',
-          value:
-            String(
-              this.manifest?.clientId ??
-              this.manifest?.customerId ??
-              '-'
-            )
-        },
-        {
-          label: 'Format',
-          value:
-            String(
-              output.outputFormat ??
-              '-'
-            )
+          value: String(
+            this.manifest?.runId ??
+            '-'
+          )
         },
         {
           label: 'Vehicles',
-          value:
-            Number(
-              simulation.amountOfVehicles ?? 0
-            ).toLocaleString()
+          value: this.formatNumber(
+            simulation.amountOfVehicles
+          )
         },
         {
           label: 'Blocks',
-          value:
-            Number(
-              simulation.numberOfBlocks ?? 0
-            ).toLocaleString()
+          value: this.formatNumber(
+            simulation.numberOfBlocks
+          )
         },
         {
           label: 'CAN IDs',
-          value:
-            Number(
-              dbc.resolvedCanIdCount ??
-              dbc.selectedCanFrames ??
-              0
-            ).toLocaleString()
+          value: this.formatNumber(
+            dbc.resolvedCanIdCount ??
+            dbc.selectedCanFrames
+          )
         },
         {
           label: 'DBC Files',
-          value:
-            Number(
-              Array.isArray(dbc.dbcFiles)
-                ? dbc.dbcFiles.length
-                : 0
-            ).toLocaleString()
+          value: this.formatNumber(
+            dbcFiles.length
+          )
         },
         {
           label: 'Duration',
-          value:
-            `${Number(simulation.durationSec ?? 0).toLocaleString()} s`
+          value: `${this.formatNumber(simulation.durationSec)} s`
         }
       ]
     };
+  }
+
+  private buildCanFrameRows():
+    CanFrameRow[] {
+
+    const resolvedCanFrames =
+      this.manifest?.dbc?.resolvedCanFrames;
+
+    const canFrames =
+      Array.isArray(resolvedCanFrames)
+        ? resolvedCanFrames
+        : this.manifest?.dbc?.canFrames;
+
+    if (!Array.isArray(canFrames)) {
+      return [];
+    }
+
+    return canFrames.map((frame: any) => {
+
+      const signals =
+        frame?.frame?.s;
+
+      return {
+        canId:
+          String(frame?.canId ?? '-'),
+
+        messageName:
+          String(
+            frame?.messageName ??
+            frame?.frame?.n ??
+            '-'
+          ),
+
+        dbcFile:
+          String(frame?.dbcFile ?? '-'),
+
+        idf:
+          String(
+            frame?.idf ??
+            frame?.frame?.idf ??
+            '-'
+          ),
+
+        signalCount:
+          this.formatNumber(
+            Array.isArray(signals)
+              ? signals.length
+              : 0
+          )
+      };
+    });
   }
 
   private buildRunManifestKey(
@@ -441,5 +683,37 @@ implements OnChanges {
         hostname === '127.0.0.1'
       )
     );
+  }
+
+  private formatNumber(
+    value: unknown
+  ): string {
+
+    const numericValue =
+      Number(value ?? 0);
+
+    if (Number.isNaN(numericValue)) {
+      return '0';
+    }
+
+    return numericValue.toLocaleString();
+  }
+
+  private formatDateTime(
+    value: unknown
+  ): string {
+
+    if (!value) {
+      return '-';
+    }
+
+    const date =
+      new Date(String(value));
+
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleString();
   }
 }

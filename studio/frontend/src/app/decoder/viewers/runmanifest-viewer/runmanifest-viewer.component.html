@@ -13,7 +13,7 @@
           </h4>
 
           <span>
-            Read-only BIN run manifest preview
+            Generated CAN simulation summary
           </span>
 
         </div>
@@ -25,7 +25,7 @@
             <input
               type="text"
               class="runmanifest-search-input"
-              placeholder="Filter manifest"
+              placeholder="Filter CAN messages"
               [(ngModel)]="runManifestSearchText"
               (input)="applyRunManifestSearch()">
 
@@ -41,6 +41,15 @@
             </button>
 
           </div>
+
+          <button
+            type="button"
+            class="runmanifest-action-button"
+            (click)="toggleRawManifest()">
+
+            {{ showRawManifest ? 'Hide JSON' : 'Raw JSON' }}
+
+          </button>
 
         </div>
 
@@ -70,7 +79,7 @@
         *ngIf="
           !isLoadingRunManifest &&
           !runManifestErrorMessage &&
-          !filteredManifestText
+          !manifestText
         ">
 
         No run manifest available.
@@ -78,14 +87,269 @@
       </div>
 
       <div
-        class="runmanifest-json-shell"
+        class="runmanifest-content-shell"
         *ngIf="
           !isLoadingRunManifest &&
           !runManifestErrorMessage &&
-          filteredManifestText
+          manifestText
         ">
 
-        <pre class="runmanifest-json-content">{{ filteredManifestText }}</pre>
+        <section class="runmanifest-section">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              Run overview
+            </h5>
+
+            <span>
+              High-level information about this generated simulation.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-card-grid runmanifest-card-grid-overview">
+
+            <article
+              class="runmanifest-info-card"
+              *ngFor="let item of overviewCards">
+
+              <span>
+                {{ item.label }}
+              </span>
+
+              <strong>
+                {{ item.value }}
+              </strong>
+
+              <small>
+                {{ item.detail }}
+              </small>
+
+            </article>
+
+          </div>
+
+        </section>
+
+        <section class="runmanifest-section">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              Simulation
+            </h5>
+
+            <span>
+              Runtime parameters used to generate the BIN file.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-card-grid">
+
+            <article
+              class="runmanifest-info-card runmanifest-info-card-soft"
+              *ngFor="let item of simulationCards">
+
+              <span>
+                {{ item.label }}
+              </span>
+
+              <strong>
+                {{ item.value }}
+              </strong>
+
+              <small>
+                {{ item.detail }}
+              </small>
+
+            </article>
+
+          </div>
+
+        </section>
+
+        <section class="runmanifest-section">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              Storage and route
+            </h5>
+
+            <span>
+              Output location and GPS generation summary.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-card-grid">
+
+            <article
+              class="runmanifest-info-card runmanifest-info-card-wide"
+              *ngFor="let item of outputCards">
+
+              <span>
+                {{ item.label }}
+              </span>
+
+              <strong>
+                {{ item.value }}
+              </strong>
+
+              <small>
+                {{ item.detail }}
+              </small>
+
+            </article>
+
+          </div>
+
+        </section>
+
+        <section class="runmanifest-section">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              DBC and CAN coverage
+            </h5>
+
+            <span>
+              Messages resolved from the selected DBC files.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-card-grid">
+
+            <article
+              class="runmanifest-info-card runmanifest-info-card-soft"
+              *ngFor="let item of dbcCards">
+
+              <span>
+                {{ item.label }}
+              </span>
+
+              <strong>
+                {{ item.value }}
+              </strong>
+
+              <small>
+                {{ item.detail }}
+              </small>
+
+            </article>
+
+          </div>
+
+        </section>
+
+        <section class="runmanifest-section runmanifest-section-table">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              CAN messages
+            </h5>
+
+            <span>
+              {{ filteredCanFrameRows.length }} visible messages.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-table-shell">
+
+            <table class="runmanifest-table">
+
+              <thead>
+
+                <tr>
+
+                  <th>
+                    CAN ID
+                  </th>
+
+                  <th>
+                    Message
+                  </th>
+
+                  <th>
+                    DBC file
+                  </th>
+
+                  <th>
+                    ID type
+                  </th>
+
+                  <th>
+                    Signals
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                <tr
+                  *ngFor="let row of filteredCanFrameRows">
+
+                  <td>
+                    {{ row.canId }}
+                  </td>
+
+                  <td>
+                    {{ row.messageName }}
+                  </td>
+
+                  <td>
+                    {{ row.dbcFile }}
+                  </td>
+
+                  <td>
+                    {{ row.idf }}
+                  </td>
+
+                  <td>
+                    {{ row.signalCount }}
+                  </td>
+
+                </tr>
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
+        <section
+          class="runmanifest-section runmanifest-section-raw"
+          *ngIf="showRawManifest">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              Raw manifest JSON
+            </h5>
+
+            <span>
+              Advanced technical view.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-json-shell">
+
+            <pre class="runmanifest-json-content">{{ filteredManifestText }}</pre>
+
+          </div>
+
+        </section>
 
       </div>
 

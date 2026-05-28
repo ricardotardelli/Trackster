@@ -131,6 +131,29 @@
   font-size: 1.05rem;
 }
 
+.runmanifest-action-button {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: #ffffff;
+  color: #102349;
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.15s ease;
+  box-sizing: border-box;
+}
+
+.runmanifest-action-button:hover {
+  background: #f8fbff;
+}
+
+.runmanifest-action-button:focus {
+  outline: none;
+}
+
 .runmanifest-loading,
 .runmanifest-error,
 .runmanifest-empty-state {
@@ -151,33 +174,227 @@
   border-bottom: 1px solid rgba(254, 202, 202, 0.95);
 }
 
-.runmanifest-json-shell {
+.runmanifest-content-shell {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   width: 100%;
   overflow: auto;
+  padding: 12px;
   background: #ffffff;
   border-radius: 0 0 12px 12px;
   box-sizing: border-box;
 }
 
+.runmanifest-content-shell::-webkit-scrollbar,
+.runmanifest-table-shell::-webkit-scrollbar,
 .runmanifest-json-shell::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
+.runmanifest-content-shell::-webkit-scrollbar-track,
+.runmanifest-table-shell::-webkit-scrollbar-track,
 .runmanifest-json-shell::-webkit-scrollbar-track {
   background: transparent;
 }
 
+.runmanifest-content-shell::-webkit-scrollbar-thumb,
+.runmanifest-table-shell::-webkit-scrollbar-thumb,
 .runmanifest-json-shell::-webkit-scrollbar-thumb {
   border-radius: 6px;
   background: rgba(100, 116, 139, 0.35);
 }
 
+.runmanifest-content-shell::-webkit-scrollbar-thumb:hover,
+.runmanifest-table-shell::-webkit-scrollbar-thumb:hover,
 .runmanifest-json-shell::-webkit-scrollbar-thumb:hover {
   background: rgba(71, 85, 105, 0.55);
+}
+
+.runmanifest-section {
+  margin-bottom: 14px;
+}
+
+.runmanifest-section:last-child {
+  margin-bottom: 0;
+}
+
+.runmanifest-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.runmanifest-section-heading h5 {
+  margin: 0;
+  color: #102349;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.runmanifest-section-heading span {
+  color: #5a6b82;
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.runmanifest-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.runmanifest-card-grid-overview {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.runmanifest-info-card {
+  min-width: 0;
+  min-height: 78px;
+  padding: 10px 11px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
+  box-sizing: border-box;
+}
+
+.runmanifest-info-card-soft {
+  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+}
+
+.runmanifest-info-card-wide strong {
+  font-size: 0.74rem;
+}
+
+.runmanifest-info-card span {
+  display: block;
+  margin-bottom: 5px;
+  color: #5a6b82;
+  font-size: 0.65rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.runmanifest-info-card strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #102349;
+  font-size: 0.94rem;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runmanifest-info-card small {
+  display: block;
+  min-width: 0;
+  margin-top: 6px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runmanifest-table-shell {
+  width: 100%;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 12px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.runmanifest-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #ffffff;
+}
+
+.runmanifest-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.runmanifest-table th {
+  height: 32px;
+  padding: 0 9px;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.7);
+  background: #f8fafc;
+  color: #102349;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-align: left;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.runmanifest-table td {
+  height: 30px;
+  padding: 0 9px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.75);
+  color: #102349;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 30px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.runmanifest-table tbody tr:hover td {
+  background: #f8fbff;
+}
+
+.runmanifest-table th:nth-child(1),
+.runmanifest-table td:nth-child(1) {
+  width: 90px;
+}
+
+.runmanifest-table th:nth-child(2),
+.runmanifest-table td:nth-child(2) {
+  width: 220px;
+}
+
+.runmanifest-table th:nth-child(3),
+.runmanifest-table td:nth-child(3) {
+  width: 240px;
+}
+
+.runmanifest-table th:nth-child(4),
+.runmanifest-table td:nth-child(4) {
+  width: 90px;
+}
+
+.runmanifest-table th:nth-child(5),
+.runmanifest-table td:nth-child(5) {
+  width: 90px;
+}
+
+.runmanifest-json-shell {
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 12px;
+  background: #ffffff;
+  box-sizing: border-box;
 }
 
 .runmanifest-json-content {
