@@ -139,7 +139,7 @@
   background: #ffffff;
   color: #102349;
   font-size: 0.78rem;
-  font-weight: 750;
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
   transition: 0.15s ease;
@@ -160,7 +160,7 @@
   flex: 0 0 auto;
   padding: 12px;
   font-size: 0.82rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .runmanifest-loading,
@@ -232,14 +232,14 @@
   margin: 0;
   color: #102349;
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 850;
   line-height: 1.2;
 }
 
 .runmanifest-section-heading span {
-  color: #5a6b82;
-  font-size: 0.72rem;
-  font-weight: 650;
+  color: #64748b;
+  font-size: 0.71rem;
+  font-weight: 600;
   text-align: right;
 }
 
@@ -264,7 +264,7 @@
   border: 1px solid rgba(191, 219, 254, 0.9);
   border-radius: 12px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.03);
   box-sizing: border-box;
 }
 
@@ -275,9 +275,9 @@
 .runmanifest-info-card span {
   display: block;
   margin-bottom: 5px;
-  color: #5a6b82;
+  color: #64748b;
   font-size: 0.65rem;
-  font-weight: 850;
+  font-weight: 750;
   line-height: 1.1;
   text-transform: uppercase;
 }
@@ -287,8 +287,8 @@
   min-width: 0;
   overflow: hidden;
   color: #102349;
-  font-size: 0.94rem;
-  font-weight: 900;
+  font-size: 0.92rem;
+  font-weight: 800;
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -301,7 +301,7 @@
   overflow: hidden;
   color: #64748b;
   font-size: 0.68rem;
-  font-weight: 650;
+  font-weight: 550;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -317,10 +317,6 @@
   box-sizing: border-box;
 }
 
-.runmanifest-dbc-table-shell {
-  max-height: 150px;
-}
-
 .runmanifest-table {
   width: 100%;
   min-width: 760px;
@@ -328,10 +324,6 @@
   border-spacing: 0;
   table-layout: fixed;
   background: #ffffff;
-}
-
-.runmanifest-dbc-table {
-  min-width: 520px;
 }
 
 .runmanifest-table thead {
@@ -345,9 +337,9 @@
   padding: 0 9px;
   border-bottom: 1px solid rgba(203, 213, 225, 0.7);
   background: #f8fafc;
-  color: #102349;
-  font-size: 0.72rem;
-  font-weight: 850;
+  color: #334155;
+  font-size: 0.71rem;
+  font-weight: 750;
   text-align: left;
   white-space: nowrap;
   box-sizing: border-box;
@@ -359,7 +351,7 @@
   border-bottom: 1px solid rgba(226, 232, 240, 0.75);
   color: #102349;
   font-size: 0.74rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 30px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -369,6 +361,10 @@
 
 .runmanifest-table tbody tr:hover td {
   background: #f8fbff;
+}
+
+.runmanifest-dbc-table td:first-child {
+  font-weight: 700;
 }
 
 .runmanifest-table th:nth-child(1),
@@ -396,21 +392,6 @@
   width: 90px;
 }
 
-.runmanifest-dbc-table th:nth-child(1),
-.runmanifest-dbc-table td:nth-child(1) {
-  width: 340px;
-}
-
-.runmanifest-dbc-table th:nth-child(2),
-.runmanifest-dbc-table td:nth-child(2) {
-  width: 90px;
-}
-
-.runmanifest-dbc-table th:nth-child(3),
-.runmanifest-dbc-table td:nth-child(3) {
-  width: 90px;
-}
-
 .runmanifest-json-shell {
   max-height: 280px;
   overflow: auto;
@@ -429,7 +410,7 @@
   background: #ffffff;
   font-family: Consolas, 'Courier New', monospace;
   font-size: 0.74rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.45;
   white-space: pre;
   box-sizing: border-box;
@@ -455,9 +436,9 @@
 .runmanifest-summary-box span {
   display: block;
   margin-bottom: 4px;
-  color: #5a6b82;
+  color: #64748b;
   font-size: 0.66rem;
-  font-weight: 850;
+  font-weight: 750;
   text-transform: uppercase;
 }
 
@@ -466,8 +447,8 @@
   min-width: 0;
   overflow: hidden;
   color: #102349;
-  font-size: 0.9rem;
-  font-weight: 900;
+  font-size: 0.88rem;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
