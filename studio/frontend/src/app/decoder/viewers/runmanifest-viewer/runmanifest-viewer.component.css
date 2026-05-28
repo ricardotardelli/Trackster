@@ -26,7 +26,7 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  border: 1px solid rgba(191, 219, 254, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 13px;
   background: #ffffff;
   overflow: hidden;
@@ -41,7 +41,7 @@
   flex: 0 0 auto;
   min-height: 40px;
   padding: 0 8px 0 12px;
-  border-bottom: 1px solid rgba(203, 213, 225, 0.4);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
   background: #f8fafc;
   box-sizing: border-box;
 }
@@ -78,7 +78,7 @@
   gap: 4px;
   height: 30px;
   padding: 0 4px;
-  border: 1px solid rgba(191, 219, 254, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 9px;
   background: #ffffff;
   box-sizing: border-box;
@@ -107,9 +107,9 @@
   width: 25px;
   height: 24px;
   padding: 0;
-  border: 1px solid rgba(191, 219, 254, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 7px;
-  background: #f8fbff;
+  background: #ffffff;
   color: #102349;
   font-size: 1rem;
   font-weight: 850;
@@ -119,7 +119,7 @@
 }
 
 .runmanifest-search-button:hover:not(:disabled) {
-  background: #eaf4ff;
+  background: #f1f5f9;
 }
 
 .runmanifest-search-button:disabled {
@@ -136,9 +136,9 @@
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border: 1px solid rgba(191, 219, 254, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 10px;
-  background: #f8fbff;
+  background: #f8fafc;
   box-sizing: border-box;
 }
 
@@ -160,7 +160,8 @@
   box-sizing: border-box;
 }
 
-.runmanifest-view-toggle button:hover {
+.runmanifest-view-toggle button:hover:not(.runmanifest-view-toggle-active) {
+  background: rgba(37, 99, 235, 0.08);
   color: #102349;
 }
 
@@ -169,11 +170,17 @@
 }
 
 .runmanifest-view-toggle-active {
-  background: #ffffff !important;
-  color: #102349 !important;
+  background: linear-gradient(
+    180deg,
+    #2563eb 0%,
+    #1d4ed8 100%
+  ) !important;
+
+  color: #ffffff !important;
+
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.08),
-    inset 0 0 0 1px rgba(191, 219, 254, 0.9);
+    0 1px 3px rgba(37, 99, 235, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .runmanifest-loading,
@@ -283,15 +290,15 @@
   min-width: 0;
   min-height: 78px;
   padding: 10px 11px;
-  border: 1px solid rgba(191, 219, 254, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.03);
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
   box-sizing: border-box;
 }
 
 .runmanifest-info-card-soft {
-  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+  background: #ffffff;
 }
 
 .runmanifest-info-card span {
@@ -365,7 +372,7 @@
 .runmanifest-table th {
   height: 32px;
   padding: 0 9px;
-  border-bottom: 1px solid rgba(203, 213, 225, 0.7);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.95);
   background: #f8fafc;
   color: #334155;
   font-size: 0.71rem;
@@ -378,7 +385,7 @@
 .runmanifest-table td {
   height: 30px;
   padding: 0 9px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.75);
+  border-bottom: 1px solid rgba(241, 245, 249, 1);
   color: #102349;
   font-size: 0.74rem;
   font-weight: 500;
@@ -478,9 +485,9 @@
 .runmanifest-summary-box {
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid rgba(191, 219, 254, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 10px;
-  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+  background: #ffffff;
   box-sizing: border-box;
 }
 
