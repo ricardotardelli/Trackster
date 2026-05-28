@@ -103,7 +103,7 @@
             </h5>
 
             <span>
-              High-level information about this generated simulation.
+              Simulation execution reference.
             </span>
 
           </div>
@@ -175,20 +175,20 @@
           <div class="runmanifest-section-heading">
 
             <h5>
-              Storage and route
+              GPS route
             </h5>
 
             <span>
-              Output location and GPS generation summary.
+              Route information used by the generated run.
             </span>
 
           </div>
 
-          <div class="runmanifest-card-grid">
+          <div class="runmanifest-card-grid runmanifest-card-grid-compact">
 
             <article
-              class="runmanifest-info-card runmanifest-info-card-wide"
-              *ngFor="let item of outputCards">
+              class="runmanifest-info-card runmanifest-info-card-soft"
+              *ngFor="let item of gpsCards">
 
               <span>
                 {{ item.label }}
@@ -213,11 +213,11 @@
           <div class="runmanifest-section-heading">
 
             <h5>
-              DBC and CAN coverage
+              CAN coverage
             </h5>
 
             <span>
-              Messages resolved from the selected DBC files.
+              Decoding coverage available for this simulation.
             </span>
 
           </div>
@@ -226,7 +226,7 @@
 
             <article
               class="runmanifest-info-card runmanifest-info-card-soft"
-              *ngFor="let item of dbcCards">
+              *ngFor="let item of coverageCards">
 
               <span>
                 {{ item.label }}
@@ -241,6 +241,71 @@
               </small>
 
             </article>
+
+          </div>
+
+        </section>
+
+        <section class="runmanifest-section runmanifest-section-table">
+
+          <div class="runmanifest-section-heading">
+
+            <h5>
+              DBC files
+            </h5>
+
+            <span>
+              Sources used to resolve CAN messages and signals.
+            </span>
+
+          </div>
+
+          <div class="runmanifest-table-shell runmanifest-dbc-table-shell">
+
+            <table class="runmanifest-table runmanifest-dbc-table">
+
+              <thead>
+
+                <tr>
+
+                  <th>
+                    DBC file
+                  </th>
+
+                  <th>
+                    Messages
+                  </th>
+
+                  <th>
+                    Signals
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                <tr
+                  *ngFor="let row of dbcFileRows">
+
+                  <td>
+                    {{ row.dbcFile }}
+                  </td>
+
+                  <td>
+                    {{ row.messageCount }}
+                  </td>
+
+                  <td>
+                    {{ row.signalCount }}
+                  </td>
+
+                </tr>
+
+              </tbody>
+
+            </table>
 
           </div>
 

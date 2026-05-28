@@ -40,6 +40,12 @@ interface CanFrameRow {
   signalCount: string;
 }
 
+interface DbcFileRow {
+  dbcFile: string;
+  messageCount: string;
+  signalCount: string;
+}
+
 @Component({
   selector: 'app-runmanifest-viewer',
   standalone: true,
@@ -72,9 +78,11 @@ implements OnChanges {
 
   simulationCards: ViewerCard[] = [];
 
-  outputCards: ViewerCard[] = [];
+  gpsCards: ViewerCard[] = [];
 
-  dbcCards: ViewerCard[] = [];
+  coverageCards: ViewerCard[] = [];
+
+  dbcFileRows: DbcFileRow[] = [];
 
   canFrameRows: CanFrameRow[] = [];
 
@@ -180,9 +188,11 @@ implements OnChanges {
 
     this.simulationCards = [];
 
-    this.outputCards = [];
+    this.gpsCards = [];
 
-    this.dbcCards = [];
+    this.coverageCards = [];
+
+    this.dbcFileRows = [];
 
     this.canFrameRows = [];
 
@@ -291,19 +301,28 @@ implements OnChanges {
     const simulation =
       this.manifest?.simulation ?? {};
 
-    const output =
-      this.manifest?.output ?? {};
-
     const dbc =
       this.manifest?.dbc ?? {};
 
     const gps =
       this.manifest?.gps ?? {};
 
-    const dbcFiles =
-      Array.isArray(dbc.dbcFiles)
-        ? dbc.dbcFiles
-        : [];
+    this.canFrameRows =
+      this.buildCanFrameRows();
+
+    this.filteredCanFrameRows = [
+      ...this.canFrameRows
+    ];
+
+    this.dbcFileRows =
+      this.buildDbcFileRows();
+
+    const totalSignalCount =
+      this.dbcFileRows.reduce(
+        (total, row) =>
+          total + Number(row.signalCount || 0),
+        0
+      );
 
     this.overviewCards = [
       {
@@ -313,24 +332,7 @@ implements OnChanges {
           this.manifest?.timestamp ??
           '-'
         ),
-        detail: 'Generated simulation run'
-      },
-      {
-        label: 'Client',
-        value: String(
-          this.manifest?.clientId ??
-          this.manifest?.customerId ??
-          '-'
-        ),
-        detail: 'Tenant isolation key'
-      },
-      {
-        label: 'Format',
-        value: String(
-          output.outputFormat ??
-          '-'
-        ),
-        detail: 'Generated output format'
+        detail: 'Simulation execution reference'
       },
       {
         label: 'Created at',
@@ -338,6 +340,21 @@ implements OnChanges {
           this.manifest?.createdAt
         ),
         detail: 'Manifest creation time'
+      },
+      {
+        label: 'Initial time',
+        value: String(
+          simulation.initialDateTime ??
+          '-'
+        ),
+        detail: 'Simulation start reference'
+      },
+      {
+        label: 'Generation',
+        value: this.formatGenerationType(
+          simulation.generationType
+        ),
+        detail: 'Generation strategy'
       }
     ];
 
@@ -381,61 +398,55 @@ implements OnChanges {
       }
     ];
 
-    this.outputCards = [
-      {
-        label: 'Bucket',
-        value: String(
-          output.bucket ??
-          '-'
-        ),
-        detail: 'Storage target'
-      },
-      {
-        label: 'Run folder',
-        value: String(
-          output.runFolder ??
-          '-'
-        ),
-        detail: 'S3 folder'
-      },
-      {
-        label: 'Manifest key',
-        value: String(
-          output.manifestKey ??
-          '-'
-        ),
-        detail: 'Current JSON source'
-      },
+    this.gpsCards = [
       {
         label: 'GPS blocks',
         value: this.formatNumber(
           gps.gpsBlockCount
         ),
-        detail: `${this.formatNumber(gps.gpsCoordinateRuns)} coordinate runs`
+        detail: 'Blocks containing route data'
+      },
+      {
+        label: 'Coordinate runs',
+        value: this.formatNumber(
+          gps.gpsCoordinateRuns
+        ),
+        detail: 'Compressed coordinate groups'
+      },
+      {
+        label: 'Route points',
+        value: this.formatNumber(
+          Array.isArray(gps.gpsCoordinates)
+            ? gps.gpsCoordinates.length
+            : 0
+        ),
+        detail: 'Manifest route entries'
       }
     ];
 
-    this.dbcCards = [
-      {
-        label: 'DBC files',
-        value: this.formatNumber(
-          dbcFiles.length
-        ),
-        detail: dbcFiles.join(', ') || '-'
-      },
-      {
-        label: 'Selected CAN frames',
-        value: this.formatNumber(
-          dbc.selectedCanFrames
-        ),
-        detail: 'Requested from simulation'
-      },
+    this.coverageCards = [
       {
         label: 'Resolved CAN IDs',
         value: this.formatNumber(
-          dbc.resolvedCanIdCount
+          dbc.resolvedCanIdCount ??
+          dbc.selectedCanFrames ??
+          this.canFrameRows.length
         ),
-        detail: 'Ready for decode'
+        detail: 'Messages ready for decode'
+      },
+      {
+        label: 'Signals',
+        value: this.formatNumber(
+          totalSignalCount
+        ),
+        detail: 'Decoded signal definitions'
+      },
+      {
+        label: 'DBC files',
+        value: this.formatNumber(
+          this.dbcFileRows.length
+        ),
+        detail: 'Sources used for CAN mapping'
       },
       {
         label: 'Missing CAN IDs',
@@ -444,15 +455,8 @@ implements OnChanges {
             ? dbc.missingCanIds.length
             : 0
         ),
-        detail: 'Unresolved messages'
+        detail: 'Unresolved requested messages'
       }
-    ];
-
-    this.canFrameRows =
-      this.buildCanFrameRows();
-
-    this.filteredCanFrameRows = [
-      ...this.canFrameRows
     ];
 
     this.runManifestViewer = {
@@ -480,13 +484,14 @@ implements OnChanges {
           label: 'CAN IDs',
           value: this.formatNumber(
             dbc.resolvedCanIdCount ??
-            dbc.selectedCanFrames
+            dbc.selectedCanFrames ??
+            this.canFrameRows.length
           )
         },
         {
-          label: 'DBC Files',
+          label: 'Signals',
           value: this.formatNumber(
-            dbcFiles.length
+            totalSignalCount
           )
         },
         {
@@ -546,6 +551,46 @@ implements OnChanges {
           )
       };
     });
+  }
+
+  private buildDbcFileRows():
+    DbcFileRow[] {
+
+    const byDbc =
+      new Map<string, {
+        messageCount: number;
+        signalCount: number;
+      }>();
+
+    for (const row of this.canFrameRows) {
+
+      const current =
+        byDbc.get(row.dbcFile) ??
+        {
+          messageCount: 0,
+          signalCount: 0
+        };
+
+      current.messageCount += 1;
+
+      current.signalCount +=
+        Number(row.signalCount || 0);
+
+      byDbc.set(
+        row.dbcFile,
+        current
+      );
+    }
+
+    return Array.from(
+      byDbc.entries()
+    ).map(([dbcFile, value]) => ({
+      dbcFile,
+      messageCount:
+        this.formatNumber(value.messageCount),
+      signalCount:
+        this.formatNumber(value.signalCount)
+    }));
   }
 
   private buildRunManifestKey(
@@ -715,5 +760,13 @@ implements OnChanges {
     }
 
     return date.toLocaleString();
+  }
+
+  private formatGenerationType(
+    value: unknown
+  ): string {
+
+    return String(value ?? '-')
+      .replace(/_/g, ' ');
   }
 }

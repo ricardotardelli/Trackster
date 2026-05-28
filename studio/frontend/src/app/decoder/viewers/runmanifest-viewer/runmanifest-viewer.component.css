@@ -253,6 +253,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.runmanifest-card-grid-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .runmanifest-info-card {
   min-width: 0;
   min-height: 78px;
@@ -266,10 +270,6 @@
 
 .runmanifest-info-card-soft {
   background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
-}
-
-.runmanifest-info-card-wide strong {
-  font-size: 0.74rem;
 }
 
 .runmanifest-info-card span {
@@ -317,6 +317,10 @@
   box-sizing: border-box;
 }
 
+.runmanifest-dbc-table-shell {
+  max-height: 150px;
+}
+
 .runmanifest-table {
   width: 100%;
   min-width: 760px;
@@ -324,6 +328,10 @@
   border-spacing: 0;
   table-layout: fixed;
   background: #ffffff;
+}
+
+.runmanifest-dbc-table {
+  min-width: 520px;
 }
 
 .runmanifest-table thead {
@@ -385,6 +393,21 @@
 
 .runmanifest-table th:nth-child(5),
 .runmanifest-table td:nth-child(5) {
+  width: 90px;
+}
+
+.runmanifest-dbc-table th:nth-child(1),
+.runmanifest-dbc-table td:nth-child(1) {
+  width: 340px;
+}
+
+.runmanifest-dbc-table th:nth-child(2),
+.runmanifest-dbc-table td:nth-child(2) {
+  width: 90px;
+}
+
+.runmanifest-dbc-table th:nth-child(3),
+.runmanifest-dbc-table td:nth-child(3) {
   width: 90px;
 }
 
