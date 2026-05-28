@@ -42,15 +42,27 @@
 
           </div>
 
-          <button
-            type="button"
-            class="runmanifest-action-button"
-            [class.runmanifest-action-button-active]="showRawManifest"
-            (click)="toggleRawManifest()">
+          <div class="runmanifest-view-toggle">
 
-            {{ showRawManifest ? 'Summary view' : 'Raw JSON view' }}
+            <button
+              type="button"
+              [class.runmanifest-view-toggle-active]="!showRawManifest"
+              (click)="showRawManifest = false">
 
-          </button>
+              Summary
+
+            </button>
+
+            <button
+              type="button"
+              [class.runmanifest-view-toggle-active]="showRawManifest"
+              (click)="showRawManifest = true">
+
+              Raw JSON
+
+            </button>
+
+          </div>
 
         </div>
 
