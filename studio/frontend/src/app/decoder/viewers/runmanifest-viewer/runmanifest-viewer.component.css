@@ -138,7 +138,7 @@
   padding: 2px;
   border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 10px;
-  background: #ffffff;
+  background: #f8fafc;
   box-sizing: border-box;
 }
 
@@ -161,8 +161,8 @@
 }
 
 .runmanifest-view-toggle button:hover:not(.runmanifest-view-toggle-active) {
-  background: rgba(16, 35, 73, 0.08);
-  color: #102349;
+  background: rgba(2, 132, 199, 0.08);
+  color: #0f3b67;
 }
 
 .runmanifest-view-toggle button:focus {
@@ -170,15 +170,9 @@
 }
 
 .runmanifest-view-toggle-active {
-  background: linear-gradient(
-    180deg,
-    #173a78 0%,
-    #102349 100%
-  ) !important;
+  background: #0284c7 !important;
   color: #ffffff !important;
-  box-shadow:
-    0 1px 3px rgba(16, 35, 73, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.18);
 }
 
 .runmanifest-loading,
@@ -474,7 +468,6 @@
 
 .runmanifest-monaco-shell {
   display: flex;
-  flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -484,82 +477,13 @@
   box-sizing: border-box;
 }
 
-.runmanifest-monaco-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex: 0 0 auto;
-  min-height: 36px;
-  padding: 0 10px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
-  background: #f8fafc;
-  box-sizing: border-box;
-}
-
-.runmanifest-monaco-surface {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  background: #ffffff;
-}
-
-.runmanifest-monaco-surface ngx-monaco-editor {
+.runmanifest-monaco-shell ngx-monaco-editor {
   display: block;
   flex: 1 1 auto;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
-}
-
-.dbc-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  margin: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  box-sizing: border-box;
-  transition:
-    background-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.dbc-tool-btn:focus {
-  outline: none;
-}
-
-.dbc-tool-btn mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
-  line-height: 18px;
-  color: inherit;
-}
-
-.dbc-tool-btn span {
-  line-height: 1;
-}
-
-.dbc-tool-btn:hover {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: #0f172a;
-}
-
-.dbc-tool-btn:active {
-  background-color: rgba(59, 130, 246, 0.16);
-  color: #0f172a;
 }
 
 .runmanifest-summary-sidebar {
