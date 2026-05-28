@@ -8,6 +8,14 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
+import { MatIconModule } from '@angular/material/icon';
+
+import { DefaultMonacoLoader, NGX_MONACO_LOADER_PROVIDER, NgxMonacoEditorComponent, type EditorInitializedEvent } from '@jean-merelis/ngx-monaco-editor';
+
+import * as monaco from 'monaco-editor';
+
+import { registerDbcLanguage } from '../../../dbceditor/dbc-monaco-language';
+
 import { environment } from '../../../../environments/environment';
 
 import {
@@ -18,6 +26,12 @@ import {
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 import { S3TreeNode } from '../../decoder.component';
+
+const monacoLoader = new DefaultMonacoLoader({
+  paths: {
+    vs: '/vs'
+  }
+});
 
 interface RuntimeConfig {
   s3Default?: string;
@@ -47,12 +61,22 @@ interface DbcFileRow {
   signalCount: string;
 }
 
+type RunManifestView = 'summary' | 'dbc' | 'json';
+
 @Component({
   selector: 'app-runmanifest-viewer',
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule
+    FormsModule,
+    MatIconModule,
+    NgxMonacoEditorComponent
+  ],
+  providers: [
+    {
+      provide: NGX_MONACO_LOADER_PROVIDER,
+      useValue: monacoLoader
+    }
   ],
   templateUrl: './runmanifest-viewer.component.html',
   styleUrl: './runmanifest-viewer.component.css'
@@ -69,11 +93,15 @@ implements OnChanges {
 
   runManifestSearchText = '';
 
-  showRawManifest = false;
+  activeView: RunManifestView = 'summary';
 
   manifestText = '';
 
   filteredManifestText = '';
+
+  dbcPreviewText = '';
+
+  filteredDbcPreviewText = '';
 
   overviewCards: ViewerCard[] = [];
 
@@ -90,6 +118,43 @@ implements OnChanges {
   filteredCanFrameRows: CanFrameRow[] = [];
 
   private manifest: any = null;
+
+  private dbcEditorInstance: monaco.editor.IStandaloneCodeEditor | null = null;
+
+  dbcEditorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+    automaticLayout: true,
+    fixedOverflowWidgets: true,
+    minimap: {
+      enabled: false
+    },
+    fontSize: 13,
+    lineHeight: 20,
+    lineNumbers: 'on',
+    lineNumbersMinChars: 3,
+    glyphMargin: false,
+    folding: false,
+    roundedSelection: false,
+    scrollBeyondLastLine: false,
+    wordWrap: 'off',
+    tabSize: 2,
+    insertSpaces: true,
+    readOnly: true,
+    language: 'dbc',
+    theme: 'dbcVsCodeLight',
+    overviewRulerBorder: false,
+    hideCursorInOverviewRuler: true,
+    padding: {
+      top: 10,
+      bottom: 10
+    },
+    scrollbar: {
+      vertical: 'auto',
+      horizontal: 'auto',
+      verticalScrollbarSize: 8,
+      horizontalScrollbarSize: 8,
+      alwaysConsumeMouseWheel: false
+    }
+  };
 
   runManifestViewer = {
     summary: [] as ViewerCard[]
@@ -109,6 +174,49 @@ implements OnChanges {
     }
   }
 
+  onDbcEditorInit(
+    event: EditorInitializedEvent
+  ): void {
+
+    this.dbcEditorInstance =
+      event.editor;
+
+    registerDbcLanguage(
+      event.monaco
+    );
+
+    const model =
+      this.dbcEditorInstance.getModel();
+
+    if (model) {
+      event.monaco.editor.setModelLanguage(
+        model,
+        'dbc'
+      );
+    }
+
+    event.monaco.editor.setTheme(
+      'dbcVsCodeLight'
+    );
+
+    setTimeout(() => {
+      this.dbcEditorInstance?.layout();
+    }, 0);
+  }
+
+  setView(
+    view: RunManifestView
+  ): void {
+
+    this.activeView = view;
+
+    this.applyRunManifestSearch();
+
+    setTimeout(() => {
+      this.dbcEditorInstance?.layout();
+    }, 0);
+  }
+
   applyRunManifestSearch(): void {
 
     const searchText =
@@ -124,6 +232,9 @@ implements OnChanges {
 
       this.filteredManifestText =
         this.manifestText;
+
+      this.filteredDbcPreviewText =
+        this.dbcPreviewText;
 
       return;
     }
@@ -152,6 +263,16 @@ implements OnChanges {
             .includes(searchText)
         )
         .join('\n');
+
+    this.filteredDbcPreviewText =
+      this.dbcPreviewText
+        .split('\n')
+        .filter((line) =>
+          line
+            .toLowerCase()
+            .includes(searchText)
+        )
+        .join('\n');
   }
 
   clearRunManifestSearch(): void {
@@ -164,12 +285,49 @@ implements OnChanges {
 
     this.filteredManifestText =
       this.manifestText;
+
+    this.filteredDbcPreviewText =
+      this.dbcPreviewText;
   }
 
-  toggleRawManifest(): void {
+  toggleWrap(): void {
 
-    this.showRawManifest =
-      !this.showRawManifest;
+    const nextWrap: monaco.editor.IEditorOptions['wordWrap'] =
+      this.dbcEditorOptions.wordWrap === 'off'
+        ? 'on'
+        : 'off';
+
+    this.dbcEditorOptions.wordWrap =
+      nextWrap;
+
+    this.dbcEditorInstance?.updateOptions({
+      wordWrap: nextWrap
+    });
+
+    this.dbcEditorInstance?.layout();
+  }
+
+  downloadDbcPreview(): void {
+
+    const blob =
+      new Blob(
+        [this.dbcPreviewText],
+        {
+          type: 'text/plain;charset=utf-8'
+        }
+      );
+
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const anchor =
+      document.createElement('a');
+
+    anchor.href = url;
+    anchor.download = 'run-manifest-preview.dbc';
+    anchor.click();
+
+    window.URL.revokeObjectURL(url);
   }
 
   private async loadRunManifest(
@@ -182,13 +340,17 @@ implements OnChanges {
 
     this.runManifestSearchText = '';
 
-    this.showRawManifest = false;
+    this.activeView = 'summary';
 
     this.manifest = null;
 
     this.manifestText = '';
 
     this.filteredManifestText = '';
+
+    this.dbcPreviewText = '';
+
+    this.filteredDbcPreviewText = '';
 
     this.overviewCards = [];
 
@@ -232,6 +394,8 @@ implements OnChanges {
         this.manifestText;
 
       this.buildViewModel();
+
+      this.buildDbcPreview();
 
     } catch (error) {
 
@@ -508,6 +672,192 @@ implements OnChanges {
     };
   }
 
+  private buildDbcPreview(): void {
+
+    const lines: string[] = [];
+
+    lines.push('VERSION ""');
+    lines.push('');
+    lines.push('NS_ :');
+    lines.push('\tNS_DESC_');
+    lines.push('\tCM_');
+    lines.push('\tBA_DEF_');
+    lines.push('\tBA_');
+    lines.push('\tVAL_');
+    lines.push('\tCAT_DEF_');
+    lines.push('\tCAT_');
+    lines.push('\tFILTER');
+    lines.push('\tBA_DEF_DEF_');
+    lines.push('\tEV_DATA_');
+    lines.push('\tENVVAR_DATA_');
+    lines.push('\tSGTYPE_');
+    lines.push('\tSGTYPE_VAL_');
+    lines.push('\tBA_DEF_SGTYPE_');
+    lines.push('\tBA_SGTYPE_');
+    lines.push('\tSIG_TYPE_REF_');
+    lines.push('\tVAL_TABLE_');
+    lines.push('\tSIG_GROUP_');
+    lines.push('\tSIG_VALTYPE_');
+    lines.push('\tSIGTYPE_VALTYPE_');
+    lines.push('\tBO_TX_BU_');
+    lines.push('\tBA_DEF_REL_');
+    lines.push('\tBA_REL_');
+    lines.push('\tBA_DEF_DEF_REL_');
+    lines.push('\tBU_SG_REL_');
+    lines.push('\tBU_EV_REL_');
+    lines.push('\tBU_BO_REL_');
+    lines.push('\tSG_MUL_VAL_');
+    lines.push('');
+    lines.push('BS_:');
+    lines.push('');
+    lines.push('BU_: Vector__XXX');
+    lines.push('');
+
+    const resolvedCanFrames =
+      this.manifest?.dbc?.resolvedCanFrames;
+
+    const canFrames =
+      Array.isArray(resolvedCanFrames)
+        ? resolvedCanFrames
+        : this.manifest?.dbc?.canFrames;
+
+    if (!Array.isArray(canFrames)) {
+
+      this.dbcPreviewText =
+        lines.join('\n');
+
+      this.filteredDbcPreviewText =
+        this.dbcPreviewText;
+
+      return;
+    }
+
+    for (const frame of canFrames) {
+
+      const rawCanId =
+        frame?.canId ??
+        frame?.frame?.id ??
+        frame?.frame?.i ??
+        0;
+
+      const canId =
+        this.parseCanIdForDbc(rawCanId);
+
+      const messageName =
+        this.sanitizeDbcIdentifier(
+          String(
+            frame?.messageName ??
+            frame?.frame?.n ??
+            `Message_${canId}`
+          )
+        );
+
+      const dlc =
+        Number(
+          frame?.frame?.l ??
+          frame?.frame?.dlc ??
+          8
+        );
+
+      lines.push(
+        `BO_ ${canId} ${messageName}: ${dlc} Vector__XXX`
+      );
+
+      const signals =
+        frame?.frame?.s;
+
+      if (Array.isArray(signals)) {
+
+        for (const signal of signals) {
+
+          const signalName =
+            this.sanitizeDbcIdentifier(
+              String(
+                signal?.n ??
+                signal?.name ??
+                'Signal'
+              )
+            );
+
+          const startBit =
+            Number(
+              signal?.sb ??
+              signal?.startBit ??
+              0
+            );
+
+          const bitLength =
+            Number(
+              signal?.bl ??
+              signal?.bitLength ??
+              1
+            );
+
+          const byteOrder =
+            Number(
+              signal?.bo ??
+              signal?.byteOrder ??
+              0
+            );
+
+          const signed =
+            Number(
+              signal?.sg ??
+              signal?.signed ??
+              0
+            );
+
+          const factor =
+            Number(
+              signal?.f ??
+              signal?.factor ??
+              1
+            );
+
+          const offset =
+            Number(
+              signal?.o ??
+              signal?.offset ??
+              0
+            );
+
+          const min =
+            Number(
+              signal?.min ??
+              signal?.minimum ??
+              0
+            );
+
+          const max =
+            Number(
+              signal?.max ??
+              signal?.maximum ??
+              0
+            );
+
+          const unit =
+            String(
+              signal?.u ??
+              signal?.unit ??
+              ''
+            ).replace(/"/g, '');
+
+          lines.push(
+            ` SG_ ${signalName} : ${startBit}|${bitLength}@${byteOrder}${signed ? '-' : '+'} (${factor},${offset}) [${min}|${max}] "${unit}" Vector__XXX`
+          );
+        }
+      }
+
+      lines.push('');
+    }
+
+    this.dbcPreviewText =
+      lines.join('\n');
+
+    this.filteredDbcPreviewText =
+      this.dbcPreviewText;
+  }
+
   private buildCanFrameRows():
     CanFrameRow[] {
 
@@ -739,6 +1089,53 @@ implements OnChanges {
         hostname === '127.0.0.1'
       )
     );
+  }
+
+  private parseCanIdForDbc(
+    value: unknown
+  ): number {
+
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    const text =
+      String(value ?? '0').trim();
+
+    if (
+      text.toLowerCase().startsWith('0x')
+    ) {
+      return parseInt(text, 16);
+    }
+
+    const parsed =
+      Number(text);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : 0;
+  }
+
+  private sanitizeDbcIdentifier(
+    value: string
+  ): string {
+
+    const sanitized =
+      value
+        .trim()
+        .replace(/[^A-Za-z0-9_]/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+    if (!sanitized) {
+      return 'Unnamed';
+    }
+
+    if (/^[0-9]/.test(sanitized)) {
+      return `_${sanitized}`;
+    }
+
+    return sanitized;
   }
 
   private formatNumber(

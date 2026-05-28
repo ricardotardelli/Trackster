@@ -138,7 +138,7 @@
   padding: 2px;
   border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #ffffff;
   box-sizing: border-box;
 }
 
@@ -161,7 +161,7 @@
 }
 
 .runmanifest-view-toggle button:hover:not(.runmanifest-view-toggle-active) {
-  background: rgba(37, 99, 235, 0.08);
+  background: rgba(16, 35, 73, 0.08);
   color: #102349;
 }
 
@@ -172,14 +172,12 @@
 .runmanifest-view-toggle-active {
   background: linear-gradient(
     180deg,
-    #2563eb 0%,
-    #1d4ed8 100%
+    #173a78 0%,
+    #102349 100%
   ) !important;
-
   color: #ffffff !important;
-
   box-shadow:
-    0 1px 3px rgba(37, 99, 235, 0.35),
+    0 1px 3px rgba(16, 35, 73, 0.28),
     inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
@@ -474,6 +472,96 @@
   box-sizing: border-box;
 }
 
+.runmanifest-monaco-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+  box-sizing: border-box;
+}
+
+.runmanifest-monaco-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.runmanifest-monaco-surface {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.runmanifest-monaco-surface ngx-monaco-editor {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dbc-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.dbc-tool-btn:focus {
+  outline: none;
+}
+
+.dbc-tool-btn mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  color: inherit;
+}
+
+.dbc-tool-btn span {
+  line-height: 1;
+}
+
+.dbc-tool-btn:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #0f172a;
+}
+
+.dbc-tool-btn:active {
+  background-color: rgba(59, 130, 246, 0.16);
+  color: #0f172a;
+}
+
 .runmanifest-summary-sidebar {
   display: flex;
   flex-direction: column;
@@ -509,4 +597,32 @@
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+:host ::ng-deep .monaco-editor,
+:host ::ng-deep .monaco-editor-background,
+:host ::ng-deep .monaco-editor .margin {
+  background: #ffffff !important;
+}
+
+:host ::ng-deep .monaco-editor .scroll-decoration {
+  display: none !important;
+}
+
+:host ::ng-deep .monaco-scrollable-element .scrollbar .slider {
+  background: rgba(100, 116, 139, 0.35) !important;
+  border-radius: 6px;
+}
+
+:host ::ng-deep .monaco-scrollable-element .scrollbar .slider:hover {
+  background: rgba(71, 85, 105, 0.55) !important;
+}
+
+:host ::ng-deep .monaco-scrollable-element .scrollbar .slider.active {
+  background: rgba(37, 99, 235, 0.7) !important;
+}
+
+:host ::ng-deep .monaco-editor {
+  position: relative !important;
+  z-index: 1 !important;
 }

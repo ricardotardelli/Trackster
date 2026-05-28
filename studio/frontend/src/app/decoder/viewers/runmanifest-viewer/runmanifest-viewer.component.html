@@ -25,7 +25,13 @@
             <input
               type="text"
               class="runmanifest-search-input"
-              [placeholder]="showRawManifest ? 'Filter JSON' : 'Filter CAN messages'"
+              [placeholder]="
+                activeView === 'json'
+                  ? 'Filter JSON'
+                  : activeView === 'dbc'
+                    ? 'Filter DBC preview'
+                    : 'Filter CAN messages'
+              "
               [(ngModel)]="runManifestSearchText"
               (input)="applyRunManifestSearch()">
 
@@ -46,8 +52,8 @@
 
             <button
               type="button"
-              [class.runmanifest-view-toggle-active]="!showRawManifest"
-              (click)="showRawManifest = false">
+              [class.runmanifest-view-toggle-active]="activeView === 'summary'"
+              (click)="setView('summary')">
 
               Summary
 
@@ -55,8 +61,17 @@
 
             <button
               type="button"
-              [class.runmanifest-view-toggle-active]="showRawManifest"
-              (click)="showRawManifest = true">
+              [class.runmanifest-view-toggle-active]="activeView === 'dbc'"
+              (click)="setView('dbc')">
+
+              DBC Preview
+
+            </button>
+
+            <button
+              type="button"
+              [class.runmanifest-view-toggle-active]="activeView === 'json'"
+              (click)="setView('json')">
 
               Raw JSON
 
@@ -99,13 +114,15 @@
 
       </div>
 
+      <!-- SUMMARY -->
+
       <div
         class="runmanifest-content-shell"
         *ngIf="
           !isLoadingRunManifest &&
           !runManifestErrorMessage &&
           manifestText &&
-          !showRawManifest
+          activeView === 'summary'
         ">
 
         <section class="runmanifest-section">
@@ -408,13 +425,70 @@
 
       </div>
 
+      <!-- DBC PREVIEW -->
+
+      <div
+        class="runmanifest-monaco-shell"
+        *ngIf="
+          !isLoadingRunManifest &&
+          !runManifestErrorMessage &&
+          manifestText &&
+          activeView === 'dbc'
+        ">
+
+        <div class="runmanifest-monaco-toolbar">
+
+          <button
+            class="dbc-tool-btn"
+            (click)="toggleWrap()">
+
+            <mat-icon>wrap_text</mat-icon>
+
+            <span>
+              Wrap
+            </span>
+
+          </button>
+
+          <button
+            class="dbc-tool-btn"
+            (click)="downloadDbcPreview()">
+
+            <mat-icon>download</mat-icon>
+
+            <span>
+              Download
+            </span>
+
+          </button>
+
+        </div>
+
+        <div class="runmanifest-monaco-surface">
+
+          <ngx-monaco-editor
+            [(ngModel)]="filteredDbcPreviewText"
+            [options]="dbcEditorOptions"
+            [editorStyle]="{
+              width: '100%',
+              height: '100%'
+            }"
+            (editorInitialized)="onDbcEditorInit($event)">
+          </ngx-monaco-editor>
+
+        </div>
+
+      </div>
+
+      <!-- RAW JSON -->
+
       <div
         class="runmanifest-json-shell runmanifest-json-shell-full"
         *ngIf="
           !isLoadingRunManifest &&
           !runManifestErrorMessage &&
           manifestText &&
-          showRawManifest
+          activeView === 'json'
         ">
 
         <pre class="runmanifest-json-content">{{ filteredManifestText }}</pre>
