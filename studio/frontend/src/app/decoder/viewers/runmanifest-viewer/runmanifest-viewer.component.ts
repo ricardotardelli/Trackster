@@ -38,6 +38,7 @@ interface CanFrameRow {
   dbcFile: string;
   idf: string;
   signalCount: string;
+  signalCountValue: number;
 }
 
 interface DbcFileRow {
@@ -129,12 +130,17 @@ implements OnChanges {
 
     this.filteredCanFrameRows =
       this.canFrameRows.filter((row) =>
-        Object.values(row)
-          .some((value) =>
-            String(value)
-              .toLowerCase()
-              .includes(searchText)
-          )
+        [
+          row.canId,
+          row.messageName,
+          row.dbcFile,
+          row.idf,
+          row.signalCount
+        ].some((value) =>
+          String(value)
+            .toLowerCase()
+            .includes(searchText)
+        )
       );
 
     this.filteredManifestText =
@@ -318,9 +324,9 @@ implements OnChanges {
       this.buildDbcFileRows();
 
     const totalSignalCount =
-      this.dbcFileRows.reduce(
+      this.canFrameRows.reduce(
         (total, row) =>
-          total + Number(row.signalCount || 0),
+          total + row.signalCountValue,
         0
       );
 
@@ -522,6 +528,11 @@ implements OnChanges {
       const signals =
         frame?.frame?.s;
 
+      const signalCountValue =
+        Array.isArray(signals)
+          ? signals.length
+          : 0;
+
       return {
         canId:
           String(frame?.canId ?? '-'),
@@ -545,10 +556,10 @@ implements OnChanges {
 
         signalCount:
           this.formatNumber(
-            Array.isArray(signals)
-              ? signals.length
-              : 0
-          )
+            signalCountValue
+          ),
+
+        signalCountValue
       };
     });
   }
@@ -574,7 +585,7 @@ implements OnChanges {
       current.messageCount += 1;
 
       current.signalCount +=
-        Number(row.signalCount || 0);
+        row.signalCountValue;
 
       byDbc.set(
         row.dbcFile,

@@ -25,7 +25,7 @@
             <input
               type="text"
               class="runmanifest-search-input"
-              placeholder="Filter CAN messages"
+              [placeholder]="showRawManifest ? 'Filter JSON' : 'Filter CAN messages'"
               [(ngModel)]="runManifestSearchText"
               (input)="applyRunManifestSearch()">
 
@@ -45,9 +45,10 @@
           <button
             type="button"
             class="runmanifest-action-button"
+            [class.runmanifest-action-button-active]="showRawManifest"
             (click)="toggleRawManifest()">
 
-            {{ showRawManifest ? 'Hide JSON' : 'Raw JSON' }}
+            {{ showRawManifest ? 'Summary view' : 'Raw JSON view' }}
 
           </button>
 
@@ -91,7 +92,8 @@
         *ngIf="
           !isLoadingRunManifest &&
           !runManifestErrorMessage &&
-          manifestText
+          manifestText &&
+          !showRawManifest
         ">
 
         <section class="runmanifest-section">
@@ -392,29 +394,18 @@
 
         </section>
 
-        <section
-          class="runmanifest-section runmanifest-section-raw"
-          *ngIf="showRawManifest">
+      </div>
 
-          <div class="runmanifest-section-heading">
+      <div
+        class="runmanifest-json-shell runmanifest-json-shell-full"
+        *ngIf="
+          !isLoadingRunManifest &&
+          !runManifestErrorMessage &&
+          manifestText &&
+          showRawManifest
+        ">
 
-            <h5>
-              Raw manifest JSON
-            </h5>
-
-            <span>
-              Advanced technical view.
-            </span>
-
-          </div>
-
-          <div class="runmanifest-json-shell">
-
-            <pre class="runmanifest-json-content">{{ filteredManifestText }}</pre>
-
-          </div>
-
-        </section>
+        <pre class="runmanifest-json-content">{{ filteredManifestText }}</pre>
 
       </div>
 
