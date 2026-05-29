@@ -8,20 +8,12 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-
 import { environment } from '../../environments/environment';
-
-import {
-  ListObjectsV2Command,
-  S3Client
-} from '@aws-sdk/client-s3';
-
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
-
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
 import { MatDividerModule } from '@angular/material/divider';
-
 import { JsonViewerComponent } from './viewers/json-viewer/json-viewer.component';
 import { CsvViewerComponent } from './viewers/csv-viewer/csv-viewer.component';
 import { HexDumpViewerComponent } from './viewers/hex-dump-viewer/hex-dump-viewer.component';
@@ -31,12 +23,21 @@ import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
 import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
+import { LocalFileSaveService } from './export-files/local-file-save.service';
 
 export interface S3TreeNode {
   name: string;
   key: string;
   children?: S3TreeNode[];
 }
+
+export type ExportFileFormat =
+  | 'json'
+  | 'csv'
+  | 'vectorasc'
+  | 'blf'
+  | 'mf4'
+  | 'parquet';
 
 interface RuntimeConfig {
   s3Default?: string;
@@ -93,6 +94,10 @@ export class DecoderComponent implements OnInit {
 
   readonly s3TreeDataSource =
     new MatTreeNestedDataSource<S3TreeNode>();
+
+  constructor(
+    private readonly localFileSaveService: LocalFileSaveService
+  ) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadS3GeneratedFilesTree();
@@ -202,6 +207,149 @@ export class DecoderComponent implements OnInit {
 
     this.selectedBinKeys = this.selectedBinKeys
       .filter(key => !folderKeys.has(key));
+  }
+
+  public async saveGeneratedExportFile(
+    fileNameBase: string,
+    format: ExportFileFormat,
+    content: string | ArrayBuffer | Uint8Array
+  ): Promise<void> {
+
+    const mimeType =
+      this.getExportMimeType(format);
+
+    const blob =
+      this.buildExportBlob(
+        content,
+        mimeType
+      );
+
+    const fileName =
+      this.normalizeExportFileName(
+        fileNameBase,
+        format
+      );
+
+    await this.localFileSaveService.saveFile({
+      fileName,
+      blob,
+      mimeType
+    });
+  }
+
+  private buildExportBlob(
+    content: string | ArrayBuffer | Uint8Array,
+    mimeType: string
+  ): Blob {
+
+    if (typeof content === 'string') {
+      return new Blob(
+        [content],
+        { type: mimeType }
+      );
+    }
+
+    if (content instanceof Uint8Array) {
+      const arrayBuffer =
+        new ArrayBuffer(content.byteLength);
+
+      const view =
+        new Uint8Array(arrayBuffer);
+
+      view.set(content);
+
+      return new Blob(
+        [arrayBuffer],
+        { type: mimeType }
+      );
+    }
+
+    return new Blob(
+      [content],
+      { type: mimeType }
+    );
+  }
+
+  private getExportMimeType(
+    format: ExportFileFormat
+  ): string {
+
+    switch (format) {
+      case 'json':
+        return 'application/json;charset=utf-8';
+
+      case 'csv':
+        return 'text/csv;charset=utf-8';
+
+      case 'vectorasc':
+        return 'text/plain;charset=utf-8';
+
+      case 'blf':
+        return 'application/octet-stream';
+
+      case 'mf4':
+        return 'application/octet-stream';
+
+      case 'parquet':
+        return 'application/octet-stream';
+
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  private normalizeExportFileName(
+    baseName: string,
+    format: ExportFileFormat
+  ): string {
+
+    const cleanBaseName = baseName
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '_');
+
+    const safeBaseName =
+      cleanBaseName || 'trackster-export';
+
+    const extension =
+      this.getExportExtension(format);
+
+    if (
+      safeBaseName
+        .toLowerCase()
+        .endsWith(`.${extension}`)
+    ) {
+      return safeBaseName;
+    }
+
+    return `${safeBaseName}.${extension}`;
+  }
+
+  private getExportExtension(
+    format: ExportFileFormat
+  ): string {
+
+    switch (format) {
+      case 'json':
+        return 'json';
+
+      case 'csv':
+        return 'csv';
+
+      case 'vectorasc':
+        return 'asc';
+
+      case 'blf':
+        return 'blf';
+
+      case 'mf4':
+        return 'mf4';
+
+      case 'parquet':
+        return 'parquet';
+
+      default:
+        return 'bin';
+    }
   }
 
   private getBinKeysFromFolder(
