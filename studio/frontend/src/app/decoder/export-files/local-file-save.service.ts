@@ -11,6 +11,12 @@ interface SaveFileOptions {
   mimeType?: string;
 }
 
+interface SaveFileProviderOptions {
+  fileName: string;
+  mimeType?: string;
+  blobProvider: () => Promise<Blob>;
+}
+
 interface FilePickerWindow extends Window {
   showSaveFilePicker?: (options?: unknown) => Promise<{
     createWritable(): Promise<{
@@ -38,6 +44,17 @@ export class LocalFileSaveService {
   private static crcTable: Uint32Array | null = null;
 
   public async saveFile(options: SaveFileOptions): Promise<void> {
+    await this.saveFileFromProvider({
+      fileName: options.fileName,
+      mimeType: options.mimeType,
+      blobProvider: async () => options.blob
+    });
+  }
+
+  public async saveFileFromProvider(
+    options: SaveFileProviderOptions
+  ): Promise<void> {
+
     const fileName = options.fileName.trim();
 
     if (!fileName) {
@@ -48,11 +65,17 @@ export class LocalFileSaveService {
 
     if (typeof browserWindow.showSaveFilePicker === 'function') {
       try {
-        await this.saveUsingFilePicker(
-          browserWindow,
-          fileName,
-          options.blob
-        );
+        const picker = await browserWindow.showSaveFilePicker({
+          suggestedName: fileName
+        });
+
+        const blob = await options.blobProvider();
+
+        const writable = await picker.createWritable();
+
+        await writable.write(blob);
+        await writable.close();
+
         return;
       } catch (error: unknown) {
         if (this.isUserCancel(error)) {
@@ -66,49 +89,32 @@ export class LocalFileSaveService {
       }
     }
 
-    this.saveUsingDownload(fileName, options.blob);
+    const blob = await options.blobProvider();
+
+    this.saveUsingDownload(fileName, blob);
   }
 
   public async saveFiles(
-    files: ExportFile[],
+    filesProvider: () => Promise<ExportFile[]>,
     zipFileName: string
   ): Promise<void> {
-
-    if (files.length === 0) {
-      throw new Error('No files selected for export.');
-    }
 
     const normalizedZipFileName =
       this.normalizeZipFileName(zipFileName);
 
-    const zipBlob =
-      await this.createZipBlob(files);
-
-    await this.saveFile({
+    await this.saveFileFromProvider({
       fileName: normalizedZipFileName,
-      blob: zipBlob,
-      mimeType: 'application/zip'
+      mimeType: 'application/zip',
+      blobProvider: async () => {
+        const files = await filesProvider();
+
+        if (files.length === 0) {
+          throw new Error('No files selected for export.');
+        }
+
+        return await this.createZipBlob(files);
+      }
     });
-  }
-
-  private async saveUsingFilePicker(
-    browserWindow: FilePickerWindow,
-    fileName: string,
-    blob: Blob
-  ): Promise<void> {
-
-    const picker = await browserWindow.showSaveFilePicker?.({
-      suggestedName: fileName
-    });
-
-    if (!picker) {
-      throw new Error('File picker was not created.');
-    }
-
-    const writable = await picker.createWritable();
-
-    await writable.write(blob);
-    await writable.close();
   }
 
   private saveUsingDownload(
