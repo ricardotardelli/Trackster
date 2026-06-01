@@ -243,7 +243,10 @@
                     #decoderExportMenu="matMenu"
                     class="decoder-export-menu">
 
-                    <button mat-menu-item>
+                    <button
+                      mat-menu-item
+                      [disabled]="!selectedBinNode"
+                      (click)="exportCurrentFile()">
                       <span>Current file</span>
                     </button>
 
@@ -272,10 +275,10 @@
               <app-parquet-viewer *ngIf="selectedViewerMode === 'parquet' && selectedBinNode" [selectedNode]="selectedBinNode"></app-parquet-viewer>
               <app-runmanifest-viewer *ngIf="selectedViewerMode === 'run-manifest' && selectedBinNode" [selectedNode]="selectedBinNode"></app-runmanifest-viewer>
 
-              <div class="decoder-placeholder-view" 
-                *ngIf="selectedViewerMode !== 'trackster-bin' && 
-                        selectedViewerMode !== 'decoded-signals' && 
-                        selectedViewerMode !== 'json' && 
+              <div class="decoder-placeholder-view"
+                *ngIf="selectedViewerMode !== 'trackster-bin' &&
+                        selectedViewerMode !== 'decoded-signals' &&
+                        selectedViewerMode !== 'json' &&
                         selectedViewerMode !== 'csv' &&
                         selectedViewerMode !== 'hex-dump' &&
                         selectedViewerMode !== 'vector-asc' &&

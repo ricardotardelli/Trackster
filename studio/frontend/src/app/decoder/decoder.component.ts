@@ -9,7 +9,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { environment } from '../../environments/environment';
-import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client
+} from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
@@ -32,6 +36,7 @@ export interface S3TreeNode {
 }
 
 export type ExportFileFormat =
+  | 'bin'
   | 'json'
   | 'csv'
   | 'vectorasc'
@@ -209,6 +214,63 @@ export class DecoderComponent implements OnInit {
       .filter(key => !folderKeys.has(key));
   }
 
+  public async exportCurrentFile(): Promise<void> {
+    if (this.selectedViewerMode !== 'trackster-bin') {
+      console.warn(
+        `[Trackster] Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+      );
+      return;
+    }
+
+    await this.exportCurrentTracksterBinFile();
+  }
+
+  public async exportCurrentTracksterBinFile(): Promise<void> {
+    if (!this.selectedBinNode) {
+      console.warn('[Trackster] No BIN file selected for export.');
+      return;
+    }
+
+    if (!this.isBinFile(this.selectedBinNode)) {
+      console.warn('[Trackster] Selected node is not a BIN file.');
+      return;
+    }
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const s3Client =
+      await this.getS3Client();
+
+    const response =
+      await s3Client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: this.selectedBinNode.key
+        })
+      );
+
+    const content =
+      await this.readS3BodyAsArrayBuffer(
+        response.Body
+      );
+
+    await this.saveGeneratedExportFile(
+      this.selectedBinNode.name,
+      'bin',
+      content
+    );
+  }
+
   public async saveGeneratedExportFile(
     fileNameBase: string,
     format: ExportFileFormat,
@@ -275,6 +337,9 @@ export class DecoderComponent implements OnInit {
   ): string {
 
     switch (format) {
+      case 'bin':
+        return 'application/octet-stream';
+
       case 'json':
         return 'application/json;charset=utf-8';
 
@@ -329,6 +394,9 @@ export class DecoderComponent implements OnInit {
   ): string {
 
     switch (format) {
+      case 'bin':
+        return 'bin';
+
       case 'json':
         return 'json';
 
@@ -350,6 +418,69 @@ export class DecoderComponent implements OnInit {
       default:
         return 'bin';
     }
+  }
+
+  private async readS3BodyAsArrayBuffer(
+    body: unknown
+  ): Promise<ArrayBuffer> {
+
+    if (!body) {
+      throw new Error(
+        'S3 object body is empty.'
+      );
+    }
+
+    const transformedBody = body as {
+      transformToByteArray?: () => Promise<Uint8Array>;
+    };
+
+    if (
+      typeof transformedBody.transformToByteArray === 'function'
+    ) {
+      const bytes =
+        await transformedBody.transformToByteArray();
+
+      return this.copyUint8ArrayToArrayBuffer(bytes);
+    }
+
+    if (body instanceof Blob) {
+      return await body.arrayBuffer();
+    }
+
+    if (body instanceof ArrayBuffer) {
+      return body;
+    }
+
+    if (body instanceof Uint8Array) {
+      return this.copyUint8ArrayToArrayBuffer(body);
+    }
+
+    if (body instanceof ReadableStream) {
+      return await new Response(body).arrayBuffer();
+    }
+
+    if (typeof body === 'string') {
+      return new TextEncoder().encode(body).buffer;
+    }
+
+    throw new Error(
+      'Unsupported S3 object body type.'
+    );
+  }
+
+  private copyUint8ArrayToArrayBuffer(
+    bytes: Uint8Array
+  ): ArrayBuffer {
+
+    const arrayBuffer =
+      new ArrayBuffer(bytes.byteLength);
+
+    const view =
+      new Uint8Array(arrayBuffer);
+
+    view.set(bytes);
+
+    return arrayBuffer;
   }
 
   private getBinKeysFromFolder(
