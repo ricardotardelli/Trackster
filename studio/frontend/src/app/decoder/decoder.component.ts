@@ -9,11 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { environment } from '../../environments/environment';
-import {
-  GetObjectCommand,
-  ListObjectsV2Command,
-  S3Client
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
@@ -27,7 +23,7 @@ import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
 import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
-import { LocalFileSaveService } from './export-files/local-file-save.service';
+import { ExportFile, LocalFileSaveService } from './export-files/local-file-save.service';
 
 export interface S3TreeNode {
   name: string;
@@ -843,5 +839,77 @@ export class DecoderComponent implements OnInit {
     }
 
     return null;
+  }
+
+  public async exportSelectedTracksterBinFiles(): Promise<void> {
+    const uniqueSelectedKeys =
+      [...new Set(this.selectedBinKeys)]
+        .filter(key => key.toLowerCase().endsWith('.bin'));
+
+    if (uniqueSelectedKeys.length === 0) {
+      console.warn('[Trackster] No BIN files selected for export.');
+      return;
+    }
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const s3Client =
+      await this.getS3Client();
+
+    const files: ExportFile[] = [];
+
+    for (const key of uniqueSelectedKeys) {
+      const response =
+        await s3Client.send(
+          new GetObjectCommand({
+            Bucket: bucket,
+            Key: key
+          })
+        );
+
+      const content =
+        await this.readS3BodyAsArrayBuffer(
+          response.Body
+        );
+
+      files.push({
+        fileName: this.getZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    await this.localFileSaveService.saveFiles(
+      files,
+      'trackster-selected-bin-files.zip'
+    );
+  }
+
+  private getZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return parts.slice(1).join('/');
+    }
+
+    return parts[0] || 'trackster-export.bin';
   }
 }

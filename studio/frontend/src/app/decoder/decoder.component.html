@@ -243,14 +243,11 @@
                     #decoderExportMenu="matMenu"
                     class="decoder-export-menu">
 
-                    <button
-                      mat-menu-item
-                      [disabled]="!selectedBinNode"
-                      (click)="exportCurrentFile()">
+                    <button mat-menu-item [disabled]="!selectedBinNode" (click)="exportCurrentFile()">
                       <span>Current file</span>
                     </button>
 
-                    <button mat-menu-item>
+                    <button mat-menu-item [disabled]="selectedBinKeys.length === 0" (click)="exportSelectedTracksterBinFiles()">
                       <span>Selected files</span>
                     </button>
 
