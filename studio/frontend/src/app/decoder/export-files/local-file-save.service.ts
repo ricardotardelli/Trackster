@@ -70,7 +70,6 @@ export class LocalFileSaveService {
         });
 
         const blob = await options.blobProvider();
-
         const writable = await picker.createWritable();
 
         await writable.write(blob);
@@ -132,9 +131,7 @@ export class LocalFileSaveService {
       anchor.style.display = 'none';
 
       document.body.appendChild(anchor);
-
       anchor.click();
-
       document.body.removeChild(anchor);
     } finally {
       setTimeout(() => {
@@ -147,7 +144,7 @@ export class LocalFileSaveService {
     files: ExportFile[]
   ): Promise<Blob> {
 
-    const chunks: BlobPart[] = [];
+    const chunks: Uint8Array[] = [];
     const centralDirectoryEntries: ZipCentralDirectoryEntry[] = [];
     const encoder = new TextEncoder();
 
@@ -178,8 +175,8 @@ export class LocalFileSaveService {
           dosDate
         );
 
-      chunks.push(localHeader.buffer as ArrayBuffer);
-      chunks.push(fileBytes.buffer as ArrayBuffer);
+      chunks.push(localHeader);
+      chunks.push(fileBytes);
 
       centralDirectoryEntries.push({
         fileNameBytes,
@@ -200,7 +197,7 @@ export class LocalFileSaveService {
       const centralDirectoryHeader =
         this.buildCentralDirectoryHeader(entry);
 
-      chunks.push(centralDirectoryHeader.buffer as ArrayBuffer);
+      chunks.push(centralDirectoryHeader);
 
       offset += centralDirectoryHeader.byteLength;
     }
@@ -215,12 +212,43 @@ export class LocalFileSaveService {
         centralDirectoryOffset
       );
 
-    chunks.push(endOfCentralDirectory.buffer as ArrayBuffer);
+    chunks.push(endOfCentralDirectory);
+
+    const zipBytes =
+      this.concatenateUint8Arrays(chunks);
+
+    const zipArrayBuffer =
+      new ArrayBuffer(zipBytes.byteLength);
+
+    new Uint8Array(zipArrayBuffer).set(zipBytes);
 
     return new Blob(
-      chunks,
+      [zipArrayBuffer],
       { type: 'application/zip' }
     );
+  }
+
+  private concatenateUint8Arrays(
+    chunks: Uint8Array[]
+  ): Uint8Array {
+
+    const totalLength =
+      chunks.reduce(
+        (sum, chunk) => sum + chunk.byteLength,
+        0
+      );
+
+    const result =
+      new Uint8Array(totalLength);
+
+    let offset = 0;
+
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    return result;
   }
 
   private buildLocalFileHeader(
