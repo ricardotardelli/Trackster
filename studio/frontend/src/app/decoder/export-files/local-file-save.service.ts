@@ -17,13 +17,17 @@ interface SaveFileProviderOptions {
   blobProvider: () => Promise<Blob>;
 }
 
+interface FilePickerWritable {
+  write(data: Blob | ArrayBuffer | Uint8Array): Promise<void>;
+  close(): Promise<void>;
+}
+
+interface FilePickerHandle {
+  createWritable(): Promise<FilePickerWritable>;
+}
+
 interface FilePickerWindow extends Window {
-  showSaveFilePicker?: (options?: unknown) => Promise<{
-    createWritable(): Promise<{
-      write(data: Blob): Promise<void>;
-      close(): Promise<void>;
-    }>;
-  }>;
+  showSaveFilePicker?: (options?: unknown) => Promise<FilePickerHandle>;
 }
 
 interface ZipCentralDirectoryEntry {
@@ -65,15 +69,25 @@ export class LocalFileSaveService {
 
     if (typeof browserWindow.showSaveFilePicker === 'function') {
       try {
-        const picker = await browserWindow.showSaveFilePicker({
-          suggestedName: fileName
-        });
+        const picker =
+          await browserWindow.showSaveFilePicker({
+            suggestedName: fileName
+          });
 
-        const blob = await options.blobProvider();
-        const writable = await picker.createWritable();
+        const blob =
+          await options.blobProvider();
 
-        await writable.write(blob);
-        await writable.close();
+        const arrayBuffer =
+          await blob.arrayBuffer();
+
+        const writable =
+          await picker.createWritable();
+
+        try {
+          await writable.write(arrayBuffer);
+        } finally {
+          await writable.close();
+        }
 
         return;
       } catch (error: unknown) {
@@ -88,7 +102,8 @@ export class LocalFileSaveService {
       }
     }
 
-    const blob = await options.blobProvider();
+    const blob =
+      await options.blobProvider();
 
     this.saveUsingDownload(fileName, blob);
   }
@@ -105,7 +120,8 @@ export class LocalFileSaveService {
       fileName: normalizedZipFileName,
       mimeType: 'application/zip',
       blobProvider: async () => {
-        const files = await filesProvider();
+        const files =
+          await filesProvider();
 
         if (files.length === 0) {
           throw new Error('No files selected for export.');
@@ -121,10 +137,12 @@ export class LocalFileSaveService {
     blob: Blob
   ): void {
 
-    const objectUrl = URL.createObjectURL(blob);
+    const objectUrl =
+      URL.createObjectURL(blob);
 
     try {
-      const anchor = document.createElement('a');
+      const anchor =
+        document.createElement('a');
 
       anchor.href = objectUrl;
       anchor.download = fileName;
@@ -191,7 +209,8 @@ export class LocalFileSaveService {
       offset += localHeader.byteLength + fileBytes.byteLength;
     }
 
-    const centralDirectoryOffset = offset;
+    const centralDirectoryOffset =
+      offset;
 
     for (const entry of centralDirectoryEntries) {
       const centralDirectoryHeader =
@@ -383,10 +402,14 @@ export class LocalFileSaveService {
     dosDate: number;
   } {
 
-    const now = new Date();
+    const now =
+      new Date();
 
     const year =
-      Math.max(1980, now.getFullYear());
+      Math.max(
+        1980,
+        now.getFullYear()
+      );
 
     const dosTime =
       (now.getHours() << 11) |
@@ -408,19 +431,20 @@ export class LocalFileSaveService {
     fileName: string
   ): string {
 
-    const parts = fileName
-      .replace(/\\/g, '/')
-      .split('/')
-      .map(part =>
-        part
-          .trim()
-          .replace(/[\\:*?"<>|]+/g, '_')
-      )
-      .filter(part =>
-        part.length > 0 &&
-        part !== '.' &&
-        part !== '..'
-      );
+    const parts =
+      fileName
+        .replace(/\\/g, '/')
+        .split('/')
+        .map(part =>
+          part
+            .trim()
+            .replace(/[\\:*?"<>|]+/g, '_')
+        )
+        .filter(part =>
+          part.length > 0 &&
+          part !== '.' &&
+          part !== '..'
+        );
 
     return parts.join('/') || 'trackster-export.bin';
   }
