@@ -299,6 +299,133 @@ export class DecodedSignalsViewerComponent implements OnChanges {
     await this.copyRowsToClipboard(rows);
   }
 
+  public buildDecodedSignalsTextExport(
+    sourceFileName: string
+  ): string {
+
+    const rows =
+      this.getVisibleRows();
+
+    const headers = [
+      'CAN ID',
+      'Message',
+      'Signal',
+      'Value',
+      'Min',
+      'Max',
+      'Avg',
+      'Samples',
+      'Changes',
+      'Changed',
+      'First Block',
+      'Last Block'
+    ];
+
+    const tableRows =
+      rows.map(row => [
+        row.canId,
+        row.messageName,
+        row.signalName,
+        row.value,
+        row.min,
+        row.max,
+        row.avg,
+        row.samples.toString(),
+        row.changes.toString(),
+        this.getSignalChangedPercent(row),
+        row.firstBlockIndex.toString(),
+        row.lastBlockIndex.toString()
+      ]);
+
+    const columnWidths =
+      this.calculateTextTableColumnWidths(
+        headers,
+        tableRows
+      );
+
+    const lines: string[] = [];
+
+    lines.push('Trackster Decoded Signals');
+    lines.push(`Source file: ${sourceFileName}`);
+    lines.push(`Visible rows: ${rows.length.toLocaleString()}`);
+    lines.push(`Total decoded signals: ${this.signalCatalog.length.toLocaleString()}`);
+
+    const filter =
+      this.filterText.trim();
+
+    if (filter) {
+      lines.push(`Filter: ${filter}`);
+    }
+
+    lines.push(`Generated at: ${new Date().toISOString()}`);
+    lines.push('');
+
+    lines.push(
+      this.formatTextTableRow(
+        headers,
+        columnWidths
+      )
+    );
+
+    lines.push(
+      this.formatTextTableSeparator(
+        columnWidths
+      )
+    );
+
+    for (const row of tableRows) {
+      lines.push(
+        this.formatTextTableRow(
+          row,
+          columnWidths
+        )
+      );
+    }
+
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  private calculateTextTableColumnWidths(
+    headers: string[],
+    rows: string[][]
+  ): number[] {
+
+    return headers.map((header, columnIndex) => {
+      const rowWidths =
+        rows.map(row =>
+          String(row[columnIndex] ?? '').length
+        );
+
+      return Math.max(
+        header.length,
+        ...rowWidths
+      );
+    });
+  }
+
+  private formatTextTableRow(
+    values: string[],
+    columnWidths: number[]
+  ): string {
+
+    return values
+      .map((value, index) =>
+        String(value ?? '').padEnd(columnWidths[index], ' ')
+      )
+      .join('  ');
+  }
+
+  private formatTextTableSeparator(
+    columnWidths: number[]
+  ): string {
+
+    return columnWidths
+      .map(width => '-'.repeat(width))
+      .join('  ');
+  }
+
   private sortRows(
     rows: SignalCatalogRow[]
   ): SignalCatalogRow[] {

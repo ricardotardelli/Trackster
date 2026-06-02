@@ -1,5 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  ViewChild
+} from '@angular/core';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
@@ -40,6 +44,7 @@ export interface S3TreeNode {
 
 export type ExportFileFormat =
   | 'bin'
+  | 'txt'
   | 'json'
   | 'csv'
   | 'vectorasc'
@@ -83,6 +88,9 @@ interface RuntimeConfig {
   styleUrl: './decoder.component.css'
 })
 export class DecoderComponent implements OnInit {
+
+  @ViewChild(DecodedSignalsViewerComponent)
+  private decodedSignalsViewer?: DecodedSignalsViewerComponent;
 
   selectedViewerMode = 'trackster-bin';
 
@@ -218,14 +226,19 @@ export class DecoderComponent implements OnInit {
   }
 
   public async exportCurrentFile(): Promise<void> {
-    if (this.selectedViewerMode !== 'trackster-bin') {
-      console.warn(
-        `[Trackster] Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
-      );
+    if (this.selectedViewerMode === 'trackster-bin') {
+      await this.exportCurrentTracksterBinFile();
       return;
     }
 
-    await this.exportCurrentTracksterBinFile();
+    if (this.selectedViewerMode === 'decoded-signals') {
+      await this.exportCurrentDecodedSignalsFile();
+      return;
+    }
+
+    console.warn(
+      `[Trackster] Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    );
   }
 
   public async exportCurrentTracksterBinFile(): Promise<void> {
@@ -280,6 +293,43 @@ export class DecoderComponent implements OnInit {
         return this.buildExportBlob(
           content,
           'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentDecodedSignalsFile(): Promise<void> {
+    if (!this.selectedBinNode) {
+      console.warn('[Trackster] No BIN file selected for decoded signals export.');
+      return;
+    }
+
+    if (!this.decodedSignalsViewer) {
+      console.warn('[Trackster] Decoded Signals viewer is not available.');
+      return;
+    }
+
+    const fileNameBase =
+      `${this.removeFileExtension(this.selectedBinNode.name)}.decoded-signals`;
+
+    const fileName =
+      this.normalizeExportFileName(
+        fileNameBase,
+        'txt'
+      );
+
+    await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const content =
+          this.decodedSignalsViewer!.buildDecodedSignalsTextExport(
+            this.selectedBinNode!.name
+          );
+
+        return this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
         );
       }
     });
@@ -520,6 +570,9 @@ export class DecoderComponent implements OnInit {
       case 'bin':
         return 'application/octet-stream';
 
+      case 'txt':
+        return 'text/plain;charset=utf-8';
+
       case 'json':
         return 'application/json;charset=utf-8';
 
@@ -577,6 +630,9 @@ export class DecoderComponent implements OnInit {
       case 'bin':
         return 'bin';
 
+      case 'txt':
+        return 'txt';
+
       case 'json':
         return 'json';
 
@@ -598,6 +654,16 @@ export class DecoderComponent implements OnInit {
       default:
         return 'bin';
     }
+  }
+
+  private removeFileExtension(
+    fileName: string
+  ): string {
+
+    return fileName.replace(
+      /\.[^/.]+$/,
+      ''
+    );
   }
 
   private async readS3BodyAsArrayBuffer(
