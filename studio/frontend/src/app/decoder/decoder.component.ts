@@ -1,9 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  OnInit,
-  ViewChild
-} from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
@@ -35,6 +31,10 @@ import {
   ExportFile,
   LocalFileSaveService
 } from './export-files/local-file-save.service';
+import {
+  parseTracksterBin,
+  ParsedTracksterBin
+} from './parser/decoder.bin.parser';
 
 export interface S3TreeNode {
   name: string;
@@ -57,6 +57,17 @@ interface RuntimeConfig {
   s3Region?: string;
   customerId?: string;
   clientId?: string;
+}
+
+interface DecodedSignalExportRow {
+  blockIndex: string;
+  frameOffset: string;
+  canId: string;
+  messageName: string;
+  signalName: string;
+  value: string;
+  raw: string;
+  unit: string;
 }
 
 @Component({
@@ -88,9 +99,6 @@ interface RuntimeConfig {
   styleUrl: './decoder.component.css'
 })
 export class DecoderComponent implements OnInit {
-
-  @ViewChild(DecodedSignalsViewerComponent)
-  private decodedSignalsViewer?: DecodedSignalsViewerComponent;
 
   selectedViewerMode = 'trackster-bin';
 
@@ -241,6 +249,38 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+  public async exportSelectedFiles(): Promise<void> {
+    if (this.selectedViewerMode === 'trackster-bin') {
+      await this.exportSelectedTracksterBinFiles();
+      return;
+    }
+
+    if (this.selectedViewerMode === 'decoded-signals') {
+      await this.exportSelectedDecodedSignalsFiles();
+      return;
+    }
+
+    console.warn(
+      `[Trackster] Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    );
+  }
+
+  public async exportSelectedFolders(): Promise<void> {
+    if (this.selectedViewerMode === 'trackster-bin') {
+      await this.exportSelectedTracksterBinFolders();
+      return;
+    }
+
+    if (this.selectedViewerMode === 'decoded-signals') {
+      await this.exportSelectedDecodedSignalsFolders();
+      return;
+    }
+
+    console.warn(
+      `[Trackster] Folder export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    );
+  }
+
   public async exportCurrentTracksterBinFile(): Promise<void> {
     if (!this.selectedBinNode) {
       console.warn('[Trackster] No BIN file selected for export.');
@@ -304,31 +344,23 @@ export class DecoderComponent implements OnInit {
       return;
     }
 
-    if (!this.decodedSignalsViewer) {
-      console.warn('[Trackster] Decoded Signals viewer is not available.');
-      return;
-    }
-
-    const fileNameBase =
-      `${this.removeFileExtension(this.selectedBinNode.name)}.decoded-signals`;
-
     const fileName =
-      this.normalizeExportFileName(
-        fileNameBase,
-        'txt'
+      this.getDecodedSignalsFileNameFromBinName(
+        this.selectedBinNode.name
       );
 
     await this.localFileSaveService.saveFileFromProvider({
       fileName,
       mimeType: 'text/plain;charset=utf-8',
       blobProvider: async () => {
-        const content =
-          this.decodedSignalsViewer!.buildDecodedSignalsTextExport(
+        const decodedText =
+          await this.buildDecodedSignalsTextForKey(
+            this.selectedBinNode!.key,
             this.selectedBinNode!.name
           );
 
         return this.buildExportBlob(
-          content,
+          decodedText,
           'text/plain;charset=utf-8'
         );
       }
@@ -375,6 +407,53 @@ export class DecoderComponent implements OnInit {
         return await this.loadBinFilesForZip(folderBinKeys);
       },
       'trackster-selected-bin-folders.zip'
+    );
+  }
+
+  public async exportSelectedDecodedSignalsFiles(): Promise<void> {
+    const uniqueSelectedKeys =
+      [...new Set(this.selectedBinKeys)]
+        .filter(key => key.toLowerCase().endsWith('.bin'));
+
+    if (uniqueSelectedKeys.length === 0) {
+      console.warn('[Trackster] No BIN files selected for decoded signals export.');
+      return;
+    }
+
+    await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadDecodedSignalTextFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-decoded-signals.zip'
+    );
+  }
+
+  public async exportSelectedDecodedSignalsFolders(): Promise<void> {
+    const selectedFolderKeys =
+      this.getSelectedBinParentFolderKeys();
+
+    if (selectedFolderKeys.length === 0) {
+      console.warn('[Trackster] No BIN folders selected for decoded signals export.');
+      return;
+    }
+
+    const folderBinKeys =
+      this.getAllBinKeysFromSelectedFolders(selectedFolderKeys);
+
+    if (folderBinKeys.length === 0) {
+      console.warn('[Trackster] Selected folders do not contain BIN files.');
+      return;
+    }
+
+    await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadDecodedSignalTextFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-decoded-signal-folders.zip'
     );
   }
 
@@ -451,6 +530,274 @@ export class DecoderComponent implements OnInit {
     }
 
     return files;
+  }
+
+  private async loadDecodedSignalTextFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const sourceFileName =
+        this.getFileNameFromS3Key(key);
+
+      const content =
+        await this.buildDecodedSignalsTextForKey(
+          key,
+          sourceFileName
+        );
+
+      files.push({
+        fileName: this.getDecodedSignalsZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async buildDecodedSignalsTextForKey(
+    binKey: string,
+    sourceFileName: string
+  ): Promise<string> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const binBuffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        binKey
+      );
+
+    const manifest =
+      await this.loadRunManifestForBinKey(
+        bucket,
+        binKey,
+        config
+      );
+
+    const parsed =
+      parseTracksterBin(
+        binBuffer,
+        manifest
+      );
+
+    return this.buildDecodedSignalsTextExport(
+      sourceFileName,
+      parsed
+    );
+  }
+
+  private async loadRunManifestForBinKey(
+    bucket: string,
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<unknown> {
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(binKey);
+
+    if (!runId) {
+      return null;
+    }
+
+    const manifestKey =
+      `${clientId}/${runId}/run-manifest.json`;
+
+    const manifestBuffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        manifestKey
+      );
+
+    const manifestText =
+      new TextDecoder('utf-8')
+        .decode(manifestBuffer);
+
+    return JSON.parse(manifestText);
+  }
+
+  private buildDecodedSignalsTextExport(
+    sourceFileName: string,
+    parsed: ParsedTracksterBin
+  ): string {
+
+    const rows =
+      this.buildDecodedSignalExportRows(parsed);
+
+    const headers = [
+      'Block',
+      'Frame Offset',
+      'CAN ID',
+      'Message',
+      'Signal',
+      'Value',
+      'Raw',
+      'Unit'
+    ];
+
+    const tableRows =
+      rows.map(row => [
+        row.blockIndex,
+        row.frameOffset,
+        row.canId,
+        row.messageName,
+        row.signalName,
+        row.value,
+        row.raw,
+        row.unit
+      ]);
+
+    const columnWidths =
+      this.calculateTextTableColumnWidths(
+        headers,
+        tableRows
+      );
+
+    const lines: string[] = [];
+
+    lines.push('Trackster Decoded Signals');
+    lines.push(`Source file: ${sourceFileName}`);
+    lines.push(`Blocks: ${parsed.blockCount.toLocaleString()}`);
+    lines.push(`Frames: ${parsed.totalFrameCount.toLocaleString()}`);
+    lines.push(`Decoded signal samples: ${rows.length.toLocaleString()}`);
+    lines.push(`Generated at: ${new Date().toISOString()}`);
+    lines.push('');
+
+    if (rows.length === 0) {
+      lines.push('No decoded signal samples were found.');
+      lines.push('');
+      return lines.join('\n');
+    }
+
+    lines.push(
+      this.formatTextTableRow(
+        headers,
+        columnWidths
+      )
+    );
+
+    lines.push(
+      this.formatTextTableSeparator(
+        columnWidths
+      )
+    );
+
+    for (const row of tableRows) {
+      lines.push(
+        this.formatTextTableRow(
+          row,
+          columnWidths
+        )
+      );
+    }
+
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  private buildDecodedSignalExportRows(
+    parsed: ParsedTracksterBin
+  ): DecodedSignalExportRow[] {
+
+    const rows: DecodedSignalExportRow[] = [];
+
+    for (const block of parsed.blocks) {
+      for (const frame of block.frames) {
+        for (const signal of frame.signals) {
+          rows.push({
+            blockIndex: block.blockIndex.toString(),
+            frameOffset: frame.offset.toString(),
+            canId: frame.canIdHex,
+            messageName: frame.messageName,
+            signalName: signal.name,
+            value: signal.value,
+            raw: signal.raw,
+            unit: signal.unit || ''
+          });
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  private calculateTextTableColumnWidths(
+    headers: string[],
+    rows: string[][]
+  ): number[] {
+
+    return headers.map((header, columnIndex) => {
+      const rowWidths =
+        rows.map(row =>
+          String(row[columnIndex] ?? '').length
+        );
+
+      return Math.max(
+        header.length,
+        ...rowWidths
+      );
+    });
+  }
+
+  private formatTextTableRow(
+    values: string[],
+    columnWidths: number[]
+  ): string {
+
+    return values
+      .map((value, index) =>
+        String(value ?? '').padEnd(columnWidths[index], ' ')
+      )
+      .join('  ');
+  }
+
+  private formatTextTableSeparator(
+    columnWidths: number[]
+  ): string {
+
+    return columnWidths
+      .map(width => '-'.repeat(width))
+      .join('  ');
+  }
+
+  private async getS3ObjectBuffer(
+    bucket: string,
+    key: string
+  ): Promise<ArrayBuffer> {
+
+    const s3Client =
+      await this.getS3Client();
+
+    const response =
+      await s3Client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: key
+        })
+      );
+
+    return await this.readS3BodyAsArrayBuffer(
+      response.Body
+    );
   }
 
   private getSelectedBinParentFolderKeys(): string[] {
@@ -666,6 +1013,47 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+  private getDecodedSignalsFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      `${baseName}.decoded-signals`,
+      'txt'
+    );
+  }
+
+  private getDecodedSignalsZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    const entryName =
+      this.getZipEntryNameFromBinKey(key);
+
+    const parts =
+      entryName
+        .split('/')
+        .filter(Boolean);
+
+    const lastIndex =
+      parts.length - 1;
+
+    if (lastIndex < 0) {
+      return 'trackster-export.decoded-signals.txt';
+    }
+
+    const baseName =
+      this.removeFileExtension(parts[lastIndex]);
+
+    parts[lastIndex] =
+      `${baseName}.decoded-signals.txt`;
+
+    return parts.join('/');
+  }
+
   private async readS3BodyAsArrayBuffer(
     body: unknown
   ): Promise<ArrayBuffer> {
@@ -743,6 +1131,34 @@ export class DecoderComponent implements OnInit {
     }
 
     return parts[0] || 'trackster-export.bin';
+  }
+
+  private getFileNameFromS3Key(
+    key: string
+  ): string {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    return parts[parts.length - 1] || 'trackster-export.bin';
+  }
+
+  private getRunIdFromKey(
+    key: string
+  ): string {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length < 2) {
+      return '';
+    }
+
+    return parts[1];
   }
 
   private getBinKeysFromFolder(
