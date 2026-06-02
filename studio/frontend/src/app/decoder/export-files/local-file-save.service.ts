@@ -47,8 +47,11 @@ export class LocalFileSaveService {
 
   private static crcTable: Uint32Array | null = null;
 
-  public async saveFile(options: SaveFileOptions): Promise<void> {
-    await this.saveFileFromProvider({
+  public async saveFile(
+    options: SaveFileOptions
+  ): Promise<boolean> {
+
+    return await this.saveFileFromProvider({
       fileName: options.fileName,
       mimeType: options.mimeType,
       blobProvider: async () => options.blob
@@ -57,17 +60,22 @@ export class LocalFileSaveService {
 
   public async saveFileFromProvider(
     options: SaveFileProviderOptions
-  ): Promise<void> {
+  ): Promise<boolean> {
 
-    const fileName = options.fileName.trim();
+    const fileName =
+      options.fileName.trim();
 
     if (!fileName) {
       throw new Error('File name is required.');
     }
 
-    const browserWindow = window as FilePickerWindow;
+    const browserWindow =
+      window as FilePickerWindow;
 
-    if (typeof browserWindow.showSaveFilePicker === 'function') {
+    if (
+      typeof browserWindow.showSaveFilePicker ===
+      'function'
+    ) {
       try {
         const picker =
           await browserWindow.showSaveFilePicker({
@@ -89,10 +97,12 @@ export class LocalFileSaveService {
           await writable.close();
         }
 
-        return;
+        return true;
+
       } catch (error: unknown) {
+
         if (this.isUserCancel(error)) {
-          return;
+          return false;
         }
 
         console.warn(
@@ -105,18 +115,23 @@ export class LocalFileSaveService {
     const blob =
       await options.blobProvider();
 
-    this.saveUsingDownload(fileName, blob);
+    this.saveUsingDownload(
+      fileName,
+      blob
+    );
+
+    return true;
   }
 
   public async saveFiles(
     filesProvider: () => Promise<ExportFile[]>,
     zipFileName: string
-  ): Promise<void> {
+  ): Promise<boolean> {
 
     const normalizedZipFileName =
       this.normalizeZipFileName(zipFileName);
 
-    await this.saveFileFromProvider({
+    return await this.saveFileFromProvider({
       fileName: normalizedZipFileName,
       mimeType: 'application/zip',
       blobProvider: async () => {
@@ -151,6 +166,7 @@ export class LocalFileSaveService {
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
+
     } finally {
       setTimeout(() => {
         URL.revokeObjectURL(objectUrl);
@@ -164,7 +180,8 @@ export class LocalFileSaveService {
 
     const chunks: Uint8Array[] = [];
     const centralDirectoryEntries: ZipCentralDirectoryEntry[] = [];
-    const encoder = new TextEncoder();
+    const encoder =
+      new TextEncoder();
 
     let offset = 0;
 
@@ -176,7 +193,9 @@ export class LocalFileSaveService {
         encoder.encode(fileName);
 
       const fileBytes =
-        new Uint8Array(await file.blob.arrayBuffer());
+        new Uint8Array(
+          await file.blob.arrayBuffer()
+        );
 
       const crc32 =
         this.calculateCrc32(fileBytes);
@@ -206,7 +225,9 @@ export class LocalFileSaveService {
         dosDate
       });
 
-      offset += localHeader.byteLength + fileBytes.byteLength;
+      offset +=
+        localHeader.byteLength +
+        fileBytes.byteLength;
     }
 
     const centralDirectoryOffset =
@@ -218,7 +239,8 @@ export class LocalFileSaveService {
 
       chunks.push(centralDirectoryHeader);
 
-      offset += centralDirectoryHeader.byteLength;
+      offset +=
+        centralDirectoryHeader.byteLength;
     }
 
     const centralDirectorySize =
@@ -239,7 +261,8 @@ export class LocalFileSaveService {
     const zipArrayBuffer =
       new ArrayBuffer(zipBytes.byteLength);
 
-    new Uint8Array(zipArrayBuffer).set(zipBytes);
+    new Uint8Array(zipArrayBuffer)
+      .set(zipBytes);
 
     return new Blob(
       [zipArrayBuffer],
@@ -253,7 +276,8 @@ export class LocalFileSaveService {
 
     const totalLength =
       chunks.reduce(
-        (sum, chunk) => sum + chunk.byteLength,
+        (sum, chunk) =>
+          sum + chunk.byteLength,
         0
       );
 
@@ -279,7 +303,9 @@ export class LocalFileSaveService {
   ): Uint8Array {
 
     const header =
-      new Uint8Array(30 + fileNameBytes.byteLength);
+      new Uint8Array(
+        30 + fileNameBytes.byteLength
+      );
 
     const view =
       new DataView(header.buffer);
@@ -306,7 +332,9 @@ export class LocalFileSaveService {
   ): Uint8Array {
 
     const header =
-      new Uint8Array(46 + entry.fileNameBytes.byteLength);
+      new Uint8Array(
+        46 + entry.fileNameBytes.byteLength
+      );
 
     const view =
       new DataView(header.buffer);
@@ -358,14 +386,19 @@ export class LocalFileSaveService {
     return header;
   }
 
-  private calculateCrc32(bytes: Uint8Array): number {
+  private calculateCrc32(
+    bytes: Uint8Array
+  ): number {
+
     const table =
       this.getCrcTable();
 
     let crc = 0xffffffff;
 
     for (const byte of bytes) {
-      crc = (crc >>> 8) ^ table[(crc ^ byte) & 0xff];
+      crc =
+        (crc >>> 8) ^
+        table[(crc ^ byte) & 0xff];
     }
 
     return (crc ^ 0xffffffff) >>> 0;
@@ -392,7 +425,8 @@ export class LocalFileSaveService {
       table[index] = value >>> 0;
     }
 
-    LocalFileSaveService.crcTable = table;
+    LocalFileSaveService.crcTable =
+      table;
 
     return table;
   }
@@ -459,9 +493,14 @@ export class LocalFileSaveService {
         .replace(/[\\/:*?"<>|]+/g, '_');
 
     const safeName =
-      cleanName || 'trackster-selected-files.zip';
+      cleanName ||
+      'trackster-selected-files.zip';
 
-    if (safeName.toLowerCase().endsWith('.zip')) {
+    if (
+      safeName
+        .toLowerCase()
+        .endsWith('.zip')
+    ) {
       return safeName;
     }
 
@@ -484,7 +523,9 @@ export class LocalFileSaveService {
     view.setUint32(offset, value >>> 0, true);
   }
 
-  private isUserCancel(error: unknown): boolean {
+  private isUserCancel(
+    error: unknown
+  ): boolean {
 
     if (!(error instanceof Error)) {
       return false;
@@ -492,7 +533,9 @@ export class LocalFileSaveService {
 
     return (
       error.name === 'AbortError' ||
-      error.message.toLowerCase().includes('abort')
+      error.message
+        .toLowerCase()
+        .includes('abort')
     );
   }
 }

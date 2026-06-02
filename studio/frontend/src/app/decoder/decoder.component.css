@@ -879,3 +879,92 @@
   font-size: 0.82rem;
   font-weight: 750;
 }
+
+.decoder-export-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.decoder-export-modal {
+  width: min(420px, calc(100vw - 48px));
+  padding: 28px 30px 26px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+  text-align: center;
+  color: #0f172a;
+}
+
+.decoder-export-modal h3 {
+  margin: 18px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.decoder-export-modal p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.decoder-export-details {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.decoder-export-spinner {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
+  border: 4px solid #dbeafe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: decoder-export-spin 0.8s linear infinite;
+}
+
+.decoder-export-success-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 48px;
+  color: #16a34a;
+}
+
+.decoder-export-error-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 48px;
+  color: #dc2626;
+}
+
+.decoder-export-ok-button {
+  min-width: 96px;
+  margin-top: 22px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.decoder-export-ok-button:hover {
+  background: #1d4ed8;
+}
+
+@keyframes decoder-export-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

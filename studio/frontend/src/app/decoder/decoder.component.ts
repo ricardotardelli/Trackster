@@ -52,6 +52,12 @@ export type ExportFileFormat =
   | 'mf4'
   | 'parquet';
 
+type ExportDialogState =
+  | 'idle'
+  | 'running'
+  | 'success'
+  | 'error';
+
 interface RuntimeConfig {
   s3Default?: string;
   s3Region?: string;
@@ -111,6 +117,16 @@ export class DecoderComponent implements OnInit {
   selectedBinNode: S3TreeNode | null = null;
 
   selectedBinKeys: string[] = [];
+
+  exportDialogVisible = false;
+
+  exportDialogState: ExportDialogState = 'idle';
+
+  exportDialogTitle = '';
+
+  exportDialogMessage = '';
+
+  exportDialogDetails = '';
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
     node => node.children ?? []
@@ -233,63 +249,88 @@ export class DecoderComponent implements OnInit {
       .filter(key => !folderKeys.has(key));
   }
 
-  public async exportCurrentFile(): Promise<void> {
-    if (this.selectedViewerMode === 'trackster-bin') {
-      await this.exportCurrentTracksterBinFile();
-      return;
-    }
-
-    if (this.selectedViewerMode === 'decoded-signals') {
-      await this.exportCurrentDecodedSignalsFile();
-      return;
-    }
-
-    console.warn(
-      `[Trackster] Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+  public async exportCurrentFileWithDialog(): Promise<void> {
+    await this.runExportWithDialog(
+      async () => await this.exportCurrentFile(),
+      'File saved successfully.'
     );
   }
 
-  public async exportSelectedFiles(): Promise<void> {
-    if (this.selectedViewerMode === 'trackster-bin') {
-      await this.exportSelectedTracksterBinFiles();
-      return;
-    }
-
-    if (this.selectedViewerMode === 'decoded-signals') {
-      await this.exportSelectedDecodedSignalsFiles();
-      return;
-    }
-
-    console.warn(
-      `[Trackster] Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+  public async exportSelectedFilesWithDialog(): Promise<void> {
+    await this.runExportWithDialog(
+      async () => await this.exportSelectedFiles(),
+      'ZIP file saved successfully.'
     );
   }
 
-  public async exportSelectedFolders(): Promise<void> {
-    if (this.selectedViewerMode === 'trackster-bin') {
-      await this.exportSelectedTracksterBinFolders();
-      return;
-    }
-
-    if (this.selectedViewerMode === 'decoded-signals') {
-      await this.exportSelectedDecodedSignalsFolders();
-      return;
-    }
-
-    console.warn(
-      `[Trackster] Folder export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+  public async exportSelectedFoldersWithDialog(): Promise<void> {
+    await this.runExportWithDialog(
+      async () => await this.exportSelectedFolders(),
+      'ZIP file saved successfully.'
     );
   }
 
-  public async exportCurrentTracksterBinFile(): Promise<void> {
+  public closeExportDialog(): void {
+    if (this.exportDialogState === 'running') {
+      return;
+    }
+
+    this.exportDialogVisible = false;
+    this.exportDialogState = 'idle';
+    this.exportDialogTitle = '';
+    this.exportDialogMessage = '';
+    this.exportDialogDetails = '';
+  }
+
+  public async exportCurrentFile(): Promise<boolean> {
+    if (this.selectedViewerMode === 'trackster-bin') {
+      return await this.exportCurrentTracksterBinFile();
+    }
+
+    if (this.selectedViewerMode === 'decoded-signals') {
+      return await this.exportCurrentDecodedSignalsFile();
+    }
+
+    throw new Error(
+      `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    );
+  }
+
+  public async exportSelectedFiles(): Promise<boolean> {
+    if (this.selectedViewerMode === 'trackster-bin') {
+      return await this.exportSelectedTracksterBinFiles();
+    }
+
+    if (this.selectedViewerMode === 'decoded-signals') {
+      return await this.exportSelectedDecodedSignalsFiles();
+    }
+
+    throw new Error(
+      `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    );
+  }
+
+  public async exportSelectedFolders(): Promise<boolean> {
+    if (this.selectedViewerMode === 'trackster-bin') {
+      return await this.exportSelectedTracksterBinFolders();
+    }
+
+    if (this.selectedViewerMode === 'decoded-signals') {
+      return await this.exportSelectedDecodedSignalsFolders();
+    }
+
+    throw new Error(
+      `Folder export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    );
+  }
+
+  public async exportCurrentTracksterBinFile(): Promise<boolean> {
     if (!this.selectedBinNode) {
-      console.warn('[Trackster] No BIN file selected for export.');
-      return;
+      throw new Error('No BIN file selected for export.');
     }
 
     if (!this.isBinFile(this.selectedBinNode)) {
-      console.warn('[Trackster] Selected node is not a BIN file.');
-      return;
+      throw new Error('Selected node is not a BIN file.');
     }
 
     const fileName =
@@ -298,7 +339,7 @@ export class DecoderComponent implements OnInit {
         'bin'
       );
 
-    await this.localFileSaveService.saveFileFromProvider({
+    return await this.localFileSaveService.saveFileFromProvider({
       fileName,
       mimeType: 'application/octet-stream',
       blobProvider: async () => {
@@ -338,10 +379,9 @@ export class DecoderComponent implements OnInit {
     });
   }
 
-  public async exportCurrentDecodedSignalsFile(): Promise<void> {
+  public async exportCurrentDecodedSignalsFile(): Promise<boolean> {
     if (!this.selectedBinNode) {
-      console.warn('[Trackster] No BIN file selected for decoded signals export.');
-      return;
+      throw new Error('No BIN file selected for decoded signals export.');
     }
 
     const fileName =
@@ -349,7 +389,7 @@ export class DecoderComponent implements OnInit {
         this.selectedBinNode.name
       );
 
-    await this.localFileSaveService.saveFileFromProvider({
+    return await this.localFileSaveService.saveFileFromProvider({
       fileName,
       mimeType: 'text/plain;charset=utf-8',
       blobProvider: async () => {
@@ -367,17 +407,16 @@ export class DecoderComponent implements OnInit {
     });
   }
 
-  public async exportSelectedTracksterBinFiles(): Promise<void> {
+  public async exportSelectedTracksterBinFiles(): Promise<boolean> {
     const uniqueSelectedKeys =
       [...new Set(this.selectedBinKeys)]
         .filter(key => key.toLowerCase().endsWith('.bin'));
 
     if (uniqueSelectedKeys.length === 0) {
-      console.warn('[Trackster] No BIN files selected for export.');
-      return;
+      throw new Error('No BIN files selected for export.');
     }
 
-    await this.localFileSaveService.saveFiles(
+    return await this.localFileSaveService.saveFiles(
       async () => {
         return await this.loadBinFilesForZip(uniqueSelectedKeys);
       },
@@ -385,24 +424,22 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  public async exportSelectedTracksterBinFolders(): Promise<void> {
+  public async exportSelectedTracksterBinFolders(): Promise<boolean> {
     const selectedFolderKeys =
       this.getSelectedBinParentFolderKeys();
 
     if (selectedFolderKeys.length === 0) {
-      console.warn('[Trackster] No BIN folders selected for export.');
-      return;
+      throw new Error('No BIN folders selected for export.');
     }
 
     const folderBinKeys =
       this.getAllBinKeysFromSelectedFolders(selectedFolderKeys);
 
     if (folderBinKeys.length === 0) {
-      console.warn('[Trackster] Selected folders do not contain BIN files.');
-      return;
+      throw new Error('Selected folders do not contain BIN files.');
     }
 
-    await this.localFileSaveService.saveFiles(
+    return await this.localFileSaveService.saveFiles(
       async () => {
         return await this.loadBinFilesForZip(folderBinKeys);
       },
@@ -410,17 +447,16 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  public async exportSelectedDecodedSignalsFiles(): Promise<void> {
+  public async exportSelectedDecodedSignalsFiles(): Promise<boolean> {
     const uniqueSelectedKeys =
       [...new Set(this.selectedBinKeys)]
         .filter(key => key.toLowerCase().endsWith('.bin'));
 
     if (uniqueSelectedKeys.length === 0) {
-      console.warn('[Trackster] No BIN files selected for decoded signals export.');
-      return;
+      throw new Error('No BIN files selected for decoded signals export.');
     }
 
-    await this.localFileSaveService.saveFiles(
+    return await this.localFileSaveService.saveFiles(
       async () => {
         return await this.loadDecodedSignalTextFilesForZip(
           uniqueSelectedKeys
@@ -430,24 +466,22 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  public async exportSelectedDecodedSignalsFolders(): Promise<void> {
+  public async exportSelectedDecodedSignalsFolders(): Promise<boolean> {
     const selectedFolderKeys =
       this.getSelectedBinParentFolderKeys();
 
     if (selectedFolderKeys.length === 0) {
-      console.warn('[Trackster] No BIN folders selected for decoded signals export.');
-      return;
+      throw new Error('No BIN folders selected for decoded signals export.');
     }
 
     const folderBinKeys =
       this.getAllBinKeysFromSelectedFolders(selectedFolderKeys);
 
     if (folderBinKeys.length === 0) {
-      console.warn('[Trackster] Selected folders do not contain BIN files.');
-      return;
+      throw new Error('Selected folders do not contain BIN files.');
     }
 
-    await this.localFileSaveService.saveFiles(
+    return await this.localFileSaveService.saveFiles(
       async () => {
         return await this.loadDecodedSignalTextFilesForZip(
           folderBinKeys
@@ -461,7 +495,7 @@ export class DecoderComponent implements OnInit {
     fileNameBase: string,
     format: ExportFileFormat,
     content: string | ArrayBuffer | Uint8Array
-  ): Promise<void> {
+  ): Promise<boolean> {
 
     const mimeType =
       this.getExportMimeType(format);
@@ -478,11 +512,54 @@ export class DecoderComponent implements OnInit {
         format
       );
 
-    await this.localFileSaveService.saveFile({
+    return await this.localFileSaveService.saveFile({
       fileName,
       blob,
       mimeType
     });
+  }
+
+  private async runExportWithDialog(
+    action: () => Promise<boolean>,
+    successMessage: string
+  ): Promise<void> {
+
+    this.exportDialogVisible = true;
+    this.exportDialogState = 'running';
+    this.exportDialogTitle = 'Exporting...';
+    this.exportDialogMessage =
+      'Please wait while Trackster prepares the export.';
+    this.exportDialogDetails =
+      'Do not close this window.';
+
+    try {
+      const completed =
+        await action();
+
+      if (!completed) {
+        this.closeExportDialog();
+        return;
+      }
+
+      this.exportDialogState = 'success';
+      this.exportDialogTitle = 'Export completed';
+      this.exportDialogMessage = successMessage;
+      this.exportDialogDetails = '';
+
+    } catch (error: unknown) {
+
+      this.exportDialogState = 'error';
+      this.exportDialogTitle = 'Export failed';
+      this.exportDialogMessage =
+        this.getErrorMessage(error);
+      this.exportDialogDetails =
+        'Please try again or check the browser console for details.';
+
+      console.error(
+        '[Trackster] Export failed.',
+        error
+      );
+    }
   }
 
   private async loadBinFilesForZip(
@@ -1186,6 +1263,20 @@ export class DecoderComponent implements OnInit {
     walk(node);
 
     return result;
+  }
+
+  private getErrorMessage(
+    error: unknown
+  ): string {
+
+    if (
+      error instanceof Error &&
+      error.message.trim()
+    ) {
+      return error.message;
+    }
+
+    return 'Unable to export file.';
   }
 
   private async loadS3GeneratedFilesTree(): Promise<void> {

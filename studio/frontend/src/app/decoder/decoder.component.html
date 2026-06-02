@@ -223,6 +223,7 @@
                   <button
                     type="button"
                     class="decoder-export-button"
+                    [disabled]="exportDialogState === 'running'"
                     [matMenuTriggerFor]="decoderExportMenu">
 
                     <mat-icon>
@@ -239,16 +240,28 @@
 
                   </button>
 
-                  <mat-menu #decoderExportMenu="matMenu" class="decoder-export-menu">
-                    <button mat-menu-item [disabled]="!selectedBinNode" (click)="exportCurrentFile()">
+                  <mat-menu
+                    #decoderExportMenu="matMenu"
+                    class="decoder-export-menu">
+
+                    <button
+                      mat-menu-item
+                      [disabled]="!selectedBinNode || exportDialogState === 'running'"
+                      (click)="exportCurrentFileWithDialog()">
                       <span>Current file</span>
                     </button>
 
-                    <button mat-menu-item [disabled]="selectedBinKeys.length === 0" (click)="exportSelectedFiles()">
+                    <button
+                      mat-menu-item
+                      [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'"
+                      (click)="exportSelectedFilesWithDialog()">
                       <span>Selected files</span>
                     </button>
 
-                    <button mat-menu-item [disabled]="selectedBinKeys.length === 0" (click)="exportSelectedFolders()">
+                    <button
+                      mat-menu-item
+                      [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'"
+                      (click)="exportSelectedFoldersWithDialog()">
                       <span>Entire folder</span>
                     </button>
 
@@ -296,6 +309,55 @@
           </div>
         </div>
       </section>
+
+    </div>
+  </div>
+
+  <div
+    class="decoder-export-overlay"
+    *ngIf="exportDialogVisible">
+
+    <div class="decoder-export-modal">
+
+      <div
+        class="decoder-export-spinner"
+        *ngIf="exportDialogState === 'running'"
+        aria-hidden="true">
+      </div>
+
+      <mat-icon
+        class="decoder-export-success-icon"
+        *ngIf="exportDialogState === 'success'">
+        check_circle
+      </mat-icon>
+
+      <mat-icon
+        class="decoder-export-error-icon"
+        *ngIf="exportDialogState === 'error'">
+        error
+      </mat-icon>
+
+      <h3>
+        {{ exportDialogTitle }}
+      </h3>
+
+      <p>
+        {{ exportDialogMessage }}
+      </p>
+
+      <span
+        class="decoder-export-details"
+        *ngIf="exportDialogDetails">
+        {{ exportDialogDetails }}
+      </span>
+
+      <button
+        type="button"
+        class="decoder-export-ok-button"
+        *ngIf="exportDialogState !== 'running'"
+        (click)="closeExportDialog()">
+        OK
+      </button>
 
     </div>
   </div>
