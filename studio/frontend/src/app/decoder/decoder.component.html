@@ -251,7 +251,7 @@
                       <span>Selected files</span>
                     </button>
 
-                    <button mat-menu-item>
+                    <button mat-menu-item [disabled]="selectedBinKeys.length === 0" (click)="exportSelectedTracksterBinFolders()">
                       <span>Entire folder</span>
                     </button>
 

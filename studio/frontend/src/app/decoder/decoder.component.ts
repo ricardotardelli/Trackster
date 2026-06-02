@@ -297,49 +297,34 @@ export class DecoderComponent implements OnInit {
 
     await this.localFileSaveService.saveFiles(
       async () => {
-        const config =
-          await this.loadRuntimeConfig();
-
-        const bucket =
-          config.s3Default?.trim();
-
-        if (!bucket) {
-          throw new Error(
-            'Missing s3Default in assets/config.json'
-          );
-        }
-
-        const s3Client =
-          await this.getS3Client();
-
-        const files: ExportFile[] = [];
-
-        for (const key of uniqueSelectedKeys) {
-          const response =
-            await s3Client.send(
-              new GetObjectCommand({
-                Bucket: bucket,
-                Key: key
-              })
-            );
-
-          const content =
-            await this.readS3BodyAsArrayBuffer(
-              response.Body
-            );
-
-          files.push({
-            fileName: this.getZipEntryNameFromBinKey(key),
-            blob: this.buildExportBlob(
-              content,
-              'application/octet-stream'
-            )
-          });
-        }
-
-        return files;
+        return await this.loadBinFilesForZip(uniqueSelectedKeys);
       },
       'trackster-selected-bin-files.zip'
+    );
+  }
+
+  public async exportSelectedTracksterBinFolders(): Promise<void> {
+    const selectedFolderKeys =
+      this.getSelectedBinParentFolderKeys();
+
+    if (selectedFolderKeys.length === 0) {
+      console.warn('[Trackster] No BIN folders selected for export.');
+      return;
+    }
+
+    const folderBinKeys =
+      this.getAllBinKeysFromSelectedFolders(selectedFolderKeys);
+
+    if (folderBinKeys.length === 0) {
+      console.warn('[Trackster] Selected folders do not contain BIN files.');
+      return;
+    }
+
+    await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBinFilesForZip(folderBinKeys);
+      },
+      'trackster-selected-bin-folders.zip'
     );
   }
 
@@ -369,6 +354,129 @@ export class DecoderComponent implements OnInit {
       blob,
       mimeType
     });
+  }
+
+  private async loadBinFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const s3Client =
+      await this.getS3Client();
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const response =
+        await s3Client.send(
+          new GetObjectCommand({
+            Bucket: bucket,
+            Key: key
+          })
+        );
+
+      const content =
+        await this.readS3BodyAsArrayBuffer(
+          response.Body
+        );
+
+      files.push({
+        fileName: this.getZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private getSelectedBinParentFolderKeys(): string[] {
+    const folders =
+      new Set<string>();
+
+    for (const key of this.selectedBinKeys) {
+      if (!key.toLowerCase().endsWith('.bin')) {
+        continue;
+      }
+
+      const folderKey =
+        this.getParentFolderKeyFromS3Key(key);
+
+      if (folderKey) {
+        folders.add(folderKey);
+      }
+    }
+
+    return [...folders];
+  }
+
+  private getAllBinKeysFromSelectedFolders(
+    folderKeys: string[]
+  ): string[] {
+
+    const folderKeySet =
+      new Set(folderKeys);
+
+    const result =
+      new Set<string>();
+
+    const walk = (
+      nodes: S3TreeNode[]
+    ): void => {
+
+      for (const node of nodes) {
+        if (this.isBinFile(node)) {
+          const parentFolderKey =
+            this.getParentFolderKeyFromS3Key(node.key);
+
+          if (
+            parentFolderKey &&
+            folderKeySet.has(parentFolderKey)
+          ) {
+            result.add(node.key);
+          }
+
+          continue;
+        }
+
+        walk(node.children ?? []);
+      }
+    };
+
+    walk(this.s3TreeDataSource.data);
+
+    return [...result].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }
+
+  private getParentFolderKeyFromS3Key(
+    key: string
+  ): string | null {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length < 2) {
+      return null;
+    }
+
+    return parts.slice(0, -1).join('/');
   }
 
   private buildExportBlob(
