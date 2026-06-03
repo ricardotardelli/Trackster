@@ -1865,17 +1865,11 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  private getHexDumpFileNameFromBinName(
-    fileName: string
-  ): string {
-
+  private getHexDumpFileNameFromBinName( fileName: string ): string {
     const baseName =
       this.removeFileExtension(fileName);
 
-    return this.normalizeExportFileName(
-      `${baseName}.hex-dump`,
-      'txt'
-    );
+    return `${baseName}.hex`;
   }
 
   private getDecodedSignalsZipEntryNameFromBinKey(
@@ -1926,10 +1920,7 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  private getHexDumpZipEntryNameFromBinKey(
-    key: string
-  ): string {
-
+  private getHexDumpZipEntryNameFromBinKey( key: string ): string {
     const entryName =
       this.getZipEntryNameFromBinKey(key);
 
@@ -1942,14 +1933,14 @@ export class DecoderComponent implements OnInit {
       parts.length - 1;
 
     if (lastIndex < 0) {
-      return 'trackster-export.hex-dump.txt';
+      return 'trackster-export.hex';
     }
 
     const baseName =
       this.removeFileExtension(parts[lastIndex]);
 
     parts[lastIndex] =
-      `${baseName}.hex-dump.txt`;
+      `${baseName}.hex`;
 
     return parts.join('/');
   }
