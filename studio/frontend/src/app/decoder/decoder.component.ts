@@ -9,11 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { environment } from '../../environments/environment';
-import {
-  GetObjectCommand,
-  ListObjectsV2Command,
-  S3Client
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
@@ -27,14 +23,8 @@ import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
 import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
-import {
-  ExportFile,
-  LocalFileSaveService
-} from './export-files/local-file-save.service';
-import {
-  parseTracksterBin,
-  ParsedTracksterBin
-} from './parser/decoder.bin.parser';
+import { ExportFile, LocalFileSaveService } from './export-files/local-file-save.service';
+import { parseTracksterBin, ParsedTracksterBin } from './parser/decoder.bin.parser';
 
 export interface S3TreeNode {
   name: string;
@@ -62,10 +52,12 @@ interface RuntimeConfig {
   s3Default?: string;
   s3Region?: string;
   s3CsvBucket?: string;
+  s3VectorAscBucket?: string;
   customerId?: string;
   clientId?: string;
   decoderApi?: {
     csvExportUrl?: string;
+    vectorAscExportUrl?: string;
   };
 }
 
@@ -319,6 +311,10 @@ export class DecoderComponent implements OnInit {
       return await this.exportCurrentHexDumpFile();
     }
 
+    if (this.selectedViewerMode === 'vector-asc') {
+      return await this.exportCurrentVectorAscFile();
+    }
+
     throw new Error(
       `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -345,6 +341,10 @@ export class DecoderComponent implements OnInit {
       return await this.exportSelectedHexDumpFiles();
     }
 
+    if (this.selectedViewerMode === 'vector-asc') {
+      return await this.exportSelectedVectorAscFiles();
+    }
+
     throw new Error(
       `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -369,6 +369,10 @@ export class DecoderComponent implements OnInit {
 
     if (this.selectedViewerMode === 'hex-dump') {
       return await this.exportSelectedHexDumpFolders();
+    }
+
+    if (this.selectedViewerMode === 'vector-asc') {
+      return await this.exportSelectedVectorAscFolders();
     }
 
     throw new Error(
@@ -535,6 +539,33 @@ export class DecoderComponent implements OnInit {
 
         return this.buildExportBlob(
           hexDumpText,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentVectorAscFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for Vector ASC export.');
+    }
+
+    const fileName =
+      this.getVectorAscFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const ascBuffer =
+          await this.loadVectorAscOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          ascBuffer,
           'text/plain;charset=utf-8'
         );
       }
@@ -714,6 +745,42 @@ export class DecoderComponent implements OnInit {
         );
       },
       'trackster-selected-hexdump-folders.zip'
+    );
+  }
+
+  public async exportSelectedVectorAscFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for Vector ASC export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadVectorAscFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-vectorasc-files.zip'
+    );
+  }
+
+  public async exportSelectedVectorAscFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadVectorAscFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-vectorasc-folders.zip'
     );
   }
 
@@ -927,6 +994,28 @@ export class DecoderComponent implements OnInit {
         fileName: this.getHexDumpZipEntryNameFromBinKey(key),
         blob: this.buildExportBlob(
           content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadVectorAscFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const ascBuffer =
+        await this.loadVectorAscOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getVectorAscZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          ascBuffer,
           'text/plain;charset=utf-8'
         )
       });
@@ -1429,6 +1518,127 @@ export class DecoderComponent implements OnInit {
       .replace(/\.[^.]+$/, '.csv.json');
   }
 
+  private async loadVectorAscOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3VectorAscBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3VectorAscBucket in assets/config.json'
+      );
+    }
+
+    const outputKey =
+      await this.exportVectorAscWithLambda(
+        binKey,
+        config
+      );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportVectorAscWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<string> {
+
+    const exportUrl =
+      config.decoderApi?.vectorAscExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.vectorAscExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucket =
+      config.s3Default?.trim();
+
+    if (!inputBucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucket =
+      config.s3VectorAscBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3VectorAscBucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(binKey);
+
+    const outputFileName =
+      this.getVectorAscFileNameFromBinName(
+        this.getFileNameFromS3Key(binKey)
+      );
+
+    const outputKey =
+      `${clientId}/${runId}/${outputFileName}`;
+
+    const manifestKey =
+      `${clientId}/${runId}/run-manifest.json`;
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            clientId,
+            runId,
+            inputBucket,
+            inputKey: binKey,
+            manifestBucket: inputBucket,
+            manifestKey,
+            outputBucket,
+            outputKey,
+            outputFileName
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok) {
+      throw new Error(
+        result.message ||
+        `Vector ASC export failed. HTTP ${response.status}`
+      );
+    }
+
+    return outputKey;
+  }
+
   private buildDecodedSignalsTextExport(
     sourceFileName: string,
     parsed: ParsedTracksterBin
@@ -1865,11 +2075,27 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  private getHexDumpFileNameFromBinName( fileName: string ): string {
+  private getHexDumpFileNameFromBinName(
+    fileName: string
+  ): string {
+
     const baseName =
       this.removeFileExtension(fileName);
 
     return `${baseName}.hex`;
+  }
+
+  private getVectorAscFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'vectorasc'
+    );
   }
 
   private getDecodedSignalsZipEntryNameFromBinKey(
@@ -1920,7 +2146,10 @@ export class DecoderComponent implements OnInit {
     );
   }
 
-  private getHexDumpZipEntryNameFromBinKey( key: string ): string {
+  private getHexDumpZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
     const entryName =
       this.getZipEntryNameFromBinKey(key);
 
@@ -1943,6 +2172,16 @@ export class DecoderComponent implements OnInit {
       `${baseName}.hex`;
 
     return parts.join('/');
+  }
+
+  private getVectorAscZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'asc'
+    );
   }
 
   private replaceZipEntryExtension(
