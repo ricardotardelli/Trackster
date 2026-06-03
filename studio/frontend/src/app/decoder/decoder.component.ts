@@ -84,6 +84,12 @@ interface CsvExportManifest {
   outputKey?: string;
 }
 
+interface HexDumpExportRow {
+  offset: string;
+  hex: string;
+  ascii: string;
+}
+
 @Component({
   selector: 'app-decoder',
   standalone: true,
@@ -135,6 +141,8 @@ export class DecoderComponent implements OnInit {
   exportDialogMessage = '';
 
   exportDialogDetails = '';
+
+  private readonly hexDumpBytesPerRow = 16;
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
     node => node.children ?? []
@@ -307,6 +315,10 @@ export class DecoderComponent implements OnInit {
       return await this.exportCurrentCsvFile();
     }
 
+    if (this.selectedViewerMode === 'hex-dump') {
+      return await this.exportCurrentHexDumpFile();
+    }
+
     throw new Error(
       `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -329,6 +341,10 @@ export class DecoderComponent implements OnInit {
       return await this.exportSelectedCsvFiles();
     }
 
+    if (this.selectedViewerMode === 'hex-dump') {
+      return await this.exportSelectedHexDumpFiles();
+    }
+
     throw new Error(
       `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -349,6 +365,10 @@ export class DecoderComponent implements OnInit {
 
     if (this.selectedViewerMode === 'csv') {
       return await this.exportSelectedCsvFolders();
+    }
+
+    if (this.selectedViewerMode === 'hex-dump') {
+      return await this.exportSelectedHexDumpFolders();
     }
 
     throw new Error(
@@ -493,6 +513,34 @@ export class DecoderComponent implements OnInit {
     });
   }
 
+  public async exportCurrentHexDumpFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for HEX dump export.');
+    }
+
+    const fileName =
+      this.getHexDumpFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const hexDumpText =
+          await this.buildHexDumpTextForKey(
+            this.selectedBinNode!.key,
+            this.selectedBinNode!.name
+          );
+
+        return this.buildExportBlob(
+          hexDumpText,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
   public async exportSelectedTracksterBinFiles(): Promise<boolean> {
     const uniqueSelectedKeys =
       this.getUniqueSelectedBinKeys();
@@ -630,6 +678,42 @@ export class DecoderComponent implements OnInit {
         );
       },
       'trackster-selected-csv-folders.zip'
+    );
+  }
+
+  public async exportSelectedHexDumpFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for HEX dump export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadHexDumpTextFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-hexdump-files.zip'
+    );
+  }
+
+  public async exportSelectedHexDumpFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadHexDumpTextFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-hexdump-folders.zip'
     );
   }
 
@@ -823,6 +907,34 @@ export class DecoderComponent implements OnInit {
     return files;
   }
 
+  private async loadHexDumpTextFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const sourceFileName =
+        this.getFileNameFromS3Key(key);
+
+      const content =
+        await this.buildHexDumpTextForKey(
+          key,
+          sourceFileName
+        );
+
+      files.push({
+        fileName: this.getHexDumpZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
   private async buildDecodedSignalsTextForKey(
     binKey: string,
     sourceFileName: string
@@ -852,6 +964,148 @@ export class DecoderComponent implements OnInit {
       null,
       2
     );
+  }
+
+  private async buildHexDumpTextForKey(
+    binKey: string,
+    sourceFileName: string
+  ): Promise<string> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const buffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        binKey
+      );
+
+    return this.buildHexDumpTextExport(
+      sourceFileName,
+      buffer
+    );
+  }
+
+  private buildHexDumpTextExport(
+    sourceFileName: string,
+    buffer: ArrayBuffer
+  ): string {
+
+    const bytes =
+      new Uint8Array(buffer);
+
+    const rows =
+      this.buildHexDumpRows(bytes);
+
+    const lines: string[] = [];
+
+    lines.push('Trackster HEX Dump');
+    lines.push(`Source file: ${sourceFileName}`);
+    lines.push(`File size: ${bytes.byteLength.toLocaleString()} bytes`);
+    lines.push(`Rows: ${rows.length.toLocaleString()}`);
+    lines.push(`Generated at: ${new Date().toISOString()}`);
+    lines.push('');
+
+    if (rows.length === 0) {
+      lines.push('No HEX dump content available.');
+      lines.push('');
+      return lines.join('\n');
+    }
+
+    for (const row of rows) {
+      lines.push(
+        `${row.offset}  ${row.hex.padEnd(47, ' ')}  ${row.ascii}`
+      );
+    }
+
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  private buildHexDumpRows(
+    bytes: Uint8Array
+  ): HexDumpExportRow[] {
+
+    const rows: HexDumpExportRow[] = [];
+
+    for (
+      let offset = 0;
+      offset < bytes.length;
+      offset += this.hexDumpBytesPerRow
+    ) {
+
+      const chunk =
+        bytes.slice(
+          offset,
+          Math.min(
+            offset + this.hexDumpBytesPerRow,
+            bytes.length
+          )
+        );
+
+      rows.push({
+        offset:
+          this.formatHexDumpOffset(offset),
+        hex:
+          this.formatHexDumpBytes(chunk),
+        ascii:
+          this.formatHexDumpAscii(chunk)
+      });
+    }
+
+    return rows;
+  }
+
+  private formatHexDumpOffset(
+    offset: number
+  ): string {
+
+    return `0x${offset
+      .toString(16)
+      .toUpperCase()
+      .padStart(8, '0')}`;
+  }
+
+  private formatHexDumpBytes(
+    bytes: Uint8Array
+  ): string {
+
+    return Array.from(bytes)
+      .map(byte =>
+        byte
+          .toString(16)
+          .toUpperCase()
+          .padStart(2, '0')
+      )
+      .join(' ');
+  }
+
+  private formatHexDumpAscii(
+    bytes: Uint8Array
+  ): string {
+
+    return Array.from(bytes)
+      .map(byte => {
+        if (
+          byte >= 32 &&
+          byte <= 126
+        ) {
+          return String.fromCharCode(byte);
+        }
+
+        return '.';
+      })
+      .join('');
   }
 
   private async parseBinKeyWithManifest(
@@ -1611,6 +1865,19 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+  private getHexDumpFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      `${baseName}.hex-dump`,
+      'txt'
+    );
+  }
+
   private getDecodedSignalsZipEntryNameFromBinKey(
     key: string
   ): string {
@@ -1657,6 +1924,34 @@ export class DecoderComponent implements OnInit {
       key,
       'csv'
     );
+  }
+
+  private getHexDumpZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    const entryName =
+      this.getZipEntryNameFromBinKey(key);
+
+    const parts =
+      entryName
+        .split('/')
+        .filter(Boolean);
+
+    const lastIndex =
+      parts.length - 1;
+
+    if (lastIndex < 0) {
+      return 'trackster-export.hex-dump.txt';
+    }
+
+    const baseName =
+      this.removeFileExtension(parts[lastIndex]);
+
+    parts[lastIndex] =
+      `${baseName}.hex-dump.txt`;
+
+    return parts.join('/');
   }
 
   private replaceZipEntryExtension(
