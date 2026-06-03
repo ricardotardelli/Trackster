@@ -61,8 +61,12 @@ type ExportDialogState =
 interface RuntimeConfig {
   s3Default?: string;
   s3Region?: string;
+  s3CsvBucket?: string;
   customerId?: string;
   clientId?: string;
+  decoderApi?: {
+    csvExportUrl?: string;
+  };
 }
 
 interface DecodedSignalExportRow {
@@ -74,6 +78,10 @@ interface DecodedSignalExportRow {
   value: string;
   raw: string;
   unit: string;
+}
+
+interface CsvExportManifest {
+  outputKey?: string;
 }
 
 @Component({
@@ -291,6 +299,14 @@ export class DecoderComponent implements OnInit {
       return await this.exportCurrentDecodedSignalsFile();
     }
 
+    if (this.selectedViewerMode === 'json') {
+      return await this.exportCurrentJsonFile();
+    }
+
+    if (this.selectedViewerMode === 'csv') {
+      return await this.exportCurrentCsvFile();
+    }
+
     throw new Error(
       `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -305,6 +321,14 @@ export class DecoderComponent implements OnInit {
       return await this.exportSelectedDecodedSignalsFiles();
     }
 
+    if (this.selectedViewerMode === 'json') {
+      return await this.exportSelectedJsonFiles();
+    }
+
+    if (this.selectedViewerMode === 'csv') {
+      return await this.exportSelectedCsvFiles();
+    }
+
     throw new Error(
       `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -317,6 +341,14 @@ export class DecoderComponent implements OnInit {
 
     if (this.selectedViewerMode === 'decoded-signals') {
       return await this.exportSelectedDecodedSignalsFolders();
+    }
+
+    if (this.selectedViewerMode === 'json') {
+      return await this.exportSelectedJsonFolders();
+    }
+
+    if (this.selectedViewerMode === 'csv') {
+      return await this.exportSelectedCsvFolders();
     }
 
     throw new Error(
@@ -407,10 +439,63 @@ export class DecoderComponent implements OnInit {
     });
   }
 
+  public async exportCurrentJsonFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for JSON export.');
+    }
+
+    const fileName =
+      this.getJsonFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/json;charset=utf-8',
+      blobProvider: async () => {
+        const jsonText =
+          await this.buildJsonTextForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          jsonText,
+          'application/json;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentCsvFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for CSV export.');
+    }
+
+    const fileName =
+      this.getCsvFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/csv;charset=utf-8',
+      blobProvider: async () => {
+        const csvBuffer =
+          await this.loadCsvOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          csvBuffer,
+          'text/csv;charset=utf-8'
+        );
+      }
+    });
+  }
+
   public async exportSelectedTracksterBinFiles(): Promise<boolean> {
     const uniqueSelectedKeys =
-      [...new Set(this.selectedBinKeys)]
-        .filter(key => key.toLowerCase().endsWith('.bin'));
+      this.getUniqueSelectedBinKeys();
 
     if (uniqueSelectedKeys.length === 0) {
       throw new Error('No BIN files selected for export.');
@@ -425,15 +510,8 @@ export class DecoderComponent implements OnInit {
   }
 
   public async exportSelectedTracksterBinFolders(): Promise<boolean> {
-    const selectedFolderKeys =
-      this.getSelectedBinParentFolderKeys();
-
-    if (selectedFolderKeys.length === 0) {
-      throw new Error('No BIN folders selected for export.');
-    }
-
     const folderBinKeys =
-      this.getAllBinKeysFromSelectedFolders(selectedFolderKeys);
+      this.getSelectedFolderBinKeys();
 
     if (folderBinKeys.length === 0) {
       throw new Error('Selected folders do not contain BIN files.');
@@ -449,8 +527,7 @@ export class DecoderComponent implements OnInit {
 
   public async exportSelectedDecodedSignalsFiles(): Promise<boolean> {
     const uniqueSelectedKeys =
-      [...new Set(this.selectedBinKeys)]
-        .filter(key => key.toLowerCase().endsWith('.bin'));
+      this.getUniqueSelectedBinKeys();
 
     if (uniqueSelectedKeys.length === 0) {
       throw new Error('No BIN files selected for decoded signals export.');
@@ -467,15 +544,8 @@ export class DecoderComponent implements OnInit {
   }
 
   public async exportSelectedDecodedSignalsFolders(): Promise<boolean> {
-    const selectedFolderKeys =
-      this.getSelectedBinParentFolderKeys();
-
-    if (selectedFolderKeys.length === 0) {
-      throw new Error('No BIN folders selected for decoded signals export.');
-    }
-
     const folderBinKeys =
-      this.getAllBinKeysFromSelectedFolders(selectedFolderKeys);
+      this.getSelectedFolderBinKeys();
 
     if (folderBinKeys.length === 0) {
       throw new Error('Selected folders do not contain BIN files.');
@@ -488,6 +558,78 @@ export class DecoderComponent implements OnInit {
         );
       },
       'trackster-selected-decoded-signal-folders.zip'
+    );
+  }
+
+  public async exportSelectedJsonFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for JSON export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadJsonFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-json-files.zip'
+    );
+  }
+
+  public async exportSelectedJsonFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadJsonFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-json-folders.zip'
+    );
+  }
+
+  public async exportSelectedCsvFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for CSV export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCsvFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-csv-files.zip'
+    );
+  }
+
+  public async exportSelectedCsvFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCsvFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-csv-folders.zip'
     );
   }
 
@@ -637,10 +779,84 @@ export class DecoderComponent implements OnInit {
     return files;
   }
 
+  private async loadJsonFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const jsonText =
+        await this.buildJsonTextForKey(key);
+
+      files.push({
+        fileName: this.getJsonZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          jsonText,
+          'application/json;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadCsvFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const csvBuffer =
+        await this.loadCsvOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getCsvZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          csvBuffer,
+          'text/csv;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
   private async buildDecodedSignalsTextForKey(
     binKey: string,
     sourceFileName: string
   ): Promise<string> {
+
+    const parsed =
+      await this.parseBinKeyWithManifest(binKey);
+
+    return this.buildDecodedSignalsTextExport(
+      sourceFileName,
+      parsed
+    );
+  }
+
+  private async buildJsonTextForKey(
+    binKey: string
+  ): Promise<string> {
+
+    const parsed =
+      await this.parseBinKeyWithManifest(binKey);
+
+    const messages =
+      this.buildDecodedMessagesJson(parsed);
+
+    return JSON.stringify(
+      messages,
+      null,
+      2
+    );
+  }
+
+  private async parseBinKeyWithManifest(
+    binKey: string
+  ): Promise<ParsedTracksterBin> {
 
     const config =
       await this.loadRuntimeConfig();
@@ -667,15 +883,9 @@ export class DecoderComponent implements OnInit {
         config
       );
 
-    const parsed =
-      parseTracksterBin(
-        binBuffer,
-        manifest
-      );
-
-    return this.buildDecodedSignalsTextExport(
-      sourceFileName,
-      parsed
+    return parseTracksterBin(
+      binBuffer,
+      manifest
     );
   }
 
@@ -698,7 +908,253 @@ export class DecoderComponent implements OnInit {
     const manifestKey =
       `${clientId}/${runId}/run-manifest.json`;
 
-    const manifestBuffer =
+    try {
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          bucket,
+          manifestKey
+        );
+
+      const manifestText =
+        new TextDecoder('utf-8')
+          .decode(manifestBuffer);
+
+      return JSON.parse(manifestText);
+
+    } catch (error) {
+
+      console.warn(
+        '[Trackster] Run manifest not available for export.',
+        error
+      );
+
+      return null;
+    }
+  }
+
+  private buildDecodedMessagesJson(
+    parsed: ParsedTracksterBin
+  ): any[] {
+
+    const messages: any[] = [];
+
+    const blocks =
+      Array.isArray(parsed.blocks)
+        ? parsed.blocks
+        : [];
+
+    const firstTimestampNs =
+      blocks[0]?.timestampNs ?? '0';
+
+    for (const block of blocks) {
+
+      const blockTimestampNs =
+        block.timestampNs ?? firstTimestampNs;
+
+      for (const frame of block.frames ?? []) {
+
+        const signals:
+          Record<string, unknown> = {};
+
+        for (const signal of frame.signals ?? []) {
+          signals[signal.name] = signal.value;
+        }
+
+        messages.push({
+          timestamp:
+            this.calculateFrameTimestampSeconds(
+              firstTimestampNs,
+              blockTimestampNs,
+              frame.timestampDeltaNs
+            ),
+
+          canId:
+            frame.canIdHex,
+
+          name:
+            frame.messageName ||
+            `CAN_${frame.canIdHex}`,
+
+          dlc:
+            frame.payloadLength,
+
+          data:
+            this.normalizePayloadHex(
+              frame.payloadBytes
+            ),
+
+          signals
+        });
+      }
+    }
+
+    return messages;
+  }
+
+  private calculateFrameTimestampSeconds(
+    firstTimestampNs: string,
+    blockTimestampNs: string,
+    frameDeltaNs: string | number
+  ): number {
+
+    const baseNs =
+      BigInt(
+        firstTimestampNs || '0'
+      );
+
+    const blockNs =
+      BigInt(
+        blockTimestampNs || '0'
+      );
+
+    const deltaNs =
+      BigInt(
+        frameDeltaNs ?? 0
+      );
+
+    const absoluteNs =
+      blockNs + deltaNs;
+
+    const relativeNs =
+      absoluteNs - baseNs;
+
+    return Number(relativeNs) /
+      1_000_000_000;
+  }
+
+  private normalizePayloadHex(
+    payload: string
+  ): string {
+
+    if (!payload) {
+      return '';
+    }
+
+    return payload
+      .replace(/\s+/g, '')
+      .toUpperCase();
+  }
+
+  private async loadCsvOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3CsvBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3CsvBucket in assets/config.json'
+      );
+    }
+
+    await this.exportCsvWithLambda(
+      binKey,
+      config
+    );
+
+    const manifest =
+      await this.loadCsvManifest(
+        binKey,
+        outputBucket
+      );
+
+    const outputKey =
+      manifest.outputKey?.trim();
+
+    if (!outputKey) {
+      throw new Error(
+        `CSV manifest does not contain outputKey for ${binKey}.`
+      );
+    }
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportCsvWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<void> {
+
+    const exportUrl =
+      config.decoderApi?.csvExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.csvExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim() ||
+      's3-trackster-can-bucket';
+
+    const outputBucketName =
+      config.s3CsvBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3CsvBucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
+            clientId,
+            inputKeys: [
+              binKey
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok) {
+      throw new Error(
+        result.message ||
+        `CSV export failed. HTTP ${response.status}`
+      );
+    }
+  }
+
+  private async loadCsvManifest(
+    binKey: string,
+    bucket: string
+  ): Promise<CsvExportManifest> {
+
+    const manifestKey =
+      this.buildCsvManifestKey(binKey);
+
+    const buffer =
       await this.getS3ObjectBuffer(
         bucket,
         manifestKey
@@ -706,9 +1162,17 @@ export class DecoderComponent implements OnInit {
 
     const manifestText =
       new TextDecoder('utf-8')
-        .decode(manifestBuffer);
+        .decode(buffer);
 
     return JSON.parse(manifestText);
+  }
+
+  private buildCsvManifestKey(
+    inputKey: string
+  ): string {
+
+    return inputKey
+      .replace(/\.[^.]+$/, '.csv.json');
   }
 
   private buildDecodedSignalsTextExport(
@@ -874,6 +1338,24 @@ export class DecoderComponent implements OnInit {
 
     return await this.readS3BodyAsArrayBuffer(
       response.Body
+    );
+  }
+
+  private getUniqueSelectedBinKeys(): string[] {
+    return [...new Set(this.selectedBinKeys)]
+      .filter(key => key.toLowerCase().endsWith('.bin'));
+  }
+
+  private getSelectedFolderBinKeys(): string[] {
+    const selectedFolderKeys =
+      this.getSelectedBinParentFolderKeys();
+
+    if (selectedFolderKeys.length === 0) {
+      throw new Error('No BIN folders selected for export.');
+    }
+
+    return this.getAllBinKeysFromSelectedFolders(
+      selectedFolderKeys
     );
   }
 
@@ -1103,6 +1585,32 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+  private getJsonFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'json'
+    );
+  }
+
+  private getCsvFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'csv'
+    );
+  }
+
   private getDecodedSignalsZipEntryNameFromBinKey(
     key: string
   ): string {
@@ -1127,6 +1635,55 @@ export class DecoderComponent implements OnInit {
 
     parts[lastIndex] =
       `${baseName}.decoded-signals.txt`;
+
+    return parts.join('/');
+  }
+
+  private getJsonZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'json'
+    );
+  }
+
+  private getCsvZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'csv'
+    );
+  }
+
+  private replaceZipEntryExtension(
+    key: string,
+    extension: string
+  ): string {
+
+    const entryName =
+      this.getZipEntryNameFromBinKey(key);
+
+    const parts =
+      entryName
+        .split('/')
+        .filter(Boolean);
+
+    const lastIndex =
+      parts.length - 1;
+
+    if (lastIndex < 0) {
+      return `trackster-export.${extension}`;
+    }
+
+    const baseName =
+      this.removeFileExtension(parts[lastIndex]);
+
+    parts[lastIndex] =
+      `${baseName}.${extension}`;
 
     return parts.join('/');
   }
@@ -1277,6 +1834,24 @@ export class DecoderComponent implements OnInit {
     }
 
     return 'Unable to export file.';
+  }
+
+  private async getIdToken():
+    Promise<string> {
+
+    const session =
+      await fetchAuthSession();
+
+    const token =
+      session.tokens?.idToken?.toString();
+
+    if (!token) {
+      throw new Error(
+        'Cognito ID token unavailable.'
+      );
+    }
+
+    return token;
   }
 
   private async loadS3GeneratedFilesTree(): Promise<void> {
