@@ -9,11 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { environment } from '../../environments/environment';
-import {
-  GetObjectCommand,
-  ListObjectsV2Command,
-  S3Client
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
@@ -27,14 +23,8 @@ import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
 import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
-import {
-  ExportFile,
-  LocalFileSaveService
-} from './export-files/local-file-save.service';
-import {
-  parseTracksterBin,
-  ParsedTracksterBin
-} from './parser/decoder.bin.parser';
+import { ExportFile, LocalFileSaveService } from './export-files/local-file-save.service';
+import { parseTracksterBin, ParsedTracksterBin } from './parser/decoder.bin.parser';
 
 export interface S3TreeNode {
   name: string;
@@ -108,6 +98,13 @@ interface HexDumpExportRow {
   ascii: string;
 }
 
+interface CandumpExportRow {
+  timestamp: string;
+  canId: string;
+  data: string;
+  line: string;
+}
+
 @Component({
   selector: 'app-decoder',
   standalone: true,
@@ -161,6 +158,8 @@ export class DecoderComponent implements OnInit {
   exportDialogDetails = '';
 
   private readonly hexDumpBytesPerRow = 16;
+
+  private readonly candumpInterfaceName = 'can0';
 
   readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
     node => node.children ?? []
@@ -341,6 +340,10 @@ export class DecoderComponent implements OnInit {
       return await this.exportCurrentVectorAscFile();
     }
 
+    if (this.selectedViewerMode === 'candump') {
+      return await this.exportCurrentCandumpFile();
+    }
+
     throw new Error(
       `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -371,6 +374,10 @@ export class DecoderComponent implements OnInit {
       return await this.exportSelectedVectorAscFiles();
     }
 
+    if (this.selectedViewerMode === 'candump') {
+      return await this.exportSelectedCandumpFiles();
+    }
+
     throw new Error(
       `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -399,6 +406,10 @@ export class DecoderComponent implements OnInit {
 
     if (this.selectedViewerMode === 'vector-asc') {
       return await this.exportSelectedVectorAscFolders();
+    }
+
+    if (this.selectedViewerMode === 'candump') {
+      return await this.exportSelectedCandumpFolders();
     }
 
     throw new Error(
@@ -592,6 +603,33 @@ export class DecoderComponent implements OnInit {
 
         return this.buildExportBlob(
           ascBuffer,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentCandumpFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for CANdump export.');
+    }
+
+    const fileName =
+      this.getCandumpFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const candumpText =
+          await this.buildCandumpTextForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          candumpText,
           'text/plain;charset=utf-8'
         );
       }
@@ -807,6 +845,42 @@ export class DecoderComponent implements OnInit {
         );
       },
       'trackster-selected-vectorasc-folders.zip'
+    );
+  }
+
+  public async exportSelectedCandumpFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for CANdump export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCandumpFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-candump-files.zip'
+    );
+  }
+
+  public async exportSelectedCandumpFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCandumpFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-candump-folders.zip'
     );
   }
 
@@ -1050,6 +1124,28 @@ export class DecoderComponent implements OnInit {
     return files;
   }
 
+  private async loadCandumpFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const content =
+        await this.buildCandumpTextForKey(key);
+
+      files.push({
+        fileName: this.getCandumpZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
   private async buildDecodedSignalsTextForKey(
     binKey: string,
     sourceFileName: string
@@ -1079,6 +1175,99 @@ export class DecoderComponent implements OnInit {
       null,
       2
     );
+  }
+
+  private async buildCandumpTextForKey(
+    binKey: string
+  ): Promise<string> {
+
+    const parsed =
+      await this.parseBinKeyWithManifest(binKey);
+
+    const rows =
+      this.buildCandumpRows(parsed);
+
+    return rows
+      .map(row => row.line)
+      .join('\n');
+  }
+
+  private buildCandumpRows(
+    parsed: ParsedTracksterBin
+  ): CandumpExportRow[] {
+
+    const rows: CandumpExportRow[] = [];
+
+    const blocks =
+      Array.isArray(parsed.blocks)
+        ? parsed.blocks
+        : [];
+
+    const firstTimestampNs =
+      blocks[0]?.timestampNs ?? '0';
+
+    for (const block of blocks) {
+      const blockTimestampNs =
+        block.timestampNs ?? firstTimestampNs;
+
+      for (const frame of block.frames ?? []) {
+        const timestamp =
+          this.calculateFrameTimestampSeconds(
+            firstTimestampNs,
+            blockTimestampNs,
+            frame.timestampDeltaNs
+          ).toFixed(6);
+
+        const canId =
+          this.normalizeCandumpCanId(
+            frame.canIdHex
+          );
+
+        const data =
+          this.normalizeCandumpPayloadHex(
+            frame.payloadBytes
+          );
+
+        const line =
+          `(${timestamp}) ${this.candumpInterfaceName} ${canId}#${data}`;
+
+        rows.push({
+          timestamp,
+          canId,
+          data,
+          line
+        });
+      }
+    }
+
+    return rows;
+  }
+
+  private normalizeCandumpCanId(
+    canId: string
+  ): string {
+
+    if (!canId) {
+      return '';
+    }
+
+    return canId
+      .replace(/^0x/i, '')
+      .replace(/\s+/g, '')
+      .toUpperCase();
+  }
+
+  private normalizeCandumpPayloadHex(
+    payload: string
+  ): string {
+
+    if (!payload) {
+      return '';
+    }
+
+    return payload
+      .replace(/\s+/g, '')
+      .toUpperCase();
   }
 
   private async buildHexDumpTextForKey(
@@ -2134,6 +2323,16 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+  private getCandumpFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.can`;
+  }
+
   private getDecodedSignalsZipEntryNameFromBinKey(
     key: string
   ): string {
@@ -2217,6 +2416,16 @@ export class DecoderComponent implements OnInit {
     return this.replaceZipEntryExtension(
       key,
       'asc'
+    );
+  }
+
+  private getCandumpZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'can'
     );
   }
 
