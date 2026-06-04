@@ -9,7 +9,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { environment } from '../../environments/environment';
-import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client
+} from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { TracksterBinViewerComponent } from './viewers/trackster-bin-viewer/trackster-bin-viewer.component';
 import { DecodedSignalsViewerComponent } from './viewers/decodedsignals-viewer/decodedsignals-viewer.component';
@@ -23,8 +27,14 @@ import { BlfViewerComponent } from './viewers/blf-viewer/blf-viewer.component';
 import { Mf4ViewerComponent } from './viewers/mf4-viewer/mf4-viewer.component';
 import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.component';
 import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
-import { ExportFile, LocalFileSaveService } from './export-files/local-file-save.service';
-import { parseTracksterBin, ParsedTracksterBin } from './parser/decoder.bin.parser';
+import {
+  ExportFile,
+  LocalFileSaveService
+} from './export-files/local-file-save.service';
+import {
+  parseTracksterBin,
+  ParsedTracksterBin
+} from './parser/decoder.bin.parser';
 
 export interface S3TreeNode {
   name: string;
@@ -74,6 +84,22 @@ interface DecodedSignalExportRow {
 
 interface CsvExportManifest {
   outputKey?: string;
+}
+
+interface VectorAscExportResult {
+  inputKey?: string;
+  outputKey?: string;
+  manifestKey?: string;
+  status?: string;
+  error?: string;
+}
+
+interface VectorAscExportResponse {
+  message?: string;
+  exportedCount?: number;
+  failedCount?: number;
+  results?: VectorAscExportResult[];
+  errors?: VectorAscExportResult[];
 }
 
 interface HexDumpExportRow {
@@ -1560,19 +1586,19 @@ export class DecoderComponent implements OnInit {
       );
     }
 
-    const inputBucket =
+    const inputBucketName =
       config.s3Default?.trim();
 
-    if (!inputBucket) {
+    if (!inputBucketName) {
       throw new Error(
         'Missing s3Default in assets/config.json'
       );
     }
 
-    const outputBucket =
+    const outputBucketName =
       config.s3VectorAscBucket?.trim();
 
-    if (!outputBucket) {
+    if (!outputBucketName) {
       throw new Error(
         'Missing s3VectorAscBucket in assets/config.json'
       );
@@ -1580,20 +1606,6 @@ export class DecoderComponent implements OnInit {
 
     const clientId =
       this.resolveClientId(config);
-
-    const runId =
-      this.getRunIdFromKey(binKey);
-
-    const outputFileName =
-      this.getVectorAscFileNameFromBinName(
-        this.getFileNameFromS3Key(binKey)
-      );
-
-    const outputKey =
-      `${clientId}/${runId}/${outputFileName}`;
-
-    const manifestKey =
-      `${clientId}/${runId}/run-manifest.json`;
 
     const token =
       await this.getIdToken();
@@ -1608,15 +1620,12 @@ export class DecoderComponent implements OnInit {
             Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
             clientId,
-            runId,
-            inputBucket,
-            inputKey: binKey,
-            manifestBucket: inputBucket,
-            manifestKey,
-            outputBucket,
-            outputKey,
-            outputFileName
+            inputKeys: [
+              binKey
+            ]
           })
         }
       );
@@ -1626,17 +1635,44 @@ export class DecoderComponent implements OnInit {
 
     const result =
       responseText
-        ? JSON.parse(responseText)
+        ? JSON.parse(responseText) as VectorAscExportResponse
         : {};
 
-    if (!response.ok) {
+    if (!response.ok && response.status !== 207) {
       throw new Error(
         result.message ||
         `Vector ASC export failed. HTTP ${response.status}`
       );
     }
 
-    return outputKey;
+    const exported =
+      result.results?.find(item =>
+        item.inputKey === binKey &&
+        !!item.outputKey
+      ) ||
+      result.results?.find(item =>
+        !!item.outputKey
+      );
+
+    if (exported?.outputKey) {
+      return exported.outputKey;
+    }
+
+    const failed =
+      result.errors?.find(item =>
+        item.inputKey === binKey
+      ) ||
+      result.errors?.[0];
+
+    if (failed?.error) {
+      throw new Error(
+        failed.error
+      );
+    }
+
+    throw new Error(
+      `Vector ASC export did not return outputKey for ${binKey}.`
+    );
   }
 
   private buildDecodedSignalsTextExport(
