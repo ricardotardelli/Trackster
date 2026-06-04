@@ -55,6 +55,7 @@ interface RuntimeConfig {
   s3VectorAscBucket?: string;
   s3BlfBucket?: string;
   s3Mf4Bucket?: string;
+  s3ParquetBucket?: string;
   customerId?: string;
   clientId?: string;
   decoderApi?: {
@@ -62,6 +63,7 @@ interface RuntimeConfig {
     vectorAscExportUrl?: string;
     blfExportUrl?: string;
     mf4ExportUrl?: string;
+    parquetExportUrl?: string;
   };
 }
 
@@ -356,6 +358,17 @@ export class DecoderComponent implements OnInit {
       return await this.exportCurrentMf4File();
     }
 
+    if (this.selectedViewerMode === 'parquet') {
+      return await this.exportCurrentParquetFile();
+    }
+
+    if (
+      this.selectedViewerMode === 'run-manifest' ||
+      this.selectedViewerMode === 'runmanifest'
+    ) {
+      return await this.exportCurrentRunManifestFile();
+    }
+
     throw new Error(
       `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -398,6 +411,17 @@ export class DecoderComponent implements OnInit {
       return await this.exportSelectedMf4Files();
     }
 
+    if (this.selectedViewerMode === 'parquet') {
+      return await this.exportSelectedParquetFiles();
+    }
+
+    if (
+      this.selectedViewerMode === 'run-manifest' ||
+      this.selectedViewerMode === 'runmanifest'
+    ) {
+      return await this.exportSelectedRunManifestFiles();
+    }
+
     throw new Error(
       `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -438,6 +462,17 @@ export class DecoderComponent implements OnInit {
 
     if (this.selectedViewerMode === 'mf4') {
       return await this.exportSelectedMf4Folders();
+    }
+
+    if (this.selectedViewerMode === 'parquet') {
+      return await this.exportSelectedParquetFolders();
+    }
+
+    if (
+      this.selectedViewerMode === 'run-manifest' ||
+      this.selectedViewerMode === 'runmanifest'
+    ) {
+      return await this.exportSelectedRunManifestFolders();
     }
 
     throw new Error(
@@ -714,6 +749,57 @@ export class DecoderComponent implements OnInit {
         return this.buildExportBlob(
           mf4Buffer,
           'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentParquetFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for Parquet export.');
+    }
+
+    const fileName =
+      this.getParquetFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const parquetBuffer =
+          await this.loadParquetOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          parquetBuffer,
+          'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentRunManifestFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for run manifest export.');
+    }
+
+    const fileName = 'run-manifest.json';
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/json;charset=utf-8',
+      blobProvider: async () => {
+        const manifestText =
+          await this.loadRunManifestTextForBinKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          manifestText,
+          'application/json;charset=utf-8'
         );
       }
     });
@@ -1040,6 +1126,78 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+  public async exportSelectedParquetFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for Parquet export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadParquetFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-parquet-files.zip'
+    );
+  }
+
+  public async exportSelectedParquetFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadParquetFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-parquet-folders.zip'
+    );
+  }
+
+  public async exportSelectedRunManifestFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for run manifest export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadRunManifestFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-run-manifests.zip'
+    );
+  }
+
+  public async exportSelectedRunManifestFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadRunManifestFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-run-manifest-folders.zip'
+    );
+  }
+
   public async saveGeneratedExportFile(
     fileNameBase: string,
     format: ExportFileFormat,
@@ -1342,6 +1500,89 @@ export class DecoderComponent implements OnInit {
           'application/octet-stream'
         )
       });
+    }
+
+    return files;
+  }
+
+  private async loadParquetFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const parquetBuffer =
+        await this.loadParquetOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getParquetZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          parquetBuffer,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadRunManifestFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const files: ExportFile[] = [];
+    const includedManifestKeys =
+      new Set<string>();
+
+    for (const key of keys) {
+      const manifestKey =
+        this.buildRunManifestKeyForBinKey(
+          key,
+          config
+        );
+
+      if (
+        !manifestKey ||
+        includedManifestKeys.has(manifestKey)
+      ) {
+        continue;
+      }
+
+      includedManifestKeys.add(manifestKey);
+
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          bucket,
+          manifestKey
+        );
+
+      files.push({
+        fileName:
+          this.getRunManifestZipEntryNameFromManifestKey(
+            manifestKey
+          ),
+        blob: this.buildExportBlob(
+          manifestBuffer,
+          'application/json;charset=utf-8'
+        )
+      });
+    }
+
+    if (files.length === 0) {
+      throw new Error('No run manifest files were found for the selected BIN files.');
     }
 
     return files;
@@ -1689,6 +1930,78 @@ export class DecoderComponent implements OnInit {
 
       return null;
     }
+  }
+
+  private async loadRunManifestTextForBinKey(
+    binKey: string
+  ): Promise<string> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const manifestKey =
+      this.buildRunManifestKeyForBinKey(
+        binKey,
+        config
+      );
+
+    if (!manifestKey) {
+      throw new Error(
+        `Unable to resolve run manifest key for ${binKey}.`
+      );
+    }
+
+    const manifestBuffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        manifestKey
+      );
+
+    return new TextDecoder('utf-8')
+      .decode(manifestBuffer);
+  }
+
+  private buildRunManifestKeyForBinKey(
+    binKey: string,
+    config: RuntimeConfig
+  ): string {
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(binKey);
+
+    if (!runId) {
+      return '';
+    }
+
+    return `${clientId}/${runId}/run-manifest.json`;
+  }
+
+  private getRunManifestZipEntryNameFromManifestKey(
+    manifestKey: string
+  ): string {
+
+    const parts =
+      manifestKey
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return parts.slice(1).join('/');
+    }
+
+    return 'run-manifest.json';
   }
 
   private buildDecodedMessagesJson(
@@ -2066,6 +2379,81 @@ export class DecoderComponent implements OnInit {
   }
 
 
+  private async loadParquetOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3ParquetBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3ParquetBucket in assets/config.json'
+      );
+    }
+
+    const outputKey =
+      await this.exportParquetWithLambda(
+        binKey,
+        config
+      );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportParquetWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<string> {
+
+    const exportUrl =
+      config.decoderApi?.parquetExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.parquetExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3ParquetBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3ParquetBucket in assets/config.json'
+      );
+    }
+
+    await this.exportBinaryFormatWithLambda({
+      exportUrl,
+      inputBucketName,
+      outputBucketName,
+      binKey,
+      clientId: this.resolveClientId(config),
+      formatLabel: 'Parquet'
+    });
+
+    return await this.resolveParquetOutputKey(
+      outputBucketName,
+      binKey
+    );
+  }
+
   private async loadBlfOutputBufferForKey(
     binKey: string
   ): Promise<ArrayBuffer> {
@@ -2268,6 +2656,45 @@ export class DecoderComponent implements OnInit {
     }
   }
 
+  private async resolveParquetOutputKey(
+    outputBucket: string,
+    binKey: string
+  ): Promise<string> {
+
+    const manifestKey =
+      this.buildParquetManifestKey(binKey);
+
+    try {
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          outputBucket,
+          manifestKey
+        );
+
+      const manifestText =
+        new TextDecoder('utf-8')
+          .decode(manifestBuffer);
+
+      const manifest =
+        JSON.parse(manifestText);
+
+      const outputKey =
+        String(manifest.outputKey || '').trim();
+
+      if (outputKey) {
+        return outputKey;
+      }
+
+    } catch (error) {
+      console.warn(
+        '[Trackster] Parquet manifest not available while saving export. Falling back to inferred Parquet key.',
+        error
+      );
+    }
+
+    return this.buildParquetOutputKey(binKey);
+  }
+
   private async resolveMf4OutputKey(
     outputBucket: string,
     binKey: string
@@ -2334,6 +2761,26 @@ export class DecoderComponent implements OnInit {
     return binKey.replace(
       /\.bin$/i,
       '.mf4.json'
+    );
+  }
+
+  private buildParquetOutputKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.parquet'
+    );
+  }
+
+  private buildParquetManifestKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.parquet.json'
     );
   }
 
@@ -2827,6 +3274,19 @@ export class DecoderComponent implements OnInit {
     return `${baseName}.mf4`;
   }
 
+  private getParquetFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'parquet'
+    );
+  }
+
   private getDecodedSignalsZipEntryNameFromBinKey(
     key: string
   ): string {
@@ -2941,6 +3401,16 @@ export class DecoderComponent implements OnInit {
     return this.replaceZipEntryExtension(
       key,
       'mf4'
+    );
+  }
+
+  private getParquetZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'parquet'
     );
   }
 
