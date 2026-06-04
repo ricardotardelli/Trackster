@@ -40,7 +40,8 @@ export type ExportFileFormat =
   | 'vectorasc'
   | 'blf'
   | 'mf4'
-  | 'parquet';
+  | 'parquet'
+  | 'dbc';
 
 type ExportDialogState =
   | 'idle'
@@ -783,23 +784,26 @@ export class DecoderComponent implements OnInit {
 
   public async exportCurrentRunManifestFile(): Promise<boolean> {
     if (!this.selectedBinNode) {
-      throw new Error('No BIN file selected for run manifest export.');
+      throw new Error('No BIN file selected for DBC export.');
     }
 
-    const fileName = 'run-manifest.json';
+    const fileName =
+      await this.getDbcFileNameForBinKey(
+        this.selectedBinNode.key
+      );
 
     return await this.localFileSaveService.saveFileFromProvider({
       fileName,
-      mimeType: 'application/json;charset=utf-8',
+      mimeType: 'text/plain;charset=utf-8',
       blobProvider: async () => {
-        const manifestText =
-          await this.loadRunManifestTextForBinKey(
+        const dbcText =
+          await this.buildDbcTextForBinKey(
             this.selectedBinNode!.key
           );
 
         return this.buildExportBlob(
-          manifestText,
-          'application/json;charset=utf-8'
+          dbcText,
+          'text/plain;charset=utf-8'
         );
       }
     });
@@ -1534,15 +1538,6 @@ export class DecoderComponent implements OnInit {
     const config =
       await this.loadRuntimeConfig();
 
-    const bucket =
-      config.s3Default?.trim();
-
-    if (!bucket) {
-      throw new Error(
-        'Missing s3Default in assets/config.json'
-      );
-    }
-
     const files: ExportFile[] = [];
     const includedManifestKeys =
       new Set<string>();
@@ -1563,26 +1558,24 @@ export class DecoderComponent implements OnInit {
 
       includedManifestKeys.add(manifestKey);
 
-      const manifestBuffer =
-        await this.getS3ObjectBuffer(
-          bucket,
-          manifestKey
-        );
+      const dbcText =
+        await this.buildDbcTextForBinKey(key);
 
       files.push({
         fileName:
-          this.getRunManifestZipEntryNameFromManifestKey(
+          await this.getDbcZipEntryNameForBinKey(
+            key,
             manifestKey
           ),
         blob: this.buildExportBlob(
-          manifestBuffer,
-          'application/json;charset=utf-8'
+          dbcText,
+          'text/plain;charset=utf-8'
         )
       });
     }
 
     if (files.length === 0) {
-      throw new Error('No run manifest files were found for the selected BIN files.');
+      throw new Error('No DBC files were found for the selected BIN files.');
     }
 
     return files;
@@ -2002,6 +1995,407 @@ export class DecoderComponent implements OnInit {
     }
 
     return 'run-manifest.json';
+  }
+
+  private async buildDbcTextForBinKey(
+    binKey: string
+  ): Promise<string> {
+
+    const manifestText =
+      await this.loadRunManifestTextForBinKey(binKey);
+
+    const manifest =
+      JSON.parse(manifestText);
+
+    return this.buildDbcTextFromRunManifest(manifest);
+  }
+
+  private async getDbcFileNameForBinKey(
+    binKey: string
+  ): Promise<string> {
+
+    const manifestText =
+      await this.loadRunManifestTextForBinKey(binKey);
+
+    const manifest =
+      JSON.parse(manifestText);
+
+    return this.getDbcFileNameFromRunManifest(manifest);
+  }
+
+  private async getDbcZipEntryNameForBinKey(
+    binKey: string,
+    manifestKey: string
+  ): Promise<string> {
+
+    const fileName =
+      await this.getDbcFileNameForBinKey(binKey);
+
+    const parts =
+      manifestKey
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return [
+        ...parts.slice(1, -1),
+        fileName
+      ].join('/');
+    }
+
+    return fileName;
+  }
+
+  private getDbcFileNameFromRunManifest(
+    manifest: any
+  ): string {
+
+    const dbcFiles =
+      Array.isArray(manifest?.dbc?.dbcFiles)
+        ? manifest.dbc.dbcFiles
+        : [];
+
+    const firstDbcFile =
+      String(dbcFiles[0] ?? '').trim();
+
+    if (firstDbcFile) {
+      return this.normalizeExportFileName(
+        firstDbcFile,
+        'dbc'
+      );
+    }
+
+    const runId =
+      String(manifest?.runId ?? '').trim();
+
+    if (runId) {
+      return this.normalizeExportFileName(
+        `trackster-${runId}`,
+        'dbc'
+      );
+    }
+
+    return 'trackster-run-manifest.dbc';
+  }
+
+  private buildDbcTextFromRunManifest(
+    manifest: any
+  ): string {
+
+    const rawDbcText =
+      this.extractRawDbcTextFromRunManifest(manifest);
+
+    if (rawDbcText) {
+      return rawDbcText.endsWith('\n')
+        ? rawDbcText
+        : `${rawDbcText}\n`;
+    }
+
+    const resolvedFrames =
+      this.getResolvedDbcFramesFromRunManifest(manifest);
+
+    if (resolvedFrames.length === 0) {
+      throw new Error(
+        'Run manifest does not contain DBC frames that can be exported.'
+      );
+    }
+
+    const dbcLines: string[] = [];
+
+    dbcLines.push('VERSION "Trackster generated DBC export"');
+    dbcLines.push('');
+    dbcLines.push('NS_ :');
+    dbcLines.push('\tNS_DESC_');
+    dbcLines.push('\tCM_');
+    dbcLines.push('\tBA_DEF_');
+    dbcLines.push('\tBA_');
+    dbcLines.push('\tVAL_');
+    dbcLines.push('\tCAT_DEF_');
+    dbcLines.push('\tCAT_');
+    dbcLines.push('\tFILTER');
+    dbcLines.push('\tBA_DEF_DEF_');
+    dbcLines.push('\tEV_DATA_');
+    dbcLines.push('\tENVVAR_DATA_');
+    dbcLines.push('\tSGTYPE_');
+    dbcLines.push('\tSGTYPE_VAL_');
+    dbcLines.push('\tBA_DEF_SGTYPE_');
+    dbcLines.push('\tBA_SGTYPE_');
+    dbcLines.push('\tSIG_TYPE_REF_');
+    dbcLines.push('\tVAL_TABLE_');
+    dbcLines.push('\tSIG_GROUP_');
+    dbcLines.push('\tSIG_VALTYPE_');
+    dbcLines.push('\tSIGTYPE_VALTYPE_');
+    dbcLines.push('\tBO_TX_BU_');
+    dbcLines.push('\tBA_DEF_REL_');
+    dbcLines.push('\tBA_REL_');
+    dbcLines.push('\tBA_DEF_DEF_REL_');
+    dbcLines.push('\tBU_SG_REL_');
+    dbcLines.push('\tBU_EV_REL_');
+    dbcLines.push('\tBU_BO_REL_');
+    dbcLines.push('\tSG_MUL_VAL_');
+    dbcLines.push('');
+    dbcLines.push('BS_:');
+    dbcLines.push('');
+    dbcLines.push('BU_: XXX');
+    dbcLines.push('');
+
+    for (const item of resolvedFrames) {
+      const frame =
+        item?.frame ?? item;
+
+      const canId =
+        this.parseCanIdToDecimal(item?.canId ?? frame?.id);
+
+      if (canId === null) {
+        continue;
+      }
+
+      const messageName =
+        this.sanitizeDbcIdentifier(
+          String(
+            item?.messageName ??
+            frame?.n ??
+            `CAN_${canId.toString(16).toUpperCase()}`
+          )
+        );
+
+      const dlc =
+        this.toSafeDbcNumber(frame?.l, 8);
+
+      const transmitter =
+        this.sanitizeDbcIdentifier(
+          String(frame?.tx ?? 'XXX')
+        );
+
+      dbcLines.push(
+        `BO_ ${canId} ${messageName}: ${dlc} ${transmitter}`
+      );
+
+      const signals =
+        Array.isArray(frame?.s)
+          ? frame.s
+          : [];
+
+      for (const signal of signals) {
+        const signalLine =
+          this.buildDbcSignalLine(signal);
+
+        if (signalLine) {
+          dbcLines.push(signalLine);
+        }
+      }
+
+      dbcLines.push('');
+    }
+
+    return dbcLines.join('\n');
+  }
+
+  private extractRawDbcTextFromRunManifest(
+    manifest: any
+  ): string {
+
+    const candidates = [
+      manifest?.dbc?.content,
+      manifest?.dbc?.dbcContent,
+      manifest?.dbc?.rawContent,
+      manifest?.dbc?.rawDbc,
+      manifest?.dbc?.rawDbcText,
+      manifest?.dbc?.source,
+      manifest?.dbc?.sourceText
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate === 'string' &&
+        candidate.includes('BO_') &&
+        candidate.includes('SG_')
+      ) {
+        return candidate;
+      }
+    }
+
+    return '';
+  }
+
+  private getResolvedDbcFramesFromRunManifest(
+    manifest: any
+  ): any[] {
+
+    const resolvedFrames =
+      Array.isArray(manifest?.dbc?.resolvedCanFrames)
+        ? manifest.dbc.resolvedCanFrames
+        : [];
+
+    if (resolvedFrames.length > 0) {
+      return this.deduplicateDbcFrames(resolvedFrames);
+    }
+
+    const compiledMessages =
+      manifest?.dbc?.compiledDbc?.m;
+
+    if (
+      compiledMessages &&
+      typeof compiledMessages === 'object'
+    ) {
+      const frames: any[] = [];
+
+      for (const value of Object.values(compiledMessages)) {
+        if (Array.isArray(value)) {
+          frames.push(...value);
+        }
+      }
+
+      return this.deduplicateDbcFrames(frames);
+    }
+
+    return [];
+  }
+
+  private deduplicateDbcFrames(
+    frames: any[]
+  ): any[] {
+
+    const byCanId =
+      new Map<string, any>();
+
+    for (const frame of frames) {
+      const key =
+        String(frame?.canId ?? frame?.frame?.id ?? '')
+          .trim()
+          .toLowerCase();
+
+      if (!key || byCanId.has(key)) {
+        continue;
+      }
+
+      byCanId.set(key, frame);
+    }
+
+    return [...byCanId.values()].sort((left, right) => {
+      const leftCanId =
+        this.parseCanIdToDecimal(left?.canId ?? left?.frame?.id) ?? 0;
+
+      const rightCanId =
+        this.parseCanIdToDecimal(right?.canId ?? right?.frame?.id) ?? 0;
+
+      return leftCanId - rightCanId;
+    });
+  }
+
+  private buildDbcSignalLine(
+    signal: any
+  ): string {
+
+    if (!Array.isArray(signal)) {
+      return '';
+    }
+
+    const name =
+      this.sanitizeDbcIdentifier(
+        String(signal[8] ?? 'Signal')
+      );
+
+    const startBit =
+      this.toSafeDbcNumber(signal[0], 0);
+
+    const length =
+      this.toSafeDbcNumber(signal[1], 1);
+
+    const byteOrder =
+      this.toSafeDbcNumber(signal[2], 0) === 1
+        ? 1
+        : 0;
+
+    const sign =
+      this.toSafeDbcNumber(signal[3], 0) === 1
+        ? '-'
+        : '+';
+
+    const factor =
+      this.toSafeDbcNumber(signal[4], 1);
+
+    const offset =
+      this.toSafeDbcNumber(signal[5], 0);
+
+    const minimum =
+      this.toSafeDbcNumber(signal[6], 0);
+
+    const maximum =
+      this.toSafeDbcNumber(signal[7], 0);
+
+    const unit =
+      this.escapeDbcString(
+        String(signal[9] ?? '')
+      );
+
+    const receiver =
+      this.sanitizeDbcIdentifier(
+        String(signal[10] ?? 'XXX')
+      );
+
+    return ` SG_ ${name} : ${startBit}|${length}@${byteOrder}${sign} (${factor},${offset}) [${minimum}|${maximum}] "${unit}" ${receiver}`;
+  }
+
+  private parseCanIdToDecimal(
+    value: unknown
+  ): number | null {
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value)
+        ? Math.trunc(value)
+        : null;
+    }
+
+    const text =
+      String(value ?? '').trim();
+
+    if (!text) {
+      return null;
+    }
+
+    const parsed =
+      text.toLowerCase().startsWith('0x')
+        ? Number.parseInt(text, 16)
+        : Number.parseInt(text, 10);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : null;
+  }
+
+  private toSafeDbcNumber(
+    value: unknown,
+    fallback: number
+  ): number {
+
+    const parsed =
+      Number(value);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : fallback;
+  }
+
+  private sanitizeDbcIdentifier(
+    value: string
+  ): string {
+
+    const sanitized =
+      value
+        .trim()
+        .replace(/[^A-Za-z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^([0-9])/, '_$1');
+
+    return sanitized || 'TracksterSignal';
+  }
+
+  private escapeDbcString(
+    value: string
+  ): string {
+
+    return value.replace(/"/g, '\\"');
   }
 
   private buildDecodedMessagesJson(
@@ -3106,6 +3500,9 @@ export class DecoderComponent implements OnInit {
       case 'parquet':
         return 'application/octet-stream';
 
+      case 'dbc':
+        return 'text/plain;charset=utf-8';
+
       default:
         return 'application/octet-stream';
     }
@@ -3165,6 +3562,9 @@ export class DecoderComponent implements OnInit {
 
       case 'parquet':
         return 'parquet';
+
+      case 'dbc':
+        return 'dbc';
 
       default:
         return 'bin';
