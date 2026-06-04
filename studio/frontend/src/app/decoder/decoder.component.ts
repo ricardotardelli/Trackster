@@ -53,11 +53,15 @@ interface RuntimeConfig {
   s3Region?: string;
   s3CsvBucket?: string;
   s3VectorAscBucket?: string;
+  s3BlfBucket?: string;
+  s3Mf4Bucket?: string;
   customerId?: string;
   clientId?: string;
   decoderApi?: {
     csvExportUrl?: string;
     vectorAscExportUrl?: string;
+    blfExportUrl?: string;
+    mf4ExportUrl?: string;
   };
 }
 
@@ -344,6 +348,14 @@ export class DecoderComponent implements OnInit {
       return await this.exportCurrentCandumpFile();
     }
 
+    if (this.selectedViewerMode === 'blf') {
+      return await this.exportCurrentBlfFile();
+    }
+
+    if (this.selectedViewerMode === 'mf4') {
+      return await this.exportCurrentMf4File();
+    }
+
     throw new Error(
       `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -378,6 +390,14 @@ export class DecoderComponent implements OnInit {
       return await this.exportSelectedCandumpFiles();
     }
 
+    if (this.selectedViewerMode === 'blf') {
+      return await this.exportSelectedBlfFiles();
+    }
+
+    if (this.selectedViewerMode === 'mf4') {
+      return await this.exportSelectedMf4Files();
+    }
+
     throw new Error(
       `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
     );
@@ -410,6 +430,14 @@ export class DecoderComponent implements OnInit {
 
     if (this.selectedViewerMode === 'candump') {
       return await this.exportSelectedCandumpFolders();
+    }
+
+    if (this.selectedViewerMode === 'blf') {
+      return await this.exportSelectedBlfFolders();
+    }
+
+    if (this.selectedViewerMode === 'mf4') {
+      return await this.exportSelectedMf4Folders();
     }
 
     throw new Error(
@@ -631,6 +659,61 @@ export class DecoderComponent implements OnInit {
         return this.buildExportBlob(
           candumpText,
           'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+
+  public async exportCurrentBlfFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for BLF export.');
+    }
+
+    const fileName =
+      this.getBlfFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const blfBuffer =
+          await this.loadBlfOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          blfBuffer,
+          'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentMf4File(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for MF4 export.');
+    }
+
+    const fileName =
+      this.getMf4FileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const mf4Buffer =
+          await this.loadMf4OutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          mf4Buffer,
+          'application/octet-stream'
         );
       }
     });
@@ -881,6 +964,79 @@ export class DecoderComponent implements OnInit {
         );
       },
       'trackster-selected-candump-folders.zip'
+    );
+  }
+
+
+  public async exportSelectedBlfFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for BLF export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBlfFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-blf-files.zip'
+    );
+  }
+
+  public async exportSelectedBlfFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBlfFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-blf-folders.zip'
+    );
+  }
+
+  public async exportSelectedMf4Files(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for MF4 export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadMf4FilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-mf4-files.zip'
+    );
+  }
+
+  public async exportSelectedMf4Folders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadMf4FilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-mf4-folders.zip'
     );
   }
 
@@ -1139,6 +1295,51 @@ export class DecoderComponent implements OnInit {
         blob: this.buildExportBlob(
           content,
           'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+
+  private async loadBlfFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const blfBuffer =
+        await this.loadBlfOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getBlfZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          blfBuffer,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadMf4FilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const mf4Buffer =
+        await this.loadMf4OutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getMf4ZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          mf4Buffer,
+          'application/octet-stream'
         )
       });
     }
@@ -1864,6 +2065,278 @@ export class DecoderComponent implements OnInit {
     );
   }
 
+
+  private async loadBlfOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3BlfBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3BlfBucket in assets/config.json'
+      );
+    }
+
+    await this.exportBlfWithLambda(
+      binKey,
+      config
+    );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      this.buildBlfOutputKey(binKey)
+    );
+  }
+
+  private async loadMf4OutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3Mf4Bucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3Mf4Bucket in assets/config.json'
+      );
+    }
+
+    await this.exportMf4WithLambda(
+      binKey,
+      config
+    );
+
+    const outputKey =
+      await this.resolveMf4OutputKey(
+        outputBucket,
+        binKey
+      );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportBlfWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<void> {
+
+    const exportUrl =
+      config.decoderApi?.blfExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.blfExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3BlfBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3BlfBucket in assets/config.json'
+      );
+    }
+
+    await this.exportBinaryFormatWithLambda({
+      exportUrl,
+      inputBucketName,
+      outputBucketName,
+      binKey,
+      clientId: this.resolveClientId(config),
+      formatLabel: 'BLF'
+    });
+  }
+
+  private async exportMf4WithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<void> {
+
+    const exportUrl =
+      config.decoderApi?.mf4ExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.mf4ExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3Mf4Bucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3Mf4Bucket in assets/config.json'
+      );
+    }
+
+    await this.exportBinaryFormatWithLambda({
+      exportUrl,
+      inputBucketName,
+      outputBucketName,
+      binKey,
+      clientId: this.resolveClientId(config),
+      formatLabel: 'MF4'
+    });
+  }
+
+  private async exportBinaryFormatWithLambda(options: {
+    exportUrl: string;
+    inputBucketName: string;
+    outputBucketName: string;
+    clientId: string;
+    binKey: string;
+    formatLabel: string;
+  }): Promise<void> {
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        options.exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName: options.inputBucketName,
+            outputBucketName: options.outputBucketName,
+            clientId: options.clientId,
+            inputKeys: [
+              options.binKey
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok && response.status !== 207) {
+      throw new Error(
+        result.error ||
+        result.message ||
+        `${options.formatLabel} export failed. HTTP ${response.status}`
+      );
+    }
+
+    const failed =
+      Array.isArray(result.errors)
+        ? result.errors.find((item: { inputKey?: string }) => item.inputKey === options.binKey) || result.errors[0]
+        : null;
+
+    if (failed?.error) {
+      throw new Error(failed.error);
+    }
+  }
+
+  private async resolveMf4OutputKey(
+    outputBucket: string,
+    binKey: string
+  ): Promise<string> {
+
+    const manifestKey =
+      this.buildMf4ManifestKey(binKey);
+
+    try {
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          outputBucket,
+          manifestKey
+        );
+
+      const manifestText =
+        new TextDecoder('utf-8')
+          .decode(manifestBuffer);
+
+      const manifest =
+        JSON.parse(manifestText);
+
+      const outputKey =
+        String(manifest.outputKey || '').trim();
+
+      if (outputKey) {
+        return outputKey;
+      }
+
+    } catch (error) {
+      console.warn(
+        '[Trackster] MF4 manifest not available while saving export. Falling back to inferred MF4 key.',
+        error
+      );
+    }
+
+    return this.buildMf4OutputKey(binKey);
+  }
+
+  private buildBlfOutputKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.blf'
+    );
+  }
+
+  private buildMf4OutputKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.mf4'
+    );
+  }
+
+  private buildMf4ManifestKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.mf4.json'
+    );
+  }
+
   private buildDecodedSignalsTextExport(
     sourceFileName: string,
     parsed: ParsedTracksterBin
@@ -2333,6 +2806,27 @@ export class DecoderComponent implements OnInit {
     return `${baseName}.can`;
   }
 
+
+  private getBlfFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.blf`;
+  }
+
+  private getMf4FileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.mf4`;
+  }
+
   private getDecodedSignalsZipEntryNameFromBinKey(
     key: string
   ): string {
@@ -2426,6 +2920,27 @@ export class DecoderComponent implements OnInit {
     return this.replaceZipEntryExtension(
       key,
       'can'
+    );
+  }
+
+
+  private getBlfZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'blf'
+    );
+  }
+
+  private getMf4ZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'mf4'
     );
   }
 
