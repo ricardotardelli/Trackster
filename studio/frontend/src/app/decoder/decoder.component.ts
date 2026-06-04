@@ -2047,35 +2047,10 @@ export class DecoderComponent implements OnInit {
   }
 
   private getDbcFileNameFromRunManifest(
-    manifest: any
+    _manifest: any
   ): string {
 
-    const dbcFiles =
-      Array.isArray(manifest?.dbc?.dbcFiles)
-        ? manifest.dbc.dbcFiles
-        : [];
-
-    const firstDbcFile =
-      String(dbcFiles[0] ?? '').trim();
-
-    if (firstDbcFile) {
-      return this.normalizeExportFileName(
-        firstDbcFile,
-        'dbc'
-      );
-    }
-
-    const runId =
-      String(manifest?.runId ?? '').trim();
-
-    if (runId) {
-      return this.normalizeExportFileName(
-        `trackster-${runId}`,
-        'dbc'
-      );
-    }
-
-    return 'trackster-run-manifest.dbc';
+    return 'run-manifest.dbc';
   }
 
   private buildDbcTextFromRunManifest(
