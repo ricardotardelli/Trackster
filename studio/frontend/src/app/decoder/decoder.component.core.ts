@@ -1,0 +1,4138 @@
+import { OnInit } from '@angular/core';
+import { NestedTreeControl } from '@angular/cdk/tree';
+import { MatTreeNestedDataSource } from '@angular/material/tree';
+import { environment } from '../../environments/environment';
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { ExportFile, LocalFileSaveService } from './export-files/local-file-save.service';
+import { parseTracksterBin, ParsedTracksterBin } from './parser/decoder.bin.parser';
+import { DecoderExportService } from './decoder-export.service';
+
+export interface S3TreeNode {
+  name: string;
+  key: string;
+  children?: S3TreeNode[];
+}
+
+export type ExportFileFormat =
+  | 'bin'
+  | 'txt'
+  | 'json'
+  | 'csv'
+  | 'vectorasc'
+  | 'blf'
+  | 'mf4'
+  | 'parquet'
+  | 'dbc';
+
+type ExportDialogState =
+  | 'idle'
+  | 'running'
+  | 'success'
+  | 'error';
+
+interface RuntimeConfig {
+  s3Default?: string;
+  s3Region?: string;
+  s3CsvBucket?: string;
+  s3VectorAscBucket?: string;
+  s3BlfBucket?: string;
+  s3Mf4Bucket?: string;
+  s3ParquetBucket?: string;
+  customerId?: string;
+  clientId?: string;
+  decoderApi?: {
+    csvExportUrl?: string;
+    vectorAscExportUrl?: string;
+    blfExportUrl?: string;
+    mf4ExportUrl?: string;
+    parquetExportUrl?: string;
+  };
+}
+
+interface DecodedSignalExportRow {
+  blockIndex: string;
+  frameOffset: string;
+  canId: string;
+  messageName: string;
+  signalName: string;
+  value: string;
+  raw: string;
+  unit: string;
+}
+
+interface CsvExportManifest {
+  outputKey?: string;
+}
+
+interface VectorAscExportResult {
+  inputKey?: string;
+  outputKey?: string;
+  manifestKey?: string;
+  status?: string;
+  error?: string;
+}
+
+interface VectorAscExportResponse {
+  message?: string;
+  exportedCount?: number;
+  failedCount?: number;
+  results?: VectorAscExportResult[];
+  errors?: VectorAscExportResult[];
+}
+
+interface HexDumpExportRow {
+  offset: string;
+  hex: string;
+  ascii: string;
+}
+
+interface CandumpExportRow {
+  timestamp: string;
+  canId: string;
+  data: string;
+  line: string;
+}
+
+export class DecoderComponentCore implements OnInit {
+
+  selectedViewerMode = 'trackster-bin';
+
+  isDecoderFilterOpen = false;
+
+  isLoadingBinCatalog = false;
+
+  selectedS3Key: string | null = null;
+
+  selectedBinNode: S3TreeNode | null = null;
+
+  selectedBinKeys: string[] = [];
+
+  exportDialogVisible = false;
+
+  exportDialogState: ExportDialogState = 'idle';
+
+  exportDialogTitle = '';
+
+  exportDialogMessage = '';
+
+  exportDialogDetails = '';
+
+  private readonly hexDumpBytesPerRow = 16;
+
+  private readonly candumpInterfaceName = 'can0';
+
+  readonly s3TreeControl = new NestedTreeControl<S3TreeNode>(
+    node => node.children ?? []
+  );
+
+  readonly s3TreeDataSource =
+    new MatTreeNestedDataSource<S3TreeNode>();
+
+  constructor(
+    private readonly localFileSaveService: LocalFileSaveService,
+    private readonly decoderExportService: DecoderExportService
+  ) {}
+
+  async ngOnInit(): Promise<void> {
+    await this.loadS3GeneratedFilesTree();
+  }
+
+  hasChild = (_: number, node: S3TreeNode): boolean => {
+    return !!node.children && node.children.length > 0;
+  };
+
+  async selectS3Node(node: S3TreeNode): Promise<void> {
+    this.selectedS3Key = node.key;
+
+    if (!this.isBinFile(node)) {
+      return;
+    }
+
+    this.selectedBinNode = node;
+  }
+
+  isBinFile(node: S3TreeNode): boolean {
+    return node.name.toLowerCase().endsWith('.bin');
+  }
+
+  isJsonFile(node: S3TreeNode): boolean {
+    return node.name.toLowerCase().endsWith('.json');
+  }
+
+  isBinSelected(node: S3TreeNode): boolean {
+    return this.selectedBinKeys.includes(node.key);
+  }
+
+  toggleBinSelection(node: S3TreeNode, checked: boolean): void {
+    if (!this.isBinFile(node)) {
+      return;
+    }
+
+    if (checked) {
+      if (!this.selectedBinKeys.includes(node.key)) {
+        this.selectedBinKeys = [
+          ...this.selectedBinKeys,
+          node.key
+        ];
+      }
+
+      return;
+    }
+
+    this.selectedBinKeys = this.selectedBinKeys
+      .filter(key => key !== node.key);
+  }
+
+  isFolderFullySelected(node: S3TreeNode): boolean {
+    const binKeys = this.getBinKeysFromFolder(node);
+
+    if (binKeys.length === 0) {
+      return false;
+    }
+
+    return binKeys.every(key =>
+      this.selectedBinKeys.includes(key)
+    );
+  }
+
+  isFolderPartiallySelected(node: S3TreeNode): boolean {
+    const binKeys = this.getBinKeysFromFolder(node);
+
+    if (binKeys.length === 0) {
+      return false;
+    }
+
+    const selectedCount = binKeys
+      .filter(key => this.selectedBinKeys.includes(key))
+      .length;
+
+    return (
+      selectedCount > 0 &&
+      selectedCount < binKeys.length
+    );
+  }
+
+  toggleFolderSelection(
+    node: S3TreeNode,
+    checked: boolean
+  ): void {
+
+    const folderBinKeys =
+      this.getBinKeysFromFolder(node);
+
+    if (folderBinKeys.length === 0) {
+      return;
+    }
+
+    if (checked) {
+      const mergedKeys = new Set<string>([
+        ...this.selectedBinKeys,
+        ...folderBinKeys
+      ]);
+
+      this.selectedBinKeys = [...mergedKeys];
+
+      return;
+    }
+
+    const folderKeys = new Set<string>(
+      folderBinKeys
+    );
+
+    this.selectedBinKeys = this.selectedBinKeys
+      .filter(key => !folderKeys.has(key));
+  }
+
+  public async exportCurrentFileWithDialog(): Promise<void> {
+    await this.runExportWithDialog(
+      async () => await this.exportCurrentFile(),
+      'File saved successfully.'
+    );
+  }
+
+  public async exportSelectedFilesWithDialog(): Promise<void> {
+    await this.runExportWithDialog(
+      async () => await this.exportSelectedFiles(),
+      'ZIP file saved successfully.'
+    );
+  }
+
+  public async exportSelectedFoldersWithDialog(): Promise<void> {
+    await this.runExportWithDialog(
+      async () => await this.exportSelectedFolders(),
+      'ZIP file saved successfully.'
+    );
+  }
+
+  public closeExportDialog(): void {
+    if (this.exportDialogState === 'running') {
+      return;
+    }
+
+    this.exportDialogVisible = false;
+    this.exportDialogState = 'idle';
+    this.exportDialogTitle = '';
+    this.exportDialogMessage = '';
+    this.exportDialogDetails = '';
+  }
+
+  public async exportCurrentFile(): Promise<boolean> {
+    return await this.decoderExportService.exportCurrentFile(
+      this.selectedViewerMode,
+      this
+    );
+  }
+
+  public async exportSelectedFiles(): Promise<boolean> {
+    return await this.decoderExportService.exportSelectedFiles(
+      this.selectedViewerMode,
+      this
+    );
+  }
+
+  public async exportSelectedFolders(): Promise<boolean> {
+    return await this.decoderExportService.exportSelectedFolders(
+      this.selectedViewerMode,
+      this
+    );
+  }
+
+  public async exportCurrentTracksterBinFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for export.');
+    }
+
+    if (!this.isBinFile(this.selectedBinNode)) {
+      throw new Error('Selected node is not a BIN file.');
+    }
+
+    const fileName =
+      this.normalizeExportFileName(
+        this.selectedBinNode.name,
+        'bin'
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const config =
+          await this.loadRuntimeConfig();
+
+        const bucket =
+          config.s3Default?.trim();
+
+        if (!bucket) {
+          throw new Error(
+            'Missing s3Default in assets/config.json'
+          );
+        }
+
+        const s3Client =
+          await this.getS3Client();
+
+        const response =
+          await s3Client.send(
+            new GetObjectCommand({
+              Bucket: bucket,
+              Key: this.selectedBinNode!.key
+            })
+          );
+
+        const content =
+          await this.readS3BodyAsArrayBuffer(
+            response.Body
+          );
+
+        return this.buildExportBlob(
+          content,
+          'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentDecodedSignalsFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for decoded signals export.');
+    }
+
+    const fileName =
+      this.getDecodedSignalsFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const decodedText =
+          await this.buildDecodedSignalsTextForKey(
+            this.selectedBinNode!.key,
+            this.selectedBinNode!.name
+          );
+
+        return this.buildExportBlob(
+          decodedText,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentJsonFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for JSON export.');
+    }
+
+    const fileName =
+      this.getJsonFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/json;charset=utf-8',
+      blobProvider: async () => {
+        const jsonText =
+          await this.buildJsonTextForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          jsonText,
+          'application/json;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentCsvFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for CSV export.');
+    }
+
+    const fileName =
+      this.getCsvFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/csv;charset=utf-8',
+      blobProvider: async () => {
+        const csvBuffer =
+          await this.loadCsvOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          csvBuffer,
+          'text/csv;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentHexDumpFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for HEX dump export.');
+    }
+
+    const fileName =
+      this.getHexDumpFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const hexDumpText =
+          await this.buildHexDumpTextForKey(
+            this.selectedBinNode!.key,
+            this.selectedBinNode!.name
+          );
+
+        return this.buildExportBlob(
+          hexDumpText,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentVectorAscFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for Vector ASC export.');
+    }
+
+    const fileName =
+      this.getVectorAscFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const ascBuffer =
+          await this.loadVectorAscOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          ascBuffer,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentCandumpFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for CANdump export.');
+    }
+
+    const fileName =
+      this.getCandumpFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const candumpText =
+          await this.buildCandumpTextForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          candumpText,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+
+  public async exportCurrentBlfFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for BLF export.');
+    }
+
+    const fileName =
+      this.getBlfFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const blfBuffer =
+          await this.loadBlfOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          blfBuffer,
+          'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentMf4File(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for MF4 export.');
+    }
+
+    const fileName =
+      this.getMf4FileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const mf4Buffer =
+          await this.loadMf4OutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          mf4Buffer,
+          'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentParquetFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for Parquet export.');
+    }
+
+    const fileName =
+      this.getParquetFileNameFromBinName(
+        this.selectedBinNode.name
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'application/octet-stream',
+      blobProvider: async () => {
+        const parquetBuffer =
+          await this.loadParquetOutputBufferForKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          parquetBuffer,
+          'application/octet-stream'
+        );
+      }
+    });
+  }
+
+  public async exportCurrentRunManifestFile(): Promise<boolean> {
+    if (!this.selectedBinNode) {
+      throw new Error('No BIN file selected for DBC export.');
+    }
+
+    const fileName =
+      await this.getDbcFileNameForBinKey(
+        this.selectedBinNode.key
+      );
+
+    return await this.localFileSaveService.saveFileFromProvider({
+      fileName,
+      mimeType: 'text/plain;charset=utf-8',
+      blobProvider: async () => {
+        const dbcText =
+          await this.buildDbcTextForBinKey(
+            this.selectedBinNode!.key
+          );
+
+        return this.buildExportBlob(
+          dbcText,
+          'text/plain;charset=utf-8'
+        );
+      }
+    });
+  }
+
+  public async exportSelectedTracksterBinFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBinFilesForZip(uniqueSelectedKeys);
+      },
+      'trackster-selected-bin-files.zip'
+    );
+  }
+
+  public async exportSelectedTracksterBinFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBinFilesForZip(folderBinKeys);
+      },
+      'trackster-selected-bin-folders.zip'
+    );
+  }
+
+  public async exportSelectedDecodedSignalsFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for decoded signals export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadDecodedSignalTextFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-decoded-signals.zip'
+    );
+  }
+
+  public async exportSelectedDecodedSignalsFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadDecodedSignalTextFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-decoded-signal-folders.zip'
+    );
+  }
+
+  public async exportSelectedJsonFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for JSON export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadJsonFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-json-files.zip'
+    );
+  }
+
+  public async exportSelectedJsonFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadJsonFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-json-folders.zip'
+    );
+  }
+
+  public async exportSelectedCsvFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for CSV export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCsvFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-csv-files.zip'
+    );
+  }
+
+  public async exportSelectedCsvFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCsvFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-csv-folders.zip'
+    );
+  }
+
+  public async exportSelectedHexDumpFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for HEX dump export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadHexDumpTextFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-hexdump-files.zip'
+    );
+  }
+
+  public async exportSelectedHexDumpFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadHexDumpTextFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-hexdump-folders.zip'
+    );
+  }
+
+  public async exportSelectedVectorAscFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for Vector ASC export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadVectorAscFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-vectorasc-files.zip'
+    );
+  }
+
+  public async exportSelectedVectorAscFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadVectorAscFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-vectorasc-folders.zip'
+    );
+  }
+
+  public async exportSelectedCandumpFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for CANdump export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCandumpFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-candump-files.zip'
+    );
+  }
+
+  public async exportSelectedCandumpFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadCandumpFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-candump-folders.zip'
+    );
+  }
+
+
+  public async exportSelectedBlfFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for BLF export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBlfFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-blf-files.zip'
+    );
+  }
+
+  public async exportSelectedBlfFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadBlfFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-blf-folders.zip'
+    );
+  }
+
+  public async exportSelectedMf4Files(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for MF4 export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadMf4FilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-mf4-files.zip'
+    );
+  }
+
+  public async exportSelectedMf4Folders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadMf4FilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-mf4-folders.zip'
+    );
+  }
+
+  public async exportSelectedParquetFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for Parquet export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadParquetFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-parquet-files.zip'
+    );
+  }
+
+  public async exportSelectedParquetFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadParquetFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-parquet-folders.zip'
+    );
+  }
+
+  public async exportSelectedRunManifestFiles(): Promise<boolean> {
+    const uniqueSelectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (uniqueSelectedKeys.length === 0) {
+      throw new Error('No BIN files selected for run manifest export.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadRunManifestFilesForZip(
+          uniqueSelectedKeys
+        );
+      },
+      'trackster-selected-run-manifests.zip'
+    );
+  }
+
+  public async exportSelectedRunManifestFolders(): Promise<boolean> {
+    const folderBinKeys =
+      this.getSelectedFolderBinKeys();
+
+    if (folderBinKeys.length === 0) {
+      throw new Error('Selected folders do not contain BIN files.');
+    }
+
+    return await this.localFileSaveService.saveFiles(
+      async () => {
+        return await this.loadRunManifestFilesForZip(
+          folderBinKeys
+        );
+      },
+      'trackster-selected-run-manifest-folders.zip'
+    );
+  }
+
+  public async saveGeneratedExportFile(
+    fileNameBase: string,
+    format: ExportFileFormat,
+    content: string | ArrayBuffer | Uint8Array
+  ): Promise<boolean> {
+
+    const mimeType =
+      this.getExportMimeType(format);
+
+    const blob =
+      this.buildExportBlob(
+        content,
+        mimeType
+      );
+
+    const fileName =
+      this.normalizeExportFileName(
+        fileNameBase,
+        format
+      );
+
+    return await this.localFileSaveService.saveFile({
+      fileName,
+      blob,
+      mimeType
+    });
+  }
+
+  private async runExportWithDialog(
+    action: () => Promise<boolean>,
+    successMessage: string
+  ): Promise<void> {
+
+    this.exportDialogVisible = true;
+    this.exportDialogState = 'running';
+    this.exportDialogTitle = 'Exporting...';
+    this.exportDialogMessage =
+      'Please wait while Trackster prepares the export.';
+    this.exportDialogDetails =
+      'Do not close this window.';
+
+    try {
+      const completed =
+        await action();
+
+      if (!completed) {
+        this.closeExportDialog();
+        return;
+      }
+
+      this.exportDialogState = 'success';
+      this.exportDialogTitle = 'Export completed';
+      this.exportDialogMessage = successMessage;
+      this.exportDialogDetails = '';
+
+    } catch (error: unknown) {
+
+      this.exportDialogState = 'error';
+      this.exportDialogTitle = 'Export failed';
+      this.exportDialogMessage =
+        this.getErrorMessage(error);
+      this.exportDialogDetails =
+        'Please try again or check the browser console for details.';
+
+      console.error(
+        '[Trackster] Export failed.',
+        error
+      );
+    }
+  }
+
+  private async loadBinFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const s3Client =
+      await this.getS3Client();
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const response =
+        await s3Client.send(
+          new GetObjectCommand({
+            Bucket: bucket,
+            Key: key
+          })
+        );
+
+      const content =
+        await this.readS3BodyAsArrayBuffer(
+          response.Body
+        );
+
+      files.push({
+        fileName: this.getZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadDecodedSignalTextFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const sourceFileName =
+        this.getFileNameFromS3Key(key);
+
+      const content =
+        await this.buildDecodedSignalsTextForKey(
+          key,
+          sourceFileName
+        );
+
+      files.push({
+        fileName: this.getDecodedSignalsZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadJsonFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const jsonText =
+        await this.buildJsonTextForKey(key);
+
+      files.push({
+        fileName: this.getJsonZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          jsonText,
+          'application/json;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadCsvFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const csvBuffer =
+        await this.loadCsvOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getCsvZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          csvBuffer,
+          'text/csv;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadHexDumpTextFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const sourceFileName =
+        this.getFileNameFromS3Key(key);
+
+      const content =
+        await this.buildHexDumpTextForKey(
+          key,
+          sourceFileName
+        );
+
+      files.push({
+        fileName: this.getHexDumpZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadVectorAscFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const ascBuffer =
+        await this.loadVectorAscOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getVectorAscZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          ascBuffer,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadCandumpFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const content =
+        await this.buildCandumpTextForKey(key);
+
+      files.push({
+        fileName: this.getCandumpZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          content,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    return files;
+  }
+
+
+  private async loadBlfFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const blfBuffer =
+        await this.loadBlfOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getBlfZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          blfBuffer,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadMf4FilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const mf4Buffer =
+        await this.loadMf4OutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getMf4ZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          mf4Buffer,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadParquetFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const files: ExportFile[] = [];
+
+    for (const key of keys) {
+      const parquetBuffer =
+        await this.loadParquetOutputBufferForKey(key);
+
+      files.push({
+        fileName: this.getParquetZipEntryNameFromBinKey(key),
+        blob: this.buildExportBlob(
+          parquetBuffer,
+          'application/octet-stream'
+        )
+      });
+    }
+
+    return files;
+  }
+
+  private async loadRunManifestFilesForZip(
+    keys: string[]
+  ): Promise<ExportFile[]> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const files: ExportFile[] = [];
+    const includedManifestKeys =
+      new Set<string>();
+
+    for (const key of keys) {
+      const manifestKey =
+        this.buildRunManifestKeyForBinKey(
+          key,
+          config
+        );
+
+      if (
+        !manifestKey ||
+        includedManifestKeys.has(manifestKey)
+      ) {
+        continue;
+      }
+
+      includedManifestKeys.add(manifestKey);
+
+      const dbcText =
+        await this.buildDbcTextForBinKey(key);
+
+      files.push({
+        fileName:
+          await this.getDbcZipEntryNameForBinKey(
+            key,
+            manifestKey
+          ),
+        blob: this.buildExportBlob(
+          dbcText,
+          'text/plain;charset=utf-8'
+        )
+      });
+    }
+
+    if (files.length === 0) {
+      throw new Error('No DBC files were found for the selected BIN files.');
+    }
+
+    return files;
+  }
+
+  private async buildDecodedSignalsTextForKey(
+    binKey: string,
+    sourceFileName: string
+  ): Promise<string> {
+
+    const parsed =
+      await this.parseBinKeyWithManifest(binKey);
+
+    return this.buildDecodedSignalsTextExport(
+      sourceFileName,
+      parsed
+    );
+  }
+
+  private async buildJsonTextForKey(
+    binKey: string
+  ): Promise<string> {
+
+    const parsed =
+      await this.parseBinKeyWithManifest(binKey);
+
+    const messages =
+      this.buildDecodedMessagesJson(parsed);
+
+    return JSON.stringify(
+      messages,
+      null,
+      2
+    );
+  }
+
+  private async buildCandumpTextForKey(
+    binKey: string
+  ): Promise<string> {
+
+    const parsed =
+      await this.parseBinKeyWithManifest(binKey);
+
+    const rows =
+      this.buildCandumpRows(parsed);
+
+    return rows
+      .map(row => row.line)
+      .join('\n');
+  }
+
+  private buildCandumpRows(
+    parsed: ParsedTracksterBin
+  ): CandumpExportRow[] {
+
+    const rows: CandumpExportRow[] = [];
+
+    const blocks =
+      Array.isArray(parsed.blocks)
+        ? parsed.blocks
+        : [];
+
+    const firstTimestampNs =
+      blocks[0]?.timestampNs ?? '0';
+
+    for (const block of blocks) {
+      const blockTimestampNs =
+        block.timestampNs ?? firstTimestampNs;
+
+      for (const frame of block.frames ?? []) {
+        const timestamp =
+          this.calculateFrameTimestampSeconds(
+            firstTimestampNs,
+            blockTimestampNs,
+            frame.timestampDeltaNs
+          ).toFixed(6);
+
+        const canId =
+          this.normalizeCandumpCanId(
+            frame.canIdHex
+          );
+
+        const data =
+          this.normalizeCandumpPayloadHex(
+            frame.payloadBytes
+          );
+
+        const line =
+          `(${timestamp}) ${this.candumpInterfaceName} ${canId}#${data}`;
+
+        rows.push({
+          timestamp,
+          canId,
+          data,
+          line
+        });
+      }
+    }
+
+    return rows;
+  }
+
+  private normalizeCandumpCanId(
+    canId: string
+  ): string {
+
+    if (!canId) {
+      return '';
+    }
+
+    return canId
+      .replace(/^0x/i, '')
+      .replace(/\s+/g, '')
+      .toUpperCase();
+  }
+
+  private normalizeCandumpPayloadHex(
+    payload: string
+  ): string {
+
+    if (!payload) {
+      return '';
+    }
+
+    return payload
+      .replace(/\s+/g, '')
+      .toUpperCase();
+  }
+
+  private async buildHexDumpTextForKey(
+    binKey: string,
+    sourceFileName: string
+  ): Promise<string> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const buffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        binKey
+      );
+
+    return this.buildHexDumpTextExport(
+      sourceFileName,
+      buffer
+    );
+  }
+
+  private buildHexDumpTextExport(
+    sourceFileName: string,
+    buffer: ArrayBuffer
+  ): string {
+
+    const bytes =
+      new Uint8Array(buffer);
+
+    const rows =
+      this.buildHexDumpRows(bytes);
+
+    const lines: string[] = [];
+
+    lines.push('Trackster HEX Dump');
+    lines.push(`Source file: ${sourceFileName}`);
+    lines.push(`File size: ${bytes.byteLength.toLocaleString()} bytes`);
+    lines.push(`Rows: ${rows.length.toLocaleString()}`);
+    lines.push(`Generated at: ${new Date().toISOString()}`);
+    lines.push('');
+
+    if (rows.length === 0) {
+      lines.push('No HEX dump content available.');
+      lines.push('');
+      return lines.join('\n');
+    }
+
+    for (const row of rows) {
+      lines.push(
+        `${row.offset}  ${row.hex.padEnd(47, ' ')}  ${row.ascii}`
+      );
+    }
+
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  private buildHexDumpRows(
+    bytes: Uint8Array
+  ): HexDumpExportRow[] {
+
+    const rows: HexDumpExportRow[] = [];
+
+    for (
+      let offset = 0;
+      offset < bytes.length;
+      offset += this.hexDumpBytesPerRow
+    ) {
+
+      const chunk =
+        bytes.slice(
+          offset,
+          Math.min(
+            offset + this.hexDumpBytesPerRow,
+            bytes.length
+          )
+        );
+
+      rows.push({
+        offset:
+          this.formatHexDumpOffset(offset),
+        hex:
+          this.formatHexDumpBytes(chunk),
+        ascii:
+          this.formatHexDumpAscii(chunk)
+      });
+    }
+
+    return rows;
+  }
+
+  private formatHexDumpOffset(
+    offset: number
+  ): string {
+
+    return `0x${offset
+      .toString(16)
+      .toUpperCase()
+      .padStart(8, '0')}`;
+  }
+
+  private formatHexDumpBytes(
+    bytes: Uint8Array
+  ): string {
+
+    return Array.from(bytes)
+      .map(byte =>
+        byte
+          .toString(16)
+          .toUpperCase()
+          .padStart(2, '0')
+      )
+      .join(' ');
+  }
+
+  private formatHexDumpAscii(
+    bytes: Uint8Array
+  ): string {
+
+    return Array.from(bytes)
+      .map(byte => {
+        if (
+          byte >= 32 &&
+          byte <= 126
+        ) {
+          return String.fromCharCode(byte);
+        }
+
+        return '.';
+      })
+      .join('');
+  }
+
+  private async parseBinKeyWithManifest(
+    binKey: string
+  ): Promise<ParsedTracksterBin> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const binBuffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        binKey
+      );
+
+    const manifest =
+      await this.loadRunManifestForBinKey(
+        bucket,
+        binKey,
+        config
+      );
+
+    return parseTracksterBin(
+      binBuffer,
+      manifest
+    );
+  }
+
+  private async loadRunManifestForBinKey(
+    bucket: string,
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<unknown> {
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(binKey);
+
+    if (!runId) {
+      return null;
+    }
+
+    const manifestKey =
+      `${clientId}/${runId}/run-manifest.json`;
+
+    try {
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          bucket,
+          manifestKey
+        );
+
+      const manifestText =
+        new TextDecoder('utf-8')
+          .decode(manifestBuffer);
+
+      return JSON.parse(manifestText);
+
+    } catch (error) {
+
+      console.warn(
+        '[Trackster] Run manifest not available for export.',
+        error
+      );
+
+      return null;
+    }
+  }
+
+  private async loadRunManifestTextForBinKey(
+    binKey: string
+  ): Promise<string> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const manifestKey =
+      this.buildRunManifestKeyForBinKey(
+        binKey,
+        config
+      );
+
+    if (!manifestKey) {
+      throw new Error(
+        `Unable to resolve run manifest key for ${binKey}.`
+      );
+    }
+
+    const manifestBuffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        manifestKey
+      );
+
+    return new TextDecoder('utf-8')
+      .decode(manifestBuffer);
+  }
+
+  private buildRunManifestKeyForBinKey(
+    binKey: string,
+    config: RuntimeConfig
+  ): string {
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const runId =
+      this.getRunIdFromKey(binKey);
+
+    if (!runId) {
+      return '';
+    }
+
+    return `${clientId}/${runId}/run-manifest.json`;
+  }
+
+  private getRunManifestZipEntryNameFromManifestKey(
+    manifestKey: string
+  ): string {
+
+    const parts =
+      manifestKey
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return parts.slice(1).join('/');
+    }
+
+    return 'run-manifest.json';
+  }
+
+  private async buildDbcTextForBinKey(
+    binKey: string
+  ): Promise<string> {
+
+    const manifestText =
+      await this.loadRunManifestTextForBinKey(binKey);
+
+    const manifest =
+      JSON.parse(manifestText);
+
+    return this.buildDbcTextFromRunManifest(manifest);
+  }
+
+  private async getDbcFileNameForBinKey(
+    binKey: string
+  ): Promise<string> {
+
+    const manifestText =
+      await this.loadRunManifestTextForBinKey(binKey);
+
+    const manifest =
+      JSON.parse(manifestText);
+
+    return this.getDbcFileNameFromRunManifest(manifest);
+  }
+
+  private async getDbcZipEntryNameForBinKey(
+    binKey: string,
+    manifestKey: string
+  ): Promise<string> {
+
+    const fileName =
+      await this.getDbcFileNameForBinKey(binKey);
+
+    const parts =
+      manifestKey
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return [
+        ...parts.slice(1, -1),
+        fileName
+      ].join('/');
+    }
+
+    return fileName;
+  }
+
+  private getDbcFileNameFromRunManifest(
+    _manifest: any
+  ): string {
+
+    return 'run-manifest.dbc';
+  }
+
+  private buildDbcTextFromRunManifest(
+    manifest: any
+  ): string {
+
+    const rawDbcText =
+      this.extractRawDbcTextFromRunManifest(manifest);
+
+    if (rawDbcText) {
+      return rawDbcText.endsWith('\n')
+        ? rawDbcText
+        : `${rawDbcText}\n`;
+    }
+
+    const resolvedFrames =
+      this.getResolvedDbcFramesFromRunManifest(manifest);
+
+    if (resolvedFrames.length === 0) {
+      throw new Error(
+        'Run manifest does not contain DBC frames that can be exported.'
+      );
+    }
+
+    const dbcLines: string[] = [];
+
+    dbcLines.push('VERSION "Trackster generated DBC export"');
+    dbcLines.push('');
+    dbcLines.push('NS_ :');
+    dbcLines.push('\tNS_DESC_');
+    dbcLines.push('\tCM_');
+    dbcLines.push('\tBA_DEF_');
+    dbcLines.push('\tBA_');
+    dbcLines.push('\tVAL_');
+    dbcLines.push('\tCAT_DEF_');
+    dbcLines.push('\tCAT_');
+    dbcLines.push('\tFILTER');
+    dbcLines.push('\tBA_DEF_DEF_');
+    dbcLines.push('\tEV_DATA_');
+    dbcLines.push('\tENVVAR_DATA_');
+    dbcLines.push('\tSGTYPE_');
+    dbcLines.push('\tSGTYPE_VAL_');
+    dbcLines.push('\tBA_DEF_SGTYPE_');
+    dbcLines.push('\tBA_SGTYPE_');
+    dbcLines.push('\tSIG_TYPE_REF_');
+    dbcLines.push('\tVAL_TABLE_');
+    dbcLines.push('\tSIG_GROUP_');
+    dbcLines.push('\tSIG_VALTYPE_');
+    dbcLines.push('\tSIGTYPE_VALTYPE_');
+    dbcLines.push('\tBO_TX_BU_');
+    dbcLines.push('\tBA_DEF_REL_');
+    dbcLines.push('\tBA_REL_');
+    dbcLines.push('\tBA_DEF_DEF_REL_');
+    dbcLines.push('\tBU_SG_REL_');
+    dbcLines.push('\tBU_EV_REL_');
+    dbcLines.push('\tBU_BO_REL_');
+    dbcLines.push('\tSG_MUL_VAL_');
+    dbcLines.push('');
+    dbcLines.push('BS_:');
+    dbcLines.push('');
+    dbcLines.push('BU_: XXX');
+    dbcLines.push('');
+
+    for (const item of resolvedFrames) {
+      const frame =
+        item?.frame ?? item;
+
+      const canId =
+        this.parseCanIdToDecimal(item?.canId ?? frame?.id);
+
+      if (canId === null) {
+        continue;
+      }
+
+      const messageName =
+        this.sanitizeDbcIdentifier(
+          String(
+            item?.messageName ??
+            frame?.n ??
+            `CAN_${canId.toString(16).toUpperCase()}`
+          )
+        );
+
+      const dlc =
+        this.toSafeDbcNumber(frame?.l, 8);
+
+      const transmitter =
+        this.sanitizeDbcIdentifier(
+          String(frame?.tx ?? 'XXX')
+        );
+
+      dbcLines.push(
+        `BO_ ${canId} ${messageName}: ${dlc} ${transmitter}`
+      );
+
+      const signals =
+        Array.isArray(frame?.s)
+          ? frame.s
+          : [];
+
+      for (const signal of signals) {
+        const signalLine =
+          this.buildDbcSignalLine(signal);
+
+        if (signalLine) {
+          dbcLines.push(signalLine);
+        }
+      }
+
+      dbcLines.push('');
+    }
+
+    return dbcLines.join('\n');
+  }
+
+  private extractRawDbcTextFromRunManifest(
+    manifest: any
+  ): string {
+
+    const candidates = [
+      manifest?.dbc?.content,
+      manifest?.dbc?.dbcContent,
+      manifest?.dbc?.rawContent,
+      manifest?.dbc?.rawDbc,
+      manifest?.dbc?.rawDbcText,
+      manifest?.dbc?.source,
+      manifest?.dbc?.sourceText
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        typeof candidate === 'string' &&
+        candidate.includes('BO_') &&
+        candidate.includes('SG_')
+      ) {
+        return candidate;
+      }
+    }
+
+    return '';
+  }
+
+  private getResolvedDbcFramesFromRunManifest(
+    manifest: any
+  ): any[] {
+
+    const resolvedFrames =
+      Array.isArray(manifest?.dbc?.resolvedCanFrames)
+        ? manifest.dbc.resolvedCanFrames
+        : [];
+
+    if (resolvedFrames.length > 0) {
+      return this.deduplicateDbcFrames(resolvedFrames);
+    }
+
+    const compiledMessages =
+      manifest?.dbc?.compiledDbc?.m;
+
+    if (
+      compiledMessages &&
+      typeof compiledMessages === 'object'
+    ) {
+      const frames: any[] = [];
+
+      for (const value of Object.values(compiledMessages)) {
+        if (Array.isArray(value)) {
+          frames.push(...value);
+        }
+      }
+
+      return this.deduplicateDbcFrames(frames);
+    }
+
+    return [];
+  }
+
+  private deduplicateDbcFrames(
+    frames: any[]
+  ): any[] {
+
+    const byCanId =
+      new Map<string, any>();
+
+    for (const frame of frames) {
+      const key =
+        String(frame?.canId ?? frame?.frame?.id ?? '')
+          .trim()
+          .toLowerCase();
+
+      if (!key || byCanId.has(key)) {
+        continue;
+      }
+
+      byCanId.set(key, frame);
+    }
+
+    return [...byCanId.values()].sort((left, right) => {
+      const leftCanId =
+        this.parseCanIdToDecimal(left?.canId ?? left?.frame?.id) ?? 0;
+
+      const rightCanId =
+        this.parseCanIdToDecimal(right?.canId ?? right?.frame?.id) ?? 0;
+
+      return leftCanId - rightCanId;
+    });
+  }
+
+  private buildDbcSignalLine(
+    signal: any
+  ): string {
+
+    if (!Array.isArray(signal)) {
+      return '';
+    }
+
+    const name =
+      this.sanitizeDbcIdentifier(
+        String(signal[8] ?? 'Signal')
+      );
+
+    const startBit =
+      this.toSafeDbcNumber(signal[0], 0);
+
+    const length =
+      this.toSafeDbcNumber(signal[1], 1);
+
+    const byteOrder =
+      this.toSafeDbcNumber(signal[2], 0) === 1
+        ? 1
+        : 0;
+
+    const sign =
+      this.toSafeDbcNumber(signal[3], 0) === 1
+        ? '-'
+        : '+';
+
+    const factor =
+      this.toSafeDbcNumber(signal[4], 1);
+
+    const offset =
+      this.toSafeDbcNumber(signal[5], 0);
+
+    const minimum =
+      this.toSafeDbcNumber(signal[6], 0);
+
+    const maximum =
+      this.toSafeDbcNumber(signal[7], 0);
+
+    const unit =
+      this.escapeDbcString(
+        String(signal[9] ?? '')
+      );
+
+    const receiver =
+      this.sanitizeDbcIdentifier(
+        String(signal[10] ?? 'XXX')
+      );
+
+    return ` SG_ ${name} : ${startBit}|${length}@${byteOrder}${sign} (${factor},${offset}) [${minimum}|${maximum}] "${unit}" ${receiver}`;
+  }
+
+  private parseCanIdToDecimal(
+    value: unknown
+  ): number | null {
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value)
+        ? Math.trunc(value)
+        : null;
+    }
+
+    const text =
+      String(value ?? '').trim();
+
+    if (!text) {
+      return null;
+    }
+
+    const parsed =
+      text.toLowerCase().startsWith('0x')
+        ? Number.parseInt(text, 16)
+        : Number.parseInt(text, 10);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : null;
+  }
+
+  private toSafeDbcNumber(
+    value: unknown,
+    fallback: number
+  ): number {
+
+    const parsed =
+      Number(value);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : fallback;
+  }
+
+  private sanitizeDbcIdentifier(
+    value: string
+  ): string {
+
+    const sanitized =
+      value
+        .trim()
+        .replace(/[^A-Za-z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^([0-9])/, '_$1');
+
+    return sanitized || 'TracksterSignal';
+  }
+
+  private escapeDbcString(
+    value: string
+  ): string {
+
+    return value.replace(/"/g, '\\"');
+  }
+
+  private buildDecodedMessagesJson(
+    parsed: ParsedTracksterBin
+  ): any[] {
+
+    const messages: any[] = [];
+
+    const blocks =
+      Array.isArray(parsed.blocks)
+        ? parsed.blocks
+        : [];
+
+    const firstTimestampNs =
+      blocks[0]?.timestampNs ?? '0';
+
+    for (const block of blocks) {
+
+      const blockTimestampNs =
+        block.timestampNs ?? firstTimestampNs;
+
+      for (const frame of block.frames ?? []) {
+
+        const signals:
+          Record<string, unknown> = {};
+
+        for (const signal of frame.signals ?? []) {
+          signals[signal.name] = signal.value;
+        }
+
+        messages.push({
+          timestamp:
+            this.calculateFrameTimestampSeconds(
+              firstTimestampNs,
+              blockTimestampNs,
+              frame.timestampDeltaNs
+            ),
+
+          canId:
+            frame.canIdHex,
+
+          name:
+            frame.messageName ||
+            `CAN_${frame.canIdHex}`,
+
+          dlc:
+            frame.payloadLength,
+
+          data:
+            this.normalizePayloadHex(
+              frame.payloadBytes
+            ),
+
+          signals
+        });
+      }
+    }
+
+    return messages;
+  }
+
+  private calculateFrameTimestampSeconds(
+    firstTimestampNs: string,
+    blockTimestampNs: string,
+    frameDeltaNs: string | number
+  ): number {
+
+    const baseNs =
+      BigInt(
+        firstTimestampNs || '0'
+      );
+
+    const blockNs =
+      BigInt(
+        blockTimestampNs || '0'
+      );
+
+    const deltaNs =
+      BigInt(
+        frameDeltaNs ?? 0
+      );
+
+    const absoluteNs =
+      blockNs + deltaNs;
+
+    const relativeNs =
+      absoluteNs - baseNs;
+
+    return Number(relativeNs) /
+      1_000_000_000;
+  }
+
+  private normalizePayloadHex(
+    payload: string
+  ): string {
+
+    if (!payload) {
+      return '';
+    }
+
+    return payload
+      .replace(/\s+/g, '')
+      .toUpperCase();
+  }
+
+  private async loadCsvOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3CsvBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3CsvBucket in assets/config.json'
+      );
+    }
+
+    await this.exportCsvWithLambda(
+      binKey,
+      config
+    );
+
+    const manifest =
+      await this.loadCsvManifest(
+        binKey,
+        outputBucket
+      );
+
+    const outputKey =
+      manifest.outputKey?.trim();
+
+    if (!outputKey) {
+      throw new Error(
+        `CSV manifest does not contain outputKey for ${binKey}.`
+      );
+    }
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportCsvWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<void> {
+
+    const exportUrl =
+      config.decoderApi?.csvExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.csvExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim() ||
+      's3-trackster-can-bucket';
+
+    const outputBucketName =
+      config.s3CsvBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3CsvBucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
+            clientId,
+            inputKeys: [
+              binKey
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok) {
+      throw new Error(
+        result.message ||
+        `CSV export failed. HTTP ${response.status}`
+      );
+    }
+  }
+
+  private async loadCsvManifest(
+    binKey: string,
+    bucket: string
+  ): Promise<CsvExportManifest> {
+
+    const manifestKey =
+      this.buildCsvManifestKey(binKey);
+
+    const buffer =
+      await this.getS3ObjectBuffer(
+        bucket,
+        manifestKey
+      );
+
+    const manifestText =
+      new TextDecoder('utf-8')
+        .decode(buffer);
+
+    return JSON.parse(manifestText);
+  }
+
+  private buildCsvManifestKey(
+    inputKey: string
+  ): string {
+
+    return inputKey
+      .replace(/\.[^.]+$/, '.csv.json');
+  }
+
+  private async loadVectorAscOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3VectorAscBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3VectorAscBucket in assets/config.json'
+      );
+    }
+
+    const outputKey =
+      await this.exportVectorAscWithLambda(
+        binKey,
+        config
+      );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportVectorAscWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<string> {
+
+    const exportUrl =
+      config.decoderApi?.vectorAscExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.vectorAscExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3VectorAscBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3VectorAscBucket in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName,
+            outputBucketName,
+            clientId,
+            inputKeys: [
+              binKey
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText) as VectorAscExportResponse
+        : {};
+
+    if (!response.ok && response.status !== 207) {
+      throw new Error(
+        result.message ||
+        `Vector ASC export failed. HTTP ${response.status}`
+      );
+    }
+
+    const exported =
+      result.results?.find(item =>
+        item.inputKey === binKey &&
+        !!item.outputKey
+      ) ||
+      result.results?.find(item =>
+        !!item.outputKey
+      );
+
+    if (exported?.outputKey) {
+      return exported.outputKey;
+    }
+
+    const failed =
+      result.errors?.find(item =>
+        item.inputKey === binKey
+      ) ||
+      result.errors?.[0];
+
+    if (failed?.error) {
+      throw new Error(
+        failed.error
+      );
+    }
+
+    throw new Error(
+      `Vector ASC export did not return outputKey for ${binKey}.`
+    );
+  }
+
+
+  private async loadParquetOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3ParquetBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3ParquetBucket in assets/config.json'
+      );
+    }
+
+    const outputKey =
+      await this.exportParquetWithLambda(
+        binKey,
+        config
+      );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportParquetWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<string> {
+
+    const exportUrl =
+      config.decoderApi?.parquetExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.parquetExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3ParquetBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3ParquetBucket in assets/config.json'
+      );
+    }
+
+    await this.exportBinaryFormatWithLambda({
+      exportUrl,
+      inputBucketName,
+      outputBucketName,
+      binKey,
+      clientId: this.resolveClientId(config),
+      formatLabel: 'Parquet'
+    });
+
+    return await this.resolveParquetOutputKey(
+      outputBucketName,
+      binKey
+    );
+  }
+
+  private async loadBlfOutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3BlfBucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3BlfBucket in assets/config.json'
+      );
+    }
+
+    await this.exportBlfWithLambda(
+      binKey,
+      config
+    );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      this.buildBlfOutputKey(binKey)
+    );
+  }
+
+  private async loadMf4OutputBufferForKey(
+    binKey: string
+  ): Promise<ArrayBuffer> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const outputBucket =
+      config.s3Mf4Bucket?.trim();
+
+    if (!outputBucket) {
+      throw new Error(
+        'Missing s3Mf4Bucket in assets/config.json'
+      );
+    }
+
+    await this.exportMf4WithLambda(
+      binKey,
+      config
+    );
+
+    const outputKey =
+      await this.resolveMf4OutputKey(
+        outputBucket,
+        binKey
+      );
+
+    return await this.getS3ObjectBuffer(
+      outputBucket,
+      outputKey
+    );
+  }
+
+  private async exportBlfWithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<void> {
+
+    const exportUrl =
+      config.decoderApi?.blfExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.blfExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3BlfBucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3BlfBucket in assets/config.json'
+      );
+    }
+
+    await this.exportBinaryFormatWithLambda({
+      exportUrl,
+      inputBucketName,
+      outputBucketName,
+      binKey,
+      clientId: this.resolveClientId(config),
+      formatLabel: 'BLF'
+    });
+  }
+
+  private async exportMf4WithLambda(
+    binKey: string,
+    config: RuntimeConfig
+  ): Promise<void> {
+
+    const exportUrl =
+      config.decoderApi?.mf4ExportUrl?.trim();
+
+    if (!exportUrl) {
+      throw new Error(
+        'Missing decoderApi.mf4ExportUrl in assets/config.json'
+      );
+    }
+
+    const inputBucketName =
+      config.s3Default?.trim();
+
+    if (!inputBucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const outputBucketName =
+      config.s3Mf4Bucket?.trim();
+
+    if (!outputBucketName) {
+      throw new Error(
+        'Missing s3Mf4Bucket in assets/config.json'
+      );
+    }
+
+    await this.exportBinaryFormatWithLambda({
+      exportUrl,
+      inputBucketName,
+      outputBucketName,
+      binKey,
+      clientId: this.resolveClientId(config),
+      formatLabel: 'MF4'
+    });
+  }
+
+  private async exportBinaryFormatWithLambda(options: {
+    exportUrl: string;
+    inputBucketName: string;
+    outputBucketName: string;
+    clientId: string;
+    binKey: string;
+    formatLabel: string;
+  }): Promise<void> {
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        options.exportUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            inputBucketName: options.inputBucketName,
+            outputBucketName: options.outputBucketName,
+            clientId: options.clientId,
+            inputKeys: [
+              options.binKey
+            ]
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok && response.status !== 207) {
+      throw new Error(
+        result.error ||
+        result.message ||
+        `${options.formatLabel} export failed. HTTP ${response.status}`
+      );
+    }
+
+    const failed =
+      Array.isArray(result.errors)
+        ? result.errors.find((item: { inputKey?: string }) => item.inputKey === options.binKey) || result.errors[0]
+        : null;
+
+    if (failed?.error) {
+      throw new Error(failed.error);
+    }
+  }
+
+  private async resolveParquetOutputKey(
+    outputBucket: string,
+    binKey: string
+  ): Promise<string> {
+
+    const manifestKey =
+      this.buildParquetManifestKey(binKey);
+
+    try {
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          outputBucket,
+          manifestKey
+        );
+
+      const manifestText =
+        new TextDecoder('utf-8')
+          .decode(manifestBuffer);
+
+      const manifest =
+        JSON.parse(manifestText);
+
+      const outputKey =
+        String(manifest.outputKey || '').trim();
+
+      if (outputKey) {
+        return outputKey;
+      }
+
+    } catch (error) {
+      console.warn(
+        '[Trackster] Parquet manifest not available while saving export. Falling back to inferred Parquet key.',
+        error
+      );
+    }
+
+    return this.buildParquetOutputKey(binKey);
+  }
+
+  private async resolveMf4OutputKey(
+    outputBucket: string,
+    binKey: string
+  ): Promise<string> {
+
+    const manifestKey =
+      this.buildMf4ManifestKey(binKey);
+
+    try {
+      const manifestBuffer =
+        await this.getS3ObjectBuffer(
+          outputBucket,
+          manifestKey
+        );
+
+      const manifestText =
+        new TextDecoder('utf-8')
+          .decode(manifestBuffer);
+
+      const manifest =
+        JSON.parse(manifestText);
+
+      const outputKey =
+        String(manifest.outputKey || '').trim();
+
+      if (outputKey) {
+        return outputKey;
+      }
+
+    } catch (error) {
+      console.warn(
+        '[Trackster] MF4 manifest not available while saving export. Falling back to inferred MF4 key.',
+        error
+      );
+    }
+
+    return this.buildMf4OutputKey(binKey);
+  }
+
+  private buildBlfOutputKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.blf'
+    );
+  }
+
+  private buildMf4OutputKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.mf4'
+    );
+  }
+
+  private buildMf4ManifestKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.mf4.json'
+    );
+  }
+
+  private buildParquetOutputKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.parquet'
+    );
+  }
+
+  private buildParquetManifestKey(
+    binKey: string
+  ): string {
+
+    return binKey.replace(
+      /\.bin$/i,
+      '.parquet.json'
+    );
+  }
+
+  private buildDecodedSignalsTextExport(
+    sourceFileName: string,
+    parsed: ParsedTracksterBin
+  ): string {
+
+    const rows =
+      this.buildDecodedSignalExportRows(parsed);
+
+    const headers = [
+      'Block',
+      'Frame Offset',
+      'CAN ID',
+      'Message',
+      'Signal',
+      'Value',
+      'Raw',
+      'Unit'
+    ];
+
+    const tableRows =
+      rows.map(row => [
+        row.blockIndex,
+        row.frameOffset,
+        row.canId,
+        row.messageName,
+        row.signalName,
+        row.value,
+        row.raw,
+        row.unit
+      ]);
+
+    const columnWidths =
+      this.calculateTextTableColumnWidths(
+        headers,
+        tableRows
+      );
+
+    const lines: string[] = [];
+
+    lines.push('Trackster Decoded Signals');
+    lines.push(`Source file: ${sourceFileName}`);
+    lines.push(`Blocks: ${parsed.blockCount.toLocaleString()}`);
+    lines.push(`Frames: ${parsed.totalFrameCount.toLocaleString()}`);
+    lines.push(`Decoded signal samples: ${rows.length.toLocaleString()}`);
+    lines.push(`Generated at: ${new Date().toISOString()}`);
+    lines.push('');
+
+    if (rows.length === 0) {
+      lines.push('No decoded signal samples were found.');
+      lines.push('');
+      return lines.join('\n');
+    }
+
+    lines.push(
+      this.formatTextTableRow(
+        headers,
+        columnWidths
+      )
+    );
+
+    lines.push(
+      this.formatTextTableSeparator(
+        columnWidths
+      )
+    );
+
+    for (const row of tableRows) {
+      lines.push(
+        this.formatTextTableRow(
+          row,
+          columnWidths
+        )
+      );
+    }
+
+    lines.push('');
+
+    return lines.join('\n');
+  }
+
+  private buildDecodedSignalExportRows(
+    parsed: ParsedTracksterBin
+  ): DecodedSignalExportRow[] {
+
+    const rows: DecodedSignalExportRow[] = [];
+
+    for (const block of parsed.blocks) {
+      for (const frame of block.frames) {
+        for (const signal of frame.signals) {
+          rows.push({
+            blockIndex: block.blockIndex.toString(),
+            frameOffset: frame.offset.toString(),
+            canId: frame.canIdHex,
+            messageName: frame.messageName,
+            signalName: signal.name,
+            value: signal.value,
+            raw: signal.raw,
+            unit: signal.unit || ''
+          });
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  private calculateTextTableColumnWidths(
+    headers: string[],
+    rows: string[][]
+  ): number[] {
+
+    return headers.map((header, columnIndex) => {
+      const rowWidths =
+        rows.map(row =>
+          String(row[columnIndex] ?? '').length
+        );
+
+      return Math.max(
+        header.length,
+        ...rowWidths
+      );
+    });
+  }
+
+  private formatTextTableRow(
+    values: string[],
+    columnWidths: number[]
+  ): string {
+
+    return values
+      .map((value, index) =>
+        String(value ?? '').padEnd(columnWidths[index], ' ')
+      )
+      .join('  ');
+  }
+
+  private formatTextTableSeparator(
+    columnWidths: number[]
+  ): string {
+
+    return columnWidths
+      .map(width => '-'.repeat(width))
+      .join('  ');
+  }
+
+  private async getS3ObjectBuffer(
+    bucket: string,
+    key: string
+  ): Promise<ArrayBuffer> {
+
+    const s3Client =
+      await this.getS3Client();
+
+    const response =
+      await s3Client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: key
+        })
+      );
+
+    return await this.readS3BodyAsArrayBuffer(
+      response.Body
+    );
+  }
+
+  private getUniqueSelectedBinKeys(): string[] {
+    return [...new Set(this.selectedBinKeys)]
+      .filter(key => key.toLowerCase().endsWith('.bin'));
+  }
+
+  private getSelectedFolderBinKeys(): string[] {
+    const selectedFolderKeys =
+      this.getSelectedBinParentFolderKeys();
+
+    if (selectedFolderKeys.length === 0) {
+      throw new Error('No BIN folders selected for export.');
+    }
+
+    return this.getAllBinKeysFromSelectedFolders(
+      selectedFolderKeys
+    );
+  }
+
+  private getSelectedBinParentFolderKeys(): string[] {
+    const folders =
+      new Set<string>();
+
+    for (const key of this.selectedBinKeys) {
+      if (!key.toLowerCase().endsWith('.bin')) {
+        continue;
+      }
+
+      const folderKey =
+        this.getParentFolderKeyFromS3Key(key);
+
+      if (folderKey) {
+        folders.add(folderKey);
+      }
+    }
+
+    return [...folders];
+  }
+
+  private getAllBinKeysFromSelectedFolders(
+    folderKeys: string[]
+  ): string[] {
+
+    const folderKeySet =
+      new Set(folderKeys);
+
+    const result =
+      new Set<string>();
+
+    const walk = (
+      nodes: S3TreeNode[]
+    ): void => {
+
+      for (const node of nodes) {
+        if (this.isBinFile(node)) {
+          const parentFolderKey =
+            this.getParentFolderKeyFromS3Key(node.key);
+
+          if (
+            parentFolderKey &&
+            folderKeySet.has(parentFolderKey)
+          ) {
+            result.add(node.key);
+          }
+
+          continue;
+        }
+
+        walk(node.children ?? []);
+      }
+    };
+
+    walk(this.s3TreeDataSource.data);
+
+    return [...result].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }
+
+  private getParentFolderKeyFromS3Key(
+    key: string
+  ): string | null {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length < 2) {
+      return null;
+    }
+
+    return parts.slice(0, -1).join('/');
+  }
+
+  private buildExportBlob(
+    content: string | ArrayBuffer | Uint8Array,
+    mimeType: string
+  ): Blob {
+
+    if (typeof content === 'string') {
+      return new Blob(
+        [content],
+        { type: mimeType }
+      );
+    }
+
+    if (content instanceof Uint8Array) {
+      const arrayBuffer =
+        new ArrayBuffer(content.byteLength);
+
+      const view =
+        new Uint8Array(arrayBuffer);
+
+      view.set(content);
+
+      return new Blob(
+        [arrayBuffer],
+        { type: mimeType }
+      );
+    }
+
+    return new Blob(
+      [content],
+      { type: mimeType }
+    );
+  }
+
+  private getExportMimeType(
+    format: ExportFileFormat
+  ): string {
+
+    switch (format) {
+      case 'bin':
+        return 'application/octet-stream';
+
+      case 'txt':
+        return 'text/plain;charset=utf-8';
+
+      case 'json':
+        return 'application/json;charset=utf-8';
+
+      case 'csv':
+        return 'text/csv;charset=utf-8';
+
+      case 'vectorasc':
+        return 'text/plain;charset=utf-8';
+
+      case 'blf':
+        return 'application/octet-stream';
+
+      case 'mf4':
+        return 'application/octet-stream';
+
+      case 'parquet':
+        return 'application/octet-stream';
+
+      case 'dbc':
+        return 'text/plain;charset=utf-8';
+
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  private normalizeExportFileName(
+    baseName: string,
+    format: ExportFileFormat
+  ): string {
+
+    const cleanBaseName = baseName
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '_');
+
+    const safeBaseName =
+      cleanBaseName || 'trackster-export';
+
+    const extension =
+      this.getExportExtension(format);
+
+    if (
+      safeBaseName
+        .toLowerCase()
+        .endsWith(`.${extension}`)
+    ) {
+      return safeBaseName;
+    }
+
+    return `${safeBaseName}.${extension}`;
+  }
+
+  private getExportExtension(
+    format: ExportFileFormat
+  ): string {
+
+    switch (format) {
+      case 'bin':
+        return 'bin';
+
+      case 'txt':
+        return 'txt';
+
+      case 'json':
+        return 'json';
+
+      case 'csv':
+        return 'csv';
+
+      case 'vectorasc':
+        return 'asc';
+
+      case 'blf':
+        return 'blf';
+
+      case 'mf4':
+        return 'mf4';
+
+      case 'parquet':
+        return 'parquet';
+
+      case 'dbc':
+        return 'dbc';
+
+      default:
+        return 'bin';
+    }
+  }
+
+  private removeFileExtension(
+    fileName: string
+  ): string {
+
+    return fileName.replace(
+      /\.[^/.]+$/,
+      ''
+    );
+  }
+
+  private getDecodedSignalsFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      `${baseName}.decoded-signals`,
+      'txt'
+    );
+  }
+
+  private getJsonFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'json'
+    );
+  }
+
+  private getCsvFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'csv'
+    );
+  }
+
+  private getHexDumpFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.hex`;
+  }
+
+  private getVectorAscFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'vectorasc'
+    );
+  }
+
+  private getCandumpFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.can`;
+  }
+
+
+  private getBlfFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.blf`;
+  }
+
+  private getMf4FileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return `${baseName}.mf4`;
+  }
+
+  private getParquetFileNameFromBinName(
+    fileName: string
+  ): string {
+
+    const baseName =
+      this.removeFileExtension(fileName);
+
+    return this.normalizeExportFileName(
+      baseName,
+      'parquet'
+    );
+  }
+
+  private getDecodedSignalsZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    const entryName =
+      this.getZipEntryNameFromBinKey(key);
+
+    const parts =
+      entryName
+        .split('/')
+        .filter(Boolean);
+
+    const lastIndex =
+      parts.length - 1;
+
+    if (lastIndex < 0) {
+      return 'trackster-export.decoded-signals.txt';
+    }
+
+    const baseName =
+      this.removeFileExtension(parts[lastIndex]);
+
+    parts[lastIndex] =
+      `${baseName}.decoded-signals.txt`;
+
+    return parts.join('/');
+  }
+
+  private getJsonZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'json'
+    );
+  }
+
+  private getCsvZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'csv'
+    );
+  }
+
+  private getHexDumpZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    const entryName =
+      this.getZipEntryNameFromBinKey(key);
+
+    const parts =
+      entryName
+        .split('/')
+        .filter(Boolean);
+
+    const lastIndex =
+      parts.length - 1;
+
+    if (lastIndex < 0) {
+      return 'trackster-export.hex';
+    }
+
+    const baseName =
+      this.removeFileExtension(parts[lastIndex]);
+
+    parts[lastIndex] =
+      `${baseName}.hex`;
+
+    return parts.join('/');
+  }
+
+  private getVectorAscZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'asc'
+    );
+  }
+
+  private getCandumpZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'can'
+    );
+  }
+
+
+  private getBlfZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'blf'
+    );
+  }
+
+  private getMf4ZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'mf4'
+    );
+  }
+
+  private getParquetZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    return this.replaceZipEntryExtension(
+      key,
+      'parquet'
+    );
+  }
+
+  private replaceZipEntryExtension(
+    key: string,
+    extension: string
+  ): string {
+
+    const entryName =
+      this.getZipEntryNameFromBinKey(key);
+
+    const parts =
+      entryName
+        .split('/')
+        .filter(Boolean);
+
+    const lastIndex =
+      parts.length - 1;
+
+    if (lastIndex < 0) {
+      return `trackster-export.${extension}`;
+    }
+
+    const baseName =
+      this.removeFileExtension(parts[lastIndex]);
+
+    parts[lastIndex] =
+      `${baseName}.${extension}`;
+
+    return parts.join('/');
+  }
+
+  private async readS3BodyAsArrayBuffer(
+    body: unknown
+  ): Promise<ArrayBuffer> {
+
+    if (!body) {
+      throw new Error(
+        'S3 object body is empty.'
+      );
+    }
+
+    const transformedBody = body as {
+      transformToByteArray?: () => Promise<Uint8Array>;
+    };
+
+    if (
+      typeof transformedBody.transformToByteArray === 'function'
+    ) {
+      const bytes =
+        await transformedBody.transformToByteArray();
+
+      return this.copyUint8ArrayToArrayBuffer(bytes);
+    }
+
+    if (body instanceof Blob) {
+      return await body.arrayBuffer();
+    }
+
+    if (body instanceof ArrayBuffer) {
+      return body;
+    }
+
+    if (body instanceof Uint8Array) {
+      return this.copyUint8ArrayToArrayBuffer(body);
+    }
+
+    if (body instanceof ReadableStream) {
+      return await new Response(body).arrayBuffer();
+    }
+
+    if (typeof body === 'string') {
+      return new TextEncoder().encode(body).buffer;
+    }
+
+    throw new Error(
+      'Unsupported S3 object body type.'
+    );
+  }
+
+  private copyUint8ArrayToArrayBuffer(
+    bytes: Uint8Array
+  ): ArrayBuffer {
+
+    const arrayBuffer =
+      new ArrayBuffer(bytes.byteLength);
+
+    const view =
+      new Uint8Array(arrayBuffer);
+
+    view.set(bytes);
+
+    return arrayBuffer;
+  }
+
+  private getZipEntryNameFromBinKey(
+    key: string
+  ): string {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return parts.slice(1).join('/');
+    }
+
+    return parts[0] || 'trackster-export.bin';
+  }
+
+  private getFileNameFromS3Key(
+    key: string
+  ): string {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    return parts[parts.length - 1] || 'trackster-export.bin';
+  }
+
+  private getRunIdFromKey(
+    key: string
+  ): string {
+
+    const parts =
+      key
+        .split('/')
+        .filter(Boolean);
+
+    if (parts.length < 2) {
+      return '';
+    }
+
+    return parts[1];
+  }
+
+  private getBinKeysFromFolder(
+    node: S3TreeNode
+  ): string[] {
+
+    const result: string[] = [];
+
+    const walk = (
+      currentNode: S3TreeNode
+    ): void => {
+
+      if (this.isBinFile(currentNode)) {
+        result.push(currentNode.key);
+        return;
+      }
+
+      for (
+        const child of currentNode.children ?? []
+      ) {
+        walk(child);
+      }
+    };
+
+    walk(node);
+
+    return result;
+  }
+
+  private getErrorMessage(
+    error: unknown
+  ): string {
+
+    if (
+      error instanceof Error &&
+      error.message.trim()
+    ) {
+      return error.message;
+    }
+
+    return 'Unable to export file.';
+  }
+
+  private async getIdToken():
+    Promise<string> {
+
+    const session =
+      await fetchAuthSession();
+
+    const token =
+      session.tokens?.idToken?.toString();
+
+    if (!token) {
+      throw new Error(
+        'Cognito ID token unavailable.'
+      );
+    }
+
+    return token;
+  }
+
+  private async loadS3GeneratedFilesTree(): Promise<void> {
+    this.isLoadingBinCatalog = true;
+
+    try {
+
+      const config =
+        await this.loadRuntimeConfig();
+
+      const clientId =
+        this.resolveClientId(config);
+
+      if (this.shouldUseLocalMock()) {
+
+        this.setTreeData(
+          this.buildLocalMockTree()
+        );
+
+        return;
+      }
+
+      const bucket =
+        config.s3Default?.trim();
+
+      if (!bucket) {
+        throw new Error(
+          'Missing s3Default in assets/config.json'
+        );
+      }
+
+      const prefix = `${clientId}/`;
+
+      const keys =
+        await this.listS3KeysFromBucket(
+          bucket,
+          prefix
+        );
+
+      const tree =
+        this.buildTreeFromS3Keys(
+          keys,
+          clientId
+        );
+
+      this.setTreeData(tree);
+
+    } finally {
+      this.isLoadingBinCatalog = false;
+    }
+  }
+
+  private setTreeData(data: S3TreeNode[]): void {
+    this.s3TreeControl.expansionModel.clear();
+
+    this.s3TreeDataSource.data = data;
+
+    this.s3TreeControl.dataNodes = data;
+
+    this.selectedBinKeys = this.selectedBinKeys.filter(key =>
+      this.treeContainsKey(data, key)
+    );
+
+    const firstFolderNode = data.find(node =>
+      node.children && node.children.length > 0
+    );
+
+    if (firstFolderNode) {
+      this.s3TreeControl.expand(firstFolderNode);
+    }
+
+    const firstBinNode = this.findFirstBinNode(data);
+
+    if (firstBinNode && !this.selectedBinNode) {
+      this.selectedBinNode = firstBinNode;
+      this.selectedS3Key = firstBinNode.key;
+    }
+  }
+
+  private treeContainsKey(
+    nodes: S3TreeNode[],
+    key: string
+  ): boolean {
+
+    for (const node of nodes) {
+
+      if (node.key === key) {
+        return true;
+      }
+
+      if (
+        node.children &&
+        this.treeContainsKey(
+          node.children,
+          key
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private buildTreeFromS3Keys(
+    keys: string[],
+    clientId: string
+  ): S3TreeNode[] {
+
+    const runs =
+      new Map<string, S3TreeNode>();
+
+    const prefix = `${clientId}/`;
+
+    for (const rawKey of keys) {
+
+      const key =
+        rawKey.replace(
+          /^generated-files\//,
+          ''
+        );
+
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+
+      const relativeKey =
+        key.slice(prefix.length);
+
+      const parts = relativeKey
+        .split('/')
+        .filter(Boolean);
+
+      if (parts.length < 2) {
+        continue;
+      }
+
+      const runId = parts[0];
+
+      const fileName =
+        parts[parts.length - 1];
+
+      if (
+        !fileName.toLowerCase().endsWith('.bin')
+      ) {
+        continue;
+      }
+
+      let runNode = runs.get(runId);
+
+      if (!runNode) {
+
+        runNode = {
+          name: runId,
+          key: `${clientId}/${runId}`,
+          children: []
+        };
+
+        runs.set(runId, runNode);
+      }
+
+      runNode.children?.push({
+        name: fileName,
+        key: `${clientId}/${relativeKey}`
+      });
+    }
+
+    const runNodes = [...runs.values()]
+      .sort((a, b) =>
+        b.name.localeCompare(a.name)
+      );
+
+    for (const runNode of runNodes) {
+
+      runNode.children =
+        [...(runNode.children ?? [])]
+          .sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
+    }
+
+    return runNodes;
+  }
+
+  private async loadRuntimeConfig():
+    Promise<RuntimeConfig> {
+
+    const response = await fetch(
+      `assets/config.json?t=${Date.now()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load assets/config.json. HTTP ${response.status}`
+      );
+    }
+
+    return await response.json();
+  }
+
+  private resolveClientId(
+    config: RuntimeConfig
+  ): string {
+
+    const clientId =
+      config.clientId ||
+      config.customerId ||
+      localStorage.getItem('clientId') ||
+      localStorage.getItem('customerId') ||
+      '00000000';
+
+    if (
+      !/^[a-zA-Z0-9]{8}$/.test(clientId)
+    ) {
+      throw new Error(
+        `Invalid clientId: ${clientId}`
+      );
+    }
+
+    return clientId;
+  }
+
+  private shouldUseLocalMock(): boolean {
+
+    const hostname =
+      window.location.hostname;
+
+    return (
+      environment.disableAuth === true &&
+      (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1'
+      )
+    );
+  }
+
+  private buildLocalMockTree():
+    S3TreeNode[] {
+
+    return [
+      {
+        name: '20260508183000',
+        key: '00000000/20260508183000',
+
+        children: [
+          {
+            name: 'VINKDT000001KADUT.bin',
+            key: '00000000/20260508183000/VIN000001KADUT.bin'
+          }
+        ]
+      }
+    ];
+  }
+
+  private async getS3Client():
+    Promise<S3Client> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const region =
+      config.s3Region?.trim() ||
+      'us-east-1';
+
+    const session =
+      await fetchAuthSession();
+
+    if (!session.credentials) {
+      throw new Error(
+        'Cognito credentials unavailable.'
+      );
+    }
+
+    return new S3Client({
+      region,
+      credentials: session.credentials
+    });
+  }
+
+  private async listS3KeysFromBucket(
+    bucket: string,
+    prefix: string
+  ): Promise<string[]> {
+
+    const s3Client =
+      await this.getS3Client();
+
+    const keys: string[] = [];
+
+    let continuationToken:
+      string | undefined;
+
+    do {
+
+      const response =
+        await s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken:
+              continuationToken
+          })
+        );
+
+      for (
+        const item of response.Contents ?? []
+      ) {
+
+        if (item.Key) {
+          keys.push(item.Key);
+        }
+      }
+
+      continuationToken =
+        response.NextContinuationToken;
+
+    } while (continuationToken);
+
+    return keys;
+  }
+
+  private findFirstBinNode(nodes: S3TreeNode[]): S3TreeNode | null {
+    for (const node of nodes) {
+      if (this.isBinFile(node)) {
+        return node;
+      }
+
+      const childMatch = this.findFirstBinNode(node.children ?? []);
+
+      if (childMatch) {
+        return childMatch;
+      }
+    }
+
+    return null;
+  }
+}
