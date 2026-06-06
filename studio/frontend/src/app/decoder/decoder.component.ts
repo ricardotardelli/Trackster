@@ -25,6 +25,7 @@ import { ParquetViewerComponent } from './viewers/parquet-viewer/parquet-viewer.
 import { RunmanifestViewerComponent } from './viewers/runmanifest-viewer/runmanifest-viewer.component';
 import { ExportFile, LocalFileSaveService } from './export-files/local-file-save.service';
 import { parseTracksterBin, ParsedTracksterBin } from './parser/decoder.bin.parser';
+import { DecoderExportService } from './decoder-export.service';
 
 export interface S3TreeNode {
   name: string;
@@ -176,7 +177,8 @@ export class DecoderComponent implements OnInit {
     new MatTreeNestedDataSource<S3TreeNode>();
 
   constructor(
-    private readonly localFileSaveService: LocalFileSaveService
+    private readonly localFileSaveService: LocalFileSaveService,
+    private readonly decoderExportService: DecoderExportService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -323,161 +325,23 @@ export class DecoderComponent implements OnInit {
   }
 
   public async exportCurrentFile(): Promise<boolean> {
-    if (this.selectedViewerMode === 'trackster-bin') {
-      return await this.exportCurrentTracksterBinFile();
-    }
-
-    if (this.selectedViewerMode === 'decoded-signals') {
-      return await this.exportCurrentDecodedSignalsFile();
-    }
-
-    if (this.selectedViewerMode === 'json') {
-      return await this.exportCurrentJsonFile();
-    }
-
-    if (this.selectedViewerMode === 'csv') {
-      return await this.exportCurrentCsvFile();
-    }
-
-    if (this.selectedViewerMode === 'hex-dump') {
-      return await this.exportCurrentHexDumpFile();
-    }
-
-    if (this.selectedViewerMode === 'vector-asc') {
-      return await this.exportCurrentVectorAscFile();
-    }
-
-    if (this.selectedViewerMode === 'candump') {
-      return await this.exportCurrentCandumpFile();
-    }
-
-    if (this.selectedViewerMode === 'blf') {
-      return await this.exportCurrentBlfFile();
-    }
-
-    if (this.selectedViewerMode === 'mf4') {
-      return await this.exportCurrentMf4File();
-    }
-
-    if (this.selectedViewerMode === 'parquet') {
-      return await this.exportCurrentParquetFile();
-    }
-
-    if (
-      this.selectedViewerMode === 'run-manifest' ||
-      this.selectedViewerMode === 'runmanifest'
-    ) {
-      return await this.exportCurrentRunManifestFile();
-    }
-
-    throw new Error(
-      `Export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    return await this.decoderExportService.exportCurrentFile(
+      this.selectedViewerMode,
+      this
     );
   }
 
   public async exportSelectedFiles(): Promise<boolean> {
-    if (this.selectedViewerMode === 'trackster-bin') {
-      return await this.exportSelectedTracksterBinFiles();
-    }
-
-    if (this.selectedViewerMode === 'decoded-signals') {
-      return await this.exportSelectedDecodedSignalsFiles();
-    }
-
-    if (this.selectedViewerMode === 'json') {
-      return await this.exportSelectedJsonFiles();
-    }
-
-    if (this.selectedViewerMode === 'csv') {
-      return await this.exportSelectedCsvFiles();
-    }
-
-    if (this.selectedViewerMode === 'hex-dump') {
-      return await this.exportSelectedHexDumpFiles();
-    }
-
-    if (this.selectedViewerMode === 'vector-asc') {
-      return await this.exportSelectedVectorAscFiles();
-    }
-
-    if (this.selectedViewerMode === 'candump') {
-      return await this.exportSelectedCandumpFiles();
-    }
-
-    if (this.selectedViewerMode === 'blf') {
-      return await this.exportSelectedBlfFiles();
-    }
-
-    if (this.selectedViewerMode === 'mf4') {
-      return await this.exportSelectedMf4Files();
-    }
-
-    if (this.selectedViewerMode === 'parquet') {
-      return await this.exportSelectedParquetFiles();
-    }
-
-    if (
-      this.selectedViewerMode === 'run-manifest' ||
-      this.selectedViewerMode === 'runmanifest'
-    ) {
-      return await this.exportSelectedRunManifestFiles();
-    }
-
-    throw new Error(
-      `Selected files export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    return await this.decoderExportService.exportSelectedFiles(
+      this.selectedViewerMode,
+      this
     );
   }
 
   public async exportSelectedFolders(): Promise<boolean> {
-    if (this.selectedViewerMode === 'trackster-bin') {
-      return await this.exportSelectedTracksterBinFolders();
-    }
-
-    if (this.selectedViewerMode === 'decoded-signals') {
-      return await this.exportSelectedDecodedSignalsFolders();
-    }
-
-    if (this.selectedViewerMode === 'json') {
-      return await this.exportSelectedJsonFolders();
-    }
-
-    if (this.selectedViewerMode === 'csv') {
-      return await this.exportSelectedCsvFolders();
-    }
-
-    if (this.selectedViewerMode === 'hex-dump') {
-      return await this.exportSelectedHexDumpFolders();
-    }
-
-    if (this.selectedViewerMode === 'vector-asc') {
-      return await this.exportSelectedVectorAscFolders();
-    }
-
-    if (this.selectedViewerMode === 'candump') {
-      return await this.exportSelectedCandumpFolders();
-    }
-
-    if (this.selectedViewerMode === 'blf') {
-      return await this.exportSelectedBlfFolders();
-    }
-
-    if (this.selectedViewerMode === 'mf4') {
-      return await this.exportSelectedMf4Folders();
-    }
-
-    if (this.selectedViewerMode === 'parquet') {
-      return await this.exportSelectedParquetFolders();
-    }
-
-    if (
-      this.selectedViewerMode === 'run-manifest' ||
-      this.selectedViewerMode === 'runmanifest'
-    ) {
-      return await this.exportSelectedRunManifestFolders();
-    }
-
-    throw new Error(
-      `Folder export for viewer mode "${this.selectedViewerMode}" is not integrated yet.`
+    return await this.decoderExportService.exportSelectedFolders(
+      this.selectedViewerMode,
+      this
     );
   }
 
