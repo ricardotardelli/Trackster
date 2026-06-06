@@ -7,27 +7,7 @@
 
         <div class="status-panel">
 
-          <div class="explorer-header">
-
-            <h2>CAN Files Explorer</h2>
-
-            <button
-              type="button"
-              class="decoder-delete-selected-button"
-              [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'"
-              title="Delete selected files">
-
-              <mat-icon>
-                delete
-              </mat-icon>
-
-              <span>
-                Delete selected
-              </span>
-
-            </button>
-
-          </div>
+          <h2>CAN Files Explorer</h2>
 
           <div class="tree-shell">
 
@@ -239,6 +219,22 @@
 
                     </mat-select>
                   </mat-form-field>
+
+                  <button
+                    type="button"
+                    class="decoder-delete-button"
+                    [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'"
+                    title="Delete selected files">
+
+                    <mat-icon>
+                      delete
+                    </mat-icon>
+
+                    <span>
+                      Delete selected
+                    </span>
+
+                  </button>
 
                   <button
                     type="button"
