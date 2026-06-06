@@ -23,6 +23,8 @@ import { LocalFileSaveService } from './export-files/local-file-save.service';
 import { DecoderExportService } from './decoder-export.service';
 import { DecoderComponentCore } from './decoder.component.core';
 
+export type { S3TreeNode, ExportFileFormat } from './decoder.component.core';
+
 @Component({
   selector: 'app-decoder',
   standalone: true,

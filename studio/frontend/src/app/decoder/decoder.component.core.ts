@@ -1,4 +1,4 @@
-import { OnInit } from '@angular/core';
+import { Directive, OnInit } from '@angular/core';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatTreeNestedDataSource } from '@angular/material/tree';
 import { environment } from '../../environments/environment';
@@ -94,7 +94,8 @@ interface CandumpExportRow {
   line: string;
 }
 
-export class DecoderComponentCore implements OnInit {
+@Directive()
+export abstract class DecoderComponentCore implements OnInit {
 
   selectedViewerMode = 'trackster-bin';
 
