@@ -1,4 +1,16 @@
 import { Injectable } from '@angular/core';
+import { BlfExportHandler } from './export-files/blf-export.handler';
+import { CandumpExportHandler } from './export-files/candump-export.handler';
+import { CsvExportHandler } from './export-files/csv-export.handler';
+import { DecodedSignalsExportHandler } from './export-files/decoded-signals-export.handler';
+import { DecoderExportHandler } from './export-files/decoder-export-handler';
+import { HexDumpExportHandler } from './export-files/hex-dump-export.handler';
+import { JsonExportHandler } from './export-files/json-export.handler';
+import { Mf4ExportHandler } from './export-files/mf4-export.handler';
+import { ParquetExportHandler } from './export-files/parquet-export.handler';
+import { RunManifestExportHandler } from './export-files/run-manifest-export.handler';
+import { TracksterBinExportHandler } from './export-files/trackster-bin-export.handler';
+import { VectorAscExportHandler } from './export-files/vector-asc-export.handler';
 
 export interface DecoderExportHost {
   exportCurrentTracksterBinFile(): Promise<boolean>;
@@ -43,39 +55,18 @@ export interface DecoderExportHost {
 })
 export class DecoderExportService {
 
+  private readonly handlersByViewerMode =
+    this.buildHandlersByViewerMode();
+
   async exportCurrentFile(
     viewerMode: string,
     host: DecoderExportHost
   ): Promise<boolean> {
 
-    switch (this.normalizeViewerMode(viewerMode)) {
-      case 'trackster-bin':
-        return await host.exportCurrentTracksterBinFile();
-      case 'decoded-signals':
-        return await host.exportCurrentDecodedSignalsFile();
-      case 'json':
-        return await host.exportCurrentJsonFile();
-      case 'csv':
-        return await host.exportCurrentCsvFile();
-      case 'hex-dump':
-        return await host.exportCurrentHexDumpFile();
-      case 'vector-asc':
-        return await host.exportCurrentVectorAscFile();
-      case 'candump':
-        return await host.exportCurrentCandumpFile();
-      case 'blf':
-        return await host.exportCurrentBlfFile();
-      case 'mf4':
-        return await host.exportCurrentMf4File();
-      case 'parquet':
-        return await host.exportCurrentParquetFile();
-      case 'run-manifest':
-        return await host.exportCurrentRunManifestFile();
-      default:
-        throw new Error(
-          `Export for viewer mode "${viewerMode}" is not integrated yet.`
-        );
-    }
+    const handler =
+      this.getHandler(viewerMode);
+
+    return await handler.exportCurrent(host);
   }
 
   async exportSelectedFiles(
@@ -83,34 +74,10 @@ export class DecoderExportService {
     host: DecoderExportHost
   ): Promise<boolean> {
 
-    switch (this.normalizeViewerMode(viewerMode)) {
-      case 'trackster-bin':
-        return await host.exportSelectedTracksterBinFiles();
-      case 'decoded-signals':
-        return await host.exportSelectedDecodedSignalsFiles();
-      case 'json':
-        return await host.exportSelectedJsonFiles();
-      case 'csv':
-        return await host.exportSelectedCsvFiles();
-      case 'hex-dump':
-        return await host.exportSelectedHexDumpFiles();
-      case 'vector-asc':
-        return await host.exportSelectedVectorAscFiles();
-      case 'candump':
-        return await host.exportSelectedCandumpFiles();
-      case 'blf':
-        return await host.exportSelectedBlfFiles();
-      case 'mf4':
-        return await host.exportSelectedMf4Files();
-      case 'parquet':
-        return await host.exportSelectedParquetFiles();
-      case 'run-manifest':
-        return await host.exportSelectedRunManifestFiles();
-      default:
-        throw new Error(
-          `Selected files export for viewer mode "${viewerMode}" is not integrated yet.`
-        );
-    }
+    const handler =
+      this.getHandler(viewerMode);
+
+    return await handler.exportSelectedFiles(host);
   }
 
   async exportSelectedFolders(
@@ -118,34 +85,59 @@ export class DecoderExportService {
     host: DecoderExportHost
   ): Promise<boolean> {
 
-    switch (this.normalizeViewerMode(viewerMode)) {
-      case 'trackster-bin':
-        return await host.exportSelectedTracksterBinFolders();
-      case 'decoded-signals':
-        return await host.exportSelectedDecodedSignalsFolders();
-      case 'json':
-        return await host.exportSelectedJsonFolders();
-      case 'csv':
-        return await host.exportSelectedCsvFolders();
-      case 'hex-dump':
-        return await host.exportSelectedHexDumpFolders();
-      case 'vector-asc':
-        return await host.exportSelectedVectorAscFolders();
-      case 'candump':
-        return await host.exportSelectedCandumpFolders();
-      case 'blf':
-        return await host.exportSelectedBlfFolders();
-      case 'mf4':
-        return await host.exportSelectedMf4Folders();
-      case 'parquet':
-        return await host.exportSelectedParquetFolders();
-      case 'run-manifest':
-        return await host.exportSelectedRunManifestFolders();
-      default:
-        throw new Error(
-          `Folder export for viewer mode "${viewerMode}" is not integrated yet.`
-        );
+    const handler =
+      this.getHandler(viewerMode);
+
+    return await handler.exportSelectedFolders(host);
+  }
+
+  private getHandler(
+    viewerMode: string
+  ): DecoderExportHandler {
+
+    const normalizedViewerMode =
+      this.normalizeViewerMode(viewerMode);
+
+    const handler =
+      this.handlersByViewerMode.get(normalizedViewerMode);
+
+    if (!handler) {
+      throw new Error(
+        `Export for viewer mode "${viewerMode}" is not integrated yet.`
+      );
     }
+
+    return handler;
+  }
+
+  private buildHandlersByViewerMode(): Map<string, DecoderExportHandler> {
+    const handlers: DecoderExportHandler[] = [
+      new TracksterBinExportHandler(),
+      new DecodedSignalsExportHandler(),
+      new JsonExportHandler(),
+      new CsvExportHandler(),
+      new HexDumpExportHandler(),
+      new VectorAscExportHandler(),
+      new CandumpExportHandler(),
+      new BlfExportHandler(),
+      new Mf4ExportHandler(),
+      new ParquetExportHandler(),
+      new RunManifestExportHandler()
+    ];
+
+    const handlersByViewerMode =
+      new Map<string, DecoderExportHandler>();
+
+    for (const handler of handlers) {
+      for (const viewerMode of handler.viewerModes) {
+        handlersByViewerMode.set(
+          this.normalizeViewerMode(viewerMode),
+          handler
+        );
+      }
+    }
+
+    return handlersByViewerMode;
   }
 
   private normalizeViewerMode(
