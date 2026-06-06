@@ -7,7 +7,27 @@
 
         <div class="status-panel">
 
-          <h2>CAN Files Explorer</h2>
+          <div class="explorer-header">
+
+            <h2>CAN Files Explorer</h2>
+
+            <button
+              type="button"
+              class="decoder-delete-selected-button"
+              [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'"
+              title="Delete selected files">
+
+              <mat-icon>
+                delete
+              </mat-icon>
+
+              <span>
+                Delete selected
+              </span>
+
+            </button>
+
+          </div>
 
           <div class="tree-shell">
 
