@@ -1,16 +1,16 @@
 import { Injectable } from '@angular/core';
-import { BlfExportHandler } from './exports/blf-export.handler';
-import { CandumpExportHandler } from './exports/candump-export.handler';
-import { CsvExportHandler } from './exports/csv-export.handler';
-import { DecodedSignalsExportHandler } from './exports/decoded-signals-export.handler';
-import { DecoderExportHandler } from './exports/decoder-export-handler';
-import { HexDumpExportHandler } from './exports/hex-dump-export.handler';
-import { JsonExportHandler } from './exports/json-export.handler';
-import { Mf4ExportHandler } from './exports/mf4-export.handler';
-import { ParquetExportHandler } from './exports/parquet-export.handler';
-import { RunManifestExportHandler } from './exports/run-manifest-export.handler';
-import { TracksterBinExportHandler } from './exports/trackster-bin-export.handler';
-import { VectorAscExportHandler } from './exports/vector-asc-export.handler';
+import { BlfExportHandler } from './export-files/blf-export.handler';
+import { CandumpExportHandler } from './export-files/candump-export.handler';
+import { CsvExportHandler } from './export-files/csv-export.handler';
+import { DecodedSignalsExportHandler } from './export-files/decoded-signals-export.handler';
+import { DecoderExportHandler } from './export-files/decoder-export-handler';
+import { HexDumpExportHandler } from './export-files/hex-dump-export.handler';
+import { JsonExportHandler } from './export-files/json-export.handler';
+import { Mf4ExportHandler } from './export-files/mf4-export.handler';
+import { ParquetExportHandler } from './export-files/parquet-export.handler';
+import { RunManifestExportHandler } from './export-files/run-manifest-export.handler';
+import { TracksterBinExportHandler } from './export-files/trackster-bin-export.handler';
+import { VectorAscExportHandler } from './export-files/vector-asc-export.handler';
 
 export interface DecoderExportHost {
   exportCurrentTracksterBinFile(): Promise<boolean>;
