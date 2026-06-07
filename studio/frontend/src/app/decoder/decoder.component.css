@@ -1011,3 +1011,40 @@
     transform: rotate(360deg);
   }
 }
+
+.decoder-dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.decoder-dialog-cancel-button,
+.decoder-dialog-delete-button {
+  min-width: 96px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.decoder-dialog-cancel-button {
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #ffffff;
+  color: #475569;
+}
+
+.decoder-dialog-cancel-button:hover {
+  background: #f8fafc;
+}
+
+.decoder-dialog-delete-button {
+  border: 0;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.decoder-dialog-delete-button:hover {
+  background: #b91c1c;
+}

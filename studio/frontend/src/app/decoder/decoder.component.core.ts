@@ -27,9 +27,26 @@ export type ExportFileFormat =
 
 type ExportDialogState =
   | 'idle'
+  | 'confirm-delete'
   | 'running'
   | 'success'
   | 'error';
+
+interface BinDeleteResponse {
+  success?: boolean;
+  bucketName?: string;
+  requestedBinFiles?: number;
+  deletedBinFiles?: number;
+  missingBinFiles?: number;
+  deletedManifests?: number;
+  deletedFolderMarkers?: number;
+  affectedFolders?: string[];
+  deletedBinKeys?: string[];
+  deletedManifestKeys?: string[];
+  deletedFolderMarkerKeys?: string[];
+  missingBinKeys?: string[];
+  message?: string;
+}
 
 interface RuntimeConfig {
   s3Default?: string;
@@ -47,6 +64,7 @@ interface RuntimeConfig {
     blfExportUrl?: string;
     mf4ExportUrl?: string;
     parquetExportUrl?: string;
+    binFilesDelete?: string;
   };
 }
 
@@ -276,6 +294,61 @@ export abstract class DecoderComponentCore implements OnInit {
     this.exportDialogTitle = '';
     this.exportDialogMessage = '';
     this.exportDialogDetails = '';
+  }
+
+  public openDeleteConfirmationDialog(): void {
+    const selectedCount =
+      this.selectedBinKeys.length;
+
+    if (selectedCount === 0) {
+      return;
+    }
+
+    this.exportDialogVisible = true;
+    this.exportDialogState = 'confirm-delete';
+    this.exportDialogTitle = 'Delete selected files?';
+    this.exportDialogMessage =
+      selectedCount === 1
+        ? 'This will permanently delete 1 selected BIN file.'
+        : `This will permanently delete ${selectedCount} selected BIN files.`;
+
+    this.exportDialogDetails =
+      'If a folder becomes empty, its run manifest will also be deleted.';
+  }
+
+  public async confirmDeleteSelectedBinFiles(): Promise<void> {
+    await this.runDeleteWithDialog();
+  }
+
+  private async runDeleteWithDialog(): Promise<void> {
+    this.exportDialogVisible = true;
+    this.exportDialogState = 'running';
+    this.exportDialogTitle = 'Deleting files...';
+    this.exportDialogMessage =
+      'Please wait while Trackster deletes the selected BIN files.';
+    this.exportDialogDetails =
+      'Do not close this window.';
+
+    try {
+      const result =
+        await this.deleteSelectedBinFiles();
+
+      this.exportDialogState = 'success';
+      this.exportDialogTitle = 'Delete completed';
+      this.exportDialogMessage = `${result.deletedBinFiles} BIN file(s) deleted successfully.`;
+      const deletedManifests = result.deletedManifests ?? 0; this.exportDialogDetails = deletedManifests > 0 ? `${deletedManifests} run manifest file(s) were also deleted.` : '';
+
+    } 
+    catch (error: unknown) {
+      this.exportDialogState = 'error';
+      this.exportDialogTitle = 'Delete failed';
+      this.exportDialogMessage = this.getErrorMessage(error);
+      this.exportDialogDetails = 'Please try again or check the browser console for details.';
+      console.error(
+        '[Trackster] Delete failed.',
+        error
+      );
+    }
   }
 
   public async exportCurrentFile(): Promise<boolean> {
@@ -4136,4 +4209,94 @@ export abstract class DecoderComponentCore implements OnInit {
 
     return null;
   }
+
+  private async deleteSelectedBinFiles(): Promise<BinDeleteResponse> {
+    const selectedKeys =
+      this.getUniqueSelectedBinKeys();
+
+    if (selectedKeys.length === 0) {
+      throw new Error('No BIN files selected for delete.');
+    }
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const deleteUrl =
+      config.decoderApi?.binFilesDelete?.trim();
+
+    if (!deleteUrl) {
+      throw new Error(
+        'Missing decoderApi.binFilesDelete in assets/config.json'
+      );
+    }
+
+    const bucketName =
+      config.s3Default?.trim();
+
+    if (!bucketName) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const clientId =
+      this.resolveClientId(config);
+
+    const token =
+      await this.getIdToken();
+
+    const response =
+      await fetch(
+        deleteUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            clientId,
+            bucketName,
+            keys: selectedKeys,
+            deleteManifestWhenEmpty: true
+          })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    const result: BinDeleteResponse =
+      responseText
+        ? JSON.parse(responseText)
+        : {};
+
+    if (!response.ok || result.success !== true) {
+      throw new Error(
+        result.message ||
+        `BIN delete failed. HTTP ${response.status}`
+      );
+    }
+
+    const deletedKeys =
+      new Set(result.deletedBinKeys ?? []);
+
+    this.selectedBinKeys =
+      this.selectedBinKeys.filter(
+        key => !deletedKeys.has(key)
+      );
+
+    if (
+      this.selectedBinNode &&
+      deletedKeys.has(this.selectedBinNode.key)
+    ) {
+      this.selectedBinNode = null;
+      this.selectedS3Key = null;
+    }
+
+    await this.loadS3GeneratedFilesTree();
+
+    return result;
+  }
+
 }

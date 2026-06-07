@@ -220,12 +220,15 @@
                     </mat-select>
                   </mat-form-field>
 
-                  <button type="button" class="decoder-delete-button" title="Delete selected files">
+                  <button type="button" class="decoder-delete-button" title="Delete selected files" [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'" (click)="openDeleteConfirmationDialog()">
                     <mat-icon>
                       delete
                     </mat-icon>
                     <span>
                       Delete selected
+                      <ng-container *ngIf="selectedBinKeys.length > 0">
+                        {{ selectedBinKeys.length }} files
+                      </ng-container>
                     </span>
                   </button>
 
@@ -352,14 +355,11 @@
         {{ exportDialogDetails }}
       </span>
 
-      <button
-        type="button"
-        class="decoder-export-ok-button"
-        *ngIf="exportDialogState !== 'running'"
-        (click)="closeExportDialog()">
-        OK
-      </button>
-
+      <div class="decoder-dialog-actions" *ngIf="exportDialogState === 'confirm-delete'">
+        <button type="button" class="decoder-dialog-cancel-button" (click)="closeExportDialog()">Cancel</button>
+        <button type="button" class="decoder-dialog-delete-button" (click)="confirmDeleteSelectedBinFiles()">Delete</button>
+      </div>
+      <button type="button" class="decoder-export-ok-button" *ngIf="exportDialogState !== 'running' && exportDialogState !== 'confirm-delete'" (click)="closeExportDialog()">OK</button>
     </div>
   </div>
 </div>
