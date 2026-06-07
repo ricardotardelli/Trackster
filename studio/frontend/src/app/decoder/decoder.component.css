@@ -36,22 +36,10 @@
   background: linear-gradient(180deg, rgba(240, 249, 255, 0.96), rgba(224, 242, 254, 0.9));
 }
 
-.explorer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  height: 26px;
-  margin: 0 0 6px;
-  padding: 0 2px;
-  box-sizing: border-box;
-}
-
 .status-panel h2 {
-  min-width: 0;
   height: 20px;
-  margin: 0;
-  padding: 0;
+  margin: 0 0 12px;
+  padding: 0 2px;
   font-size: 1rem;
   line-height: 20px;
   font-weight: 800;
@@ -59,45 +47,6 @@
   overflow: hidden;
   white-space: nowrap;
 }
-.decoder-delete-selected-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 24px;
-  max-width: 112px;
-  padding: 0 8px;
-  border: 1px solid rgba(239, 68, 68, 0.38);
-  border-radius: 8px;
-  background: rgba(254, 242, 242, 0.92);
-  color: #b91c1c;
-  font-size: 0.68rem;
-  font-weight: 850;
-  white-space: nowrap;
-  cursor: pointer;
-  box-sizing: border-box;
-  flex: 0 0 auto;
-}
-
-.decoder-delete-selected-button mat-icon {
-  width: 14px;
-  height: 14px;
-  font-size: 14px;
-  line-height: 14px;
-}
-
-.decoder-delete-selected-button:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: rgba(220, 38, 38, 0.62);
-  color: #991b1b;
-}
-
-.decoder-delete-selected-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-  filter: grayscale(0.18);
-}
-
 
 .tree-shell {
   width: 100%;
@@ -548,6 +497,7 @@
 }
 
 .decoder-filter-button,
+.decoder-delete-button,
 .decoder-export-button,
 .decoder-export-menu-preview button {
   height: 32px;
@@ -577,11 +527,38 @@
 }
 
 .decoder-filter-button mat-icon,
+.decoder-delete-button mat-icon,
 .decoder-export-button mat-icon {
   width: 15px;
   height: 15px;
   font-size: 15px;
   line-height: 15px;
+}
+
+.decoder-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid rgba(220, 38, 38, 0.42);
+  background: #ffffff;
+  color: #dc2626;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(220, 38, 38, 0.06);
+}
+
+.decoder-delete-button:hover {
+  background: #fef2f2;
+  border-color: rgba(220, 38, 38, 0.75);
+  color: #b91c1c;
+}
+
+.decoder-delete-button:active {
+  background: #fee2e2;
+  border-color: rgba(185, 28, 28, 0.85);
+  color: #991b1b;
 }
 
 .decoder-export-button {

@@ -220,40 +220,25 @@
                     </mat-select>
                   </mat-form-field>
 
-                  <button
-                    type="button"
-                    class="decoder-delete-button"
-                    [disabled]="selectedBinKeys.length === 0 || exportDialogState === 'running'"
-                    title="Delete selected files">
-
+                  <button type="button" class="decoder-delete-button" title="Delete selected files">
                     <mat-icon>
                       delete
                     </mat-icon>
-
                     <span>
                       Delete selected
                     </span>
-
                   </button>
 
-                  <button
-                    type="button"
-                    class="decoder-export-button"
-                    [disabled]="exportDialogState === 'running'"
-                    [matMenuTriggerFor]="decoderExportMenu">
-
+                  <button type="button" class="decoder-export-button" [disabled]="exportDialogState === 'running'" [matMenuTriggerFor]="decoderExportMenu">
                     <mat-icon>
                       download
                     </mat-icon>
-
                     <span>
                       Export
                     </span>
-
                     <mat-icon>
                       expand_more
                     </mat-icon>
-
                   </button>
 
                   <mat-menu
