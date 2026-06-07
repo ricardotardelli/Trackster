@@ -4230,14 +4230,21 @@ export abstract class DecoderComponentCore implements OnInit {
       );
     }
 
-    const bucketName =
-      config.s3Default?.trim();
+    const inputBucketName = config.s3Default?.trim();
 
-    if (!bucketName) {
+    if (!inputBucketName) {
       throw new Error(
         'Missing s3Default in assets/config.json'
       );
     }
+
+    const exportBucketNames = [
+      config.s3CsvBucket?.trim(),
+      config.s3VectorAscBucket?.trim(),
+      config.s3BlfBucket?.trim(),
+      config.s3Mf4Bucket?.trim(),
+      config.s3ParquetBucket?.trim()
+    ].filter((bucket): bucket is string => !!bucket);
 
     const clientId =
       this.resolveClientId(config);
@@ -4256,7 +4263,8 @@ export abstract class DecoderComponentCore implements OnInit {
           },
           body: JSON.stringify({
             clientId,
-            bucketName,
+            inputBucketName,
+            exportBucketNames,
             keys: selectedKeys,
             deleteManifestWhenEmpty: true
           })

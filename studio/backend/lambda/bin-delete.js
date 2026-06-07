@@ -24,17 +24,32 @@ export const handler = async (event) => {
     const body = parseBody(event.body);
 
     const clientId = normalizeClientId(body.clientId);
-    const bucketName = normalizeBucketName(body.bucketName);
-    const requestedKeys = normalizeKeys(body.keys);
-    const deleteManifestWhenEmpty = body.deleteManifestWhenEmpty !== false;
 
-    validateRequest(clientId, bucketName, requestedKeys);
+    const inputBucketName =
+      normalizeBucketName(body.inputBucketName || body.bucketName);
+
+    const exportBucketNames =
+      normalizeBucketNames(body.exportBucketNames);
+
+    const requestedKeys =
+      normalizeKeys(body.keys);
+
+    const deleteManifestWhenEmpty =
+      body.deleteManifestWhenEmpty !== false;
+
+    validateRequest(
+      clientId,
+      inputBucketName,
+      exportBucketNames,
+      requestedKeys
+    );
 
     const existingBinKeys = [];
     const missingBinKeys = [];
 
     for (const key of requestedKeys) {
-      const exists = await objectExists(bucketName, key);
+      const exists =
+        await objectExists(inputBucketName, key);
 
       if (exists) {
         existingBinKeys.push(key);
@@ -43,7 +58,25 @@ export const handler = async (event) => {
       }
     }
 
-    await deleteKeys(bucketName, existingBinKeys);
+    await deleteKeys(inputBucketName, existingBinKeys);
+
+    const deletedExportObjectsByBucket = {};
+
+    for (const exportBucketName of exportBucketNames) {
+      const exportKeysToDelete =
+        await findRelatedExportKeys(
+          exportBucketName,
+          existingBinKeys
+        );
+
+      await deleteKeys(
+        exportBucketName,
+        exportKeysToDelete
+      );
+
+      deletedExportObjectsByBucket[exportBucketName] =
+        exportKeysToDelete;
+    }
 
     const affectedFolders = Array.from(
       new Set(existingBinKeys.map(getFolderPrefix))
@@ -54,28 +87,34 @@ export const handler = async (event) => {
 
     if (deleteManifestWhenEmpty) {
       for (const folderPrefix of affectedFolders) {
-        const remainingBinCount = await countRemainingBinFiles(bucketName, folderPrefix);
+        const remainingBinCount =
+          await countRemainingBinFiles(
+            inputBucketName,
+            folderPrefix
+          );
 
         if (remainingBinCount === 0) {
-          const manifestKey = `${folderPrefix}${MANIFEST_FILE_NAME}`;
+          const manifestKey =
+            `${folderPrefix}${MANIFEST_FILE_NAME}`;
 
-          if (await objectExists(bucketName, manifestKey)) {
+          if (await objectExists(inputBucketName, manifestKey)) {
             manifestsToDelete.push(manifestKey);
           }
 
-          if (await objectExists(bucketName, folderPrefix)) {
+          if (await objectExists(inputBucketName, folderPrefix)) {
             folderMarkersToDelete.push(folderPrefix);
           }
         }
       }
 
-      await deleteKeys(bucketName, manifestsToDelete);
-      await deleteKeys(bucketName, folderMarkersToDelete);
+      await deleteKeys(inputBucketName, manifestsToDelete);
+      await deleteKeys(inputBucketName, folderMarkersToDelete);
     }
 
     return response(200, {
       success: true,
-      bucketName,
+      inputBucketName,
+      exportBucketNames,
       requestedBinFiles: requestedKeys.length,
       deletedBinFiles: existingBinKeys.length,
       missingBinFiles: missingBinKeys.length,
@@ -85,7 +124,8 @@ export const handler = async (event) => {
       deletedBinKeys: existingBinKeys,
       deletedManifestKeys: manifestsToDelete,
       deletedFolderMarkerKeys: folderMarkersToDelete,
-      missingBinKeys
+      missingBinKeys,
+      deletedExportObjectsByBucket
     });
   } catch (error) {
     console.error('BIN delete failed:', error);
@@ -133,6 +173,19 @@ function normalizeBucketName(bucketName) {
   return bucketName.trim();
 }
 
+function normalizeBucketNames(bucketNames) {
+  if (!Array.isArray(bucketNames)) {
+    return [];
+  }
+
+  return Array.from(new Set(
+    bucketNames
+      .filter((bucketName) => typeof bucketName === 'string')
+      .map((bucketName) => bucketName.trim())
+      .filter((bucketName) => bucketName.length > 0)
+  ));
+}
+
 function normalizeKeys(keys) {
   if (!Array.isArray(keys)) {
     return [];
@@ -146,17 +199,28 @@ function normalizeKeys(keys) {
   ));
 }
 
-function validateRequest(clientId, bucketName, keys) {
+function validateRequest(
+  clientId,
+  inputBucketName,
+  exportBucketNames,
+  keys
+) {
   if (!clientId) {
     throw httpError(400, 'clientId is required.');
   }
 
-  if (!bucketName) {
-    throw httpError(400, 'bucketName is required.');
+  if (!inputBucketName) {
+    throw httpError(400, 'inputBucketName is required.');
   }
 
-  if (!isValidBucketName(bucketName)) {
-    throw httpError(400, `Invalid bucketName: ${bucketName}`);
+  if (!isValidBucketName(inputBucketName)) {
+    throw httpError(400, `Invalid inputBucketName: ${inputBucketName}`);
+  }
+
+  for (const exportBucketName of exportBucketNames) {
+    if (!isValidBucketName(exportBucketName)) {
+      throw httpError(400, `Invalid exportBucketName: ${exportBucketName}`);
+    }
   }
 
   if (keys.length === 0) {
@@ -183,7 +247,8 @@ function isValidBucketName(bucketName) {
 }
 
 function getFolderPrefix(key) {
-  const lastSlashIndex = key.lastIndexOf('/');
+  const lastSlashIndex =
+    key.lastIndexOf('/');
 
   if (lastSlashIndex < 0) {
     return '';
@@ -201,7 +266,8 @@ async function objectExists(bucketName, key) {
 
     return true;
   } catch (error) {
-    const statusCode = error?.$metadata?.httpStatusCode;
+    const statusCode =
+      error?.$metadata?.httpStatusCode;
 
     if (
       statusCode === 404 ||
@@ -227,28 +293,93 @@ async function countRemainingBinFiles(bucketName, folderPrefix) {
     }));
 
     for (const item of result.Contents || []) {
-      if (item.Key && item.Key.toLowerCase().endsWith('.bin')) {
+      if (
+        item.Key &&
+        item.Key.toLowerCase().endsWith('.bin')
+      ) {
         count += 1;
       }
     }
 
-    continuationToken = result.IsTruncated
-      ? result.NextContinuationToken
-      : undefined;
+    continuationToken =
+      result.IsTruncated
+        ? result.NextContinuationToken
+        : undefined;
   } while (continuationToken);
 
   return count;
 }
 
+async function findRelatedExportKeys(bucketName, binKeys) {
+  const keysToDelete = [];
+
+  for (const binKey of binKeys) {
+    const baseKey =
+      binKey.replace(/\.[^.]+$/, '');
+
+    const folderPrefix =
+      getFolderPrefix(binKey);
+
+    const prefixes = [
+      baseKey,
+      folderPrefix
+    ];
+
+    for (const prefix of prefixes) {
+      const matchingKeys =
+        await listKeysByPrefix(
+          bucketName,
+          prefix
+        );
+
+      keysToDelete.push(...matchingKeys);
+    }
+  }
+
+  return Array.from(new Set(keysToDelete));
+}
+
+async function listKeysByPrefix(bucketName, prefix) {
+  let continuationToken;
+  const keys = [];
+
+  do {
+    const result = await s3.send(new ListObjectsV2Command({
+      Bucket: bucketName,
+      Prefix: prefix,
+      ContinuationToken: continuationToken
+    }));
+
+    for (const item of result.Contents || []) {
+      if (item.Key) {
+        keys.push(item.Key);
+      }
+    }
+
+    continuationToken =
+      result.IsTruncated
+        ? result.NextContinuationToken
+        : undefined;
+  } while (continuationToken);
+
+  return keys;
+}
+
 async function deleteKeys(bucketName, keys) {
-  const uniqueKeys = Array.from(new Set(keys)).filter(Boolean);
+  const uniqueKeys =
+    Array.from(new Set(keys)).filter(Boolean);
 
   if (uniqueKeys.length === 0) {
     return;
   }
 
-  for (let index = 0; index < uniqueKeys.length; index += 1000) {
-    const batch = uniqueKeys.slice(index, index + 1000);
+  for (
+    let index = 0;
+    index < uniqueKeys.length;
+    index += 1000
+  ) {
+    const batch =
+      uniqueKeys.slice(index, index + 1000);
 
     await s3.send(new DeleteObjectsCommand({
       Bucket: bucketName,
