@@ -1,6 +1,7 @@
 import { SimulatorComponent } from './simulator/simulator.component';
 import { DbcworkspaceComponent } from './dbcworkspace/dbcworkspace.component';
 import { DecoderComponent } from './decoder/decoder.component';
+import { SignalPlotterComponent } from './signal-plotter/signal-plotter.component';
 import { MatTabsModule } from '@angular/material/tabs';
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
@@ -25,7 +26,8 @@ interface WorkspaceTab {
     MatTabsModule,
     SimulatorComponent,
     DbcworkspaceComponent,
-    DecoderComponent
+    DecoderComponent,
+    SignalPlotterComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'

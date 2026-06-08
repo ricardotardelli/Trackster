@@ -1,0 +1,236 @@
+<div class="signal-plotter-layout">
+
+  <aside class="signal-plotter-sidebar">
+
+    <div class="signal-panel">
+
+      <h2>Signal Explorer</h2>
+
+      <div class="signal-field-group">
+
+        <label>
+          BIN file
+        </label>
+
+        <div class="signal-bin-picker">
+
+          <button
+            type="button"
+            class="signal-bin-picker-trigger"
+            (click)="toggleBinPicker()">
+
+            <span>
+              {{ selectedBinFile }}
+            </span>
+
+            <mat-icon class="signal-bin-picker-caret">
+              expand_more
+            </mat-icon>
+
+          </button>
+
+          <div
+            class="signal-bin-picker-panel"
+            *ngIf="isBinPickerOpen">
+
+            <mat-tree
+              [dataSource]="binTreeDataSource"
+              [treeControl]="binTreeControl"
+              class="signal-bin-tree">
+
+              <mat-nested-tree-node
+                *matTreeNodeDef="let node; when: hasBinChild">
+
+                <div class="signal-tree-node signal-tree-folder">
+
+                  <button
+                    type="button"
+                    class="signal-tree-toggle"
+                    matTreeNodeToggle>
+
+                    <mat-icon>
+                      {{
+                        binTreeControl.isExpanded(node)
+                          ? 'expand_more'
+                          : 'chevron_right'
+                      }}
+                    </mat-icon>
+
+                  </button>
+
+                  <button
+                    type="button"
+                    class="signal-tree-label"
+                    (click)="binTreeControl.toggle(node)">
+
+                    <mat-icon class="signal-tree-icon">
+                      {{
+                        binTreeControl.isExpanded(node)
+                          ? 'folder_open'
+                          : 'folder'
+                      }}
+                    </mat-icon>
+
+                    <span class="signal-tree-text">
+                      {{ node.name }}
+                    </span>
+
+                  </button>
+
+                </div>
+
+                <div
+                  class="signal-tree-children"
+                  [class.signal-tree-children-hidden]="!binTreeControl.isExpanded(node)">
+
+                  <ng-container matTreeNodeOutlet></ng-container>
+
+                </div>
+
+              </mat-nested-tree-node>
+
+              <mat-tree-node
+                *matTreeNodeDef="let node">
+
+                <div class="signal-tree-node signal-tree-file">
+
+                  <span class="signal-tree-indent"></span>
+
+                  <button
+                    type="button"
+                    class="signal-tree-label"
+                    [class.signal-tree-label-selected]="isSelectedBin(node)"
+                    (click)="selectBinFile(node)">
+
+                    <mat-icon class="signal-tree-icon">
+                      description
+                    </mat-icon>
+
+                    <span class="signal-tree-text">
+                      {{ node.name }}
+                    </span>
+
+                  </button>
+
+                </div>
+
+              </mat-tree-node>
+
+            </mat-tree>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="signal-field-group">
+
+        <label for="signal-message-selector">
+          Message
+        </label>
+
+        <select
+          id="signal-message-selector"
+          class="signal-select"
+          [(ngModel)]="selectedMessageName">
+
+          <option
+            *ngFor="let message of messageOptions"
+            [value]="message">
+            {{ message }}
+          </option>
+
+        </select>
+
+      </div>
+
+      <div class="signal-field-group">
+
+        <label>
+          Signals ({{ selectedSignalCount }}/{{ maxSelectedSignals }})
+        </label>
+
+        <div class="signal-check-list">
+
+          <button
+            type="button"
+            class="signal-check-row"
+            *ngFor="let signal of signalOptions"
+            [class.signal-check-row-selected]="signal.selected"
+            [class.signal-check-row-disabled]="!canSelectSignal(signal)"
+            (click)="toggleSignal(signal)">
+
+            <span class="signal-check-box">
+              <mat-icon *ngIf="signal.selected">
+                check
+              </mat-icon>
+            </span>
+
+            <span class="signal-check-name">
+              {{ signal.signalName }}
+            </span>
+
+          </button>
+
+        </div>
+
+        <div
+          class="signal-selection-warning"
+          *ngIf="signalSelectionWarning">
+          {{ signalSelectionWarning }}
+        </div>
+
+      </div>
+
+    </div>
+
+  </aside>
+
+  <section class="signal-plotter-body">
+
+    <div class="signal-body-header">
+
+      <h2>Signal Plotter</h2>
+
+      <p>
+        Inspect decoded signals and compare relationships over time.
+      </p>
+
+    </div>
+
+    <section class="signal-chart-card">
+
+      <div class="signal-chart-header">
+
+        <div class="signal-title-stack">
+
+          <h3>
+            Multi-signal plot
+          </h3>
+
+          <span>
+            {{ selectedBinFile }} · {{ selectedMessageName }}
+          </span>
+
+        </div>
+
+      </div>
+
+      <div class="signal-chart-shell">
+
+        <div
+          echarts
+          class="signal-chart"
+          [options]="chartOptions"
+          [autoResize]="true"
+          (chartInit)="onChartInit($event)">
+        </div>
+
+      </div>
+
+    </section>
+
+  </section>
+
+</div>
