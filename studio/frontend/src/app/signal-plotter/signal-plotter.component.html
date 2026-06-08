@@ -126,22 +126,60 @@
 
       <div class="signal-field-group">
 
-        <label for="signal-message-selector">
-          Message
+        <label>
+          Messages ({{ selectedMessageCount }}/{{ messageOptions.length }})
         </label>
 
-        <select
-          id="signal-message-selector"
-          class="signal-select"
-          [(ngModel)]="selectedMessageName">
+        <div class="signal-multi-picker">
 
-          <option
-            *ngFor="let message of messageOptions"
-            [value]="message">
-            {{ message }}
-          </option>
+          <button
+            type="button"
+            class="signal-multi-picker-trigger"
+            (click)="toggleMessagePicker()">
 
-        </select>
+            <span>
+              {{ selectedMessageSummary }}
+            </span>
+
+            <mat-icon class="signal-multi-picker-caret">
+              expand_more
+            </mat-icon>
+
+          </button>
+
+          <div
+            class="signal-multi-picker-panel"
+            *ngIf="isMessagePickerOpen">
+
+            <button
+              type="button"
+              class="signal-check-row"
+              *ngFor="let message of messageOptions"
+              [class.signal-check-row-selected]="isMessageSelected(message)"
+              (click)="toggleMessage(message)"
+              [title]="message">
+
+              <span class="signal-check-box">
+                <mat-icon *ngIf="isMessageSelected(message)">
+                  check
+                </mat-icon>
+              </span>
+
+              <span class="signal-check-name">
+                {{ message }}
+              </span>
+
+            </button>
+
+          </div>
+
+        </div>
+
+        <div
+          class="signal-selection-warning"
+          *ngIf="messageSelectionWarning">
+          {{ messageSelectionWarning }}
+        </div>
 
       </div>
 
@@ -151,27 +189,53 @@
           Signals ({{ selectedSignalCount }}/{{ maxSelectedSignals }})
         </label>
 
-        <div class="signal-check-list">
+        <div class="signal-multi-picker">
 
           <button
             type="button"
-            class="signal-check-row"
-            *ngFor="let signal of signalOptions"
-            [class.signal-check-row-selected]="signal.selected"
-            [class.signal-check-row-disabled]="!canSelectSignal(signal)"
-            (click)="toggleSignal(signal)">
+            class="signal-multi-picker-trigger"
+            (click)="toggleSignalPicker()">
 
-            <span class="signal-check-box">
-              <mat-icon *ngIf="signal.selected">
-                check
-              </mat-icon>
+            <span>
+              {{ selectedSignalSummary }}
             </span>
 
-            <span class="signal-check-name">
-              {{ signal.signalName }}
-            </span>
+            <mat-icon class="signal-multi-picker-caret">
+              expand_more
+            </mat-icon>
 
           </button>
+
+          <div
+            class="signal-multi-picker-panel signal-signal-picker-panel"
+            *ngIf="isSignalPickerOpen">
+
+            <button
+              type="button"
+              class="signal-check-row"
+              *ngFor="let signal of availableSignalOptions"
+              [class.signal-check-row-selected]="signal.selected"
+              [class.signal-check-row-disabled]="!canSelectSignal(signal)"
+              (click)="toggleSignal(signal)"
+              [title]="signal.messageName + ' · ' + signal.signalName">
+
+              <span class="signal-check-box">
+                <mat-icon *ngIf="signal.selected">
+                  check
+                </mat-icon>
+              </span>
+
+              <span class="signal-check-name">
+                {{ signal.signalName }}
+              </span>
+
+              <span class="signal-check-message">
+                {{ signal.messageName }}
+              </span>
+
+            </button>
+
+          </div>
 
         </div>
 
@@ -193,27 +257,34 @@
 
       <h2>Signal Plotter</h2>
 
-      <p>
-        Inspect decoded signals and compare relationships over time.
-      </p>
+      <span>
+        {{ selectedBinFile }} · {{ selectedMessageCount }} messages · {{ selectedSignalCount }} signals
+      </span>
 
     </div>
 
     <section class="signal-chart-card">
 
-      <div class="signal-chart-header">
+      <div class="signal-legend-chips">
 
-        <div class="signal-title-stack">
+        <button
+          type="button"
+          class="signal-legend-chip"
+          *ngFor="let signal of selectedSignals; let index = index"
+          [class.signal-legend-chip-muted]="isSignalHidden(signal)"
+          [style.--signal-color]="getSignalColor(index)"
+          (click)="toggleSignalVisibility(signal)"
+          (mouseenter)="highlightSignal(signal)"
+          (mouseleave)="clearSignalHighlight()"
+          [title]="signal.signalName + ' · click to show/hide'">
 
-          <h3>
-            Multi-signal plot
-          </h3>
+          <span class="signal-legend-dot"></span>
 
-          <span>
-            {{ selectedBinFile }} · {{ selectedMessageName }}
+          <span class="signal-legend-label">
+            {{ signal.signalName }}
           </span>
 
-        </div>
+        </button>
 
       </div>
 

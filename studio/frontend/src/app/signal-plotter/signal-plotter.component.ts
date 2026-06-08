@@ -49,13 +49,36 @@ export class SignalPlotterComponent {
 
   selectedBinFile = 'VINKDT000001KADUT.bin';
   selectedBinKey = '00000000/20260508183000/VINKDT000001KADUT.bin';
-  selectedMessageName = 'VehicleDynamics';
+  selectedMessageNames: string[] = [
+    'VehicleDynamics',
+    'PowertrainStatus',
+    'DriverInput',
+    'BrakeSystem',
+    'ElectricalSystem',
+    'VehicleStatus'
+  ];
+
   signalSelectionWarning = '';
+  messageSelectionWarning = '';
   isBinPickerOpen = false;
+  isMessagePickerOpen = false;
+  isSignalPickerOpen = false;
 
   chartOptions: EChartsOption = {};
 
   private chartInstance?: EChartsType;
+  private readonly hiddenSignalIds = new Set<string>();
+
+  readonly tracksterSignalColors = [
+    '#2563eb',
+    '#eab308',
+    '#dc2626',
+    '#22c55e',
+    '#d946ef',
+    '#7c3aed',
+    '#06b6d4',
+    '#64748b'
+  ];
 
   readonly binTreeControl = new NestedTreeControl<BinTreeNode>(
     node => node.children ?? []
@@ -119,7 +142,45 @@ export class SignalPlotterComponent {
   };
 
   get selectedSignals(): PlotSignalOption[] {
-    return this.signalOptions.filter(signal => signal.selected);
+    return this.availableSignalOptions.filter(signal => signal.selected);
+  }
+
+  get availableSignalOptions(): PlotSignalOption[] {
+    return this.signalOptions.filter(signal =>
+      this.selectedMessageNames.includes(signal.messageName)
+    );
+  }
+
+  get selectedMessageCount(): number {
+    return this.selectedMessageNames.length;
+  }
+
+  get selectedMessageSummary(): string {
+    if (this.selectedMessageNames.length === 0) {
+      return 'No messages selected';
+    }
+
+    if (this.selectedMessageNames.length === 1) {
+      return this.selectedMessageNames[0];
+    }
+
+    return `${this.selectedMessageNames.length} messages selected`;
+  }
+
+  get selectedSignalSummary(): string {
+    if (this.selectedSignalCount === 0) {
+      return 'No signals selected';
+    }
+
+    if (this.selectedSignalCount === 1) {
+      return this.selectedSignals[0].signalName;
+    }
+
+    return `${this.selectedSignalCount} signals selected`;
+  }
+
+  get visibleSelectedSignals(): PlotSignalOption[] {
+    return this.selectedSignals.filter(signal => !this.hiddenSignalIds.has(signal.id));
   }
 
   get selectedSignalCount(): number {
@@ -128,6 +189,20 @@ export class SignalPlotterComponent {
 
   toggleBinPicker(): void {
     this.isBinPickerOpen = !this.isBinPickerOpen;
+    this.isMessagePickerOpen = false;
+    this.isSignalPickerOpen = false;
+  }
+
+  toggleMessagePicker(): void {
+    this.isMessagePickerOpen = !this.isMessagePickerOpen;
+    this.isBinPickerOpen = false;
+    this.isSignalPickerOpen = false;
+  }
+
+  toggleSignalPicker(): void {
+    this.isSignalPickerOpen = !this.isSignalPickerOpen;
+    this.isBinPickerOpen = false;
+    this.isMessagePickerOpen = false;
   }
 
   selectBinFile(file: BinTreeFile): void {
@@ -142,11 +217,46 @@ export class SignalPlotterComponent {
     return this.selectedBinKey === node.key;
   }
 
+  isMessageSelected(messageName: string): boolean {
+    return this.selectedMessageNames.includes(messageName);
+  }
+
+  toggleMessage(messageName: string): void {
+    if (this.isMessageSelected(messageName)) {
+      if (this.selectedMessageNames.length === 1) {
+        this.messageSelectionWarning = 'At least one message must remain selected.';
+        return;
+      }
+
+      this.selectedMessageNames =
+        this.selectedMessageNames.filter(selected => selected !== messageName);
+    } else {
+      this.selectedMessageNames = [
+        ...this.selectedMessageNames,
+        messageName
+      ];
+    }
+
+    this.messageSelectionWarning = '';
+    this.pruneSignalsOutsideSelectedMessages();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  isSignalAvailable(signal: PlotSignalOption): boolean {
+    return this.selectedMessageNames.includes(signal.messageName);
+  }
+
   canSelectSignal(signal: PlotSignalOption): boolean {
-    return signal.selected || this.selectedSignalCount < this.maxSelectedSignals;
+    return this.isSignalAvailable(signal) &&
+      (signal.selected || this.selectedSignalCount < this.maxSelectedSignals);
   }
 
   toggleSignal(signal: PlotSignalOption): void {
+    if (!this.isSignalAvailable(signal)) {
+      return;
+    }
+
     if (!signal.selected && this.selectedSignalCount >= this.maxSelectedSignals) {
       this.signalSelectionWarning =
         `Maximum of ${this.maxSelectedSignals} signals can be plotted at once.`;
@@ -154,95 +264,218 @@ export class SignalPlotterComponent {
     }
 
     signal.selected = !signal.selected;
+
+    if (!signal.selected) {
+      this.hiddenSignalIds.delete(signal.id);
+    }
+
     this.signalSelectionWarning = '';
     this.rebuildChartOptions();
     this.resizeChart();
   }
 
+  getSignalColor(index: number): string {
+    return this.tracksterSignalColors[index % this.tracksterSignalColors.length];
+  }
+
+  isSignalHidden(signal: PlotSignalOption): boolean {
+    return this.hiddenSignalIds.has(signal.id);
+  }
+
+  toggleSignalVisibility(signal: PlotSignalOption): void {
+    if (this.hiddenSignalIds.has(signal.id)) {
+      this.hiddenSignalIds.delete(signal.id);
+    } else {
+      this.hiddenSignalIds.add(signal.id);
+    }
+
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  highlightSignal(signal: PlotSignalOption): void {
+    if (this.hiddenSignalIds.has(signal.id)) {
+      return;
+    }
+
+    this.chartInstance?.dispatchAction({
+      type: 'highlight',
+      seriesName: signal.signalName
+    });
+
+    this.forceChartCursor();
+  }
+
+  clearSignalHighlight(): void {
+    this.chartInstance?.dispatchAction({
+      type: 'downplay'
+    });
+
+    this.forceChartCursor();
+  }
+
   onChartInit(chart: EChartsType): void {
     this.chartInstance = chart;
+    this.registerChartCursorHandlers();
     this.resizeChart();
+  }
+
+  private registerChartCursorHandlers(): void {
+    const chart = this.chartInstance;
+
+    if (!chart) {
+      return;
+    }
+
+    const zr = chart.getZr();
+
+    this.forceChartCursor();
+
+    zr.on('mousemove', () => {
+      this.forceChartCursor();
+
+      window.setTimeout(() => {
+        this.forceChartCursor();
+      });
+    });
+
+    zr.on('mouseover', () => {
+      this.forceChartCursor();
+
+      window.setTimeout(() => {
+        this.forceChartCursor();
+      });
+    });
+
+    zr.on('globalout', () => {
+      this.forceChartCursor();
+    });
+  }
+
+  private forceChartCursor(): void {
+    const chart = this.chartInstance;
+
+    if (!chart) {
+      return;
+    }
+
+    const chartDom = chart.getDom();
+    const zr = chart.getZr();
+
+    chartDom.style.cursor = 'default';
+    zr.setCursorStyle('default');
+
+    const canvases = chartDom.querySelectorAll('canvas');
+
+    canvases.forEach(canvas => {
+      canvas.style.cursor = 'default';
+    });
   }
 
   private resizeChart(): void {
     window.setTimeout(() => {
       this.chartInstance?.resize();
+      this.forceChartCursor();
     });
   }
 
   private rebuildChartOptions(): void {
-    const tracksterSignalColors = [
-      '#2563eb', 
-      '#eab308', 
-      '#dc2626', 
-      '#22c55e', 
-      '#d946ef', 
-      '#7c3aed', 
-      '#06b6d4', 
-      '#64748b'  
-    ];
-
     this.chartOptions = {
       animation: false,
-      color: tracksterSignalColors,
+      color: this.tracksterSignalColors,
       textStyle: {
         fontFamily: 'inherit',
-        color: '#102349'
+        color: '#102349',
+        fontSize: 12,
+        fontWeight: 500
       },
       grid: {
-        left: 42,
+        left: 58,
         right: 16,
-        top: 46,
-        bottom: 54,
+        top: 8,
+        bottom: 48,
         containLabel: false
       },
       tooltip: {
         trigger: 'item',
         confine: true,
-        backgroundColor: '#ffffff',
-        borderColor: 'rgba(191, 219, 254, 0.9)',
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+        borderColor: 'rgba(191, 219, 254, 0.52)',
         borderWidth: 1,
+        padding: [8, 10],
+        extraCssText:
+          'border-radius: 10px; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.10); backdrop-filter: blur(6px);',
         textStyle: {
           fontFamily: 'inherit',
           color: '#102349',
           fontSize: 12,
-          fontWeight: 700
+          fontWeight: 500,
+          lineHeight: 16
         },
         formatter: (params: any): string => {
           const signal =
-            this.signalOptions.find(item => item.signalName === params.seriesName);
+            this.signalOptions.find(
+              item => item.signalName === params.seriesName
+            );
 
           if (!signal) {
             return '';
           }
 
           const value = Number(params.value?.[1] ?? 0);
+          const time = Number(params.value?.[0] ?? 0);
 
-          return [
-            `<strong>${signal.signalName}</strong>`,
-            `Time: ${Number(params.value?.[0] ?? 0).toFixed(2)} s`,
-            `Value: ${this.formatSignalValue(value, signal.unit)}`,
-            '',
-            `Min: ${this.formatSignalValue(this.getSignalMin(signal), signal.unit)}`,
-            `Max: ${this.formatSignalValue(this.getSignalMax(signal), signal.unit)}`,
-            `Avg: ${this.formatSignalValue(this.getSignalAverage(signal), signal.unit)}`
-          ].join('<br/>');
+          return `
+            <div style="
+              min-width: 100px;
+              color: #102349;
+              font-family: inherit;
+            ">
+              <div style="
+                font-size: 13px;
+                font-weight: 700;
+                line-height: 15px;
+                margin-bottom: 4px;
+              ">
+                ${signal.signalName}
+              </div>
+
+              <div style="
+                font-size: 19px;
+                font-weight: 800;
+                line-height: 20px;
+                margin-bottom: 2px;
+                color: #102349;
+              ">
+                ${this.formatSignalValue(value, signal.unit)}
+              </div>
+
+              <div style="
+                font-size: 10px;
+                font-weight: 500;
+                color: #64748b;
+                line-height: 12px;
+                margin-bottom: 6px;
+              ">
+                ${time.toFixed(2)} s
+              </div>
+
+              <div style="
+                font-size: 11px;
+                font-weight: 500;
+                color: #64748b;
+                line-height: 15px;
+              ">
+                Min ${this.formatSignalValue(this.getSignalMin(signal), signal.unit)}<br>
+                Max ${this.formatSignalValue(this.getSignalMax(signal), signal.unit)}<br>
+                Avg ${this.formatSignalValue(this.getSignalAverage(signal), signal.unit)}
+              </div>
+            </div>
+          `;
         }
       },
       legend: {
-        show: true,
-        top: 4,
-        left: 4,
-        right: 4,
-        type: 'scroll',
-        itemWidth: 16,
-        itemHeight: 8,
-        textStyle: {
-          fontFamily: 'inherit',
-          color: '#102349',
-          fontSize: 10,
-          fontWeight: 700
-        }
+        show: false
       },
       xAxis: {
         type: 'value',
@@ -256,12 +489,12 @@ export class SignalPlotterComponent {
         },
         axisLine: {
           lineStyle: {
-            color: 'rgba(100, 116, 139, 0.35)'
+            color: 'rgba(100, 116, 139, 0.38)'
           }
         },
         axisTick: {
           lineStyle: {
-            color: 'rgba(100, 116, 139, 0.35)'
+            color: 'rgba(100, 116, 139, 0.38)'
           }
         },
         splitLine: {
@@ -279,16 +512,16 @@ export class SignalPlotterComponent {
           color: '#5a6b82',
           fontSize: 10,
           fontWeight: 700,
-          margin: 4
+          margin: 6
         },
         axisLine: {
           lineStyle: {
-            color: 'rgba(100, 116, 139, 0.35)'
+            color: 'rgba(100, 116, 139, 0.38)'
           }
         },
         axisTick: {
           lineStyle: {
-            color: 'rgba(100, 116, 139, 0.35)'
+            color: 'rgba(100, 116, 139, 0.38)'
           }
         },
         splitLine: {
@@ -303,39 +536,79 @@ export class SignalPlotterComponent {
           xAxisIndex: 0,
           filterMode: 'none',
           zoomOnMouseWheel: true,
-          moveOnMouseMove: true,
+          moveOnMouseMove: false,
           moveOnMouseWheel: false
         },
         {
           type: 'slider',
           xAxisIndex: 0,
-          height: 25,
-          bottom: 12,
+          height: 21,
+          bottom: 6,
+          left: 58,
+          right: 16,
           filterMode: 'none',
           showDetail: false,
-          showDataShadow: false,
-          brushSelect: true,
+          showDataShadow: true,
+          brushSelect: false,
           realtime: true,
           start: 0,
           end: 100,
-          borderColor: 'rgba(96, 165, 250, 0.9)',
-          fillerColor: 'rgba(147, 197, 253, 0.38)',
-          backgroundColor: 'rgba(248, 251, 255, 1)',
-          handleSize: '105%',
+          borderColor: 'rgba(147, 197, 253, 0.58)',
+          fillerColor: 'rgba(147, 197, 253, 0.28)',
+          backgroundColor: 'rgba(239, 246, 255, 0.68)',
+          dataBackground: {
+            lineStyle: {
+              color: 'rgba(37, 99, 235, 0.32)',
+              width: 1
+            },
+            areaStyle: {
+              color: 'rgba(147, 197, 253, 0.18)'
+            }
+          },
+          selectedDataBackground: {
+            lineStyle: {
+              color: 'rgba(2, 132, 199, 0.58)',
+              width: 1
+            },
+            areaStyle: {
+              color: 'rgba(56, 189, 248, 0.16)'
+            }
+          },
+          handleSize: '88%',
+          handleIcon: 'path://M8.2,0 L11.8,0 Q13,0 13,1.2 L13,22.8 Q13,24 11.8,24 L8.2,24 Q7,24 7,22.8 L7,1.2 Q7,0 8.2,0 Z',
           handleStyle: {
             color: '#ffffff',
             borderColor: '#0284c7',
-            borderWidth: 2
+            borderWidth: 2,
+            shadowBlur: 4,
+            shadowColor: 'rgba(15, 23, 42, 0.16)',
+            shadowOffsetY: 1
           },
-          moveHandleSize: 7,
+          moveHandleSize: 6,
           moveHandleStyle: {
-            color: '#0284c7'
+            color: '#0284c7',
+            opacity: 0.68
+          },
+          emphasis: {
+            handleStyle: {
+              borderColor: '#0369a1',
+              shadowBlur: 6,
+              shadowColor: 'rgba(15, 23, 42, 0.2)'
+            },
+            moveHandleStyle: {
+              color: '#0369a1'
+            }
           }
         }
       ],
-      series: this.selectedSignals.map((signal, index) => {
+      series: this.visibleSelectedSignals.map((signal) => {
+        const selectedSignalIndex =
+          this.selectedSignals.findIndex(selected => selected.id === signal.id);
+
         const signalColor =
-          tracksterSignalColors[index % tracksterSignalColors.length];
+          this.tracksterSignalColors[
+            selectedSignalIndex % this.tracksterSignalColors.length
+          ];
 
         return {
           name: signal.signalName,
@@ -343,6 +616,13 @@ export class SignalPlotterComponent {
           showSymbol: true,
           symbolSize: 5,
           smooth: true,
+          cursor: 'default',
+          emphasis: {
+            focus: 'series',
+            lineStyle: {
+              width: 3
+            }
+          },
           itemStyle: {
             color: signalColor
           },
@@ -357,6 +637,19 @@ export class SignalPlotterComponent {
         };
       })
     };
+  }
+
+  private pruneSignalsOutsideSelectedMessages(): void {
+    this.signalOptions.forEach(signal => {
+      if (!this.isSignalAvailable(signal)) {
+        signal.selected = false;
+        this.hiddenSignalIds.delete(signal.id);
+      }
+    });
+
+    if (this.selectedSignalCount <= this.maxSelectedSignals) {
+      this.signalSelectionWarning = '';
+    }
   }
 
   private getSignalMin(signal: PlotSignalOption): number {
