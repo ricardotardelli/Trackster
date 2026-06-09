@@ -1,11 +1,20 @@
 import { CommonModule } from '@angular/common';
 import { NestedTreeControl } from '@angular/cdk/tree';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { environment } from '../../environments/environment';
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
 import { EChartsOption, EChartsType } from 'echarts';
 import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
+import { firstValueFrom } from 'rxjs';
+
+type SignalChartType =
+  | 'signals-over-time'
+  | 'signal-vs-signal';
 
 interface PlotSignalOption {
   id: string;
@@ -14,6 +23,15 @@ interface PlotSignalOption {
   unit: string;
   selected: boolean;
   values: number[];
+}
+
+interface SignalPlotterData {
+  selectedBinFile: string;
+  selectedBinKey: string;
+  selectedMessageNames: string[];
+  timeAxisSeconds: number[];
+  messageOptions: string[];
+  signalOptions: PlotSignalOption[];
 }
 
 interface BinTreeFile {
@@ -27,12 +45,25 @@ interface BinTreeNode {
   children?: BinTreeNode[];
 }
 
+interface AxisBounds {
+  min: number;
+  max: number;
+}
+
+interface RuntimeConfig {
+  s3Default?: string;
+  s3Region?: string;
+  customerId?: string;
+  clientId?: string;
+}
+
 @Component({
   selector: 'app-signal-plotter',
   standalone: true,
   imports: [
     CommonModule,
     FormsModule,
+    HttpClientModule,
     MatTreeModule,
     MatIconModule,
     NgxEchartsDirective
@@ -47,27 +78,48 @@ export class SignalPlotterComponent {
 
   readonly maxSelectedSignals = 8;
 
-  selectedBinFile = 'VINKDT000001KADUT.bin';
-  selectedBinKey = '00000000/20260508183000/VINKDT000001KADUT.bin';
-  selectedMessageNames: string[] = [
-    'VehicleDynamics',
-    'PowertrainStatus',
-    'DriverInput',
-    'BrakeSystem',
-    'ElectricalSystem',
-    'VehicleStatus'
-  ];
+  chartType: SignalChartType = 'signals-over-time';
+
+  selectedBinFile = '';
+  selectedBinKey = '';
+  selectedMessageNames: string[] = [];
+
+  selectedXAxisSignalId = '';
+  selectedYAxisSignalId = '';
 
   signalSelectionWarning = '';
   messageSelectionWarning = '';
   isBinPickerOpen = false;
+  isLoadingBinCatalog = false;
   isMessagePickerOpen = false;
   isSignalPickerOpen = false;
 
   chartOptions: EChartsOption = {};
 
+  timeAxisSeconds: number[] = [];
+  messageOptions: string[] = [];
+  signalOptions: PlotSignalOption[] = [];
+
   private chartInstance?: EChartsType;
   private readonly hiddenSignalIds = new Set<string>();
+
+  private fullTimeAxisSeconds: number[] = [];
+  private fullSignalOptions: PlotSignalOption[] = [];
+
+  private fullStartSeconds = 0;
+  private fullEndSeconds = 0;
+
+  private visibleStartSeconds = 0;
+  private visibleEndSeconds = 0;
+
+  private currentZoomStartPercent = 0;
+  private currentZoomEndPercent = 100;
+
+  private isUpdatingZoom = false;
+
+  private readonly maxRenderedPointsPerSignal = 120;
+  private readonly maxPointsWithSymbols = 80;
+  private readonly developmentPlotterDataUrl = 'assets/mock/dev-plotter-data.json';
 
   readonly tracksterSignalColors = [
     '#2563eb',
@@ -86,55 +138,10 @@ export class SignalPlotterComponent {
 
   readonly binTreeDataSource = new MatTreeNestedDataSource<BinTreeNode>();
 
-  readonly timeAxisSeconds: number[] = [
-    0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60
-  ];
-
-  readonly messageOptions: string[] = [
-    'VehicleDynamics',
-    'PowertrainStatus',
-    'DriverInput',
-    'BrakeSystem',
-    'ElectricalSystem',
-    'VehicleStatus',
-    'Environment'
-  ];
-
-  readonly signalOptions: PlotSignalOption[] = [
-    { id: 'vehicle-speed', messageName: 'VehicleDynamics', signalName: 'VehicleSpeed', unit: 'km/h', selected: true, values: [18, 31, 47, 63, 78, 81, 72, 59, 46, 35, 27, 21, 16] },
-    { id: 'engine-rpm', messageName: 'PowertrainStatus', signalName: 'EngineRPM', unit: 'rpm', selected: true, values: [46, 58, 72, 88, 108, 126, 142, 136, 118, 94, 76, 59, 48] },
-    { id: 'throttle-position', messageName: 'DriverInput', signalName: 'ThrottlePosition', unit: '%', selected: true, values: [8, 22, 38, 56, 74, 88, 96, 91, 82, 66, 48, 28, 12] },
-    { id: 'brake-pressure', messageName: 'BrakeSystem', signalName: 'BrakePressure', unit: 'bar', selected: true, values: [4, 4, 5, 6, 8, 15, 30, 54, 76, 66, 44, 20, 8] },
-    { id: 'battery-voltage', messageName: 'ElectricalSystem', signalName: 'BatteryVoltage', unit: 'V', selected: true, values: [124, 123, 122, 121, 119, 118, 116, 115, 113, 111, 109, 108, 107] },
-    { id: 'steering-angle', messageName: 'VehicleDynamics', signalName: 'SteeringAngle', unit: 'deg', selected: true, values: [92, 78, 92, 70, 86, 62, 84, 64, 90, 72, 96, 80, 94] },
-    { id: 'coolant-temperature', messageName: 'PowertrainStatus', signalName: 'CoolantTemperature', unit: '°C', selected: true, values: [78, 79, 80, 82, 84, 86, 88, 89, 90, 91, 92, 93, 94] },
-    { id: 'fuel-level', messageName: 'VehicleStatus', signalName: 'FuelLevel', unit: '%', selected: true, values: [84, 84, 83, 83, 82, 82, 81, 81, 80, 80, 79, 79, 78] },
-    { id: 'oil-pressure', messageName: 'PowertrainStatus', signalName: 'OilPressure', unit: 'bar', selected: false, values: [34, 35, 36, 38, 40, 41, 42, 41, 40, 39, 38, 37, 36] },
-    { id: 'ambient-temperature', messageName: 'Environment', signalName: 'AmbientTemperature', unit: '°C', selected: false, values: [22, 22, 23, 23, 24, 24, 25, 25, 25, 24, 24, 23, 23] },
-    { id: 'accelerator-pedal', messageName: 'DriverInput', signalName: 'AcceleratorPedal', unit: '%', selected: false, values: [5, 12, 24, 36, 48, 60, 72, 64, 52, 40, 28, 16, 8] },
-    { id: 'yaw-rate', messageName: 'VehicleDynamics', signalName: 'YawRate', unit: 'deg/s', selected: false, values: [0, 2, 5, 8, 12, 15, 14, 11, 8, 5, 3, 1, 0] }
-  ];
-
-  constructor() {
-    const nodes: BinTreeNode[] = [
-      {
-        name: '20260508183000',
-        key: '00000000/20260508183000/',
-        children: [
-          { name: 'VINKDT000001KADUT.bin', key: '00000000/20260508183000/VINKDT000001KADUT.bin' },
-          { name: 'VINKDT000002KADUT.bin', key: '00000000/20260508183000/VINKDT000002KADUT.bin' },
-          { name: 'VINKDT000003KADUT.bin', key: '00000000/20260508183000/VINKDT000003KADUT.bin' }
-        ]
-      }
-    ];
-
-    this.binTreeDataSource.data = nodes;
-
-    setTimeout(() => {
-      this.binTreeControl.expand(nodes[0]);
-    });
-
-    this.rebuildChartOptions();
+  constructor(
+    private readonly http: HttpClient
+  ) {
+    void this.loadPlotterData();
   }
 
   hasBinChild = (_: number, node: BinTreeNode): boolean => {
@@ -185,6 +192,22 @@ export class SignalPlotterComponent {
 
   get selectedSignalCount(): number {
     return this.selectedSignals.length;
+  }
+
+  get selectedXAxisSignalName(): string {
+    return this.getSignalNameById(this.selectedXAxisSignalId);
+  }
+
+  get selectedYAxisSignalName(): string {
+    return this.getSignalNameById(this.selectedYAxisSignalId);
+  }
+
+  get plotterHeaderSummary(): string {
+    if (this.chartType === 'signal-vs-signal') {
+      return `${this.selectedBinFile} · ${this.selectedXAxisSignalName} x ${this.selectedYAxisSignalName}`;
+    }
+
+    return `${this.selectedBinFile} · ${this.selectedMessageCount} messages · ${this.selectedSignalCount} signals`;
   }
 
   toggleBinPicker(): void {
@@ -239,6 +262,8 @@ export class SignalPlotterComponent {
 
     this.messageSelectionWarning = '';
     this.pruneSignalsOutsideSelectedMessages();
+    this.ensureSignalVsSignalSelection();
+    this.refreshVisibleDataset();
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -264,12 +289,54 @@ export class SignalPlotterComponent {
     }
 
     signal.selected = !signal.selected;
+    this.syncSignalSelectionToFullDataset(signal.id, signal.selected);
 
     if (!signal.selected) {
       this.hiddenSignalIds.delete(signal.id);
     }
 
     this.signalSelectionWarning = '';
+    this.refreshVisibleDataset();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  changeChartType(value: SignalChartType): void {
+    this.chartType = value;
+    this.isSignalPickerOpen = false;
+    this.signalSelectionWarning = '';
+
+    if (this.chartType === 'signal-vs-signal') {
+      this.ensureSignalVsSignalSelection();
+    }
+
+    this.resetChartBeforeRebuild();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  changeXAxisSignal(signalId: string): void {
+    this.selectedXAxisSignalId = signalId;
+
+    if (this.selectedXAxisSignalId === this.selectedYAxisSignalId) {
+      this.selectedYAxisSignalId = this.getAlternativeSignalId(this.selectedXAxisSignalId);
+    }
+
+    this.ensureSignalVsSignalSelection();
+    this.resetChartBeforeRebuild();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  changeYAxisSignal(signalId: string): void {
+    this.selectedYAxisSignalId = signalId;
+
+    if (this.selectedYAxisSignalId === this.selectedXAxisSignalId) {
+      this.selectedXAxisSignalId = this.getAlternativeSignalId(this.selectedYAxisSignalId);
+    }
+
+    this.ensureSignalVsSignalSelection();
+    this.resetChartBeforeRebuild();
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -317,7 +384,596 @@ export class SignalPlotterComponent {
   onChartInit(chart: EChartsType): void {
     this.chartInstance = chart;
     this.registerChartCursorHandlers();
+    this.registerChartZoomHandler();
     this.resizeChart();
+  }
+
+  private async loadPlotterData(): Promise<void> {
+    this.isLoadingBinCatalog = true;
+
+    try {
+      const config =
+        await this.loadRuntimeConfig();
+
+      const clientId =
+        this.resolveClientId(config);
+
+      if (this.shouldUseLocalMock()) {
+        const data =
+          await this.loadDevelopmentPlotterData();
+
+        this.applyPlotterData(data);
+        this.setBinTreeData(this.buildLocalMockTree());
+
+        return;
+      }
+
+      const bucket =
+        config.s3Default?.trim();
+
+      if (!bucket) {
+        throw new Error(
+          'Missing s3Default in assets/config.json'
+        );
+      }
+
+      const prefix = `${clientId}/`;
+
+      const keys =
+        await this.listS3KeysFromBucket(
+          bucket,
+          prefix
+        );
+
+      const tree =
+        this.buildTreeFromS3Keys(
+          keys,
+          clientId
+        );
+
+      this.setBinTreeData(tree);
+
+      const firstBinNode =
+        this.findFirstBinNode(tree);
+
+      this.applyPlotterData(
+        this.buildEmptyPlotterData(firstBinNode)
+      );
+
+      if (tree.length > 0) {
+        this.setBinTreeData(tree);
+      }
+
+    } catch (error) {
+      console.error('Failed to load signal plotter data.', error);
+      this.clearPlotterData('No plotter data loaded');
+    } finally {
+      this.isLoadingBinCatalog = false;
+    }
+  }
+
+  private shouldUseLocalMock(): boolean {
+    const hostname = window.location.hostname;
+
+    return (
+      environment.disableAuth === true &&
+      (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1'
+      )
+    );
+  }
+
+  private async loadDevelopmentPlotterData(): Promise<SignalPlotterData> {
+    return firstValueFrom(
+      this.http.get<SignalPlotterData>(this.developmentPlotterDataUrl)
+    );
+  }
+
+  private buildEmptyPlotterData(
+    selectedBinNode: BinTreeNode | null
+  ): SignalPlotterData {
+
+    return {
+      selectedBinFile: selectedBinNode?.name ?? 'No BIN file available',
+      selectedBinKey: selectedBinNode?.key ?? '',
+      selectedMessageNames: [],
+      timeAxisSeconds: [],
+      messageOptions: [],
+      signalOptions: []
+    };
+  }
+
+  private clearPlotterData(
+    selectedBinFile: string
+  ): void {
+
+    this.selectedBinFile = selectedBinFile;
+    this.selectedBinKey = '';
+    this.selectedMessageNames = [];
+    this.timeAxisSeconds = [];
+    this.messageOptions = [];
+    this.signalOptions = [];
+    this.fullTimeAxisSeconds = [];
+    this.fullSignalOptions = [];
+    this.binTreeDataSource.data = [];
+    this.binTreeControl.dataNodes = [];
+    this.chartOptions = {};
+  }
+
+  private async loadRuntimeConfig(): Promise<RuntimeConfig> {
+    const response =
+      await fetch(`assets/config.json?t=${Date.now()}`);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load assets/config.json. HTTP ${response.status}`
+      );
+    }
+
+    return await response.json();
+  }
+
+  private resolveClientId(
+    config: RuntimeConfig
+  ): string {
+
+    const clientId =
+      config.clientId ||
+      config.customerId ||
+      localStorage.getItem('clientId') ||
+      localStorage.getItem('customerId') ||
+      '00000000';
+
+    if (!/^[a-zA-Z0-9]{8}$/.test(clientId)) {
+      throw new Error(
+        `Invalid clientId: ${clientId}`
+      );
+    }
+
+    return clientId;
+  }
+
+  private buildLocalMockTree(): BinTreeNode[] {
+    return [
+      {
+        name: '20260508183000',
+        key: '00000000/20260508183000',
+        children: [
+          {
+            name: 'VINKDT000001KADUT.bin',
+            key: '00000000/20260508183000/VINKDT000001KADUT.bin'
+          }
+        ]
+      }
+    ];
+  }
+
+  private async getS3Client(): Promise<S3Client> {
+    const config =
+      await this.loadRuntimeConfig();
+
+    const region =
+      config.s3Region?.trim() ||
+      'us-east-1';
+
+    const session =
+      await fetchAuthSession();
+
+    if (!session.credentials) {
+      throw new Error(
+        'Cognito credentials unavailable.'
+      );
+    }
+
+    return new S3Client({
+      region,
+      credentials: session.credentials
+    });
+  }
+
+  private async listS3KeysFromBucket(
+    bucket: string,
+    prefix: string
+  ): Promise<string[]> {
+
+    const s3Client =
+      await this.getS3Client();
+
+    const keys: string[] = [];
+
+    let continuationToken:
+      string | undefined;
+
+    do {
+      const response =
+        await s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken
+          })
+        );
+
+      for (const item of response.Contents ?? []) {
+        if (item.Key) {
+          keys.push(item.Key);
+        }
+      }
+
+      continuationToken =
+        response.NextContinuationToken;
+
+    } while (continuationToken);
+
+    return keys;
+  }
+
+  private setBinTreeData(data: BinTreeNode[]): void {
+    this.binTreeControl.expansionModel.clear();
+    this.binTreeDataSource.data = data;
+    this.binTreeControl.dataNodes = data;
+
+    const firstFolderNode = data.find(node =>
+      node.children && node.children.length > 0
+    );
+
+    if (firstFolderNode) {
+      this.binTreeControl.expand(firstFolderNode);
+    }
+  }
+
+  private findFirstBinNode(nodes: BinTreeNode[]): BinTreeNode | null {
+    for (const node of nodes) {
+      if (!node.children && node.name.toLowerCase().endsWith('.bin')) {
+        return node;
+      }
+
+      const childMatch =
+        this.findFirstBinNode(node.children ?? []);
+
+      if (childMatch) {
+        return childMatch;
+      }
+    }
+
+    return null;
+  }
+
+  private buildTreeFromS3Keys(
+    keys: string[],
+    clientId: string
+  ): BinTreeNode[] {
+
+    const runs =
+      new Map<string, BinTreeNode>();
+
+    const prefix = `${clientId}/`;
+
+    for (const rawKey of keys) {
+      const key =
+        rawKey.replace(
+          /^generated-files\//,
+          ''
+        );
+
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+
+      const relativeKey =
+        key.slice(prefix.length);
+
+      const parts =
+        relativeKey
+          .split('/')
+          .filter(Boolean);
+
+      if (parts.length < 2) {
+        continue;
+      }
+
+      const runId = parts[0];
+
+      const fileName =
+        parts[parts.length - 1];
+
+      if (!fileName.toLowerCase().endsWith('.bin')) {
+        continue;
+      }
+
+      let runNode =
+        runs.get(runId);
+
+      if (!runNode) {
+        runNode = {
+          name: runId,
+          key: `${clientId}/${runId}`,
+          children: []
+        };
+
+        runs.set(runId, runNode);
+      }
+
+      runNode.children?.push({
+        name: fileName,
+        key: `${clientId}/${relativeKey}`
+      });
+    }
+
+    const runNodes =
+      [...runs.values()]
+        .sort((a, b) =>
+          b.name.localeCompare(a.name)
+        );
+
+    for (const runNode of runNodes) {
+      runNode.children =
+        [...(runNode.children ?? [])]
+          .sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
+    }
+
+    return runNodes;
+  }
+
+  private applyPlotterData(data: SignalPlotterData): void {
+    this.selectedBinFile = data.selectedBinFile;
+    this.selectedBinKey = data.selectedBinKey;
+    this.selectedMessageNames = [...data.selectedMessageNames];
+
+    this.fullTimeAxisSeconds = [...data.timeAxisSeconds];
+    this.messageOptions = [...data.messageOptions];
+
+    this.fullSignalOptions = data.signalOptions.map(signal => ({
+      ...signal,
+      values: [...signal.values]
+    }));
+
+    this.fullStartSeconds = this.fullTimeAxisSeconds[0] ?? 0;
+    this.fullEndSeconds =
+      this.fullTimeAxisSeconds[this.fullTimeAxisSeconds.length - 1] ?? this.fullStartSeconds;
+
+    this.visibleStartSeconds = this.fullStartSeconds;
+    this.visibleEndSeconds = this.fullEndSeconds;
+
+    this.currentZoomStartPercent = 0;
+    this.currentZoomEndPercent = 100;
+
+    this.hiddenSignalIds.clear();
+    this.signalSelectionWarning = '';
+    this.messageSelectionWarning = '';
+
+    this.refreshVisibleDataset();
+    this.pruneSignalsOutsideSelectedMessages();
+    this.ensureSignalVsSignalSelection();
+    this.refreshVisibleDataset();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  private refreshVisibleDataset(): void {
+    const visibleIndexes = this.getVisibleSourceIndexes();
+    const sampledIndexes = this.downsampleIndexes(visibleIndexes);
+
+    this.timeAxisSeconds = sampledIndexes.map(index =>
+      this.fullTimeAxisSeconds[index]
+    );
+
+    this.signalOptions = this.fullSignalOptions.map(signal => ({
+      ...signal,
+      values: sampledIndexes.map(index => signal.values[index] ?? 0)
+    }));
+  }
+
+  private getVisibleSourceIndexes(): number[] {
+    const indexes: number[] = [];
+
+    this.fullTimeAxisSeconds.forEach((time, index) => {
+      if (time >= this.visibleStartSeconds && time <= this.visibleEndSeconds) {
+        indexes.push(index);
+      }
+    });
+
+    return indexes;
+  }
+
+  private downsampleIndexes(sourceIndexes: number[]): number[] {
+    if (sourceIndexes.length <= this.maxRenderedPointsPerSignal) {
+      return sourceIndexes;
+    }
+
+    const sampledIndexes: number[] = [];
+    const lastSourcePosition = sourceIndexes.length - 1;
+
+    sampledIndexes.push(sourceIndexes[0]);
+
+    for (let outputIndex = 1; outputIndex < this.maxRenderedPointsPerSignal - 1; outputIndex++) {
+      const sourcePosition =
+        Math.round(
+          outputIndex * lastSourcePosition / (this.maxRenderedPointsPerSignal - 1)
+        );
+
+      sampledIndexes.push(sourceIndexes[sourcePosition]);
+    }
+
+    sampledIndexes.push(sourceIndexes[lastSourcePosition]);
+
+    return Array.from(new Set(sampledIndexes)).sort((left, right) => left - right);
+  }
+
+  private syncSignalSelectionToFullDataset(signalId: string, selected: boolean): void {
+    const fullSignal =
+      this.fullSignalOptions.find(signal => signal.id === signalId);
+
+    if (fullSignal) {
+      fullSignal.selected = selected;
+    }
+  }
+
+  private ensureSignalVsSignalSelection(): void {
+    const availableSignals = this.availableSignalOptions;
+
+    if (availableSignals.length === 0) {
+      this.selectedXAxisSignalId = '';
+      this.selectedYAxisSignalId = '';
+      this.signalSelectionWarning = 'No signals available for the selected messages.';
+      return;
+    }
+
+    if (!availableSignals.some(signal => signal.id === this.selectedXAxisSignalId)) {
+      this.selectedXAxisSignalId = availableSignals[0].id;
+    }
+
+    if (!availableSignals.some(signal => signal.id === this.selectedYAxisSignalId)) {
+      this.selectedYAxisSignalId =
+        availableSignals.length > 1
+          ? availableSignals[1].id
+          : availableSignals[0].id;
+    }
+
+    if (
+      availableSignals.length > 1 &&
+      this.selectedXAxisSignalId === this.selectedYAxisSignalId
+    ) {
+      this.selectedYAxisSignalId = this.getAlternativeSignalId(this.selectedXAxisSignalId);
+    }
+
+    if (
+      availableSignals.length === 1 &&
+      this.chartType === 'signal-vs-signal'
+    ) {
+      this.signalSelectionWarning = 'Select at least two available signals to compare X and Y.';
+      return;
+    }
+
+    this.signalSelectionWarning = '';
+  }
+
+  private getAlternativeSignalId(currentSignalId: string): string {
+    const alternative =
+      this.availableSignalOptions.find(signal => signal.id !== currentSignalId);
+
+    return alternative?.id ?? currentSignalId;
+  }
+
+  private getSignalNameById(signalId: string): string {
+    const signal =
+      this.signalOptions.find(option => option.id === signalId) ??
+      this.fullSignalOptions.find(option => option.id === signalId);
+
+    return signal?.signalName ?? 'No signal';
+  }
+
+  private getSignalById(signalId: string): PlotSignalOption | undefined {
+    return this.signalOptions.find(signal => signal.id === signalId);
+  }
+
+  private buildSignalVsSignalData(
+    xSignal: PlotSignalOption,
+    ySignal: PlotSignalOption
+  ): Array<[number, number]> {
+    const groupedValues = new Map<number, { total: number; count: number }>();
+
+    xSignal.values.forEach((xValue, index) => {
+      const yValue = ySignal.values[index];
+
+      if (
+        typeof xValue !== 'number' ||
+        typeof yValue !== 'number' ||
+        Number.isNaN(xValue) ||
+        Number.isNaN(yValue)
+      ) {
+        return;
+      }
+
+      const existing = groupedValues.get(xValue);
+
+      if (existing) {
+        existing.total += yValue;
+        existing.count += 1;
+      } else {
+        groupedValues.set(xValue, {
+          total: yValue,
+          count: 1
+        });
+      }
+    });
+
+    return Array.from(groupedValues.entries())
+      .map(([xValue, aggregate]) => [
+        xValue,
+        aggregate.total / aggregate.count
+      ] as [number, number])
+      .sort((left, right) => left[0] - right[0]);
+  }
+
+  private getAxisBounds(values: number[]): AxisBounds {
+    if (values.length === 0) {
+      return {
+        min: 0,
+        max: 1
+      };
+    }
+
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+
+    if (minValue === maxValue) {
+      return {
+        min: Math.floor(minValue - 1),
+        max: Math.ceil(maxValue + 1)
+      };
+    }
+
+    const padding = (maxValue - minValue) * 0.08;
+
+    return {
+      min: Math.floor(minValue - padding),
+      max: Math.ceil(maxValue + padding)
+    };
+  }
+
+  private rebuildBinTreeFromSelectedBin(): void {
+    if (!this.selectedBinKey || !this.selectedBinFile) {
+      this.binTreeDataSource.data = [];
+      return;
+    }
+
+    const selectedBinFolderKey =
+      this.selectedBinKey.endsWith(this.selectedBinFile)
+        ? this.selectedBinKey.slice(0, -this.selectedBinFile.length)
+        : '';
+
+    const folderParts =
+      selectedBinFolderKey
+        .split('/')
+        .filter(part => part.length > 0);
+
+    const folderName =
+      folderParts.length > 0
+        ? folderParts[folderParts.length - 1]
+        : 'Files';
+
+    const nodes: BinTreeNode[] = [
+      {
+        name: folderName,
+        key: selectedBinFolderKey,
+        children: [
+          {
+            name: this.selectedBinFile,
+            key: this.selectedBinKey
+          }
+        ]
+      }
+    ];
+
+    this.binTreeDataSource.data = nodes;
+
+    setTimeout(() => {
+      this.binTreeControl.expand(nodes[0]);
+    });
   }
 
   private registerChartCursorHandlers(): void {
@@ -352,6 +1008,91 @@ export class SignalPlotterComponent {
     });
   }
 
+  private registerChartZoomHandler(): void {
+    const chart = this.chartInstance;
+
+    if (!chart) {
+      return;
+    }
+
+    chart.off('dataZoom');
+
+    chart.on('dataZoom', () => {
+      if (this.chartType !== 'signals-over-time') {
+        return;
+      }
+
+      this.handleChartZoomRefresh();
+    });
+  }
+
+  private handleChartZoomRefresh(): void {
+    if (this.isUpdatingZoom || this.fullTimeAxisSeconds.length === 0) {
+      return;
+    }
+
+    const chart = this.chartInstance;
+
+    if (!chart) {
+      return;
+    }
+
+    const option = chart.getOption() as {
+      dataZoom?: Array<{
+        start?: number;
+        end?: number;
+      }>;
+    };
+
+    const zoom =
+      option.dataZoom?.find(item =>
+        typeof item.start === 'number' &&
+        typeof item.end === 'number'
+      );
+
+    if (!zoom) {
+      return;
+    }
+
+    const nextStartPercent = zoom.start ?? 0;
+    const nextEndPercent = zoom.end ?? 100;
+
+    if (
+      Math.abs(nextStartPercent - this.currentZoomStartPercent) < 0.01 &&
+      Math.abs(nextEndPercent - this.currentZoomEndPercent) < 0.01
+    ) {
+      return;
+    }
+
+    this.currentZoomStartPercent = nextStartPercent;
+    this.currentZoomEndPercent = nextEndPercent;
+
+    this.updateVisibleWindowFromZoomPercent();
+    this.refreshVisibleDataset();
+
+    this.isUpdatingZoom = true;
+    this.rebuildChartOptions();
+
+    window.setTimeout(() => {
+      this.isUpdatingZoom = false;
+      this.forceChartCursor();
+    });
+  }
+
+  private updateVisibleWindowFromZoomPercent(): void {
+    const fullDuration = this.fullEndSeconds - this.fullStartSeconds;
+
+    this.visibleStartSeconds =
+      this.fullStartSeconds + fullDuration * (this.currentZoomStartPercent / 100);
+
+    this.visibleEndSeconds =
+      this.fullStartSeconds + fullDuration * (this.currentZoomEndPercent / 100);
+  }
+
+  private resetChartBeforeRebuild(): void {
+    this.chartInstance?.clear();
+  }
+
   private forceChartCursor(): void {
     const chart = this.chartInstance;
 
@@ -380,6 +1121,19 @@ export class SignalPlotterComponent {
   }
 
   private rebuildChartOptions(): void {
+    if (this.chartType === 'signal-vs-signal') {
+      this.rebuildSignalVsSignalChartOptions();
+      return;
+    }
+
+    this.rebuildSignalsOverTimeChartOptions();
+  }
+
+  private rebuildSignalsOverTimeChartOptions(): void {
+    const shouldShowSymbols =
+      this.timeAxisSeconds.length > 0 &&
+      this.timeAxisSeconds.length <= this.maxPointsWithSymbols;
+
     this.chartOptions = {
       animation: false,
       color: this.tracksterSignalColors,
@@ -397,7 +1151,7 @@ export class SignalPlotterComponent {
         containLabel: false
       },
       tooltip: {
-        trigger: 'item',
+        trigger: 'axis',
         confine: true,
         backgroundColor: 'rgba(255, 255, 255, 0.96)',
         borderColor: 'rgba(191, 219, 254, 0.52)',
@@ -413,63 +1167,59 @@ export class SignalPlotterComponent {
           lineHeight: 16
         },
         formatter: (params: any): string => {
-          const signal =
-            this.signalOptions.find(
-              item => item.signalName === params.seriesName
-            );
+          const firstParam = Array.isArray(params) ? params[0] : params;
+          const time = Number(firstParam?.value?.[0] ?? 0);
 
-          if (!signal) {
-            return '';
-          }
+          const rows =
+            (Array.isArray(params) ? params : [params])
+              .map((item: any) => {
+                const signal =
+                  this.signalOptions.find(
+                    option => option.signalName === item.seriesName
+                  );
 
-          const value = Number(params.value?.[1] ?? 0);
-          const time = Number(params.value?.[0] ?? 0);
+                if (!signal) {
+                  return '';
+                }
+
+                const value = Number(item.value?.[1] ?? 0);
+
+                return `
+                  <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 16px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #64748b;
+                    line-height: 16px;
+                  ">
+                    <span>${signal.signalName}</span>
+                    <strong style="color: #102349;">
+                      ${this.formatSignalValue(value, signal.unit)}
+                    </strong>
+                  </div>
+                `;
+              })
+              .join('');
 
           return `
             <div style="
-              min-width: 100px;
+              min-width: 180px;
               color: #102349;
               font-family: inherit;
             ">
               <div style="
-                font-size: 13px;
-                font-weight: 700;
-                line-height: 15px;
-                margin-bottom: 4px;
-              ">
-                ${signal.signalName}
-              </div>
-
-              <div style="
-                font-size: 19px;
+                font-size: 12px;
                 font-weight: 800;
-                line-height: 20px;
-                margin-bottom: 2px;
-                color: #102349;
-              ">
-                ${this.formatSignalValue(value, signal.unit)}
-              </div>
-
-              <div style="
-                font-size: 10px;
-                font-weight: 500;
-                color: #64748b;
-                line-height: 12px;
+                line-height: 16px;
                 margin-bottom: 6px;
+                color: #102349;
               ">
                 ${time.toFixed(2)} s
               </div>
 
-              <div style="
-                font-size: 11px;
-                font-weight: 500;
-                color: #64748b;
-                line-height: 15px;
-              ">
-                Min ${this.formatSignalValue(this.getSignalMin(signal), signal.unit)}<br>
-                Max ${this.formatSignalValue(this.getSignalMax(signal), signal.unit)}<br>
-                Avg ${this.formatSignalValue(this.getSignalAverage(signal), signal.unit)}
-              </div>
+              ${rows}
             </div>
           `;
         }
@@ -479,6 +1229,8 @@ export class SignalPlotterComponent {
       },
       xAxis: {
         type: 'value',
+        min: this.fullStartSeconds,
+        max: this.fullEndSeconds,
         axisLabel: {
           formatter: '{value} s',
           fontFamily: 'inherit',
@@ -537,7 +1289,9 @@ export class SignalPlotterComponent {
           filterMode: 'none',
           zoomOnMouseWheel: true,
           moveOnMouseMove: false,
-          moveOnMouseWheel: false
+          moveOnMouseWheel: false,
+          start: this.currentZoomStartPercent,
+          end: this.currentZoomEndPercent
         },
         {
           type: 'slider',
@@ -548,32 +1302,14 @@ export class SignalPlotterComponent {
           right: 16,
           filterMode: 'none',
           showDetail: false,
-          showDataShadow: true,
+          showDataShadow: false,
           brushSelect: false,
-          realtime: true,
-          start: 0,
-          end: 100,
+          realtime: false,
+          start: this.currentZoomStartPercent,
+          end: this.currentZoomEndPercent,
           borderColor: 'rgba(147, 197, 253, 0.58)',
           fillerColor: 'rgba(147, 197, 253, 0.28)',
           backgroundColor: 'rgba(239, 246, 255, 0.68)',
-          dataBackground: {
-            lineStyle: {
-              color: 'rgba(37, 99, 235, 0.32)',
-              width: 1
-            },
-            areaStyle: {
-              color: 'rgba(147, 197, 253, 0.18)'
-            }
-          },
-          selectedDataBackground: {
-            lineStyle: {
-              color: 'rgba(2, 132, 199, 0.58)',
-              width: 1
-            },
-            areaStyle: {
-              color: 'rgba(56, 189, 248, 0.16)'
-            }
-          },
           handleSize: '88%',
           handleIcon: 'path://M8.2,0 L11.8,0 Q13,0 13,1.2 L13,22.8 Q13,24 11.8,24 L8.2,24 Q7,24 7,22.8 L7,1.2 Q7,0 8.2,0 Z',
           handleStyle: {
@@ -613,8 +1349,8 @@ export class SignalPlotterComponent {
         return {
           name: signal.signalName,
           type: 'line',
-          showSymbol: true,
-          symbolSize: 5,
+          showSymbol: shouldShowSymbols,
+          symbolSize: 4,
           smooth: true,
           cursor: 'default',
           emphasis: {
@@ -639,7 +1375,194 @@ export class SignalPlotterComponent {
     };
   }
 
+  private rebuildSignalVsSignalChartOptions(): void {
+    const xSignal = this.getSignalById(this.selectedXAxisSignalId);
+    const ySignal = this.getSignalById(this.selectedYAxisSignalId);
+
+    const data =
+      xSignal && ySignal
+        ? this.buildSignalVsSignalData(xSignal, ySignal)
+        : [];
+
+    const xBounds = this.getAxisBounds(data.map(point => point[0]));
+    const yBounds = this.getAxisBounds(data.map(point => point[1]));
+
+    this.chartOptions = {
+      animation: false,
+      color: this.tracksterSignalColors,
+      textStyle: {
+        fontFamily: 'inherit',
+        color: '#102349',
+        fontSize: 12,
+        fontWeight: 500
+      },
+      grid: {
+        left: 58,
+        right: 18,
+        top: 12,
+        bottom: 42,
+        containLabel: false
+      },
+      tooltip: {
+        trigger: 'axis',
+        confine: true,
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+        borderColor: 'rgba(191, 219, 254, 0.52)',
+        borderWidth: 1,
+        padding: [8, 10],
+        extraCssText:
+          'border-radius: 10px; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.10); backdrop-filter: blur(6px);',
+        textStyle: {
+          fontFamily: 'inherit',
+          color: '#102349',
+          fontSize: 12,
+          fontWeight: 500,
+          lineHeight: 16
+        },
+        formatter: (params: any): string => {
+          const point = Array.isArray(params) ? params[0] : params;
+          const xValue = Number(point?.value?.[0] ?? 0);
+          const yValue = Number(point?.value?.[1] ?? 0);
+
+          return `
+            <div style="
+              min-width: 170px;
+              color: #102349;
+              font-family: inherit;
+            ">
+              <div style="
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                font-size: 11px;
+                font-weight: 600;
+                color: #64748b;
+                line-height: 16px;
+              ">
+                <span>${xSignal?.signalName ?? 'X'}</span>
+                <strong style="color: #102349;">
+                  ${this.formatSignalValue(xValue, xSignal?.unit ?? '')}
+                </strong>
+              </div>
+
+              <div style="
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                font-size: 11px;
+                font-weight: 600;
+                color: #64748b;
+                line-height: 16px;
+              ">
+                <span>${ySignal?.signalName ?? 'Y'}</span>
+                <strong style="color: #102349;">
+                  ${this.formatSignalValue(yValue, ySignal?.unit ?? '')}
+                </strong>
+              </div>
+            </div>
+          `;
+        }
+      },
+      legend: {
+        show: false
+      },
+      xAxis: {
+        type: 'value',
+        name: xSignal?.signalName ?? 'X Signal',
+        nameLocation: 'middle',
+        nameGap: 25,
+        min: xBounds.min,
+        max: xBounds.max,
+        axisLabel: {
+          fontFamily: 'inherit',
+          color: '#5a6b82',
+          fontSize: 10,
+          fontWeight: 700,
+          margin: 4
+        },
+        axisLine: {
+          lineStyle: {
+            color: 'rgba(100, 116, 139, 0.38)'
+          }
+        },
+        axisTick: {
+          lineStyle: {
+            color: 'rgba(100, 116, 139, 0.38)'
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(191, 219, 254, 0.45)'
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: ySignal?.signalName ?? 'Y Signal',
+        nameLocation: 'middle',
+        nameGap: 38,
+        min: yBounds.min,
+        max: yBounds.max,
+        axisLabel: {
+          fontFamily: 'inherit',
+          color: '#5a6b82',
+          fontSize: 10,
+          fontWeight: 700,
+          margin: 6
+        },
+        axisLine: {
+          lineStyle: {
+            color: 'rgba(100, 116, 139, 0.38)'
+          }
+        },
+        axisTick: {
+          lineStyle: {
+            color: 'rgba(100, 116, 139, 0.38)'
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(191, 219, 254, 0.45)'
+          }
+        }
+      },
+      series: [
+        {
+          name: `${xSignal?.signalName ?? 'X'} x ${ySignal?.signalName ?? 'Y'}`,
+          type: 'line',
+          showSymbol: true,
+          symbolSize: 4,
+          smooth: true,
+          cursor: 'default',
+          itemStyle: {
+            color: this.tracksterSignalColors[0]
+          },
+          lineStyle: {
+            color: this.tracksterSignalColors[0],
+            width: 2
+          },
+          emphasis: {
+            focus: 'series',
+            lineStyle: {
+              width: 3
+            }
+          },
+          data
+        }
+      ]
+    };
+
+    this.forceChartCursor();
+  }
+
   private pruneSignalsOutsideSelectedMessages(): void {
+    this.fullSignalOptions.forEach(signal => {
+      if (!this.selectedMessageNames.includes(signal.messageName)) {
+        signal.selected = false;
+        this.hiddenSignalIds.delete(signal.id);
+      }
+    });
+
     this.signalOptions.forEach(signal => {
       if (!this.isSignalAvailable(signal)) {
         signal.selected = false;
@@ -653,10 +1576,18 @@ export class SignalPlotterComponent {
   }
 
   private getSignalMin(signal: PlotSignalOption): number {
+    if (signal.values.length === 0) {
+      return 0;
+    }
+
     return Math.min(...signal.values);
   }
 
   private getSignalMax(signal: PlotSignalOption): number {
+    if (signal.values.length === 0) {
+      return 0;
+    }
+
     return Math.max(...signal.values);
   }
 

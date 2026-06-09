@@ -127,115 +127,200 @@
       <div class="signal-field-group">
 
         <label>
-          Messages ({{ selectedMessageCount }}/{{ messageOptions.length }})
+          Chart type
         </label>
 
-        <div class="signal-multi-picker">
+        <select
+          class="signal-select"
+          [ngModel]="chartType"
+          (ngModelChange)="changeChartType($event)">
 
-          <button
-            type="button"
-            class="signal-multi-picker-trigger"
-            (click)="toggleMessagePicker()">
+          <option value="signals-over-time">
+            Signals over time
+          </option>
 
-            <span>
-              {{ selectedMessageSummary }}
-            </span>
+          <option value="signal-vs-signal">
+            Signal vs Signal
+          </option>
 
-            <mat-icon class="signal-multi-picker-caret">
-              expand_more
-            </mat-icon>
-
-          </button>
-
-          <div
-            class="signal-multi-picker-panel"
-            *ngIf="isMessagePickerOpen">
-
-            <button
-              type="button"
-              class="signal-check-row"
-              *ngFor="let message of messageOptions"
-              [class.signal-check-row-selected]="isMessageSelected(message)"
-              (click)="toggleMessage(message)"
-              [title]="message">
-
-              <span class="signal-check-box">
-                <mat-icon *ngIf="isMessageSelected(message)">
-                  check
-                </mat-icon>
-              </span>
-
-              <span class="signal-check-name">
-                {{ message }}
-              </span>
-
-            </button>
-
-          </div>
-
-        </div>
-
-        <div
-          class="signal-selection-warning"
-          *ngIf="messageSelectionWarning">
-          {{ messageSelectionWarning }}
-        </div>
+        </select>
 
       </div>
 
-      <div class="signal-field-group">
+      <ng-container *ngIf="chartType === 'signals-over-time'">
 
-        <label>
-          Signals ({{ selectedSignalCount }}/{{ maxSelectedSignals }})
-        </label>
+        <div class="signal-field-group">
 
-        <div class="signal-multi-picker">
+          <label>
+            Messages ({{ selectedMessageCount }}/{{ messageOptions.length }})
+          </label>
 
-          <button
-            type="button"
-            class="signal-multi-picker-trigger"
-            (click)="toggleSignalPicker()">
-
-            <span>
-              {{ selectedSignalSummary }}
-            </span>
-
-            <mat-icon class="signal-multi-picker-caret">
-              expand_more
-            </mat-icon>
-
-          </button>
-
-          <div
-            class="signal-multi-picker-panel signal-signal-picker-panel"
-            *ngIf="isSignalPickerOpen">
+          <div class="signal-multi-picker">
 
             <button
               type="button"
-              class="signal-check-row"
-              *ngFor="let signal of availableSignalOptions"
-              [class.signal-check-row-selected]="signal.selected"
-              [class.signal-check-row-disabled]="!canSelectSignal(signal)"
-              (click)="toggleSignal(signal)"
-              [title]="signal.messageName + ' · ' + signal.signalName">
+              class="signal-multi-picker-trigger"
+              (click)="toggleMessagePicker()">
 
-              <span class="signal-check-box">
-                <mat-icon *ngIf="signal.selected">
-                  check
-                </mat-icon>
+              <span>
+                {{ selectedMessageSummary }}
               </span>
 
-              <span class="signal-check-name">
-                {{ signal.signalName }}
-              </span>
-
-              <span class="signal-check-message">
-                {{ signal.messageName }}
-              </span>
+              <mat-icon class="signal-multi-picker-caret">
+                expand_more
+              </mat-icon>
 
             </button>
 
+            <div
+              class="signal-multi-picker-panel"
+              *ngIf="isMessagePickerOpen">
+
+              <button
+                type="button"
+                class="signal-check-row"
+                *ngFor="let message of messageOptions"
+                [class.signal-check-row-selected]="isMessageSelected(message)"
+                (click)="toggleMessage(message)"
+                [title]="message">
+
+                <span class="signal-check-box">
+                  <mat-icon *ngIf="isMessageSelected(message)">
+                    check
+                  </mat-icon>
+                </span>
+
+                <span class="signal-check-name">
+                  {{ message }}
+                </span>
+
+              </button>
+
+            </div>
+
           </div>
+
+          <div
+            class="signal-selection-warning"
+            *ngIf="messageSelectionWarning">
+            {{ messageSelectionWarning }}
+          </div>
+
+        </div>
+
+        <div class="signal-field-group">
+
+          <label>
+            Signals ({{ selectedSignalCount }}/{{ maxSelectedSignals }})
+          </label>
+
+          <div class="signal-multi-picker">
+
+            <button
+              type="button"
+              class="signal-multi-picker-trigger"
+              (click)="toggleSignalPicker()">
+
+              <span>
+                {{ selectedSignalSummary }}
+              </span>
+
+              <mat-icon class="signal-multi-picker-caret">
+                expand_more
+              </mat-icon>
+
+            </button>
+
+            <div
+              class="signal-multi-picker-panel signal-signal-picker-panel"
+              *ngIf="isSignalPickerOpen">
+
+              <button
+                type="button"
+                class="signal-check-row"
+                *ngFor="let signal of availableSignalOptions"
+                [class.signal-check-row-selected]="signal.selected"
+                [class.signal-check-row-disabled]="!canSelectSignal(signal)"
+                (click)="toggleSignal(signal)"
+                [title]="signal.messageName + ' · ' + signal.signalName">
+
+                <span class="signal-check-box">
+                  <mat-icon *ngIf="signal.selected">
+                    check
+                  </mat-icon>
+                </span>
+
+                <span class="signal-check-name">
+                  {{ signal.signalName }}
+                </span>
+
+                <span class="signal-check-message">
+                  {{ signal.messageName }}
+                </span>
+
+              </button>
+
+            </div>
+
+          </div>
+
+          <div
+            class="signal-selection-warning"
+            *ngIf="signalSelectionWarning">
+            {{ signalSelectionWarning }}
+          </div>
+
+        </div>
+
+      </ng-container>
+
+      <ng-container *ngIf="chartType === 'signal-vs-signal'">
+
+        <div class="signal-field-group">
+
+          <label>
+            X Signal
+          </label>
+
+          <select
+            class="signal-select"
+            [ngModel]="selectedXAxisSignalId"
+            (ngModelChange)="changeXAxisSignal($event)">
+
+            <option
+              *ngFor="let signal of availableSignalOptions"
+              [value]="signal.id"
+              [disabled]="signal.id === selectedYAxisSignalId">
+
+              {{ signal.signalName }} · {{ signal.messageName }}
+
+            </option>
+
+          </select>
+
+        </div>
+
+        <div class="signal-field-group">
+
+          <label>
+            Y Signal
+          </label>
+
+          <select
+            class="signal-select"
+            [ngModel]="selectedYAxisSignalId"
+            (ngModelChange)="changeYAxisSignal($event)">
+
+            <option
+              *ngFor="let signal of availableSignalOptions"
+              [value]="signal.id"
+              [disabled]="signal.id === selectedXAxisSignalId">
+
+              {{ signal.signalName }} · {{ signal.messageName }}
+
+            </option>
+
+          </select>
 
         </div>
 
@@ -245,7 +330,7 @@
           {{ signalSelectionWarning }}
         </div>
 
-      </div>
+      </ng-container>
 
     </div>
 
@@ -258,7 +343,7 @@
       <h2>Signal Plotter</h2>
 
       <span>
-        {{ selectedBinFile }} · {{ selectedMessageCount }} messages · {{ selectedSignalCount }} signals
+        {{ plotterHeaderSummary }}
       </span>
 
     </div>
@@ -267,24 +352,58 @@
 
       <div class="signal-legend-chips">
 
-        <button
-          type="button"
-          class="signal-legend-chip"
-          *ngFor="let signal of selectedSignals; let index = index"
-          [class.signal-legend-chip-muted]="isSignalHidden(signal)"
-          [style.--signal-color]="getSignalColor(index)"
-          (click)="toggleSignalVisibility(signal)"
-          (mouseenter)="highlightSignal(signal)"
-          (mouseleave)="clearSignalHighlight()"
-          [title]="signal.signalName + ' · click to show/hide'">
+        <ng-container *ngIf="chartType === 'signals-over-time'">
 
-          <span class="signal-legend-dot"></span>
+          <button
+            type="button"
+            class="signal-legend-chip"
+            *ngFor="let signal of selectedSignals; let index = index"
+            [class.signal-legend-chip-muted]="isSignalHidden(signal)"
+            [style.--signal-color]="getSignalColor(index)"
+            (click)="toggleSignalVisibility(signal)"
+            (mouseenter)="highlightSignal(signal)"
+            (mouseleave)="clearSignalHighlight()"
+            [title]="signal.signalName + ' · click to show/hide'">
 
-          <span class="signal-legend-label">
-            {{ signal.signalName }}
-          </span>
+            <span class="signal-legend-dot"></span>
 
-        </button>
+            <span class="signal-legend-label">
+              {{ signal.signalName }}
+            </span>
+
+          </button>
+
+        </ng-container>
+
+        <ng-container *ngIf="chartType === 'signal-vs-signal'">
+
+          <div
+            class="signal-legend-chip signal-legend-chip-static"
+            [style.--signal-color]="getSignalColor(0)"
+            [title]="'X axis · ' + selectedXAxisSignalName">
+
+            <span class="signal-legend-dot"></span>
+
+            <span class="signal-legend-label">
+              X: {{ selectedXAxisSignalName }}
+            </span>
+
+          </div>
+
+          <div
+            class="signal-legend-chip signal-legend-chip-static"
+            [style.--signal-color]="getSignalColor(1)"
+            [title]="'Y axis · ' + selectedYAxisSignalName">
+
+            <span class="signal-legend-dot"></span>
+
+            <span class="signal-legend-label">
+              Y: {{ selectedYAxisSignalName }}
+            </span>
+
+          </div>
+
+        </ng-container>
 
       </div>
 

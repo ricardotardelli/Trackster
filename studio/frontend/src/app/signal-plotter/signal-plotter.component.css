@@ -559,6 +559,16 @@
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
 }
 
+.signal-legend-chip-static {
+  cursor: default;
+}
+
+.signal-legend-chip-static:hover {
+  border-color: rgba(191, 219, 254, 0.72);
+  background: rgba(248, 251, 255, 0.9);
+  box-shadow: none;
+}
+
 .signal-legend-chip-muted {
   opacity: 0.42;
 }
