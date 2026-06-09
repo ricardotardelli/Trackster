@@ -362,6 +362,54 @@
   max-height: 258px;
 }
 
+.signal-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px 4px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(191, 219, 254, 0.58);
+}
+
+.signal-picker-action-button {
+  flex: 0 0 auto;
+  min-width: 72px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(147, 197, 253, 0.78);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #102349;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.signal-picker-action-button:hover:not(:disabled) {
+  background: rgba(239, 246, 255, 0.92);
+  border-color: #38bdf8;
+}
+
+.signal-picker-action-button:disabled {
+  opacity: 0.46;
+  cursor: default;
+}
+
+.signal-picker-action-button:hover:not(:disabled) {
+  background: rgba(239, 246, 255, 0.92);
+  border-color: #38bdf8;
+}
+
+.signal-picker-action-button:disabled {
+  opacity: 0.46;
+  cursor: default;
+}
+
 .signal-check-list {
   display: grid;
   gap: 5px;

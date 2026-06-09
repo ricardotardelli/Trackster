@@ -211,7 +211,7 @@
         <div class="signal-field-group">
 
           <label>
-            Signals ({{ selectedSignalCount }}/{{ maxSelectedSignals }})
+            Signals ({{ selectedSignalCount }}/{{ availableSignalCount }})
           </label>
 
           <div class="signal-multi-picker">
@@ -234,6 +234,26 @@
             <div
               class="signal-multi-picker-panel signal-signal-picker-panel"
               *ngIf="isSignalPickerOpen">
+
+              <div class="signal-picker-actions">
+
+                <button
+                  type="button"
+                  class="signal-picker-action-button"
+                  [disabled]="availableSignalCount === 0 || selectedSignalCount >= maxSelectableSignalsForCurrentMessages"
+                  (click)="selectAllAvailableSignals()">
+                  Select all
+                </button>
+
+                <button
+                  type="button"
+                  class="signal-picker-action-button"
+                  [disabled]="selectedSignalCount === 0"
+                  (click)="deselectAllAvailableSignals()">
+                  Deselect all
+                </button>
+
+              </div>
 
               <button
                 type="button"

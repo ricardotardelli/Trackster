@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -55,6 +55,36 @@ interface RuntimeConfig {
   s3Region?: string;
   customerId?: string;
   clientId?: string;
+}
+
+interface RunManifestSignalFrame {
+  l?: number;
+  n?: string;
+  s?: unknown[][];
+}
+
+interface RunManifestResolvedCanFrame {
+  dbcFile?: string;
+  canId?: string;
+  messageName?: string;
+  frame?: RunManifestSignalFrame;
+}
+
+interface RunManifest {
+  output?: {
+    bucket?: string;
+    runFolder?: string;
+    manifestKey?: string;
+  };
+  simulation?: {
+    intervalSec?: number;
+    durationSec?: number;
+    numberOfBlocks?: number;
+  };
+  dbc?: {
+    resolvedCanFrames?: RunManifestResolvedCanFrame[];
+    canFrames?: RunManifestResolvedCanFrame[];
+  };
 }
 
 @Component({
@@ -119,7 +149,7 @@ export class SignalPlotterComponent {
 
   private readonly maxRenderedPointsPerSignal = 120;
   private readonly maxPointsWithSymbols = 80;
-  private readonly developmentPlotterDataUrl = 'assets/mock/dev-plotter-data.json';
+  private readonly developmentRunManifestUrl = 'assets/mock/run-manifest.json';
 
   readonly tracksterSignalColors = [
     '#2563eb',
@@ -158,13 +188,17 @@ export class SignalPlotterComponent {
     );
   }
 
+  get availableSignalCount(): number {
+    return this.availableSignalOptions.length;
+  }
+
   get selectedMessageCount(): number {
     return this.selectedMessageNames.length;
   }
 
   get selectedMessageSummary(): string {
     if (this.selectedMessageNames.length === 0) {
-      return 'No messages selected';
+      return 'Select Message';
     }
 
     if (this.selectedMessageNames.length === 1) {
@@ -176,7 +210,7 @@ export class SignalPlotterComponent {
 
   get selectedSignalSummary(): string {
     if (this.selectedSignalCount === 0) {
-      return 'No signals selected';
+      return 'No Signal Selected';
     }
 
     if (this.selectedSignalCount === 1) {
@@ -192,6 +226,13 @@ export class SignalPlotterComponent {
 
   get selectedSignalCount(): number {
     return this.selectedSignals.length;
+  }
+
+  get maxSelectableSignalsForCurrentMessages(): number {
+    return Math.min(
+      this.maxSelectedSignals,
+      this.availableSignalCount
+    );
   }
 
   get selectedXAxisSignalName(): string {
@@ -232,8 +273,7 @@ export class SignalPlotterComponent {
     this.selectedBinFile = file.name;
     this.selectedBinKey = file.key;
     this.isBinPickerOpen = false;
-    this.rebuildChartOptions();
-    this.resizeChart();
+    void this.loadManifestForSelectedBin();
   }
 
   isSelectedBin(node: BinTreeNode): boolean {
@@ -246,11 +286,6 @@ export class SignalPlotterComponent {
 
   toggleMessage(messageName: string): void {
     if (this.isMessageSelected(messageName)) {
-      if (this.selectedMessageNames.length === 1) {
-        this.messageSelectionWarning = 'At least one message must remain selected.';
-        return;
-      }
-
       this.selectedMessageNames =
         this.selectedMessageNames.filter(selected => selected !== messageName);
     } else {
@@ -294,6 +329,63 @@ export class SignalPlotterComponent {
     if (!signal.selected) {
       this.hiddenSignalIds.delete(signal.id);
     }
+
+    this.signalSelectionWarning = '';
+    this.refreshVisibleDataset();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  selectAllAvailableSignals(): void {
+    if (this.availableSignalOptions.length === 0) {
+      return;
+    }
+
+    const selectedIds =
+      new Set(
+        this.availableSignalOptions
+          .slice(0, this.maxSelectedSignals)
+          .map(signal => signal.id)
+      );
+
+    this.fullSignalOptions.forEach(signal => {
+      if (this.selectedMessageNames.includes(signal.messageName)) {
+        signal.selected = selectedIds.has(signal.id);
+      }
+    });
+
+    this.signalOptions.forEach(signal => {
+      if (this.selectedMessageNames.includes(signal.messageName)) {
+        signal.selected = selectedIds.has(signal.id);
+      }
+    });
+
+    this.hiddenSignalIds.clear();
+
+    this.signalSelectionWarning =
+      this.availableSignalOptions.length > this.maxSelectedSignals
+        ? `Only the first ${this.maxSelectedSignals} available signals were selected.`
+        : '';
+
+    this.refreshVisibleDataset();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  deselectAllAvailableSignals(): void {
+    this.fullSignalOptions.forEach(signal => {
+      if (this.selectedMessageNames.includes(signal.messageName)) {
+        signal.selected = false;
+        this.hiddenSignalIds.delete(signal.id);
+      }
+    });
+
+    this.signalOptions.forEach(signal => {
+      if (this.selectedMessageNames.includes(signal.messageName)) {
+        signal.selected = false;
+        this.hiddenSignalIds.delete(signal.id);
+      }
+    });
 
     this.signalSelectionWarning = '';
     this.refreshVisibleDataset();
@@ -399,11 +491,18 @@ export class SignalPlotterComponent {
         this.resolveClientId(config);
 
       if (this.shouldUseLocalMock()) {
-        const data =
-          await this.loadDevelopmentPlotterData();
+        const tree =
+          this.buildLocalMockTree();
 
-        this.applyPlotterData(data);
-        this.setBinTreeData(this.buildLocalMockTree());
+        this.setBinTreeData(tree);
+
+        const firstBinNode =
+          this.findFirstBinNode(tree);
+
+        this.selectedBinFile = firstBinNode?.name ?? 'No BIN file available';
+        this.selectedBinKey = firstBinNode?.key ?? '';
+
+        await this.loadManifestForSelectedBin();
 
         return;
       }
@@ -436,12 +535,15 @@ export class SignalPlotterComponent {
       const firstBinNode =
         this.findFirstBinNode(tree);
 
-      this.applyPlotterData(
-        this.buildEmptyPlotterData(firstBinNode)
-      );
+      this.selectedBinFile = firstBinNode?.name ?? 'No BIN file available';
+      this.selectedBinKey = firstBinNode?.key ?? '';
 
-      if (tree.length > 0) {
-        this.setBinTreeData(tree);
+      if (this.selectedBinKey) {
+        await this.loadManifestForSelectedBin();
+      } else {
+        this.applyPlotterData(
+          this.buildEmptyPlotterData(firstBinNode)
+        );
       }
 
     } catch (error) {
@@ -464,10 +566,370 @@ export class SignalPlotterComponent {
     );
   }
 
-  private async loadDevelopmentPlotterData(): Promise<SignalPlotterData> {
+  private async loadDevelopmentRunManifest(): Promise<RunManifest> {
     return firstValueFrom(
-      this.http.get<SignalPlotterData>(this.developmentPlotterDataUrl)
+      this.http.get<RunManifest>(this.developmentRunManifestUrl)
     );
+  }
+
+  private async loadManifestForSelectedBin(): Promise<void> {
+    try {
+      const manifest =
+        this.shouldUseLocalMock()
+          ? await this.loadDevelopmentRunManifest()
+          : await this.loadProductionRunManifestForSelectedBin();
+
+      const data =
+        this.buildPlotterDataFromManifest(
+          manifest,
+          this.selectedBinFile,
+          this.selectedBinKey
+        );
+
+      this.applyPlotterData(data);
+    } catch (error) {
+      console.error('Failed to load signal plotter manifest.', error);
+
+      this.applyPlotterData({
+        selectedBinFile: this.selectedBinFile || 'No BIN file available',
+        selectedBinKey: this.selectedBinKey,
+        selectedMessageNames: [],
+        timeAxisSeconds: [],
+        messageOptions: [],
+        signalOptions: []
+      });
+    }
+  }
+
+  private async loadProductionRunManifestForSelectedBin(): Promise<RunManifest> {
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const manifestKey =
+      this.resolveManifestKeyFromSelectedBinKey(this.selectedBinKey);
+
+    const s3Client =
+      await this.getS3Client();
+
+    const response =
+      await s3Client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: manifestKey
+        })
+      );
+
+    const body =
+      await response.Body?.transformToString();
+
+    if (!body) {
+      throw new Error(
+        `Empty run-manifest.json response for ${manifestKey}`
+      );
+    }
+
+    return JSON.parse(body) as RunManifest;
+  }
+
+  private resolveManifestKeyFromSelectedBinKey(selectedBinKey: string): string {
+    const parts =
+      selectedBinKey
+        .split('/')
+        .filter(part => part.length > 0);
+
+    if (parts.length < 2) {
+      throw new Error(
+        `Invalid selected BIN key: ${selectedBinKey}`
+      );
+    }
+
+    return `${parts.slice(0, -1).join('/')}/run-manifest.json`;
+  }
+
+  private buildPlotterDataFromManifest(
+    manifest: RunManifest,
+    selectedBinFile: string,
+    selectedBinKey: string
+  ): SignalPlotterData {
+
+    const resolvedFrames =
+      this.getResolvedCanFramesFromManifest(manifest);
+
+    const messageOptions =
+      resolvedFrames
+        .map(frame => frame.messageName?.trim() ?? frame.frame?.n?.trim() ?? '')
+        .filter(messageName => messageName.length > 0);
+
+    const uniqueMessageOptions =
+      Array.from(new Set(messageOptions));
+
+    const timeAxisSeconds =
+      this.buildSyntheticTimeAxisFromManifest(manifest);
+
+    const signalOptions =
+      this.buildSignalOptionsFromManifest(
+        resolvedFrames,
+        timeAxisSeconds
+      );
+
+    return {
+      selectedBinFile: selectedBinFile || 'No BIN file selected',
+      selectedBinKey,
+      selectedMessageNames: [],
+      timeAxisSeconds,
+      messageOptions: uniqueMessageOptions,
+      signalOptions: signalOptions.map(signal => ({
+        ...signal,
+        selected: false
+      }))
+    };
+  }
+
+  private getResolvedCanFramesFromManifest(
+    manifest: RunManifest
+  ): RunManifestResolvedCanFrame[] {
+
+    const resolvedFrames =
+      manifest.dbc?.resolvedCanFrames ?? [];
+
+    if (resolvedFrames.length > 0) {
+      return resolvedFrames;
+    }
+
+    return manifest.dbc?.canFrames ?? [];
+  }
+
+  private buildSyntheticTimeAxisFromManifest(
+    manifest: RunManifest
+  ): number[] {
+
+    const intervalSec =
+      this.getPositiveNumber(
+        manifest.simulation?.intervalSec,
+        5
+      );
+
+    const durationSec =
+      this.getPositiveNumber(
+        manifest.simulation?.durationSec,
+        600
+      );
+
+    const pointCountFromDuration =
+      Math.max(
+        2,
+        Math.floor(durationSec / intervalSec)
+      );
+
+    const pointCount =
+      Math.min(
+        pointCountFromDuration,
+        Math.max(
+          2,
+          this.getPositiveNumber(
+            manifest.simulation?.numberOfBlocks,
+            pointCountFromDuration
+          )
+        )
+      );
+
+    return Array.from(
+      { length: pointCount },
+      (_, index) => Number((index * intervalSec).toFixed(3))
+    );
+  }
+
+  private buildSignalOptionsFromManifest(
+    frames: RunManifestResolvedCanFrame[],
+    timeAxisSeconds: number[]
+  ): PlotSignalOption[] {
+
+    const signalOptions: PlotSignalOption[] = [];
+
+    frames.forEach((frame, frameIndex) => {
+      const messageName =
+        frame.messageName?.trim() ||
+        frame.frame?.n?.trim() ||
+        `Message_${frame.canId ?? frameIndex + 1}`;
+
+      const signals =
+        frame.frame?.s ?? [];
+
+      signals.forEach((rawSignal, signalIndex) => {
+        const signalName =
+          this.getManifestSignalName(rawSignal, signalIndex);
+
+        const id =
+          [
+            frame.canId ?? `frame-${frameIndex}`,
+            messageName,
+            signalName,
+            signalIndex
+          ].join('__');
+
+        signalOptions.push({
+          id,
+          messageName,
+          signalName,
+          unit: '',
+          selected: false,
+          values: this.buildSyntheticSignalValues(
+            rawSignal,
+            signalName,
+            signalOptions.length,
+            timeAxisSeconds
+          )
+        });
+      });
+    });
+
+    return signalOptions;
+  }
+
+  private getManifestSignalName(
+    rawSignal: unknown[],
+    signalIndex: number
+  ): string {
+
+    const compactName =
+      rawSignal[8];
+
+    return typeof compactName === 'string' && compactName.trim().length > 0
+      ? compactName.trim()
+      : `Signal_${signalIndex + 1}`;
+  }
+
+  private buildSyntheticSignalValues(
+    rawSignal: unknown[],
+    signalName: string,
+    signalGlobalIndex: number,
+    timeAxisSeconds: number[]
+  ): number[] {
+
+    const bounds =
+      this.resolveSyntheticSignalBounds(
+        rawSignal,
+        signalName,
+        signalGlobalIndex
+      );
+
+    const amplitude =
+      (bounds.max - bounds.min) / 2;
+
+    const center =
+      bounds.min + amplitude;
+
+    const period =
+      45 + ((signalGlobalIndex % 7) * 17);
+
+    const phase =
+      signalGlobalIndex * 0.73;
+
+    const isDiscrete =
+      bounds.max - bounds.min <= 4;
+
+    return timeAxisSeconds.map(time => {
+      const wave =
+        Math.sin((time / period) * Math.PI * 2 + phase);
+
+      const value =
+        center + amplitude * wave;
+
+      if (isDiscrete) {
+        return Math.max(
+          bounds.min,
+          Math.min(
+            bounds.max,
+            Math.round(value)
+          )
+        );
+      }
+
+      return Number(value.toFixed(3));
+    });
+  }
+
+  private resolveSyntheticSignalBounds(
+    rawSignal: unknown[],
+    signalName: string,
+    signalGlobalIndex: number
+  ): AxisBounds {
+
+    const manifestMin =
+      this.getFiniteNumber(rawSignal[6]);
+
+    const manifestMax =
+      this.getFiniteNumber(rawSignal[7]);
+
+    if (
+      manifestMin !== null &&
+      manifestMax !== null &&
+      manifestMax > manifestMin
+    ) {
+      return {
+        min: manifestMin,
+        max: manifestMax
+      };
+    }
+
+    const lowerName =
+      signalName.toLowerCase();
+
+    if (lowerName.includes('speed') || lowerName.includes('whl')) {
+      return { min: 0, max: 160 };
+    }
+
+    if (lowerName.includes('angle') || lowerName.includes('ste')) {
+      return { min: -120, max: 120 };
+    }
+
+    if (lowerName.includes('accel') || lowerName.includes('_a_')) {
+      return { min: -4, max: 4 };
+    }
+
+    if (lowerName.includes('yaw') || lowerName.includes('pitch') || lowerName.includes('rol')) {
+      return { min: -6.5, max: 6.5 };
+    }
+
+    if (lowerName.includes('door') || lowerName.includes('light') || lowerName.includes('button')) {
+      return { min: 0, max: 1 };
+    }
+
+    const baseMin =
+      10 + ((signalGlobalIndex % 5) * 8);
+
+    return {
+      min: baseMin,
+      max: baseMin + 80
+    };
+  }
+
+  private getPositiveNumber(
+    value: unknown,
+    fallback: number
+  ): number {
+
+    const parsedValue =
+      this.getFiniteNumber(value);
+
+    return parsedValue !== null && parsedValue > 0
+      ? parsedValue
+      : fallback;
+  }
+
+  private getFiniteNumber(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value)
+      ? value
+      : null;
   }
 
   private buildEmptyPlotterData(
@@ -537,12 +999,12 @@ export class SignalPlotterComponent {
   private buildLocalMockTree(): BinTreeNode[] {
     return [
       {
-        name: '20260508183000',
-        key: '00000000/20260508183000',
+        name: '20260521152301',
+        key: '00000000/20260521152301',
         children: [
           {
             name: 'VINKDT000001KADUT.bin',
-            key: '00000000/20260508183000/VINKDT000001KADUT.bin'
+            key: '00000000/20260521152301/VINKDT000001KADUT.bin'
           }
         ]
       }
@@ -818,7 +1280,13 @@ export class SignalPlotterComponent {
     if (availableSignals.length === 0) {
       this.selectedXAxisSignalId = '';
       this.selectedYAxisSignalId = '';
-      this.signalSelectionWarning = 'No signals available for the selected messages.';
+
+      if (this.chartType === 'signal-vs-signal') {
+        this.signalSelectionWarning = 'Select at least one message before comparing signals.';
+      } else {
+        this.signalSelectionWarning = '';
+      }
+
       return;
     }
 
@@ -933,47 +1401,6 @@ export class SignalPlotterComponent {
       min: Math.floor(minValue - padding),
       max: Math.ceil(maxValue + padding)
     };
-  }
-
-  private rebuildBinTreeFromSelectedBin(): void {
-    if (!this.selectedBinKey || !this.selectedBinFile) {
-      this.binTreeDataSource.data = [];
-      return;
-    }
-
-    const selectedBinFolderKey =
-      this.selectedBinKey.endsWith(this.selectedBinFile)
-        ? this.selectedBinKey.slice(0, -this.selectedBinFile.length)
-        : '';
-
-    const folderParts =
-      selectedBinFolderKey
-        .split('/')
-        .filter(part => part.length > 0);
-
-    const folderName =
-      folderParts.length > 0
-        ? folderParts[folderParts.length - 1]
-        : 'Files';
-
-    const nodes: BinTreeNode[] = [
-      {
-        name: folderName,
-        key: selectedBinFolderKey,
-        children: [
-          {
-            name: this.selectedBinFile,
-            key: this.selectedBinKey
-          }
-        ]
-      }
-    ];
-
-    this.binTreeDataSource.data = nodes;
-
-    setTimeout(() => {
-      this.binTreeControl.expand(nodes[0]);
-    });
   }
 
   private registerChartCursorHandlers(): void {
@@ -1573,36 +2000,6 @@ export class SignalPlotterComponent {
     if (this.selectedSignalCount <= this.maxSelectedSignals) {
       this.signalSelectionWarning = '';
     }
-  }
-
-  private getSignalMin(signal: PlotSignalOption): number {
-    if (signal.values.length === 0) {
-      return 0;
-    }
-
-    return Math.min(...signal.values);
-  }
-
-  private getSignalMax(signal: PlotSignalOption): number {
-    if (signal.values.length === 0) {
-      return 0;
-    }
-
-    return Math.max(...signal.values);
-  }
-
-  private getSignalAverage(signal: PlotSignalOption): number {
-    if (signal.values.length === 0) {
-      return 0;
-    }
-
-    const total =
-      signal.values.reduce(
-        (sum, value) => sum + value,
-        0
-      );
-
-    return total / signal.values.length;
   }
 
   private formatSignalValue(value: number, unit: string): string {
