@@ -11,6 +11,7 @@ import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
 import { EChartsOption, EChartsType } from 'echarts';
 import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 type SignalChartType =
   | 'signals-over-time'
@@ -203,9 +204,7 @@ export class SignalPlotterComponent {
 
   readonly binTreeDataSource = new MatTreeNestedDataSource<BinTreeNode>();
 
-  constructor(
-    private readonly http: HttpClient
-  ) {
+  constructor( private readonly http: HttpClient, private readonly authService: AuthService ) {
     void this.loadPlotterData();
   }
 
@@ -744,10 +743,7 @@ export class SignalPlotterComponent {
     }
   }
 
-  private async loadProductionSignalPlotData(
-    requestedSignals: PlotSignalOption[]
-  ): Promise<SignalPlotDataResponse> {
-
+  private async loadProductionSignalPlotData( requestedSignals: PlotSignalOption[] ): Promise<SignalPlotDataResponse> {
     const config =
       await this.loadRuntimeConfig();
 
@@ -779,18 +775,30 @@ export class SignalPlotterComponent {
       }))
     };
 
+    const idToken =
+      await this.authService.getIdToken();
+
+    if (!idToken) {
+      throw new Error(
+        'Cognito ID token unavailable.'
+      );
+    }
+
     return firstValueFrom(
       this.http.post<SignalPlotDataResponse>(
         plotDataUrl,
-        request
+        request,
+        {
+          headers: {
+            Authorization: idToken,
+            'Content-Type': 'application/json'
+          }
+        }
       )
     );
   }
 
-  private resolveSignalPlotterDataUrl(
-    config: RuntimeConfig
-  ): string {
-
+  private resolveSignalPlotterDataUrl( config: RuntimeConfig ): string {
     const url =
       config.decoderApi?.signalPlotterDataUrl || '';
 
