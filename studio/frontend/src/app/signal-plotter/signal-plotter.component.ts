@@ -18,6 +18,7 @@ type SignalChartType =
 
 interface PlotSignalOption {
   id: string;
+  canId: string;
   messageName: string;
   signalName: string;
   unit: string;
@@ -55,6 +56,13 @@ interface RuntimeConfig {
   s3Region?: string;
   customerId?: string;
   clientId?: string;
+  signalPlotterApi?: {
+    plotDataUrl?: string;
+  };
+  decoderApi?: {
+    signalPlotterUrl?: string;
+    signalPlotterDataUrl?: string;
+  };
 }
 
 interface RunManifestSignalFrame {
@@ -85,6 +93,35 @@ interface RunManifest {
     resolvedCanFrames?: RunManifestResolvedCanFrame[];
     canFrames?: RunManifestResolvedCanFrame[];
   };
+}
+
+interface SignalPlotDataRequestSignal {
+  id: string;
+  canId: string;
+  messageName: string;
+  signalName: string;
+}
+
+interface SignalPlotDataRequest {
+  bucket: string;
+  binKey: string;
+  manifestKey: string;
+  chartType: SignalChartType;
+  signals: SignalPlotDataRequestSignal[];
+}
+
+interface SignalPlotDataResponseSignal {
+  id?: string;
+  canId?: string;
+  messageName: string;
+  signalName: string;
+  unit?: string;
+  values: number[];
+}
+
+interface SignalPlotDataResponse {
+  timeAxisSeconds: number[];
+  signals: SignalPlotDataResponseSignal[];
 }
 
 @Component({
@@ -121,6 +158,7 @@ export class SignalPlotterComponent {
   messageSelectionWarning = '';
   isBinPickerOpen = false;
   isLoadingBinCatalog = false;
+  isLoadingPlotData = false;
   isMessagePickerOpen = false;
   isSignalPickerOpen = false;
 
@@ -150,6 +188,7 @@ export class SignalPlotterComponent {
   private readonly maxRenderedPointsPerSignal = 120;
   private readonly maxPointsWithSymbols = 80;
   private readonly developmentRunManifestUrl = 'assets/mock/run-manifest.json';
+  private readonly developmentSignalPlotDataUrl = 'assets/mock/signal-plot-data.json';
 
   readonly tracksterSignalColors = [
     '#2563eb',
@@ -244,6 +283,10 @@ export class SignalPlotterComponent {
   }
 
   get plotterHeaderSummary(): string {
+    if (this.isLoadingPlotData) {
+      return `${this.selectedBinFile} · loading signal data`;
+    }
+
     if (this.chartType === 'signal-vs-signal') {
       return `${this.selectedBinFile} · ${this.selectedXAxisSignalName} x ${this.selectedYAxisSignalName}`;
     }
@@ -298,7 +341,13 @@ export class SignalPlotterComponent {
     this.messageSelectionWarning = '';
     this.pruneSignalsOutsideSelectedMessages();
     this.ensureSignalVsSignalSelection();
-    this.refreshVisibleDataset();
+    this.clearPlotValues();
+
+    if (this.chartType === 'signal-vs-signal' && this.getRequestedSignalsForCurrentChart().length > 0) {
+      void this.loadPlotDataForCurrentSelection();
+      return;
+    }
+
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -331,9 +380,15 @@ export class SignalPlotterComponent {
     }
 
     this.signalSelectionWarning = '';
-    this.refreshVisibleDataset();
-    this.rebuildChartOptions();
-    this.resizeChart();
+
+    if (this.getRequestedSignalsForCurrentChart().length === 0) {
+      this.clearPlotValues();
+      this.rebuildChartOptions();
+      this.resizeChart();
+      return;
+    }
+
+    void this.loadPlotDataForCurrentSelection();
   }
 
   selectAllAvailableSignals(): void {
@@ -367,9 +422,7 @@ export class SignalPlotterComponent {
         ? `Only the first ${this.maxSelectedSignals} available signals were selected.`
         : '';
 
-    this.refreshVisibleDataset();
-    this.rebuildChartOptions();
-    this.resizeChart();
+    void this.loadPlotDataForCurrentSelection();
   }
 
   deselectAllAvailableSignals(): void {
@@ -388,7 +441,7 @@ export class SignalPlotterComponent {
     });
 
     this.signalSelectionWarning = '';
-    this.refreshVisibleDataset();
+    this.clearPlotValues();
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -403,6 +456,13 @@ export class SignalPlotterComponent {
     }
 
     this.resetChartBeforeRebuild();
+
+    if (this.getRequestedSignalsForCurrentChart().length > 0) {
+      void this.loadPlotDataForCurrentSelection();
+      return;
+    }
+
+    this.clearPlotValues();
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -415,7 +475,13 @@ export class SignalPlotterComponent {
     }
 
     this.ensureSignalVsSignalSelection();
-    this.resetChartBeforeRebuild();
+
+    if (this.getRequestedSignalsForCurrentChart().length > 0) {
+      void this.loadPlotDataForCurrentSelection();
+      return;
+    }
+
+    this.clearPlotValues();
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -428,7 +494,13 @@ export class SignalPlotterComponent {
     }
 
     this.ensureSignalVsSignalSelection();
-    this.resetChartBeforeRebuild();
+
+    if (this.getRequestedSignalsForCurrentChart().length > 0) {
+      void this.loadPlotDataForCurrentSelection();
+      return;
+    }
+
+    this.clearPlotValues();
     this.rebuildChartOptions();
     this.resizeChart();
   }
@@ -572,6 +644,12 @@ export class SignalPlotterComponent {
     );
   }
 
+  private async loadDevelopmentSignalPlotData(): Promise<SignalPlotDataResponse> {
+    return firstValueFrom(
+      this.http.get<SignalPlotDataResponse>(this.developmentSignalPlotDataUrl)
+    );
+  }
+
   private async loadManifestForSelectedBin(): Promise<void> {
     try {
       const manifest =
@@ -640,6 +718,210 @@ export class SignalPlotterComponent {
     return JSON.parse(body) as RunManifest;
   }
 
+  private async loadPlotDataForCurrentSelection(): Promise<void> {
+    const requestedSignals =
+      this.getRequestedSignalsForCurrentChart();
+
+    if (requestedSignals.length === 0) {
+      this.clearPlotValues();
+      this.rebuildChartOptions();
+      this.resizeChart();
+      return;
+    }
+
+    this.isLoadingPlotData = true;
+
+    try {
+      const response =
+        this.shouldUseLocalMock()
+          ? await this.loadDevelopmentSignalPlotData()
+          : await this.loadProductionSignalPlotData(requestedSignals);
+
+      this.applySignalPlotDataResponse(response);
+    } catch (error) {
+      console.error('Failed to load signal plot data.', error);
+      this.clearPlotValues();
+      this.rebuildChartOptions();
+      this.resizeChart();
+    } finally {
+      this.isLoadingPlotData = false;
+    }
+  }
+
+  private async loadProductionSignalPlotData(
+    requestedSignals: PlotSignalOption[]
+  ): Promise<SignalPlotDataResponse> {
+
+    const config =
+      await this.loadRuntimeConfig();
+
+    const bucket =
+      config.s3Default?.trim();
+
+    if (!bucket) {
+      throw new Error(
+        'Missing s3Default in assets/config.json'
+      );
+    }
+
+    const plotDataUrl =
+      this.resolveSignalPlotterDataUrl(config);
+
+    const manifestKey =
+      this.resolveManifestKeyFromSelectedBinKey(this.selectedBinKey);
+
+    const request: SignalPlotDataRequest = {
+      bucket,
+      binKey: this.selectedBinKey,
+      manifestKey,
+      chartType: this.chartType,
+      signals: requestedSignals.map(signal => ({
+        id: signal.id,
+        canId: signal.canId,
+        messageName: signal.messageName,
+        signalName: signal.signalName
+      }))
+    };
+
+    return firstValueFrom(
+      this.http.post<SignalPlotDataResponse>(
+        plotDataUrl,
+        request
+      )
+    );
+  }
+
+  private resolveSignalPlotterDataUrl(
+    config: RuntimeConfig
+  ): string {
+
+    const url =
+      config.signalPlotterApi?.plotDataUrl ||
+      config.decoderApi?.signalPlotterDataUrl ||
+      config.decoderApi?.signalPlotterUrl ||
+      '';
+
+    if (!url.trim()) {
+      throw new Error(
+        'Missing Signal Plotter API URL in assets/config.json. Expected signalPlotterApi.plotDataUrl or decoderApi.signalPlotterDataUrl.'
+      );
+    }
+
+    return url.trim();
+  }
+
+  private getRequestedSignalsForCurrentChart(): PlotSignalOption[] {
+    if (this.chartType === 'signal-vs-signal') {
+      const requestedSignals =
+        [
+          this.getSignalById(this.selectedXAxisSignalId),
+          this.getSignalById(this.selectedYAxisSignalId)
+        ]
+          .filter((signal): signal is PlotSignalOption => !!signal);
+
+      return Array.from(
+        new Map(
+          requestedSignals.map(signal => [signal.id, signal])
+        ).values()
+      );
+    }
+
+    return this.selectedSignals;
+  }
+
+  private applySignalPlotDataResponse(
+    response: SignalPlotDataResponse
+  ): void {
+
+    const responseSignals =
+      Array.isArray(response.signals)
+        ? response.signals
+        : [];
+
+    this.fullTimeAxisSeconds =
+      Array.isArray(response.timeAxisSeconds)
+        ? [...response.timeAxisSeconds]
+        : [];
+
+    this.fullSignalOptions =
+      this.fullSignalOptions.map(signal => {
+        const responseSignal =
+          responseSignals.find(item =>
+            this.isSameSignalFromPlotData(signal, item)
+          );
+
+        if (!responseSignal) {
+          return {
+            ...signal,
+            values: []
+          };
+        }
+
+        return {
+          ...signal,
+          unit: responseSignal.unit ?? signal.unit,
+          values: Array.isArray(responseSignal.values)
+            ? [...responseSignal.values]
+            : []
+        };
+      });
+
+    this.fullStartSeconds = this.fullTimeAxisSeconds[0] ?? 0;
+    this.fullEndSeconds =
+      this.fullTimeAxisSeconds[this.fullTimeAxisSeconds.length - 1] ?? this.fullStartSeconds;
+
+    this.visibleStartSeconds = this.fullStartSeconds;
+    this.visibleEndSeconds = this.fullEndSeconds;
+
+    this.currentZoomStartPercent = 0;
+    this.currentZoomEndPercent = 100;
+
+    this.refreshVisibleDataset();
+    this.rebuildChartOptions();
+    this.resizeChart();
+  }
+
+  private isSameSignalFromPlotData(
+    signal: PlotSignalOption,
+    responseSignal: SignalPlotDataResponseSignal
+  ): boolean {
+
+    if (responseSignal.id && responseSignal.id === signal.id) {
+      return true;
+    }
+
+    return (
+      (responseSignal.canId ?? '').toLowerCase() === signal.canId.toLowerCase() &&
+      responseSignal.messageName === signal.messageName &&
+      responseSignal.signalName === signal.signalName
+    );
+  }
+
+  private clearPlotValues(): void {
+    this.fullTimeAxisSeconds = [];
+    this.timeAxisSeconds = [];
+
+    this.fullStartSeconds = 0;
+    this.fullEndSeconds = 0;
+    this.visibleStartSeconds = 0;
+    this.visibleEndSeconds = 0;
+
+    this.currentZoomStartPercent = 0;
+    this.currentZoomEndPercent = 100;
+
+    this.fullSignalOptions =
+      this.fullSignalOptions.map(signal => ({
+        ...signal,
+        values: []
+      }));
+
+    this.signalOptions =
+      this.signalOptions.map(signal => ({
+        ...signal,
+        values: []
+      }));
+  }
+
   private resolveManifestKeyFromSelectedBinKey(selectedBinKey: string): string {
     const parts =
       selectedBinKey
@@ -672,24 +954,21 @@ export class SignalPlotterComponent {
     const uniqueMessageOptions =
       Array.from(new Set(messageOptions));
 
-    const timeAxisSeconds =
-      this.buildSyntheticTimeAxisFromManifest(manifest);
-
     const signalOptions =
       this.buildSignalOptionsFromManifest(
-        resolvedFrames,
-        timeAxisSeconds
+        resolvedFrames
       );
 
     return {
       selectedBinFile: selectedBinFile || 'No BIN file selected',
       selectedBinKey,
       selectedMessageNames: [],
-      timeAxisSeconds,
+      timeAxisSeconds: [],
       messageOptions: uniqueMessageOptions,
       signalOptions: signalOptions.map(signal => ({
         ...signal,
-        selected: false
+        selected: false,
+        values: []
       }))
     };
   }
@@ -708,58 +987,21 @@ export class SignalPlotterComponent {
     return manifest.dbc?.canFrames ?? [];
   }
 
-  private buildSyntheticTimeAxisFromManifest(
-    manifest: RunManifest
-  ): number[] {
-
-    const intervalSec =
-      this.getPositiveNumber(
-        manifest.simulation?.intervalSec,
-        5
-      );
-
-    const durationSec =
-      this.getPositiveNumber(
-        manifest.simulation?.durationSec,
-        600
-      );
-
-    const pointCountFromDuration =
-      Math.max(
-        2,
-        Math.floor(durationSec / intervalSec)
-      );
-
-    const pointCount =
-      Math.min(
-        pointCountFromDuration,
-        Math.max(
-          2,
-          this.getPositiveNumber(
-            manifest.simulation?.numberOfBlocks,
-            pointCountFromDuration
-          )
-        )
-      );
-
-    return Array.from(
-      { length: pointCount },
-      (_, index) => Number((index * intervalSec).toFixed(3))
-    );
-  }
-
   private buildSignalOptionsFromManifest(
-    frames: RunManifestResolvedCanFrame[],
-    timeAxisSeconds: number[]
+    frames: RunManifestResolvedCanFrame[]
   ): PlotSignalOption[] {
 
     const signalOptions: PlotSignalOption[] = [];
 
     frames.forEach((frame, frameIndex) => {
+      const canId =
+        frame.canId?.trim() ||
+        `frame-${frameIndex}`;
+
       const messageName =
         frame.messageName?.trim() ||
         frame.frame?.n?.trim() ||
-        `Message_${frame.canId ?? frameIndex + 1}`;
+        `Message_${canId}`;
 
       const signals =
         frame.frame?.s ?? [];
@@ -770,7 +1012,7 @@ export class SignalPlotterComponent {
 
         const id =
           [
-            frame.canId ?? `frame-${frameIndex}`,
+            canId,
             messageName,
             signalName,
             signalIndex
@@ -778,16 +1020,12 @@ export class SignalPlotterComponent {
 
         signalOptions.push({
           id,
+          canId,
           messageName,
           signalName,
           unit: '',
           selected: false,
-          values: this.buildSyntheticSignalValues(
-            rawSignal,
-            signalName,
-            signalOptions.length,
-            timeAxisSeconds
-          )
+          values: []
         });
       });
     });
@@ -806,130 +1044,6 @@ export class SignalPlotterComponent {
     return typeof compactName === 'string' && compactName.trim().length > 0
       ? compactName.trim()
       : `Signal_${signalIndex + 1}`;
-  }
-
-  private buildSyntheticSignalValues(
-    rawSignal: unknown[],
-    signalName: string,
-    signalGlobalIndex: number,
-    timeAxisSeconds: number[]
-  ): number[] {
-
-    const bounds =
-      this.resolveSyntheticSignalBounds(
-        rawSignal,
-        signalName,
-        signalGlobalIndex
-      );
-
-    const amplitude =
-      (bounds.max - bounds.min) / 2;
-
-    const center =
-      bounds.min + amplitude;
-
-    const period =
-      45 + ((signalGlobalIndex % 7) * 17);
-
-    const phase =
-      signalGlobalIndex * 0.73;
-
-    const isDiscrete =
-      bounds.max - bounds.min <= 4;
-
-    return timeAxisSeconds.map(time => {
-      const wave =
-        Math.sin((time / period) * Math.PI * 2 + phase);
-
-      const value =
-        center + amplitude * wave;
-
-      if (isDiscrete) {
-        return Math.max(
-          bounds.min,
-          Math.min(
-            bounds.max,
-            Math.round(value)
-          )
-        );
-      }
-
-      return Number(value.toFixed(3));
-    });
-  }
-
-  private resolveSyntheticSignalBounds(
-    rawSignal: unknown[],
-    signalName: string,
-    signalGlobalIndex: number
-  ): AxisBounds {
-
-    const manifestMin =
-      this.getFiniteNumber(rawSignal[6]);
-
-    const manifestMax =
-      this.getFiniteNumber(rawSignal[7]);
-
-    if (
-      manifestMin !== null &&
-      manifestMax !== null &&
-      manifestMax > manifestMin
-    ) {
-      return {
-        min: manifestMin,
-        max: manifestMax
-      };
-    }
-
-    const lowerName =
-      signalName.toLowerCase();
-
-    if (lowerName.includes('speed') || lowerName.includes('whl')) {
-      return { min: 0, max: 160 };
-    }
-
-    if (lowerName.includes('angle') || lowerName.includes('ste')) {
-      return { min: -120, max: 120 };
-    }
-
-    if (lowerName.includes('accel') || lowerName.includes('_a_')) {
-      return { min: -4, max: 4 };
-    }
-
-    if (lowerName.includes('yaw') || lowerName.includes('pitch') || lowerName.includes('rol')) {
-      return { min: -6.5, max: 6.5 };
-    }
-
-    if (lowerName.includes('door') || lowerName.includes('light') || lowerName.includes('button')) {
-      return { min: 0, max: 1 };
-    }
-
-    const baseMin =
-      10 + ((signalGlobalIndex % 5) * 8);
-
-    return {
-      min: baseMin,
-      max: baseMin + 80
-    };
-  }
-
-  private getPositiveNumber(
-    value: unknown,
-    fallback: number
-  ): number {
-
-    const parsedValue =
-      this.getFiniteNumber(value);
-
-    return parsedValue !== null && parsedValue > 0
-      ? parsedValue
-      : fallback;
-  }
-
-  private getFiniteNumber(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value)
-      ? value
-      : null;
   }
 
   private buildEmptyPlotterData(
