@@ -27,11 +27,13 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 
 import { S3TreeNode } from '../../decoder.component';
 
-const monacoLoader = new DefaultMonacoLoader({
-  paths: {
-    vs: '/vs'
-  }
-});
+const tracksterMonacoLoader =
+  (globalThis as any).__tracksterMonacoLoader ??
+  ((globalThis as any).__tracksterMonacoLoader = new DefaultMonacoLoader({
+    paths: {
+      vs: '/vs'
+    }
+  }));
 
 interface RuntimeConfig {
   s3Default?: string;
@@ -75,7 +77,7 @@ type RunManifestView = 'summary' | 'dbc' | 'json';
   providers: [
     {
       provide: NGX_MONACO_LOADER_PROVIDER,
-      useValue: monacoLoader
+      useValue: tracksterMonacoLoader
     }
   ],
   templateUrl: './runmanifest-viewer.component.html',

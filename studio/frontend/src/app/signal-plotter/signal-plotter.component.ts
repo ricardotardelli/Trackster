@@ -2127,4 +2127,12 @@ export class SignalPlotterComponent {
       ? `${formattedValue} ${unit}`
       : formattedValue;
   }
+
+  get shouldRenderChart(): boolean {
+    if (this.chartType === 'signals-over-time') {
+      return this.selectedSignalCount > 0;
+    }
+
+    return !!this.selectedXAxisSignalId && !!this.selectedYAxisSignalId;
+  }
 }

@@ -67,6 +67,22 @@ interface SimulationModeOption {
   description: string;
 }
 
+interface DevelopmentRunManifestResolvedCanFrame {
+  dbcFile?: string;
+  canId?: string;
+  messageName?: string;
+  frame?: {
+    n?: string;
+  };
+}
+
+interface DevelopmentRunManifest {
+  dbc?: {
+    resolvedCanFrames?: DevelopmentRunManifestResolvedCanFrame[];
+    canFrames?: DevelopmentRunManifestResolvedCanFrame[];
+  };
+}
+
 @Component({
   selector: 'app-simulator',
   standalone: true,
@@ -183,6 +199,7 @@ export class SimulatorComponent implements OnInit {
   private suppressFormReset = false;
   private formValueChangesBound = false;
   private canFrameCatalog: CanFrameOption[] = [];
+  private readonly developmentRunManifestUrl = 'assets/mock/run-manifest.json';
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -753,6 +770,7 @@ export class SimulatorComponent implements OnInit {
 
   private async loadConfig(): Promise<void> {
     const config = await this.fetchRuntimeConfig();
+    const useLocalMock = this.isAuthDisabled();
 
     this.isLoadingDbcOptions = true;
 
@@ -772,18 +790,20 @@ export class SimulatorComponent implements OnInit {
       throw new Error('engineURL missing or empty in config.json');
     }
 
-    if (
-      typeof config.dbcApi?.folderCatalogUrl !== 'string' ||
-      !config.dbcApi.folderCatalogUrl.trim()
-    ) {
-      throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
-    }
+    if (!useLocalMock) {
+      if (
+        typeof config.dbcApi?.folderCatalogUrl !== 'string' ||
+        !config.dbcApi.folderCatalogUrl.trim()
+      ) {
+        throw new Error('dbcApi.folderCatalogUrl missing or empty in config.json');
+      }
 
-    if (
-      typeof config.dbcApi?.getDbcCanIds !== 'string' ||
-      !config.dbcApi.getDbcCanIds.trim()
-    ) {
-      throw new Error('dbcApi.getDbcCanIds missing or empty in config.json');
+      if (
+        typeof config.dbcApi?.getDbcCanIds !== 'string' ||
+        !config.dbcApi.getDbcCanIds.trim()
+      ) {
+        throw new Error('dbcApi.getDbcCanIds missing or empty in config.json');
+      }
     }
 
     this.suppressFormReset = true;
@@ -801,13 +821,15 @@ export class SimulatorComponent implements OnInit {
     this.isConfigLoaded = true;
 
     try {
-      const validatedDbcFiles = await this.loadValidatedDbcFiles(
-        config.dbcApi.folderCatalogUrl.trim()
-      );
+      const validatedDbcFiles = useLocalMock
+        ? await this.loadDevelopmentDbcFiles()
+        : await this.loadValidatedDbcFiles(
+          config.dbcApi!.folderCatalogUrl!.trim()
+        );
 
       this.dbcOptions = [...validatedDbcFiles];
       this.form.controls.dbcFiles.setValue([...this.dbcOptions], { emitEvent: false });
-    } 
+    }
     catch (error) {
       console.error('Unable to load validated DBC files:', error);
 
@@ -821,10 +843,12 @@ export class SimulatorComponent implements OnInit {
     this.isLoadingCanFrameOptions = true;
 
     try {
-      this.canFrameCatalog = await this.loadCanFrameCatalog(
-        config.dbcApi.getDbcCanIds.trim()
-      );
-    } 
+      this.canFrameCatalog = useLocalMock
+        ? await this.loadDevelopmentCanFrameCatalog()
+        : await this.loadCanFrameCatalog(
+          config.dbcApi!.getDbcCanIds!.trim()
+        );
+    }
     catch (error) {
       console.error('Unable to load CAN frame catalog:', error);
 
@@ -892,6 +916,86 @@ export class SimulatorComponent implements OnInit {
     throw new Error(
       `Unable to load runtime config from assets/config.json. Last HTTP status: ${lastStatus ?? 'unknown'}`
     );
+  }
+
+  private async loadDevelopmentRunManifest(): Promise<DevelopmentRunManifest> {
+    const response = await fetch(`${this.developmentRunManifestUrl}?t=${Date.now()}`, {
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Unable to load development run-manifest. HTTP ${response.status} ${response.statusText || ''}`.trim()
+      );
+    }
+
+    return await response.json() as DevelopmentRunManifest;
+  }
+
+  private async loadDevelopmentDbcFiles(): Promise<string[]> {
+    const manifest = await this.loadDevelopmentRunManifest();
+    const frames = this.getDevelopmentResolvedCanFrames(manifest);
+
+    const dbcFiles = frames
+      .map((frame) => frame.dbcFile?.trim() ?? '')
+      .filter((dbcFile) => dbcFile.length > 0);
+
+    return Array.from(new Set(dbcFiles))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  private async loadDevelopmentCanFrameCatalog(): Promise<CanFrameOption[]> {
+    const manifest = await this.loadDevelopmentRunManifest();
+    const frames = this.getDevelopmentResolvedCanFrames(manifest);
+
+    return frames
+      .filter((frame) => {
+        return (
+          typeof frame.dbcFile === 'string' && frame.dbcFile.trim().length > 0 &&
+          typeof frame.canId === 'string' && frame.canId.trim().length > 0 &&
+          (
+            typeof frame.messageName === 'string' && frame.messageName.trim().length > 0 ||
+            typeof frame.frame?.n === 'string' && frame.frame.n.trim().length > 0
+          )
+        );
+      })
+      .map((frame) => {
+        const dbcFile = frame.dbcFile!.trim();
+        const canId = frame.canId!.trim();
+        const messageName = (frame.messageName || frame.frame?.n || '').trim();
+
+        return {
+          dbcFile,
+          canId,
+          messageName,
+          label: `${canId} · ${messageName} · ${dbcFile}`
+        };
+      })
+      .sort((a, b) => {
+        const dbcCompare = a.dbcFile.localeCompare(b.dbcFile);
+
+        if (dbcCompare !== 0) {
+          return dbcCompare;
+        }
+
+        return a.canId.localeCompare(b.canId);
+      });
+  }
+
+  private getDevelopmentResolvedCanFrames(
+    manifest: DevelopmentRunManifest
+  ): DevelopmentRunManifestResolvedCanFrame[] {
+    const resolvedFrames = manifest.dbc?.resolvedCanFrames ?? [];
+
+    if (Array.isArray(resolvedFrames) && resolvedFrames.length > 0) {
+      return resolvedFrames;
+    }
+
+    const canFrames = manifest.dbc?.canFrames ?? [];
+
+    return Array.isArray(canFrames)
+      ? canFrames
+      : [];
   }
 
   private async loadValidatedDbcFiles(folderCatalogUrl: string): Promise<string[]> {

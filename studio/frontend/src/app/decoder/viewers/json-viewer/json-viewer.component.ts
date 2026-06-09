@@ -38,6 +38,14 @@ interface MonacoEditorInitializedEvent {
   monaco?: typeof monaco;
 }
 
+const tracksterMonacoLoader =
+  (globalThis as any).__tracksterMonacoLoader ??
+  ((globalThis as any).__tracksterMonacoLoader = new DefaultMonacoLoader({
+    paths: {
+      vs: '/vs'
+    }
+  }));
+
 @Component({
   selector: 'app-json-viewer',
   standalone: true,
@@ -51,7 +59,7 @@ interface MonacoEditorInitializedEvent {
   providers: [
     {
       provide: NGX_MONACO_LOADER_PROVIDER,
-      useClass: DefaultMonacoLoader
+      useValue: tracksterMonacoLoader
     }
   ],
   templateUrl: './json-viewer.component.html',

@@ -19,11 +19,13 @@ import { firstValueFrom } from 'rxjs';
 import { ViewChild, TemplateRef } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 
-const monacoLoader = new DefaultMonacoLoader({
-  paths: {
-    vs: '/vs'
-  }
-});
+const tracksterMonacoLoader =
+  (globalThis as any).__tracksterMonacoLoader ??
+  ((globalThis as any).__tracksterMonacoLoader = new DefaultMonacoLoader({
+    paths: {
+      vs: '/vs'
+    }
+  }));
 
 type OriginalDbcStatus = 'pending' | 'validated' | 'rejected';
 
@@ -53,7 +55,7 @@ interface OriginalDbcFile {
     MatIconModule,
     DbcFindComponent
   ],
-  providers: [{ provide: NGX_MONACO_LOADER_PROVIDER, useValue: monacoLoader }],
+  providers: [{ provide: NGX_MONACO_LOADER_PROVIDER, useValue: tracksterMonacoLoader }],
   templateUrl: './dbceditor.component.html',
   styleUrl: './dbceditor.component.css'
 })
