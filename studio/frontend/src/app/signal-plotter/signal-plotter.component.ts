@@ -56,11 +56,7 @@ interface RuntimeConfig {
   s3Region?: string;
   customerId?: string;
   clientId?: string;
-  signalPlotterApi?: {
-    plotDataUrl?: string;
-  };
   decoderApi?: {
-    signalPlotterUrl?: string;
     signalPlotterDataUrl?: string;
   };
 }
@@ -796,14 +792,11 @@ export class SignalPlotterComponent {
   ): string {
 
     const url =
-      config.signalPlotterApi?.plotDataUrl ||
-      config.decoderApi?.signalPlotterDataUrl ||
-      config.decoderApi?.signalPlotterUrl ||
-      '';
+      config.decoderApi?.signalPlotterDataUrl || '';
 
     if (!url.trim()) {
       throw new Error(
-        'Missing Signal Plotter API URL in assets/config.json. Expected signalPlotterApi.plotDataUrl or decoderApi.signalPlotterDataUrl.'
+        'Missing Signal Plotter API URL in assets/config.json. Expected decoderApi.signalPlotterDataUrl.'
       );
     }
 

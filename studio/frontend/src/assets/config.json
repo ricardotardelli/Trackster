@@ -26,7 +26,8 @@
       "blfExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-blf",
       "mf4ExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-mf4",
       "parquetExportUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-parquet",
-      "binFilesDelete": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/delete-bin"
+      "binFilesDelete": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/delete-bin",
+      "signalPlotterDataUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/get-signal-plotter-data"
    },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
