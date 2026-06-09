@@ -364,40 +364,41 @@
 
 .signal-picker-actions {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  min-width: 0;
   padding: 0 2px 4px;
   margin-bottom: 2px;
   border-bottom: 1px solid rgba(191, 219, 254, 0.58);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .signal-picker-action-button {
-  flex: 0 0 auto;
-  min-width: 72px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 72px;
+  width: 72px;
+  max-width: 72px;
   height: 22px;
-  padding: 0 8px;
+  min-height: 22px;
+  padding: 0 4px;
   border: 1px solid rgba(147, 197, 253, 0.78);
   border-radius: 6px;
   background: #ffffff;
   color: #102349;
   font-family: inherit;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
   line-height: 20px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   box-sizing: border-box;
-}
-
-.signal-picker-action-button:hover:not(:disabled) {
-  background: rgba(239, 246, 255, 0.92);
-  border-color: #38bdf8;
-}
-
-.signal-picker-action-button:disabled {
-  opacity: 0.46;
-  cursor: default;
 }
 
 .signal-picker-action-button:hover:not(:disabled) {
