@@ -1,0 +1,248 @@
+<div class="admin-layout">
+  <section class="admin-hero">
+    <div>
+      <p class="eyebrow">Trackster Administration</p>
+      <h2>Clients and users</h2>
+      <p>
+        Manage Trackster clients, client IDs, and the first administrators for each tenant.
+      </p>
+    </div>
+  </section>
+
+  <section class="admin-grid">
+    <article class="admin-card">
+      <div class="card-header">
+        <div>
+          <h3>Create client</h3>
+          <p>Create a new company tenant and assign a Trackster client ID.</p>
+        </div>
+      </div>
+
+      <form class="admin-form" (ngSubmit)="createClient()">
+        <label>
+          <span>Client ID</span>
+          <input
+            type="text"
+            name="clientId"
+            [(ngModel)]="newClient.clientId"
+            placeholder="00000001"
+          />
+        </label>
+
+        <label>
+          <span>Company name</span>
+          <input
+            type="text"
+            name="companyName"
+            [(ngModel)]="newClient.companyName"
+            placeholder="Example Automotive"
+          />
+        </label>
+
+        <label>
+          <span>Company email</span>
+          <input
+            type="email"
+            name="companyEmail"
+            [(ngModel)]="newClient.companyEmail"
+            placeholder="admin@example.com"
+          />
+        </label>
+
+        <button type="submit" class="primary-button">
+          Create client
+        </button>
+      </form>
+    </article>
+
+    <article class="admin-card">
+      <div class="card-header">
+        <div>
+          <h3>Create client admin</h3>
+          <p>Create an administrator associated with the selected client ID.</p>
+        </div>
+      </div>
+
+      <form class="admin-form" (ngSubmit)="createUser()">
+        <label>
+          <span>Client</span>
+          <select
+            name="userClientId"
+            [(ngModel)]="newUser.clientId"
+          >
+            <option value="">Use selected client</option>
+            <option
+              *ngFor="let client of activeClients"
+              [value]="client.clientId"
+            >
+              {{ client.clientId }} - {{ client.companyName }}
+            </option>
+          </select>
+        </label>
+
+        <label>
+          <span>Username</span>
+          <input
+            type="text"
+            name="username"
+            [(ngModel)]="newUser.username"
+            placeholder="john"
+          />
+        </label>
+
+        <label>
+          <span>Email</span>
+          <input
+            type="email"
+            name="email"
+            [(ngModel)]="newUser.email"
+            placeholder="john@example.com"
+          />
+        </label>
+
+        <label>
+          <span>Full name</span>
+          <input
+            type="text"
+            name="fullName"
+            [(ngModel)]="newUser.fullName"
+            placeholder="John Smith"
+          />
+        </label>
+
+        <label>
+          <span>Role</span>
+          <select
+            name="clientRole"
+            [(ngModel)]="newUser.clientRole"
+          >
+            <option value="client_admin">Client administrator</option>
+            <option value="client_user">Client user</option>
+          </select>
+        </label>
+
+        <button type="submit" class="primary-button">
+          Create user
+        </button>
+      </form>
+    </article>
+  </section>
+
+  <section class="admin-card wide-card">
+    <div class="card-header split-header">
+      <div>
+        <h3>Clients</h3>
+        <p>Select a client to inspect users and tenant status.</p>
+      </div>
+
+      <select
+        class="compact-select"
+        [(ngModel)]="selectedClientId"
+        name="selectedClientId"
+      >
+        <option value="">All clients</option>
+        <option
+          *ngFor="let client of clients"
+          [value]="client.clientId"
+        >
+          {{ client.clientId }} - {{ client.companyName }}
+        </option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Client ID</th>
+            <th>Company</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let client of clients">
+            <td>{{ client.clientId }}</td>
+            <td>{{ client.companyName }}</td>
+            <td>{{ client.companyEmail || '-' }}</td>
+            <td>
+              <span class="status-pill" [class.inactive]="client.status !== 'active'">
+                {{ client.status }}
+              </span>
+            </td>
+            <td>{{ client.createdAt }}</td>
+            <td class="actions-col">
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="suspendClient(client)"
+              >
+                {{ client.status === 'active' ? 'Suspend' : 'Activate' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-card wide-card">
+    <div class="card-header">
+      <div>
+        <h3>Users</h3>
+        <p>Users associated with the selected client context.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Full name</th>
+            <th>Email</th>
+            <th>Client ID</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of filteredUsers">
+            <td>{{ user.username }}</td>
+            <td>{{ user.fullName || '-' }}</td>
+            <td>{{ user.email || '-' }}</td>
+            <td>{{ user.clientId }}</td>
+            <td>
+              {{ user.globalRole === 'trackster_admin' ? 'Trackster admin' : user.clientRole }}
+            </td>
+            <td>
+              <span class="status-pill" [class.inactive]="user.status !== 'active'">
+                {{ user.status }}
+              </span>
+            </td>
+            <td class="actions-col">
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="resetPassword(user)"
+              >
+                Reset password
+              </button>
+
+              <button
+                type="button"
+                class="danger-button"
+                (click)="disableUser(user)"
+              >
+                {{ user.status === 'active' ? 'Disable' : 'Activate' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

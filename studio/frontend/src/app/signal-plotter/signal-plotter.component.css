@@ -365,11 +365,10 @@
 .signal-picker-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
   min-width: 0;
-  padding: 0 12px 4px 2px;
-  margin-right: 8px;
+  padding: 0 2px 4px;
   margin-bottom: 2px;
   border-bottom: 1px solid rgba(191, 219, 254, 0.58);
   box-sizing: border-box;
@@ -380,9 +379,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 1 72px;
-  width: 72px;
-  max-width: 72px;
+  flex: 0 1 68px;
+  width: 68px;
+  max-width: 68px;
   height: 22px;
   min-height: 22px;
   padding: 0 4px;

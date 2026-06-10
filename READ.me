@@ -65,16 +65,30 @@ https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/export-bin-mf4
         - dlc               uint8
         - payload           dlc bytes
 
+ - RDS
+    - Postgres
+      host:           trackster-db.cyne4im2uzq8.us-east-1.rds.amazonaws.com
+      Instance:       trackster-db
+      DB:             trackster-postgres 
+      usermaster:     tracksteradm
+      psw:            Postgrestrkst1972!
+      SecurityGroup:  trackster-db-sg
+
+
+
+
+
 
 Next Steps:
 ============
 OK - Extended CAN ID - Implementado
 OK - Rolling counters - coincide with block#
-- Decoder / Exporter
+OK - Decoder / Exporter
 - Real cycle scheduling
-- BLF/MF4 export
+OK - BLF/MF4 export
 - Replay engine
 - Physical coherence AI
 - AI-assisted checksum metadata for compiled DBC files (DBC Studio)
+- Multi client/user architecture
 
 

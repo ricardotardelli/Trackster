@@ -5,11 +5,12 @@
         <img src="../assets/img/TracksterLogo.svg" alt="Trackster" class="panel-brand-logo" />
         <span class="brand-name">Trackster</span>
       </div>
+
       <div class="panel-header">
         <div class="panel-header-main">
           <div class="brand-row">
             <div class="brand-copy">
-              <h1>Simulation Studio</h1>
+              <h1>{{ activeWorkspaceTitle }}</h1>
               <p class="subtitle">{{ activeWorkspaceDescription }}</p>
             </div>
           </div>
@@ -48,11 +49,7 @@
             </span>
           </button>
 
-          <div
-            class="user-menu-dropdown"
-            *ngIf="userMenuOpen"
-            role="menu"
-          >
+          <div class="user-menu-dropdown" *ngIf="userMenuOpen" role="menu">
             <a
               class="user-menu-item"
               href=""
@@ -76,6 +73,7 @@
           </div>
         </div>
       </div>
+
       <div class="workspace-shell">
         <mat-tab-group
           class="trackster-tabs"
@@ -83,8 +81,8 @@
           (selectedIndexChange)="onTabChange($event)"
           animationDuration="0ms"
           mat-stretch-tabs="false"
-          mat-align-tabs="start">
-
+          mat-align-tabs="start"
+        >
           <mat-tab label="Simulation Generator">
             <app-simulator></app-simulator>
           </mat-tab>
@@ -101,9 +99,12 @@
             <app-signal-plotter></app-signal-plotter>
           </mat-tab>
 
+          <mat-tab *ngIf="canSeeAdministrationTab" [label]="administrationTabLabel">
+            <app-master-admin *ngIf="isTracksterAdmin"></app-master-admin>
+            <app-client-admin *ngIf="!isTracksterAdmin && isClientAdmin"></app-client-admin>
+          </mat-tab>
         </mat-tab-group>
       </div>
-      
     </section>
   </main>
 </div>

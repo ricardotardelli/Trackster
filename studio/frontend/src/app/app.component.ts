@@ -2,13 +2,23 @@ import { SimulatorComponent } from './simulator/simulator.component';
 import { DbcworkspaceComponent } from './dbcworkspace/dbcworkspace.component';
 import { DecoderComponent } from './decoder/decoder.component';
 import { SignalPlotterComponent } from './signal-plotter/signal-plotter.component';
+import { ClientAdminComponent } from './adminmodule/client-admin.component';
+import { MasterAdminComponent } from './adminmodule/master-admin.component';
 import { MatTabsModule } from '@angular/material/tabs';
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 
-type WorkspaceModule = 'generator' | 'decoder' | 'dbc-manager';
+type WorkspaceModule =
+  | 'generator'
+  | 'dbc-manager'
+  | 'decoder'
+  | 'signal-plotter'
+  | 'administration';
+
+type TracksterGlobalRole = 'trackster_admin' | null;
+type TracksterClientRole = 'client_admin' | 'client_user' | null;
 
 interface WorkspaceTab {
   id: WorkspaceModule;
@@ -27,7 +37,9 @@ interface WorkspaceTab {
     SimulatorComponent,
     DbcworkspaceComponent,
     DecoderComponent,
-    SignalPlotterComponent
+    SignalPlotterComponent,
+    ClientAdminComponent,
+    MasterAdminComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
@@ -48,26 +60,9 @@ export class AppComponent implements OnInit {
   selectedTabIndex = 0;
   activeModule: WorkspaceModule = 'generator';
 
-  readonly workspaceTabs: readonly WorkspaceTab[] = [
-    {
-      id: 'generator',
-      label: 'Simulation Studio',
-      shortLabel: 'Studio',
-      description: 'Build and generate CAN simulation packages.'
-    },
-    {
-      id: 'decoder',
-      label: 'Signal Decoder',
-      shortLabel: 'Decoder',
-      description: 'Inspect frames, decode payloads, and validate signals.'
-    },
-    {
-      id: 'dbc-manager',
-      label: 'DBC Vault',
-      shortLabel: 'Vault',
-      description: 'Organize, validate, and prepare DBC assets.'
-    }
-  ];
+  globalRole: TracksterGlobalRole = null;
+  clientRole: TracksterClientRole = null;
+  clientId = '';
 
   @ViewChild('userMenuContainer', { static: false })
   private userMenuContainer?: ElementRef<HTMLElement>;
@@ -76,16 +71,28 @@ export class AppComponent implements OnInit {
     void this.initializeApp();
   }
 
-  get isGeneratorModule(): boolean {
-    return this.activeModule === 'generator';
+  get isTracksterAdmin(): boolean {
+    return this.globalRole === 'trackster_admin';
   }
 
-  get isDecoderModule(): boolean {
-    return this.activeModule === 'decoder';
+  get isClientAdmin(): boolean {
+    return this.clientRole === 'client_admin';
   }
 
-  get isDbcManagerModule(): boolean {
-    return this.activeModule === 'dbc-manager';
+  get canSeeAdministrationTab(): boolean {
+    return this.isTracksterAdmin || this.isClientAdmin;
+  }
+
+  get administrationTabLabel(): string {
+    if (this.isTracksterAdmin) {
+      return 'Trackster Administration';
+    }
+
+    if (this.isClientAdmin) {
+      return 'User Management';
+    }
+
+    return '';
   }
 
   get activeWorkspaceTab(): WorkspaceTab {
@@ -100,6 +107,39 @@ export class AppComponent implements OnInit {
     return this.activeWorkspaceTab.description;
   }
 
+  readonly workspaceTabs: readonly WorkspaceTab[] = [
+    {
+      id: 'generator',
+      label: 'Simulation Studio',
+      shortLabel: 'Studio',
+      description: 'Build and generate CAN simulation packages.'
+    },
+    {
+      id: 'dbc-manager',
+      label: 'DBC Workspace',
+      shortLabel: 'DBC',
+      description: 'Organize, validate, and prepare DBC assets.'
+    },
+    {
+      id: 'decoder',
+      label: 'Decoder / Exporter',
+      shortLabel: 'Decoder',
+      description: 'Inspect frames, decode payloads, and export simulation data.'
+    },
+    {
+      id: 'signal-plotter',
+      label: 'Signal Plotter',
+      shortLabel: 'Plotter',
+      description: 'Visualize decoded signals and compare telemetry curves.'
+    },
+    {
+      id: 'administration',
+      label: 'Administration',
+      shortLabel: 'Admin',
+      description: 'Manage Trackster clients and users.'
+    }
+  ];
+
   onTabChange(index: number): void {
     this.selectedTabIndex = index;
 
@@ -109,24 +149,10 @@ export class AppComponent implements OnInit {
       this.activeModule = 'dbc-manager';
     } else if (index === 2) {
       this.activeModule = 'decoder';
-    }
-
-    this.closeUserMenu();
-  }
-
-  setActiveModule(module: WorkspaceModule): void {
-    if (this.activeModule === module) {
-      return;
-    }
-
-    this.activeModule = module;
-
-    if (module === 'generator') {
-      this.selectedTabIndex = 0;
-    } else if (module === 'dbc-manager') {
-      this.selectedTabIndex = 1;
-    } else if (module === 'decoder') {
-      this.selectedTabIndex = 2;
+    } else if (index === 3) {
+      this.activeModule = 'signal-plotter';
+    } else if (index === 4 && this.canSeeAdministrationTab) {
+      this.activeModule = 'administration';
     }
 
     this.closeUserMenu();
@@ -159,16 +185,12 @@ export class AppComponent implements OnInit {
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as Node | null;
+
     if (!target) {
       return;
     }
 
     if (this.userMenuOpen && this.userMenuContainer?.nativeElement.contains(target)) {
-      return;
-    }
-
-    if (!this.elementRef.nativeElement.contains(target)) {
-      this.userMenuOpen = false;
       return;
     }
 
@@ -184,7 +206,10 @@ export class AppComponent implements OnInit {
       }
 
       this.isAuthenticated = true;
+
       await this.loadUsername();
+      await this.loadUserAccessContext();
+
       this.authReady = true;
     } catch {
       this.isAuthenticated = false;
@@ -199,5 +224,27 @@ export class AppComponent implements OnInit {
     } catch {
       this.username = 'User';
     }
+  }
+
+  private async loadUserAccessContext(): Promise<void> {
+    const devProfile: 'trackster_admin' | 'client_admin' | 'client_user' = 'trackster_admin';
+
+    if (devProfile === 'trackster_admin') {
+      this.globalRole = 'trackster_admin';
+      this.clientRole = 'client_admin';
+      this.clientId = '00000000';
+      return;
+    }
+
+    if (devProfile === 'client_admin') {
+      this.globalRole = null;
+      this.clientRole = 'client_admin';
+      this.clientId = '00000000';
+      return;
+    }
+
+    this.globalRole = null;
+    this.clientRole = 'client_user';
+    this.clientId = '00000000';
   }
 }

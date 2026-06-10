@@ -1,0 +1,166 @@
+<div class="client-admin-layout">
+  <section class="admin-hero">
+    <div>
+      <p class="eyebrow">User Management</p>
+      <h2>{{ companyName }}</h2>
+      <p>
+        Manage users associated with client ID {{ clientId }}.
+      </p>
+    </div>
+
+    <div class="summary-strip">
+      <div class="summary-box">
+        <span>Client ID</span>
+        <strong>{{ clientId }}</strong>
+      </div>
+
+      <div class="summary-box">
+        <span>Active users</span>
+        <strong>{{ activeUserCount }}</strong>
+      </div>
+
+      <div class="summary-box">
+        <span>Admins</span>
+        <strong>{{ adminUserCount }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-grid">
+    <article class="admin-card create-card">
+      <div class="card-header">
+        <div>
+          <h3>Create user</h3>
+          <p>Create a user inside your company tenant.</p>
+        </div>
+      </div>
+
+      <form class="admin-form" (ngSubmit)="createUser()">
+        <label>
+          <span>Username</span>
+          <input
+            type="text"
+            name="username"
+            [(ngModel)]="newUser.username"
+            placeholder="john"
+          />
+        </label>
+
+        <label>
+          <span>Email</span>
+          <input
+            type="email"
+            name="email"
+            [(ngModel)]="newUser.email"
+            placeholder="john@example.com"
+          />
+        </label>
+
+        <label>
+          <span>Full name</span>
+          <input
+            type="text"
+            name="fullName"
+            [(ngModel)]="newUser.fullName"
+            placeholder="John Smith"
+          />
+        </label>
+
+        <label>
+          <span>Role</span>
+          <select
+            name="role"
+            [(ngModel)]="newUser.role"
+          >
+            <option value="client_user">Client user</option>
+            <option value="client_admin">Client administrator</option>
+          </select>
+        </label>
+
+        <button type="submit" class="primary-button">
+          Create user
+        </button>
+      </form>
+    </article>
+
+    <article class="admin-card info-card">
+      <div class="card-header">
+        <div>
+          <h3>Client access rules</h3>
+          <p>Users created here are always scoped to your client ID.</p>
+        </div>
+      </div>
+
+      <div class="rule-list">
+        <div class="rule-item">
+          <strong>Client isolation</strong>
+          <span>Users can only access resources under client ID {{ clientId }}.</span>
+        </div>
+
+        <div class="rule-item">
+          <strong>User role</strong>
+          <span>Client users can use Trackster but cannot manage users.</span>
+        </div>
+
+        <div class="rule-item">
+          <strong>Admin role</strong>
+          <span>Client administrators can create, disable, and reset users in this client.</span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="admin-card users-card">
+    <div class="card-header">
+      <div>
+        <h3>Users</h3>
+        <p>Current users associated with this client.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Full name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users">
+            <td>{{ user.username }}</td>
+            <td>{{ user.fullName || '-' }}</td>
+            <td>{{ user.email || '-' }}</td>
+            <td>{{ user.role }}</td>
+            <td>
+              <span class="status-pill" [class.inactive]="user.status !== 'active'">
+                {{ user.status }}
+              </span>
+            </td>
+            <td class="actions-col">
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="resetPassword(user)"
+              >
+                Reset password
+              </button>
+
+              <button
+                type="button"
+                class="danger-button"
+                (click)="disableUser(user)"
+              >
+                {{ user.status === 'active' ? 'Disable' : 'Activate' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
