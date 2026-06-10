@@ -425,9 +425,7 @@
 
       <div class="signal-chart-shell">
 
-        <div *ngIf="shouldRenderChart" echarts class="signal-chart" [options]="chartOptions" [autoResize]="true" (chartInit)="onChartInit($event)"></div>
-
-        <div *ngIf="!shouldRenderChart" class="signal-chart"></div>
+        <div echarts class="signal-chart" [options]="chartOptions" [autoResize]="true" (chartInit)="onChartInit($event)"></div>
 
       </div>
 

@@ -2,14 +2,14 @@
   "manifestVersion": 1,
   "createdAt": "2026-05-21T15:23:01.403Z",
   "requestId": "9802be99-33bd-4a7b-a777-37dc624d9eb2",
-  "runId": "20260521152301",
-  "timestamp": "20260521152301",
+  "runId": "20260508183000",
+  "timestamp": "20260508183000",
   "customerId": "00000000",
   "clientId": "00000000",
   "output": {
     "bucket": "s3-trackster-can-bucket",
-    "runFolder": "00000000/20260521152301",
-    "manifestKey": "00000000/20260521152301/run-manifest.json",
+    "runFolder": "00000000/20260508183000",
+    "manifestKey": "00000000/20260508183000/run-manifest.json",
     "outputFormat": "BIN"
   },
   "simulation": {
@@ -20,7 +20,7 @@
     "numberOfBlocks": 720,
     "blocksSize": 7560,
     "intervalSec": 5,
-    "durationSec": 3600,
+    "durationSec": 3595,
     "epochMs": 1779380040000,
     "epochSec": 1779380040,
     "initialDateTime": "2026-05-21T16:14",
@@ -1784,74 +1784,220 @@
     ],
     "canFrames": [
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x165",
-        "messageName": "Cruise_Status"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x100",
+        "messageName": "VehicleDynamics",
+        "idf": 256,
+        "frame": {
+          "l": 8,
+          "n": "VehicleDynamics",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "VehicleSpeed"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "SteeringAngle"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "YawRate"
+            ]
+          ]
+        }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x204",
-        "messageName": "EngineData_14"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x101",
+        "messageName": "PowertrainStatus",
+        "idf": 257,
+        "frame": {
+          "l": 8,
+          "n": "PowertrainStatus",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "EngineRPM"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "CoolantTemperature"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "OilPressure"
+            ]
+          ]
+        }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x216",
-        "messageName": "WheelData"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x102",
+        "messageName": "DriverInput",
+        "idf": 258,
+        "frame": {
+          "l": 8,
+          "n": "DriverInput",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "ThrottlePosition"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "AcceleratorPedal"
+            ]
+          ]
+        }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x217",
-        "messageName": "WheelSpeed_CG1"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x103",
+        "messageName": "BrakeSystem",
+        "idf": 259,
+        "frame": {
+          "l": 8,
+          "n": "BrakeSystem",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "BrakePressure"
+            ]
+          ]
+        }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3b3",
-        "messageName": "Doors"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x104",
+        "messageName": "ElectricalSystem",
+        "idf": 260,
+        "frame": {
+          "l": 8,
+          "n": "ElectricalSystem",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "BatteryVoltage"
+            ]
+          ]
+        }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3c3",
-        "messageName": "BCM_to_HS_Body"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x105",
+        "messageName": "VehicleStatus",
+        "idf": 261,
+        "frame": {
+          "l": 8,
+          "n": "VehicleStatus",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "FuelLevel"
+            ]
+          ]
+        }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3ca",
-        "messageName": "Lane_Keep_Assist_Control"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3cc",
-        "messageName": "Lane_Keep_Assist_Status"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3d8",
-        "messageName": "Lane_Keep_Assist_Ui"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x76",
-        "messageName": "Steering_Wheel_Data_CG1"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x82",
-        "messageName": "EPAS_INFO"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x83",
-        "messageName": "Steering_Buttons"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x91",
-        "messageName": "Yaw_Data"
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x92",
-        "messageName": "Accel_Data"
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x106",
+        "messageName": "Environment",
+        "idf": 262,
+        "frame": {
+          "l": 8,
+          "n": "Environment",
+          "s": [
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "AmbientTemperature"
+            ]
+          ]
+        }
       }
     ],
     "selectedCanFrames": 14,
@@ -1873,1070 +2019,219 @@
     ],
     "resolvedCanFrames": [
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x165",
-        "messageName": "Cruise_Status",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x100",
+        "messageName": "VehicleDynamics",
+        "idf": 256,
         "frame": {
           "l": 8,
-          "n": "Cruise_Status",
-          "tx": "XXX",
+          "n": "VehicleDynamics",
           "s": [
             [
-              5,
-              1,
               0,
               0,
-              1,
-              0,
-              0,
-              0,
-              "Brake_Drv_Appl",
-              null,
-              null
-            ],
-            [
-              11,
-              4,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Cruise_State",
-              null,
-              null
-            ],
-            [
-              23,
               8,
-              0,
-              0,
               1,
               0,
               0,
+              "",
+              "",
+              "VehicleSpeed"
+            ],
+            [
               0,
-              "Set_Speed",
-              null,
-              null
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "SteeringAngle"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "YawRate"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x204",
-        "messageName": "EngineData_14",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x101",
+        "messageName": "PowertrainStatus",
+        "idf": 257,
         "frame": {
           "l": 8,
-          "n": "EngineData_14",
-          "tx": "XXX",
+          "n": "PowertrainStatus",
           "s": [
             [
+              0,
+              0,
+              8,
               1,
-              10,
               0,
               0,
-              0.1,
+              "",
+              "",
+              "EngineRPM"
+            ],
+            [
               0,
               0,
+              8,
+              1,
               0,
-              "ApedPosScal_Pc_Actl",
-              null,
-              null
+              0,
+              "",
+              "",
+              "CoolantTemperature"
+            ],
+            [
+              0,
+              0,
+              8,
+              1,
+              0,
+              0,
+              "",
+              "",
+              "OilPressure"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x216",
-        "messageName": "WheelData",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x102",
+        "messageName": "DriverInput",
+        "idf": 258,
         "frame": {
           "l": 8,
-          "n": "WheelData",
-          "tx": "XXX",
+          "n": "DriverInput",
           "s": [
             [
-              23,
+              0,
+              0,
               8,
-              0,
-              0,
               1,
               0,
               0,
-              0,
-              "WhlRotatRr_No_Cnt",
-              null,
-              null
+              "",
+              "",
+              "ThrottlePosition"
             ],
             [
-              33,
-              2,
               0,
               0,
-              1,
-              0,
-              0,
-              0,
-              "WhlDirRr_D_Actl",
-              null,
-              null
-            ],
-            [
-              39,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "WhlDirRl_D_Actl",
-              null,
-              null
-            ],
-            [
-              37,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "WhlDirFr_D_Actl",
-              null,
-              null
-            ],
-            [
-              35,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "WhlDirFl_D_Actl",
-              null,
-              null
-            ],
-            [
-              31,
               8,
-              0,
-              0,
               1,
               0,
               0,
-              0,
-              "WhlRotatRl_No_Cnt",
-              null,
-              null
-            ],
-            [
-              7,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "WhlRotatFr_No_Cnt",
-              null,
-              null
-            ],
-            [
-              15,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "WhlRotatFl_No_Cnt",
-              null,
-              null
-            ],
-            [
-              47,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "WHEEL_ROLLING_TIMESTAMP",
-              null,
-              null
+              "",
+              "",
+              "AcceleratorPedal"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x217",
-        "messageName": "WheelSpeed_CG1",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x103",
+        "messageName": "BrakeSystem",
+        "idf": 259,
         "frame": {
           "l": 8,
-          "n": "WheelSpeed_CG1",
-          "tx": "XXX",
+          "n": "BrakeSystem",
           "s": [
             [
-              55,
-              14,
               0,
               0,
-              0.04,
-              0,
-              0,
-              0,
-              "WhlRr_W_Meas",
-              null,
-              null
-            ],
-            [
-              39,
-              14,
-              0,
-              0,
-              0.04,
-              0,
-              0,
-              0,
-              "WhlRl_W_Meas",
-              null,
-              null
-            ],
-            [
-              23,
-              14,
-              0,
-              0,
-              0.04,
-              0,
-              0,
-              0,
-              "WhlFr_W_Meas",
-              null,
-              null
-            ],
-            [
-              7,
-              14,
-              0,
-              0,
-              0.04,
-              0,
-              0,
-              0,
-              "WhlFl_W_Meas",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3b3",
-        "messageName": "Doors",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "Doors",
-          "tx": "XXX",
-          "s": [
-            [
-              61,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Door_FL_Open",
-              null,
-              null
-            ],
-            [
-              60,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Door_FR_Open",
-              null,
-              null
-            ],
-            [
-              48,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Door_RL_Open",
-              null,
-              null
-            ],
-            [
-              49,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Door_RR_Open",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3c3",
-        "messageName": "BCM_to_HS_Body",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "BCM_to_HS_Body",
-          "tx": "XXX",
-          "s": [
-            [
               8,
               1,
               0,
               0,
-              1,
-              0,
-              0,
-              0,
-              "Brake_Lights",
-              null,
-              null
+              "",
+              "",
+              "BrakePressure"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3ca",
-        "messageName": "Lane_Keep_Assist_Control",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x104",
+        "messageName": "ElectricalSystem",
+        "idf": 260,
         "frame": {
           "l": 8,
-          "n": "Lane_Keep_Assist_Control",
-          "tx": "XXX",
+          "n": "ElectricalSystem",
           "s": [
             [
-              7,
-              4,
               0,
               0,
-              1,
-              0,
-              0,
-              15,
-              "Lkas_Action",
-              null,
-              null
-            ],
-            [
-              3,
-              4,
-              0,
-              0,
-              1,
-              0,
-              0,
-              15,
-              "Lkas_Alert",
-              null,
-              null
-            ],
-            [
-              15,
-              12,
-              0,
-              0,
-              0.000005,
-              -0.01,
-              0,
-              0,
-              "Lane_Curvature",
-              null,
-              null
-            ],
-            [
-              19,
-              12,
-              0,
-              0,
-              0.04297,
-              -88.00445,
-              0,
-              0,
-              "Steer_Angle_Req",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3cc",
-        "messageName": "Lane_Keep_Assist_Status",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "Lane_Keep_Assist_Status",
-          "tx": "XXX",
-          "s": [
-            [
-              7,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "LaHandsOff_B_Actl",
-              null,
-              null
-            ],
-            [
-              6,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "LaActDeny_B_Actl",
-              null,
-              null
-            ],
-            [
-              5,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "LaActAvail_D_Actl",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x3d8",
-        "messageName": "Lane_Keep_Assist_Ui",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "Lane_Keep_Assist_Ui",
-          "tx": "XXX",
-          "s": [
-            [
-              39,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              255,
-              "Set_Me_X80",
-              null,
-              null
-            ],
-            [
-              47,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              255,
-              "Set_Me_X45",
-              null,
-              null
-            ],
-            [
-              55,
-              4,
-              0,
-              0,
-              1,
-              0,
-              0,
-              15,
-              "Lines_Hud",
-              null,
-              null
-            ],
-            [
-              50,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              1,
-              "Hands_Warning_W_Chime",
-              null,
-              null
-            ],
-            [
-              49,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              1,
-              "Hands_Warning",
-              null,
-              null
-            ],
-            [
-              63,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              255,
-              "Set_Me_X30",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x76",
-        "messageName": "Steering_Wheel_Data_CG1",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "Steering_Wheel_Data_CG1",
-          "tx": "XXX",
-          "s": [
-            [
-              6,
-              15,
-              0,
-              0,
-              0.1,
-              -1600,
-              0,
-              0,
-              "SteWhlRelInit_An_Sns",
-              null,
-              null
-            ],
-            [
-              23,
-              15,
-              0,
-              0,
-              0.1,
-              -1600,
-              0,
-              0,
-              "SteWhlRelCalib_An_Sns",
-              null,
-              null
-            ],
-            [
-              55,
-              16,
-              0,
-              0,
-              0.1,
-              -3200,
-              0,
-              0,
-              "SteWhlRelInit2_An_Sns",
-              null,
-              null
-            ],
-            [
-              39,
-              8,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SteWhlAn_No_Cs",
-              null,
-              null
-            ],
-            [
-              47,
-              4,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SteWhlAn_No_Cnt",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x82",
-        "messageName": "EPAS_INFO",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "EPAS_INFO",
-          "tx": "XXX",
-          "s": [
-            [
-              39,
-              8,
-              0,
-              0,
-              0.05,
-              6,
-              0,
-              0,
-              "SteMdule_U_Meas",
-              null,
-              null
-            ],
-            [
-              21,
-              12,
-              0,
-              0,
-              0.05,
-              -64,
-              0,
-              0,
-              "SteMdule_I_Est",
-              null,
-              null
-            ],
-            [
-              9,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "EPAS_FAILURE",
-              null,
-              null
-            ],
-            [
-              7,
-              8,
-              0,
-              0,
-              0.0625,
-              -8,
-              0,
-              0,
-              "SteeringColumnTorque",
-              null,
-              null
-            ],
-            [
-              15,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SAPPAngleControlStat6",
-              null,
-              null
-            ],
-            [
-              14,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SAPPAngleControlStat5",
-              null,
-              null
-            ],
-            [
-              13,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SAPPAngleControlStat4",
-              null,
-              null
-            ],
-            [
-              12,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SAPPAngleControlStat3",
-              null,
-              null
-            ],
-            [
-              11,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SAPPAngleControlStat2",
-              null,
-              null
-            ],
-            [
-              23,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "SAPPAngleControlStat1",
-              null,
-              null
-            ]
-          ],
-          "idf": "standard"
-        }
-      },
-      {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x83",
-        "messageName": "Steering_Buttons",
-        "idf": "standard",
-        "frame": {
-          "l": 8,
-          "n": "Steering_Buttons",
-          "tx": "XXX",
-          "s": [
-            [
-              5,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Right_Turn_Light",
-              null,
-              null
-            ],
-            [
-              4,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Left_Turn_Light",
-              null,
-              null
-            ],
-            [
-              12,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Dist_Decr",
-              null,
-              null
-            ],
-            [
-              11,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Dist_Incr",
-              null,
-              null
-            ],
-            [
               8,
               1,
               0,
               0,
-              1,
-              0,
-              0,
-              0,
-              "Cancel",
-              null,
-              null
-            ],
-            [
-              29,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Resume",
-              null,
-              null
-            ],
-            [
-              28,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Set",
-              null,
-              null
-            ],
-            [
-              38,
-              1,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "Main",
-              null,
-              null
+              "",
+              "",
+              "BatteryVoltage"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x91",
-        "messageName": "Yaw_Data",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x105",
+        "messageName": "VehicleStatus",
+        "idf": 261,
         "frame": {
           "l": 8,
-          "n": "Yaw_Data",
-          "tx": "XXX",
+          "n": "VehicleStatus",
           "s": [
             [
-              39,
-              16,
               0,
               0,
-              0.0002,
-              -6.5,
+              8,
+              1,
               0,
               0,
-              "VehYaw_W_Actl",
-              null,
-              null
-            ],
-            [
-              23,
-              16,
-              0,
-              0,
-              0.0002,
-              -6.5,
-              0,
-              0,
-              "VehRol_W_Actl",
-              null,
-              null
-            ],
-            [
-              7,
-              16,
-              0,
-              0,
-              0.0002,
-              -6.5,
-              0,
-              0,
-              "VehPtch_W_Actl",
-              null,
-              null
+              "",
+              "",
+              "FuelLevel"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       },
       {
-        "dbcFile": "ford_fusion_2018_pt.dbc",
-        "canId": "0x92",
-        "messageName": "Accel_Data",
-        "idf": "standard",
+        "dbcFile": "dev-mock.dbc",
+        "canId": "0x106",
+        "messageName": "Environment",
+        "idf": 262,
         "frame": {
           "l": 8,
-          "n": "Accel_Data",
-          "tx": "XXX",
+          "n": "Environment",
           "s": [
             [
-              38,
-              2,
               0,
               0,
+              8,
               1,
               0,
               0,
-              0,
-              "VehVertAActl_D_Qf",
-              null,
-              null
-            ],
-            [
-              22,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "VehLongAActl_D_Qf",
-              null,
-              null
-            ],
-            [
-              6,
-              2,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              "VehLatAActl_D_Qf",
-              null,
-              null
-            ],
-            [
-              36,
-              13,
-              0,
-              0,
-              0.01,
-              -40,
-              0,
-              0,
-              "VehVert_A_Actl",
-              null,
-              null
-            ],
-            [
-              20,
-              13,
-              0,
-              0,
-              0.01,
-              -40,
-              0,
-              0,
-              "VehLong_A_Actl",
-              null,
-              null
-            ],
-            [
-              4,
-              13,
-              0,
-              0,
-              0.01,
-              -40,
-              0,
-              0,
-              "VehLat_A_Actl",
-              null,
-              null
+              "",
+              "",
+              "AmbientTemperature"
             ]
-          ],
-          "idf": "standard"
+          ]
         }
       }
     ],
@@ -3405,7 +2700,7 @@
                   12,
                   0,
                   0,
-                  0.000005,
+                  5e-06,
                   -0.01,
                   0,
                   0,
