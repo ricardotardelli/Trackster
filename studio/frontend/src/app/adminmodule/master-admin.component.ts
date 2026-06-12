@@ -1,172 +1,213 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 
-interface TracksterClient {
-  clientId: string;
-  companyName: string;
-  companyEmail: string;
-  status: 'active' | 'inactive' | 'suspended';
-  createdAt: string;
+interface MasterAdminPlatformSummary {
+  clients: number;
+  users: number;
+  tracksterAdmins: number;
 }
 
-interface TracksterUser {
-  username: string;
-  email: string;
-  fullName: string;
-  globalRole: 'trackster_admin' | null;
-  clientRole: 'client_admin' | 'client_user';
+interface MasterAdminClientSummary {
   clientId: string;
-  status: 'active' | 'inactive' | 'suspended';
+  name: string;
+  email: string;
+  status: 'Active' | 'Suspended' | 'Inactive';
+  users: number;
+  admins: number;
+}
+
+interface MasterAdminUser {
+  username: string;
+  fullName: string;
+  email: string;
+  role: 'client_admin' | 'client_user';
+  status: 'Active' | 'Inactive' | 'Suspended';
+  clientId: string;
 }
 
 @Component({
   selector: 'app-master-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatIconModule,
+    MatSelectModule
+  ],
   templateUrl: './master-admin.component.html',
   styleUrl: './master-admin.component.css'
 })
 export class MasterAdminComponent {
-  clients: TracksterClient[] = [
+  readonly clients: MasterAdminClientSummary[] = [
     {
       clientId: '00000000',
-      companyName: 'Trackster Demo',
-      companyEmail: 'kadut3@gmail.com',
-      status: 'active',
-      createdAt: '2026-06-10'
+      name: 'Trackster Demo',
+      email: 'kadut3@gmail.com',
+      status: 'Active',
+      users: 3,
+      admins: 1
+    },
+    {
+      clientId: '00000001',
+      name: 'Client A',
+      email: 'admin-a@example.com',
+      status: 'Active',
+      users: 2,
+      admins: 1
+    },
+    {
+      clientId: '00000002',
+      name: 'Client B',
+      email: 'admin-b@example.com',
+      status: 'Active',
+      users: 4,
+      admins: 2
     }
   ];
 
-  users: TracksterUser[] = [
+  readonly users: MasterAdminUser[] = [
     {
       username: 'kadut',
-      email: 'kadut3@gmail.com',
       fullName: 'Ricardo Tardelli',
-      globalRole: 'trackster_admin',
-      clientRole: 'client_admin',
-      clientId: '00000000',
-      status: 'active'
+      email: 'kadut3@gmail.com',
+      role: 'client_admin',
+      status: 'Active',
+      clientId: '00000000'
+    },
+    {
+      username: 'trackster.demo.user',
+      fullName: 'Trackster Demo User',
+      email: 'demo.user@trackster.local',
+      role: 'client_user',
+      status: 'Active',
+      clientId: '00000000'
+    },
+    {
+      username: 'trackster.demo.ops',
+      fullName: 'Trackster Demo Ops',
+      email: 'demo.ops@trackster.local',
+      role: 'client_user',
+      status: 'Inactive',
+      clientId: '00000000'
+    },
+    {
+      username: 'client.a.admin',
+      fullName: 'Client A Admin',
+      email: 'admin-a@example.com',
+      role: 'client_admin',
+      status: 'Active',
+      clientId: '00000001'
+    },
+    {
+      username: 'client.a.user',
+      fullName: 'Client A User',
+      email: 'user-a@example.com',
+      role: 'client_user',
+      status: 'Active',
+      clientId: '00000001'
+    },
+    {
+      username: 'client.b.admin',
+      fullName: 'Client B Admin',
+      email: 'admin-b@example.com',
+      role: 'client_admin',
+      status: 'Active',
+      clientId: '00000002'
+    },
+    {
+      username: 'client.b.ops',
+      fullName: 'Client B Ops',
+      email: 'ops-b@example.com',
+      role: 'client_admin',
+      status: 'Active',
+      clientId: '00000002'
+    },
+    {
+      username: 'client.b.user.one',
+      fullName: 'Client B User One',
+      email: 'user-one-b@example.com',
+      role: 'client_user',
+      status: 'Active',
+      clientId: '00000002'
+    },
+    {
+      username: 'client.b.user.two',
+      fullName: 'Client B User Two',
+      email: 'user-two-b@example.com',
+      role: 'client_user',
+      status: 'Suspended',
+      clientId: '00000002'
     }
   ];
 
-  newClient: TracksterClient = {
-    clientId: '',
-    companyName: '',
-    companyEmail: '',
-    status: 'active',
-    createdAt: ''
-  };
+  selectedClient: MasterAdminClientSummary = this.clients[0];
 
-  newUser: TracksterUser = {
-    username: '',
-    email: '',
-    fullName: '',
-    globalRole: null,
-    clientRole: 'client_admin',
-    clientId: '',
-    status: 'active'
-  };
+  isEditingClient = false;
+  editableClientName = this.selectedClient.name;
+  editableClientEmail = this.selectedClient.email;
 
-  selectedClientId = '00000000';
-
-  get activeClients(): TracksterClient[] {
-    return this.clients.filter((client) => client.status === 'active');
-  }
-
-  get filteredUsers(): TracksterUser[] {
-    if (!this.selectedClientId) {
-      return this.users;
-    }
-
-    return this.users.filter((user) => user.clientId === this.selectedClientId);
-  }
-
-  createClient(): void {
-    const clientId = this.newClient.clientId.trim();
-    const companyName = this.newClient.companyName.trim();
-
-    if (!clientId || !companyName) {
-      return;
-    }
-
-    const exists = this.clients.some((client) => client.clientId === clientId);
-
-    if (exists) {
-      return;
-    }
-
-    this.clients = [
-      ...this.clients,
-      {
-        clientId,
-        companyName,
-        companyEmail: this.newClient.companyEmail.trim(),
-        status: 'active',
-        createdAt: new Date().toISOString().slice(0, 10)
-      }
-    ];
-
-    this.selectedClientId = clientId;
-
-    this.newClient = {
-      clientId: '',
-      companyName: '',
-      companyEmail: '',
-      status: 'active',
-      createdAt: ''
+  get platformSummary(): MasterAdminPlatformSummary {
+    return {
+      clients: this.clients.length,
+      users: this.users.length,
+      tracksterAdmins: 1
     };
   }
 
-  createUser(): void {
-    const username = this.newUser.username.trim();
-    const email = this.newUser.email.trim();
-    const fullName = this.newUser.fullName.trim();
-    const clientId = this.newUser.clientId.trim() || this.selectedClientId;
+  get selectedClientUsers(): MasterAdminUser[] {
+    return this.users.filter((user) => user.clientId === this.selectedClient.clientId);
+  }
 
-    if (!username || !clientId) {
+  selectClientById(clientId: string): void {
+    const client = this.clients.find((item) => item.clientId === clientId);
+
+    if (!client) {
       return;
     }
 
-    const exists = this.users.some((user) => user.username === username);
+    this.selectedClient = client;
+    this.isEditingClient = false;
+    this.syncEditableClientFields();
+  }
 
-    if (exists) {
+  addClient(): void {
+  }
+
+  editClient(): void {
+    this.isEditingClient = true;
+    this.syncEditableClientFields();
+  }
+
+  saveClient(): void {
+    this.selectedClient.name = this.editableClientName.trim();
+    this.selectedClient.email = this.editableClientEmail.trim();
+    this.isEditingClient = false;
+  }
+
+  cancelClientEdit(): void {
+    this.isEditingClient = false;
+    this.syncEditableClientFields();
+  }
+
+  disableClient(): void {
+    this.selectedClient.status = 'Inactive';
+  }
+
+  activateClient(): void {
+    this.selectedClient.status = 'Active';
+  }
+
+  removeClient(): void {
+    if (this.selectedClient.status === 'Active') {
       return;
     }
-
-    this.users = [
-      ...this.users,
-      {
-        username,
-        email,
-        fullName,
-        globalRole: null,
-        clientRole: this.newUser.clientRole,
-        clientId,
-        status: 'active'
-      }
-    ];
-
-    this.newUser = {
-      username: '',
-      email: '',
-      fullName: '',
-      globalRole: null,
-      clientRole: 'client_admin',
-      clientId: '',
-      status: 'active'
-    };
   }
 
-  suspendClient(client: TracksterClient): void {
-    client.status = client.status === 'active' ? 'suspended' : 'active';
-  }
-
-  disableUser(user: TracksterUser): void {
-    user.status = user.status === 'active' ? 'inactive' : 'active';
-  }
-
-  resetPassword(user: TracksterUser): void {
-    window.alert(`Password reset requested for ${user.username}.`);
+  private syncEditableClientFields(): void {
+    this.editableClientName = this.selectedClient.name;
+    this.editableClientEmail = this.selectedClient.email;
   }
 }

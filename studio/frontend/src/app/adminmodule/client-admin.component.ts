@@ -47,6 +47,10 @@ export class ClientAdminComponent {
     return this.users.filter((user) => user.role === 'client_admin').length;
   }
 
+  get inactiveUserCount(): number {
+    return this.users.filter((user) => user.status !== 'active').length;
+  }
+
   createUser(): void {
     const username = this.newUser.username.trim();
 
@@ -86,5 +90,9 @@ export class ClientAdminComponent {
 
   disableUser(user: ClientUser): void {
     user.status = user.status === 'active' ? 'inactive' : 'active';
+  }
+
+  trackByUsername(_: number, user: ClientUser): string {
+    return user.username;
   }
 }

@@ -1,248 +1,235 @@
-<div class="admin-layout">
-  <section class="admin-hero">
-    <div>
-      <p class="eyebrow">Trackster Administration</p>
-      <h2>Clients and users</h2>
-      <p>
-        Manage Trackster clients, client IDs, and the first administrators for each tenant.
-      </p>
-    </div>
-  </section>
+<div class="workspace-view">
+  <div class="module-stage-shell">
+    <div class="workspace-grid">
+      <aside class="workspace-sidebar status-panel">
+        <h2>Administration Overview</h2>
 
-  <section class="admin-grid">
-    <article class="admin-card">
-      <div class="card-header">
-        <div>
-          <h3>Create client</h3>
-          <p>Create a new company tenant and assign a Trackster client ID.</p>
-        </div>
-      </div>
+        <p>
+          <strong>Clients:</strong>
+          <span class="status-value status-ok">{{ platformSummary.clients }}</span>
+        </p>
 
-      <form class="admin-form" (ngSubmit)="createClient()">
-        <label>
-          <span>Client ID</span>
-          <input
-            type="text"
-            name="clientId"
-            [(ngModel)]="newClient.clientId"
-            placeholder="00000001"
-          />
-        </label>
+        <p>
+          <strong>Users:</strong>
+          <span class="status-value status-ok">{{ platformSummary.users }}</span>
+        </p>
 
-        <label>
-          <span>Company name</span>
-          <input
-            type="text"
-            name="companyName"
-            [(ngModel)]="newClient.companyName"
-            placeholder="Example Automotive"
-          />
-        </label>
+        <p>
+          <strong>Trackster Admins:</strong>
+          <span class="status-value status-ok">{{ platformSummary.tracksterAdmins }}</span>
+        </p>
 
-        <label>
-          <span>Company email</span>
-          <input
-            type="email"
-            name="companyEmail"
-            [(ngModel)]="newClient.companyEmail"
-            placeholder="admin@example.com"
-          />
-        </label>
+        <p>
+          <strong>Selected Client:</strong>
+          <span class="status-value status-ok">{{ selectedClient.name }}</span>
+        </p>
 
-        <button type="submit" class="primary-button">
-          Create client
-        </button>
-      </form>
-    </article>
+        <p>
+          <strong>Client ID:</strong>
+          <span class="status-value status-ok">{{ selectedClient.clientId }}</span>
+        </p>
 
-    <article class="admin-card">
-      <div class="card-header">
-        <div>
-          <h3>Create client admin</h3>
-          <p>Create an administrator associated with the selected client ID.</p>
-        </div>
-      </div>
-
-      <form class="admin-form" (ngSubmit)="createUser()">
-        <label>
-          <span>Client</span>
-          <select
-            name="userClientId"
-            [(ngModel)]="newUser.clientId"
+        <p>
+          <strong>Status:</strong>
+          <span
+            class="status-value"
+            [class.status-ok]="selectedClient.status === 'Active'"
+            [class.status-error]="selectedClient.status !== 'Active'"
           >
-            <option value="">Use selected client</option>
-            <option
-              *ngFor="let client of activeClients"
-              [value]="client.clientId"
-            >
-              {{ client.clientId }} - {{ client.companyName }}
-            </option>
-          </select>
-        </label>
+            {{ selectedClient.status }}
+          </span>
+        </p>
 
-        <label>
-          <span>Username</span>
-          <input
-            type="text"
-            name="username"
-            [(ngModel)]="newUser.username"
-            placeholder="john"
-          />
-        </label>
+        <p>
+          <strong>Client Users:</strong>
+          <span class="status-value status-ok">{{ selectedClient.users }}</span>
+        </p>
 
-        <label>
-          <span>Email</span>
-          <input
-            type="email"
-            name="email"
-            [(ngModel)]="newUser.email"
-            placeholder="john@example.com"
-          />
-        </label>
+        <p>
+          <strong>Client Admins:</strong>
+          <span class="status-value status-ok">{{ selectedClient.admins }}</span>
+        </p>
+      </aside>
 
-        <label>
-          <span>Full name</span>
-          <input
-            type="text"
-            name="fullName"
-            [(ngModel)]="newUser.fullName"
-            placeholder="John Smith"
-          />
-        </label>
+      <section class="workspace-body">
+        <div class="workspace-body-header">
+          <h2>Trackster Administration</h2>
 
-        <label>
-          <span>Role</span>
-          <select
-            name="clientRole"
-            [(ngModel)]="newUser.clientRole"
-          >
-            <option value="client_admin">Client administrator</option>
-            <option value="client_user">Client user</option>
-          </select>
-        </label>
+          <p>
+            Manage Trackster clients, client IDs, and tenant administrators from a single
+            administration workspace.
+          </p>
+        </div>
 
-        <button type="submit" class="primary-button">
-          Create user
-        </button>
-      </form>
-    </article>
-  </section>
+        <div class="workspace-body-content">
+          <section class="admin-card">
+            <div class="admin-workspace-grid">
+              <article class="admin-context-card">
+                <div class="admin-section-header">
+                  <div>
+                    <h3>Client Administration</h3>
+                    <p>Select and manage the tenant context used by this workspace.</p>
+                  </div>
+                </div>
 
-  <section class="admin-card wide-card">
-    <div class="card-header split-header">
-      <div>
-        <h3>Clients</h3>
-        <p>Select a client to inspect users and tenant status.</p>
-      </div>
+                <div class="admin-context-field">
+                  <label>Client</label>
 
-      <select
-        class="compact-select"
-        [(ngModel)]="selectedClientId"
-        name="selectedClientId"
-      >
-        <option value="">All clients</option>
-        <option
-          *ngFor="let client of clients"
-          [value]="client.clientId"
-        >
-          {{ client.clientId }} - {{ client.companyName }}
-        </option>
-      </select>
+                  <mat-select
+                    class="admin-client-select"
+                    panelClass="trackster-admin-select-panel"
+                    [value]="selectedClient.clientId"
+                    (selectionChange)="selectClientById($event.value)"
+                    [disabled]="isEditingClient"
+                  >
+                    <mat-option
+                      *ngFor="let client of clients"
+                      [value]="client.clientId"
+                    >
+                      {{ client.clientId }} - {{ client.name }}
+                    </mat-option>
+                  </mat-select>
+                </div>
+
+                <div class="client-fields-grid">
+                  <label class="client-field">
+                    <span>Company</span>
+                    <input
+                      type="text"
+                      [(ngModel)]="editableClientName"
+                      [readonly]="!isEditingClient"
+                    />
+                  </label>
+
+                  <label class="client-field">
+                    <span>Email</span>
+                    <input
+                      type="text"
+                      [(ngModel)]="editableClientEmail"
+                      [readonly]="!isEditingClient"
+                    />
+                  </label>
+                </div>
+
+                <div class="client-actions">
+                  <button
+                    type="button"
+                    class="trackster-admin-button primary"
+                    (click)="addClient()"
+                  >
+                    <mat-icon>add</mat-icon>
+                    <span>Add</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="trackster-admin-button secondary"
+                    *ngIf="!isEditingClient"
+                    (click)="editClient()"
+                  >
+                    <mat-icon>edit</mat-icon>
+                    <span>Edit</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="trackster-admin-button primary"
+                    *ngIf="isEditingClient"
+                    (click)="saveClient()"
+                  >
+                    <mat-icon>save</mat-icon>
+                    <span>Save</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="trackster-admin-button secondary"
+                    *ngIf="isEditingClient"
+                    (click)="cancelClientEdit()"
+                  >
+                    <mat-icon>close</mat-icon>
+                    <span>Cancel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="trackster-admin-button secondary"
+                    *ngIf="selectedClient.status === 'Active' && !isEditingClient"
+                    (click)="disableClient()"
+                  >
+                    <mat-icon>block</mat-icon>
+                    <span>Disable</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="trackster-admin-button secondary"
+                    *ngIf="selectedClient.status !== 'Active' && !isEditingClient"
+                    (click)="activateClient()"
+                  >
+                    <mat-icon>check_circle</mat-icon>
+                    <span>Activate</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="trackster-admin-button danger"
+                    *ngIf="selectedClient.status !== 'Active' && !isEditingClient"
+                    (click)="removeClient()"
+                  >
+                    <mat-icon>delete</mat-icon>
+                    <span>Remove</span>
+                  </button>
+                </div>
+              </article>
+
+              <article class="admin-users-card">
+                <div class="admin-users-header">
+                  <div>
+                    <h3>Client Users</h3>
+                    <p>Users associated with {{ selectedClient.name }}.</p>
+                  </div>
+                </div>
+
+                <div class="users-table-shell">
+                  <table class="users-table">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr *ngFor="let user of selectedClientUsers">
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.fullName }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>
+                          <span
+                            class="status-badge"
+                            [class.status-badge-inactive]="user.status !== 'Active'"
+                          >
+                            {{ user.status }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div class="users-empty-state" *ngIf="selectedClientUsers.length === 0">
+                    No users associated with this client.
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+      </section>
     </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Client ID</th>
-            <th>Company</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th class="actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let client of clients">
-            <td>{{ client.clientId }}</td>
-            <td>{{ client.companyName }}</td>
-            <td>{{ client.companyEmail || '-' }}</td>
-            <td>
-              <span class="status-pill" [class.inactive]="client.status !== 'active'">
-                {{ client.status }}
-              </span>
-            </td>
-            <td>{{ client.createdAt }}</td>
-            <td class="actions-col">
-              <button
-                type="button"
-                class="secondary-button"
-                (click)="suspendClient(client)"
-              >
-                {{ client.status === 'active' ? 'Suspend' : 'Activate' }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="admin-card wide-card">
-    <div class="card-header">
-      <div>
-        <h3>Users</h3>
-        <p>Users associated with the selected client context.</p>
-      </div>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Full name</th>
-            <th>Email</th>
-            <th>Client ID</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th class="actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let user of filteredUsers">
-            <td>{{ user.username }}</td>
-            <td>{{ user.fullName || '-' }}</td>
-            <td>{{ user.email || '-' }}</td>
-            <td>{{ user.clientId }}</td>
-            <td>
-              {{ user.globalRole === 'trackster_admin' ? 'Trackster admin' : user.clientRole }}
-            </td>
-            <td>
-              <span class="status-pill" [class.inactive]="user.status !== 'active'">
-                {{ user.status }}
-              </span>
-            </td>
-            <td class="actions-col">
-              <button
-                type="button"
-                class="secondary-button"
-                (click)="resetPassword(user)"
-              >
-                Reset password
-              </button>
-
-              <button
-                type="button"
-                class="danger-button"
-                (click)="disableUser(user)"
-              >
-                {{ user.status === 'active' ? 'Disable' : 'Activate' }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
+  </div>
 </div>
