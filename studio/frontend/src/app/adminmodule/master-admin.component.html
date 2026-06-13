@@ -21,12 +21,22 @@
 
         <p>
           <strong>Selected Client:</strong>
-          <span class="status-value status-ok">{{ selectedClient.name }}</span>
+          <span class="status-value status-ok">{{ selectedClient.name || 'New Client' }}</span>
         </p>
 
         <p>
           <strong>Client ID:</strong>
           <span class="status-value status-ok">{{ selectedClient.clientId }}</span>
+        </p>
+
+        <p>
+          <strong>Contact:</strong>
+          <span class="status-value status-ok">{{ selectedClient.contactName || '-' }}</span>
+        </p>
+
+        <p>
+          <strong>Country:</strong>
+          <span class="status-value status-ok">{{ selectedClient.country || '-' }}</span>
         </p>
 
         <p>
@@ -80,19 +90,19 @@
                     panelClass="trackster-admin-select-panel"
                     [value]="selectedClient.clientId"
                     (selectionChange)="selectClientById($event.value)"
-                    [disabled]="isEditingClient"
+                    [disabled]="isEditingClient || isCreatingClient || isEditingUser || isCreatingUser"
                   >
                     <mat-option
                       *ngFor="let client of clients"
                       [value]="client.clientId"
                     >
-                      {{ client.clientId }} - {{ client.name }}
+                      {{ client.clientId }} - {{ client.name || 'New Client' }}
                     </mat-option>
                   </mat-select>
                 </div>
 
                 <div class="client-fields-grid">
-                  <label class="client-field">
+                  <label class="client-field client-field-full">
                     <span>Company</span>
                     <input
                       type="text"
@@ -101,11 +111,38 @@
                     />
                   </label>
 
-                  <label class="client-field">
+                  <label class="client-field client-field-full">
+                    <span>Contact Name</span>
+                    <input
+                      type="text"
+                      [(ngModel)]="editableClientContactName"
+                      [readonly]="!isEditingClient"
+                    />
+                  </label>
+
+                  <label class="client-field client-field-full">
                     <span>Email</span>
                     <input
                       type="text"
                       [(ngModel)]="editableClientEmail"
+                      [readonly]="!isEditingClient"
+                    />
+                  </label>
+
+                  <label class="client-field">
+                    <span>Phone</span>
+                    <input
+                      type="text"
+                      [(ngModel)]="editableClientPhone"
+                      [readonly]="!isEditingClient"
+                    />
+                  </label>
+
+                  <label class="client-field">
+                    <span>Country</span>
+                    <input
+                      type="text"
+                      [(ngModel)]="editableClientCountry"
                       [readonly]="!isEditingClient"
                     />
                   </label>
@@ -115,6 +152,7 @@
                   <button
                     type="button"
                     class="trackster-admin-button primary"
+                    *ngIf="!isEditingClient"
                     (click)="addClient()"
                   >
                     <mat-icon>add</mat-icon>
@@ -187,8 +225,35 @@
                 <div class="admin-users-header">
                   <div>
                     <h3>Client Users</h3>
-                    <p>Users associated with {{ selectedClient.name }}.</p>
+                    <p>Users associated with {{ selectedClient.name || 'New Client' }}.</p>
                   </div>
+                </div>
+
+                <div class="users-toolbar">
+                  <button type="button" class="trackster-admin-button primary" [disabled]="!canAddUser" (click)="addUser()">
+                    <mat-icon>person_add</mat-icon>
+                    <span>Add</span>
+                  </button>
+
+                  <button type="button" class="trackster-admin-button secondary" [disabled]="!canEditSelectedUser" (click)="editUser()">
+                    <mat-icon>edit</mat-icon>
+                    <span>Edit</span>
+                  </button>
+
+                  <button type="button" class="trackster-admin-button secondary" *ngIf="!canActivateSelectedUser" [disabled]="!canDisableSelectedUser" (click)="disableUser()">
+                    <mat-icon>block</mat-icon>
+                    <span>Disable</span>
+                  </button>
+
+                  <button type="button" class="trackster-admin-button secondary" *ngIf="canActivateSelectedUser" (click)="activateUser()">
+                    <mat-icon>check_circle</mat-icon>
+                    <span>Activate</span>
+                  </button>
+
+                  <button type="button" class="trackster-admin-button danger" [disabled]="!canRemoveSelectedUser" (click)="removeUser()">
+                    <mat-icon>delete</mat-icon>
+                    <span>Remove</span>
+                  </button>
                 </div>
 
                 <div class="users-table-shell">
@@ -197,17 +262,22 @@
                       <tr>
                         <th>Username</th>
                         <th>Full Name</th>
-                        <th>Email</th>
                         <th>Role</th>
                         <th>Status</th>
+                        <th>Email</th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      <tr *ngFor="let user of selectedClientUsers">
+                      <tr
+                        *ngFor="let user of selectedClientUsers"
+                        class="users-table-row"
+                        [class.users-table-row-selected]="isUserSelected(user)"
+                        (click)="selectUser(user)"
+                        (dblclick)="openUserForEdit(user)"
+                      >
                         <td>{{ user.username }}</td>
-                        <td>{{ user.fullName }}</td>
-                        <td>{{ user.email }}</td>
+                        <td>{{ user.fullName || '-' }}</td>
                         <td>{{ user.role }}</td>
                         <td>
                           <span
@@ -217,6 +287,7 @@
                             {{ user.status }}
                           </span>
                         </td>
+                        <td>{{ user.email || '-' }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -233,3 +304,133 @@
     </div>
   </div>
 </div>
+
+<ng-template #userDialog>
+  <div class="trackster-dialog user-dialog">
+    <h2>{{ isCreatingUser ? 'Create User' : 'Edit User' }}</h2>
+
+    <p>
+      {{ isCreatingUser ? 'Create a new user for the selected client.' : 'Update user information for the selected client.' }}
+    </p>
+
+    <div class="user-dialog-fields-grid">
+      <label class="client-field">
+        <span>Username</span>
+        <input
+          type="text"
+          [(ngModel)]="editableUsername"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Full Name</span>
+        <input
+          type="text"
+          [(ngModel)]="editableFullName"
+        />
+      </label>
+
+      <label class="client-field user-field-full">
+        <span>Email</span>
+        <input
+          type="text"
+          [(ngModel)]="editableUserEmail"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Role</span>
+        <mat-select
+          class="admin-client-select user-dialog-select"
+          panelClass="trackster-admin-select-panel"
+          [(ngModel)]="editableUserRole"
+        >
+          <mat-option
+            *ngFor="let role of userRoles"
+            [value]="role"
+          >
+            {{ role }}
+          </mat-option>
+        </mat-select>
+      </label>
+
+      <label class="client-field">
+        <span>Status</span>
+        <mat-select
+          class="admin-client-select user-dialog-select"
+          panelClass="trackster-admin-select-panel"
+          [(ngModel)]="editableUserStatus"
+        >
+          <mat-option
+            *ngFor="let status of userStatuses"
+            [value]="status"
+          >
+            {{ status }}
+          </mat-option>
+        </mat-select>
+      </label>
+    </div>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button secondary"
+        (click)="cancelUserEdit()"
+      >
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="saveUser()"
+      >
+        Save
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #confirmationDialog>
+  <div class="trackster-dialog">
+    <h2>{{ confirmationTitle }}</h2>
+
+    <p>{{ confirmationMessage }}</p>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button secondary"
+        (click)="closeDialogs()"
+      >
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="confirmDialogAction()"
+      >
+        Confirm
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #messageDialog>
+  <div class="trackster-dialog">
+    <h2>{{ messageTitle }}</h2>
+
+    <p>{{ messageText }}</p>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="closeDialogs()"
+      >
+        OK
+      </button>
+    </div>
+  </div>
+</ng-template>

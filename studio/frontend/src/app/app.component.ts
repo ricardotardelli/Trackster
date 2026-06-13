@@ -8,7 +8,12 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { AuthService } from './auth/auth.service';
+import {
+  AuthService,
+  TracksterClientRole,
+  TracksterGlobalRole,
+  TracksterUserAccessContext
+} from './auth/auth.service';
 
 type WorkspaceModule =
   | 'generator'
@@ -16,9 +21,6 @@ type WorkspaceModule =
   | 'decoder'
   | 'signal-plotter'
   | 'administration';
-
-type TracksterGlobalRole = 'trackster_admin' | null;
-type TracksterClientRole = 'client_admin' | 'client_user' | null;
 
 interface WorkspaceTab {
   id: WorkspaceModule;
@@ -63,6 +65,15 @@ export class AppComponent implements OnInit {
   globalRole: TracksterGlobalRole = null;
   clientRole: TracksterClientRole = null;
   clientId = '';
+
+  cognitoSub = '';
+  email = '';
+  name = '';
+  groups: string[] = [];
+  idToken: string | null = null;
+  accessToken: string | null = null;
+
+  userAccessContext: TracksterUserAccessContext | null = null;
 
   @ViewChild('userMenuContainer', { static: false })
   private userMenuContainer?: ElementRef<HTMLElement>;
@@ -199,52 +210,61 @@ export class AppComponent implements OnInit {
 
   private async initializeApp(): Promise<void> {
     try {
-      const authenticated = await this.authService.isAuthenticated();
+      const accessContext = await this.authService.getUserAccessContext();
 
-      if (!authenticated) {
+      if (!accessContext.isAuthenticated) {
         throw new Error('Authenticated session is not available.');
       }
 
-      this.isAuthenticated = true;
-
-      await this.loadUsername();
-      await this.loadUserAccessContext();
-
+      this.applyUserAccessContext(accessContext);
       this.authReady = true;
     } catch {
       this.isAuthenticated = false;
       this.authReady = true;
+      this.resetUserAccessContext();
     }
   }
 
-  private async loadUsername(): Promise<void> {
-    try {
-      const username = await this.authService.getUsername();
-      this.username = username?.trim() || 'User';
-    } catch {
-      this.username = 'User';
+  private applyUserAccessContext(accessContext: TracksterUserAccessContext): void {
+    this.userAccessContext = accessContext;
+
+    this.isAuthenticated = accessContext.isAuthenticated;
+    this.username = accessContext.username || 'User';
+
+    this.globalRole = accessContext.globalRole;
+    this.clientRole = accessContext.clientRole;
+    this.clientId = accessContext.clientId;
+
+    this.cognitoSub = accessContext.cognitoSub;
+    this.email = accessContext.email;
+    this.name = accessContext.name;
+    this.groups = accessContext.groups;
+    this.idToken = accessContext.idToken;
+    this.accessToken = accessContext.accessToken;
+
+    if (!this.canSeeAdministrationTab && this.activeModule === 'administration') {
+      this.activeModule = 'generator';
+      this.selectedTabIndex = 0;
     }
   }
 
-  private async loadUserAccessContext(): Promise<void> {
-    const devProfile: 'trackster_admin' | 'client_admin' | 'client_user' = 'trackster_admin';
+  private resetUserAccessContext(): void {
+    this.userAccessContext = null;
 
-    if (devProfile === 'trackster_admin') {
-      this.globalRole = 'trackster_admin';
-      this.clientRole = 'client_admin';
-      this.clientId = '00000000';
-      return;
-    }
-
-    if (devProfile === 'client_admin') {
-      this.globalRole = null;
-      this.clientRole = 'client_admin';
-      this.clientId = '00000000';
-      return;
-    }
+    this.username = 'User';
 
     this.globalRole = null;
-    this.clientRole = 'client_user';
-    this.clientId = '00000000';
+    this.clientRole = null;
+    this.clientId = '';
+
+    this.cognitoSub = '';
+    this.email = '';
+    this.name = '';
+    this.groups = [];
+    this.idToken = null;
+    this.accessToken = null;
+
+    this.activeModule = 'generator';
+    this.selectedTabIndex = 0;
   }
 }

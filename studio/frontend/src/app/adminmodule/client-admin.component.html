@@ -2,188 +2,294 @@
   <div class="module-stage-shell">
     <div class="workspace-grid">
       <aside class="workspace-sidebar status-panel">
-        <h2>Client Status</h2>
+        <h2>Client Overview</h2>
 
         <p>
-          <strong>Company:</strong>
-          <span class="status-value status-ok">{{ companyName }}</span>
+          <strong>Client:</strong>
+          <span class="status-value status-ok">{{ currentClient.name }}</span>
         </p>
 
         <p>
           <strong>Client ID:</strong>
-          <span class="status-value status-ok">{{ clientId }}</span>
+          <span class="status-value status-ok">{{ currentClient.clientId }}</span>
         </p>
 
         <p>
-          <strong>Total Users:</strong>
-          <span class="status-value status-ok">{{ users.length }}</span>
+          <strong>Contact:</strong>
+          <span class="status-value status-ok">{{ currentClient.contactName || '-' }}</span>
         </p>
 
         <p>
-          <strong>Active Users:</strong>
-          <span class="status-value status-ok">{{ activeUserCount }}</span>
+          <strong>Country:</strong>
+          <span class="status-value status-ok">{{ currentClient.country || '-' }}</span>
         </p>
 
         <p>
-          <strong>Admins:</strong>
-          <span class="status-value status-ok">{{ adminUserCount }}</span>
-        </p>
-
-        <p>
-          <strong>Inactive:</strong>
-          <span class="status-value" [class.status-error]="inactiveUserCount > 0">
-            {{ inactiveUserCount }}
+          <strong>Status:</strong>
+          <span
+            class="status-value"
+            [class.status-ok]="currentClient.status === 'Active'"
+            [class.status-error]="currentClient.status !== 'Active'"
+          >
+            {{ currentClient.status }}
           </span>
+        </p>
+
+        <p>
+          <strong>Client Users:</strong>
+          <span class="status-value status-ok">{{ currentClient.users }}</span>
+        </p>
+
+        <p>
+          <strong>Client Admins:</strong>
+          <span class="status-value status-ok">{{ currentClient.admins }}</span>
         </p>
       </aside>
 
       <section class="workspace-body">
         <div class="workspace-body-header">
           <h2>Client Administration</h2>
+
           <p>
-            Manage users associated with client ID {{ clientId }} inside the
-            {{ companyName }} tenant.
+            Manage users and tenant administrators associated with your Trackster client.
           </p>
         </div>
 
         <div class="workspace-body-content">
-          <section class="admin-grid">
-            <article class="admin-card create-card">
-              <div class="card-header">
-                <div>
-                  <h3>Create user</h3>
-                  <p>Create a user inside your company tenant.</p>
-                </div>
-              </div>
-
-              <form class="admin-form" (ngSubmit)="createUser()">
-                <label class="field">
-                  <span>Username</span>
-                  <input
-                    type="text"
-                    name="username"
-                    [(ngModel)]="newUser.username"
-                    placeholder="john"
-                  />
-                </label>
-
-                <label class="field">
-                  <span>Email</span>
-                  <input
-                    type="email"
-                    name="email"
-                    [(ngModel)]="newUser.email"
-                    placeholder="john@example.com"
-                  />
-                </label>
-
-                <label class="field">
-                  <span>Full Name</span>
-                  <input
-                    type="text"
-                    name="fullName"
-                    [(ngModel)]="newUser.fullName"
-                    placeholder="John Smith"
-                  />
-                </label>
-
-                <label class="field">
-                  <span>Role</span>
-                  <select name="role" [(ngModel)]="newUser.role">
-                    <option value="client_user">Client user</option>
-                    <option value="client_admin">Client administrator</option>
-                  </select>
-                </label>
-
-                <div class="actions compact-actions">
-                  <button type="submit">Create user</button>
-                </div>
-              </form>
-            </article>
-
-            <article class="admin-card info-card">
-              <div class="card-header">
-                <div>
-                  <h3>Client access rules</h3>
-                  <p>Users created here are always scoped to your client ID.</p>
-                </div>
-              </div>
-
-              <div class="rule-list">
-                <div class="rule-item">
-                  <strong>Client isolation</strong>
-                  <span>Users can only access resources under client ID {{ clientId }}.</span>
-                </div>
-
-                <div class="rule-item">
-                  <strong>User role</strong>
-                  <span>Client users can use Trackster but cannot manage users.</span>
-                </div>
-
-                <div class="rule-item">
-                  <strong>Admin role</strong>
-                  <span>Client administrators can create, disable, and reset users in this client.</span>
-                </div>
-              </div>
-            </article>
-          </section>
-
-          <section class="admin-card table-card">
-            <div class="card-header">
+          <article class="admin-users-card admin-users-card-full">
+            <div class="admin-users-header">
               <div>
-                <h3>Users</h3>
-                <p>Current users associated with this client.</p>
+                <h3>Client Users</h3>
+                <p>Users associated with {{ currentClient.name || currentClient.clientId }}.</p>
               </div>
             </div>
 
-            <div class="table-wrap">
-              <table>
+            <div class="users-toolbar">
+              <button
+                type="button"
+                class="trackster-admin-button primary"
+                [disabled]="!canAddUser"
+                (click)="addUser()"
+              >
+                <mat-icon>person_add</mat-icon>
+                <span>Add</span>
+              </button>
+
+              <button
+                type="button"
+                class="trackster-admin-button secondary"
+                [disabled]="!canEditSelectedUser"
+                (click)="editUser()"
+              >
+                <mat-icon>edit</mat-icon>
+                <span>Edit</span>
+              </button>
+
+              <button
+                type="button"
+                class="trackster-admin-button secondary"
+                *ngIf="!canActivateSelectedUser"
+                [disabled]="!canDisableSelectedUser"
+                (click)="disableUser()"
+              >
+                <mat-icon>block</mat-icon>
+                <span>Disable</span>
+              </button>
+
+              <button
+                type="button"
+                class="trackster-admin-button secondary"
+                *ngIf="canActivateSelectedUser"
+                (click)="activateUser()"
+              >
+                <mat-icon>check_circle</mat-icon>
+                <span>Activate</span>
+              </button>
+
+              <button
+                type="button"
+                class="trackster-admin-button danger"
+                [disabled]="!canRemoveSelectedUser"
+                (click)="removeUser()"
+              >
+                <mat-icon>delete</mat-icon>
+                <span>Remove</span>
+              </button>
+            </div>
+
+            <div class="users-table-shell">
+              <table class="users-table">
                 <thead>
                   <tr>
                     <th>Username</th>
                     <th>Full Name</th>
-                    <th>Email</th>
                     <th>Role</th>
                     <th>Status</th>
-                    <th class="actions-col">Actions</th>
+                    <th>Email</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  <tr *ngFor="let user of users; trackBy: trackByUsername">
+                  <tr
+                    *ngFor="let user of currentClientUsers"
+                    class="users-table-row"
+                    [class.users-table-row-selected]="isUserSelected(user)"
+                    (click)="selectUser(user)"
+                    (dblclick)="openUserForEdit(user)"
+                  >
                     <td>{{ user.username }}</td>
                     <td>{{ user.fullName || '-' }}</td>
-                    <td>{{ user.email || '-' }}</td>
                     <td>{{ user.role }}</td>
                     <td>
-                      <span class="status-pill" [class.inactive]="user.status !== 'active'">
+                      <span
+                        class="status-badge"
+                        [class.status-badge-inactive]="user.status !== 'Active'"
+                      >
                         {{ user.status }}
                       </span>
                     </td>
-                    <td class="actions-col">
-                      <button
-                        type="button"
-                        class="secondary-button"
-                        (click)="resetPassword(user)"
-                      >
-                        Reset password
-                      </button>
-
-                      <button
-                        type="button"
-                        class="danger-button"
-                        (click)="disableUser(user)"
-                      >
-                        {{ user.status === 'active' ? 'Disable' : 'Activate' }}
-                      </button>
-                    </td>
+                    <td>{{ user.email || '-' }}</td>
                   </tr>
                 </tbody>
               </table>
+
+              <div class="users-empty-state" *ngIf="currentClientUsers.length === 0">
+                No users associated with this client.
+              </div>
             </div>
-          </section>
+          </article>
         </div>
       </section>
     </div>
   </div>
 </div>
+
+<ng-template #userDialog>
+  <div class="trackster-dialog user-dialog">
+    <h2>{{ isCreatingUser ? 'Create User' : 'Edit User' }}</h2>
+
+    <p>
+      {{ isCreatingUser ? 'Create a new user for the current client.' : 'Update user information for the current client.' }}
+    </p>
+
+    <div class="user-dialog-fields-grid">
+      <label class="client-field">
+        <span>Username</span>
+        <input
+          type="text"
+          [(ngModel)]="editableUsername"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Full Name</span>
+        <input
+          type="text"
+          [(ngModel)]="editableFullName"
+        />
+      </label>
+
+      <label class="client-field user-field-full">
+        <span>Email</span>
+        <input
+          type="text"
+          [(ngModel)]="editableUserEmail"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Role</span>
+        <mat-select
+          class="admin-client-select user-dialog-select"
+          panelClass="trackster-admin-select-panel"
+          [(ngModel)]="editableUserRole"
+        >
+          <mat-option
+            *ngFor="let role of userRoles"
+            [value]="role"
+          >
+            {{ role }}
+          </mat-option>
+        </mat-select>
+      </label>
+
+      <label class="client-field">
+        <span>Status</span>
+        <mat-select
+          class="admin-client-select user-dialog-select"
+          panelClass="trackster-admin-select-panel"
+          [(ngModel)]="editableUserStatus"
+        >
+          <mat-option
+            *ngFor="let status of userStatuses"
+            [value]="status"
+          >
+            {{ status }}
+          </mat-option>
+        </mat-select>
+      </label>
+    </div>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button secondary"
+        (click)="cancelUserEdit()"
+      >
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="saveUser()"
+      >
+        Save
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #confirmationDialog>
+  <div class="trackster-dialog">
+    <h2>{{ confirmationTitle }}</h2>
+
+    <p>{{ confirmationMessage }}</p>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button secondary"
+        (click)="closeDialogs()"
+      >
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="confirmDialogAction()"
+      >
+        Confirm
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #messageDialog>
+  <div class="trackster-dialog">
+    <h2>{{ messageTitle }}</h2>
+
+    <p>{{ messageText }}</p>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="closeDialogs()"
+      >
+        OK
+      </button>
+    </div>
+  </div>
+</ng-template>
