@@ -41,7 +41,7 @@ function isAuthDisabled(): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly devProfile: 'trackster_admin' | 'client_admin' | 'client_user' = 'client_admin';
+  private readonly devProfile: 'trackster_admin' | 'client_admin' | 'client_user' = 'trackster_admin';
   private readonly devClientId = '00000000';
 
   private authDisabled(): boolean {
@@ -169,6 +169,9 @@ export class AuthService {
       const accessToken = session.tokens?.accessToken?.toString() ?? null;
       const idTokenPayload = session.tokens?.idToken?.payload ?? {};
       const accessTokenPayload = session.tokens?.accessToken?.payload ?? {};
+
+      console.log('Trackster Cognito access token:', accessToken);
+      console.log('Trackster Cognito id token:', idToken);
 
       const groups = this.getStringArrayClaim(
         idTokenPayload,
