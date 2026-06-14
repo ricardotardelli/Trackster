@@ -254,6 +254,205 @@ body {
   border-radius: 999px;
 }
 
+.trackster-dialog {
+  padding: 22px 24px 24px;
+  box-sizing: border-box;
+  color: #10243f;
+}
+
+.trackster-dialog h2 {
+  margin: 0 0 8px;
+  color: #10243f;
+  font-size: 1.18rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.trackster-dialog p {
+  margin: 0 0 18px;
+  color: #4d6280;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.profile-dialog {
+  width: 100%;
+}
+
+.profile-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+}
+
+.profile-field-full {
+  grid-column: 1 / -1;
+}
+
+.profile-field span {
+  color: #10243f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.035em;
+}
+
+.profile-field input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  border: 1px solid #c8d8f0;
+  border-radius: 12px;
+  background: #f8fbff;
+  color: #2f4058;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  outline: none;
+  box-shadow: none;
+}
+
+.profile-field input[readonly] {
+  background: #f8fbff;
+  color: #2f4058;
+  font-weight: 400;
+}
+
+.profile-feedback-slot {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.profile-feedback {
+  width: 100%;
+  min-height: 32px;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: transparent;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.25;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.profile-feedback-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.profile-feedback-error {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.profile-feedback-success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.trackster-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.trackster-profile-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 15px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease;
+}
+
+.trackster-profile-button mat-icon {
+  width: 17px;
+  height: 17px;
+  font-size: 17px;
+  line-height: 17px;
+}
+
+.trackster-profile-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+  box-shadow: none;
+}
+
+.trackster-profile-button.primary {
+  border: 1px solid #0b7fab;
+  background: linear-gradient(180deg, #0588b9 0%, #0478a3 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(5, 136, 185, 0.22);
+}
+
+.trackster-profile-button.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(5, 136, 185, 0.26);
+}
+
+.trackster-profile-button.secondary {
+  border: 1px solid #c8d8f0;
+  background: #ffffff;
+  color: #10243f;
+}
+
+.trackster-profile-button.secondary:hover:not(:disabled) {
+  border-color: #9fb8d8;
+  background: #f8fbff;
+  transform: translateY(-1px);
+}
+
+::ng-deep .trackster-profile-dialog-panel .mat-mdc-dialog-container {
+  padding: 0 !important;
+}
+
+::ng-deep .trackster-profile-dialog-panel .mat-mdc-dialog-surface {
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid #c8d8f0 !important;
+  border-radius: 22px !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.2),
+    0 8px 20px rgba(15, 23, 42, 0.08) !important;
+}
+
 @media (max-width: 1200px) {
   .panel {
     width: min(100%, 1280px);
@@ -290,6 +489,18 @@ body {
 
   .user-menu-name {
     max-width: 120px;
+  }
+
+  .profile-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trackster-dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .trackster-profile-button {
+    width: 100%;
   }
 }
 

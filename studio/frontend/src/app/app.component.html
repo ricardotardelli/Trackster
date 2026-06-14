@@ -50,24 +50,17 @@
           </button>
 
           <div class="user-menu-dropdown" *ngIf="userMenuOpen" role="menu">
-            <a
-              class="user-menu-item"
-              href=""
-              role="menuitem"
-              (click)="$event.preventDefault(); closeUserMenu()"
-            >
-              About
+            <a class="user-menu-item" href="" role="menuitem" (click)="$event.preventDefault(); closeUserMenu()">
+              About Trackster
+            </a>
+
+            <a class="user-menu-item" href="" role="menuitem" (click)="openProfileDialog($event)">
+              My Profile
             </a>
 
             <div class="user-menu-divider"></div>
 
-            <button
-              type="button"
-              class="user-menu-item logout-item"
-              role="menuitem"
-              (click)="onLogout()"
-              [disabled]="isLoggingOut"
-            >
+            <button type="button" class="user-menu-item logout-item" role="menuitem" (click)="onLogout()" [disabled]="isLoggingOut">
               {{ isLoggingOut ? 'Logging out...' : 'Logout' }}
             </button>
           </div>
@@ -108,3 +101,157 @@
     </section>
   </main>
 </div>
+
+<ng-template #profileDialog>
+  <div class="trackster-dialog profile-dialog">
+    <h2>My Profile</h2>
+
+    <p *ngIf="profileDialogMode === 'view'">
+      Review your Trackster profile information.
+    </p>
+
+    <p *ngIf="profileDialogMode === 'edit'">
+      Update the information controlled by your user profile.
+    </p>
+
+    <p *ngIf="profileDialogMode === 'password'">
+      Change your password using your current password.
+    </p>
+
+    <div class="profile-fields-grid" *ngIf="profileDialogMode === 'view' || profileDialogMode === 'edit'">
+      <label class="profile-field">
+        <span>Client ID</span>
+        <input type="text" [value]="clientId || '-'" readonly />
+      </label>
+
+      <label class="profile-field">
+        <span>Login</span>
+        <input type="text" [value]="username || '-'" readonly />
+      </label>
+
+      <label class="profile-field profile-field-full">
+        <span>Email</span>
+        <input
+          type="text"
+          [(ngModel)]="editableProfileEmail"
+          [attr.readonly]="profileDialogMode === 'edit' ? null : true"
+        />
+      </label>
+
+      <label class="profile-field profile-field-full">
+        <span>Full Name</span>
+        <input
+          type="text"
+          [(ngModel)]="editableProfileName"
+          [attr.readonly]="profileDialogMode === 'edit' ? null : true"
+        />
+      </label>
+    </div>
+
+    <div class="profile-fields-grid" *ngIf="profileDialogMode === 'password'">
+      <label class="profile-field profile-field-full">
+        <span>Current Password</span>
+        <input
+          type="password"
+          [(ngModel)]="currentPassword"
+          autocomplete="current-password"
+        />
+      </label>
+
+      <label class="profile-field profile-field-full">
+        <span>New Password</span>
+        <input
+          type="password"
+          [(ngModel)]="newPassword"
+          autocomplete="new-password"
+        />
+      </label>
+
+      <label class="profile-field profile-field-full">
+        <span>Confirm New Password</span>
+        <input
+          type="password"
+          [(ngModel)]="confirmNewPassword"
+          autocomplete="new-password"
+        />
+      </label>
+
+      <div class="profile-feedback-slot profile-field-full">
+        <div
+          class="profile-feedback"
+          [class.profile-feedback-visible]="passwordErrorMessage || passwordSuccessMessage"
+          [class.profile-feedback-error]="passwordErrorMessage"
+          [class.profile-feedback-success]="!passwordErrorMessage && passwordSuccessMessage"
+          aria-live="polite"
+        >
+          {{ passwordErrorMessage || passwordSuccessMessage }}
+        </div>
+      </div>
+    </div>
+
+    <div class="trackster-dialog-actions" *ngIf="profileDialogMode === 'view'">
+      <button type="button" class="trackster-profile-button secondary" (click)="closeDialogs()">
+        <mat-icon>close</mat-icon>
+        <span>Close</span>
+      </button>
+
+      <button type="button" class="trackster-profile-button secondary" (click)="startProfileEdit()">
+        <mat-icon>edit</mat-icon>
+        <span>Edit Information</span>
+      </button>
+
+      <button type="button" class="trackster-profile-button primary" (click)="startPasswordChange()">
+        <mat-icon>lock_reset</mat-icon>
+        <span>Change Password</span>
+      </button>
+    </div>
+
+    <div class="trackster-dialog-actions" *ngIf="profileDialogMode === 'edit'">
+      <button type="button" class="trackster-profile-button secondary" (click)="cancelProfileEdit()" [disabled]="isSavingProfile">
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
+      </button>
+
+      <button type="button" class="trackster-profile-button primary" (click)="saveProfileInformation()" [disabled]="isSavingProfile">
+        <mat-icon>save</mat-icon>
+        <span>{{ isSavingProfile ? 'Saving...' : 'Save' }}</span>
+      </button>
+    </div>
+
+    <div class="trackster-dialog-actions" *ngIf="profileDialogMode === 'password'">
+      <button type="button" class="trackster-profile-button secondary" (click)="closeDialogs()">
+        <mat-icon>close</mat-icon>
+        <span>Close</span>
+      </button>
+      
+      <button type="button" class="trackster-profile-button secondary" (click)="cancelPasswordChange()" [disabled]="isSavingPassword">
+        <mat-icon>arrow_back</mat-icon>
+        <span>Back</span>
+      </button>
+
+      <button type="button" class="trackster-profile-button primary" (click)="savePasswordChange()" [disabled]="isSavingPassword">
+        <mat-icon>save</mat-icon>
+        <span>{{ isSavingPassword ? 'Saving...' : 'Save Password' }}</span>
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #messageDialog>
+  <div class="trackster-dialog">
+    <h2>{{ messageTitle }}</h2>
+
+    <p>{{ messageText }}</p>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-profile-button primary"
+        (click)="closeDialogs()"
+      >
+        <mat-icon>check</mat-icon>
+        <span>OK</span>
+      </button>
+    </div>
+  </div>
+</ng-template>
