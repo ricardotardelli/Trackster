@@ -30,7 +30,8 @@
       "signalPlotterDataUrl": "https://id9mt0lkz5.execute-api.us-east-1.amazonaws.com/get-signal-plotter-data"
    },
    "usermanagementApi": {
-      "changePassword": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/changepassword"
+      "changePassword": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/changepassword",
+      "userInfoUpdate": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/userinfo-update"
    },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",

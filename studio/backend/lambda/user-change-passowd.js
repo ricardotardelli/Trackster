@@ -15,12 +15,30 @@ const defaultHeaders = {
 };
 
 export const handler = async (event) => {
+  const method = getHttpMethod(event);
+
   try {
-    if (event.httpMethod === "OPTIONS") {
-      return response(200, { success: true });
+    console.log("Incoming change password request debug:", {
+      method,
+      hasAuthorizationHeader: Boolean(
+        event.headers?.authorization || event.headers?.Authorization
+      ),
+      authorizationPrefix: String(
+        event.headers?.authorization || event.headers?.Authorization || ""
+      ).substring(0, 20),
+      hasBody: Boolean(event.body),
+      bodyPreview: typeof event.body === "string"
+        ? event.body.substring(0, 120)
+        : event.body
+    });
+
+    if (method === "OPTIONS") {
+      return response(200, {
+        success: true
+      });
     }
 
-    if (event.httpMethod !== "POST") {
+    if (method !== "POST") {
       return response(405, {
         success: false,
         message: "Method not allowed"
@@ -28,6 +46,12 @@ export const handler = async (event) => {
     }
 
     const accessToken = extractBearerToken(event);
+
+    console.log("Token debug:", {
+      hasAccessToken: Boolean(accessToken),
+      accessTokenPrefix: accessToken ? accessToken.substring(0, 20) : "",
+      accessTokenLength: accessToken ? accessToken.length : 0
+    });
 
     if (!accessToken) {
       return response(401, {
@@ -38,27 +62,34 @@ export const handler = async (event) => {
 
     const body = parseBody(event.body);
 
-    const previousPassword = body.previousPassword;
-    const newPassword = body.newPassword;
+    const currentPassword = readString(body.currentPassword);
+    const newPassword = readString(body.newPassword);
 
-    if (!previousPassword || !newPassword) {
+    console.log("Password payload debug:", {
+      hasCurrentPassword: Boolean(currentPassword),
+      hasNewPassword: Boolean(newPassword),
+      currentPasswordLength: currentPassword.length,
+      newPasswordLength: newPassword.length
+    });
+
+    if (!currentPassword || !newPassword) {
       return response(400, {
         success: false,
-        message: "previousPassword and newPassword are required"
+        message: "currentPassword and newPassword are required"
       });
     }
 
-    if (previousPassword === newPassword) {
+    if (currentPassword === newPassword) {
       return response(400, {
         success: false,
-        message: "New password must be different from the previous password"
+        message: "New password must be different from the current password"
       });
     }
 
     await cognito.send(
       new ChangePasswordCommand({
         AccessToken: accessToken,
-        PreviousPassword: previousPassword,
+        PreviousPassword: currentPassword,
         ProposedPassword: newPassword
       })
     );
@@ -68,9 +99,16 @@ export const handler = async (event) => {
       message: "Password changed successfully"
     });
   } catch (error) {
-    console.error("Change password error:", {
-      name: error.name,
-      message: error.message
+    console.error("Change password full error:", error);
+
+    console.error("Change password summarized error:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+      statusCode: error?.$metadata?.httpStatusCode,
+      requestId: error?.$metadata?.requestId,
+      attempts: error?.$metadata?.attempts,
+      totalRetryDelay: error?.$metadata?.totalRetryDelay
     });
 
     if (error.name === "NotAuthorizedException") {
@@ -94,12 +132,35 @@ export const handler = async (event) => {
       });
     }
 
+    if (error.name === "PasswordResetRequiredException") {
+      return response(403, {
+        success: false,
+        message: "Password reset is required before changing the password"
+      });
+    }
+
+    if (error.name === "UserNotConfirmedException") {
+      return response(403, {
+        success: false,
+        message: "User is not confirmed"
+      });
+    }
+
     return response(500, {
       success: false,
       message: "Internal server error"
     });
   }
 };
+
+function getHttpMethod(event) {
+  return (
+    event.httpMethod ||
+    event.requestContext?.http?.method ||
+    event.requestContext?.httpMethod ||
+    ""
+  ).toUpperCase();
+}
 
 function extractBearerToken(event) {
   const headers = event.headers || {};
@@ -125,7 +186,24 @@ function parseBody(rawBody) {
     return rawBody;
   }
 
-  return JSON.parse(rawBody);
+  try {
+    return JSON.parse(rawBody);
+  } catch (error) {
+    console.error("Invalid JSON body:", {
+      message: error.message,
+      bodyPreview: String(rawBody).substring(0, 120)
+    });
+
+    return {};
+  }
+}
+
+function readString(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
 }
 
 function response(statusCode, body) {

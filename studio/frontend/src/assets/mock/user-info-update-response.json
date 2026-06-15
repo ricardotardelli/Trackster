@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "message": "User profile updated successfully",
+  "user": {
+    "id": "local-dev-user",
+    "username": "local-dev",
+    "email": "technical@trackster.pt",
+    "fullName": "Ricardo Tardelli",
+    "status": "active",
+    "createdAt": "2026-06-12T01:36:00.205Z",
+    "updatedAt": "2026-06-15T22:37:19.379Z"
+  }
+}

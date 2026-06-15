@@ -11,12 +11,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet } from '@angular/router';
-import {
-  AuthService,
-  TracksterClientRole,
-  TracksterGlobalRole,
-  TracksterUserAccessContext
-} from './auth/auth.service';
+import { AuthService, TracksterClientRole, TracksterGlobalRole, TracksterUserAccessContext } from './auth/auth.service';
 
 type WorkspaceModule =
   | 'generator'
@@ -37,6 +32,7 @@ interface WorkspaceTab {
 interface TracksterRuntimeConfig {
   usermanagementApi?: {
     changePassword?: string;
+    userInfoUpdate?: string;
   };
 }
 
@@ -44,6 +40,21 @@ interface ChangePasswordResponse {
   success?: boolean;
   message?: string;
   error?: string;
+}
+
+interface UserInfoUpdateResponse {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  user?: {
+    id?: string;
+    username?: string;
+    email?: string;
+    fullName?: string;
+    status?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
 }
 
 @Component({
@@ -280,22 +291,26 @@ export class AppComponent implements OnInit {
       const nextName = this.editableProfileName.trim();
       const nextEmail = this.editableProfileEmail.trim();
 
-      await new Promise<void>((resolve) => {
-        window.setTimeout(() => resolve(), 500);
-      });
+      const response = await this.updateUserInfo(nextName, nextEmail);
 
-      this.name = nextName;
-      this.email = nextEmail;
+      this.name = response.user?.fullName || nextName;
+      this.email = response.user?.email || nextEmail;
+
+      if (response.user?.username) {
+        this.username = response.user.username;
+      }
+
+      this.syncEditableProfileFields();
       this.profileDialogMode = 'view';
 
       this.openMessageDialog(
         'Profile Saved',
-        'Your profile information was saved successfully.'
+        response.message || 'Your profile information was saved successfully.'
       );
-    } catch {
+    } catch (error) {
       this.openMessageDialog(
         'Profile Save Failed',
-        'Unable to save your profile information. Please try again later.'
+        this.getUserInfoUpdateErrorMessage(error)
       );
     } finally {
       this.isSavingProfile = false;
@@ -392,7 +407,63 @@ export class AppComponent implements OnInit {
     this.userMenuOpen = false;
   }
 
-  private async changePassword( currentPassword: string, newPassword: string ): Promise<ChangePasswordResponse> {
+  private async updateUserInfo(fullName: string, email: string): Promise<UserInfoUpdateResponse> {
+    if (this.isDevelopmentMode()) {
+      return await this.loadDevelopmentUserInfoUpdateResponse();
+    }
+
+    const config = await this.getRuntimeConfig();
+    const userInfoUpdateUrl = config.usermanagementApi?.userInfoUpdate;
+
+    if (!userInfoUpdateUrl) {
+      throw new Error('User information update API URL is not configured.');
+    }
+
+    if (!this.accessToken) {
+      throw new Error('Authenticated access token is not available.');
+    }
+
+    const response = await fetch(userInfoUpdateUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fullName,
+        email
+      })
+    });
+
+    const payload = await this.readJsonResponse<UserInfoUpdateResponse>(response);
+
+    if (!response.ok || payload.success === false) {
+      throw new Error(payload.error || payload.message || 'Unable to update user profile.');
+    }
+
+    return payload;
+  }
+
+  private async loadDevelopmentUserInfoUpdateResponse(): Promise<UserInfoUpdateResponse> {
+    const response = await fetch('/assets/mock/user-info-update-response.json', {
+      method: 'GET',
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error('Development user information update response file was not found.');
+    }
+
+    const payload = await this.readJsonResponse<UserInfoUpdateResponse>(response);
+
+    if (payload.success === false) {
+      throw new Error(payload.error || payload.message || 'Unable to update user profile.');
+    }
+
+    return payload;
+  }
+
+  private async changePassword(currentPassword: string, newPassword: string): Promise<ChangePasswordResponse> {
     if (this.isDevelopmentMode()) {
       return await this.loadDevelopmentChangePasswordResponse();
     }
@@ -496,6 +567,14 @@ export class AppComponent implements OnInit {
     }
 
     return this.username === 'local-dev';
+  }
+
+  private getUserInfoUpdateErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    return 'Unable to save your profile information. Please try again later.';
   }
 
   private getChangePasswordErrorMessage(error: unknown): string {
