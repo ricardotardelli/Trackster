@@ -170,8 +170,8 @@ export class AuthService {
       const idTokenPayload = session.tokens?.idToken?.payload ?? {};
       const accessTokenPayload = session.tokens?.accessToken?.payload ?? {};
 
-      // console.log('Trackster Cognito access token:', accessToken);
-      // console.log('Trackster Cognito id token:', idToken);
+      console.log('Trackster Cognito access token:', accessToken);
+      console.log('Trackster Cognito id token:', idToken);
       // console.log( 'ACCESS TOKEN PAYLOAD', session.tokens?.accessToken?.payload );
 
       const groups = this.getStringArrayClaim(
