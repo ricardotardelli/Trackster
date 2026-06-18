@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "clientId": "00000000",
+  "users": [
+    {
+      "username": "kadut",
+      "fullName": "Ricardo Tardelli",
+      "email": "kadut3@gmail.com",
+      "role": "client_admin",
+      "status": "Active",
+      "clientId": "00000000"
+    },
+    {
+      "username": "trackster.demo.user",
+      "fullName": "Trackster Demo User",
+      "email": "demo.user@trackster.local",
+      "role": "client_user",
+      "status": "Active",
+      "clientId": "00000000"
+    },
+    {
+      "username": "trackster.demo.ops",
+      "fullName": "Trackster Demo Ops",
+      "email": "demo.ops@trackster.local",
+      "role": "client_user",
+      "status": "Inactive",
+      "clientId": "00000000"
+    }
+  ]
+}

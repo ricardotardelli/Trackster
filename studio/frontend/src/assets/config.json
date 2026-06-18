@@ -32,7 +32,8 @@
    "usermanagementApi": {
       "changePassword": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/changepassword",
       "userInfoUpdate": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/userinfo-update",
-      "userInfoGet": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/userinfo-get"
+      "userInfoGet": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/userinfo-get",
+      "clientUserInfoGet": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/clientusersinfo-get"
    },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",

@@ -1,9 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, TemplateRef, ViewChild } from '@angular/core';
+import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
+import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
 type UserRole = 'client_admin' | 'client_user';
@@ -45,12 +48,25 @@ interface MasterAdminUser {
   clientId: string;
 }
 
+interface AdminClientUsersResponse {
+  success: boolean;
+  clientId: string;
+  users: MasterAdminUser[];
+  error?: string;
+}
+
+interface TracksterRuntimeConfig {
+  clientUsersInfoGetUrl?: string;
+  clientUsersInfoUrl?: string;
+}
+
 @Component({
   selector: 'app-master-admin',
   standalone: true,
   imports: [
     CommonModule,
     FormsModule,
+    HttpClientModule,
     MatDialogModule,
     MatIconModule,
     MatSelectModule
@@ -58,13 +74,19 @@ interface MasterAdminUser {
   templateUrl: './master-admin.component.html',
   styleUrl: './master-admin.component.css'
 })
-export class MasterAdminComponent {
+export class MasterAdminComponent implements OnInit {
   @ViewChild('confirmationDialog') confirmationDialog?: TemplateRef<unknown>;
   @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
 
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
+
+  private readonly configPath = 'assets/config.json';
+  private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
+
+  private runtimeConfig: TracksterRuntimeConfig = {};
+  private isLoadingUsers = false;
 
   clients: MasterAdminClientSummary[] = [
     {
@@ -75,8 +97,8 @@ export class MasterAdminComponent {
       phone: '+351 000 000 000',
       country: 'Portugal',
       status: 'Active',
-      users: 3,
-      admins: 1
+      users: 0,
+      admins: 0
     },
     {
       clientId: '00000001',
@@ -86,8 +108,8 @@ export class MasterAdminComponent {
       phone: '+351 111 111 111',
       country: 'Portugal',
       status: 'Active',
-      users: 2,
-      admins: 1
+      users: 0,
+      admins: 0
     },
     {
       clientId: '00000002',
@@ -97,85 +119,12 @@ export class MasterAdminComponent {
       phone: '+351 222 222 222',
       country: 'Portugal',
       status: 'Active',
-      users: 4,
-      admins: 2
+      users: 0,
+      admins: 0
     }
   ];
 
-  users: MasterAdminUser[] = [
-    {
-      username: 'kadut',
-      fullName: 'Ricardo Tardelli',
-      email: 'kadut3@gmail.com',
-      role: 'client_admin',
-      status: 'Active',
-      clientId: '00000000'
-    },
-    {
-      username: 'trackster.demo.user',
-      fullName: 'Trackster Demo User',
-      email: 'demo.user@trackster.local',
-      role: 'client_user',
-      status: 'Active',
-      clientId: '00000000'
-    },
-    {
-      username: 'trackster.demo.ops',
-      fullName: 'Trackster Demo Ops',
-      email: 'demo.ops@trackster.local',
-      role: 'client_user',
-      status: 'Inactive',
-      clientId: '00000000'
-    },
-    {
-      username: 'client.a.admin',
-      fullName: 'Client A Admin',
-      email: 'admin-a@example.com',
-      role: 'client_admin',
-      status: 'Active',
-      clientId: '00000001'
-    },
-    {
-      username: 'client.a.user',
-      fullName: 'Client A User',
-      email: 'user-a@example.com',
-      role: 'client_user',
-      status: 'Active',
-      clientId: '00000001'
-    },
-    {
-      username: 'client.b.admin',
-      fullName: 'Client B Admin',
-      email: 'admin-b@example.com',
-      role: 'client_admin',
-      status: 'Active',
-      clientId: '00000002'
-    },
-    {
-      username: 'client.b.ops',
-      fullName: 'Client B Ops',
-      email: 'ops-b@example.com',
-      role: 'client_admin',
-      status: 'Active',
-      clientId: '00000002'
-    },
-    {
-      username: 'client.b.user.one',
-      fullName: 'Client B User One',
-      email: 'user-one-b@example.com',
-      role: 'client_user',
-      status: 'Active',
-      clientId: '00000002'
-    },
-    {
-      username: 'client.b.user.two',
-      fullName: 'Client B User Two',
-      email: 'user-two-b@example.com',
-      role: 'client_user',
-      status: 'Suspended',
-      clientId: '00000002'
-    }
-  ];
+  users: MasterAdminUser[] = [];
 
   selectedClient: MasterAdminClientSummary = this.clients[0];
   selectedUser: MasterAdminUser | null = null;
@@ -205,7 +154,16 @@ export class MasterAdminComponent {
   messageTitle = '';
   messageText = '';
 
-  constructor(private readonly dialog: MatDialog) {}
+  constructor(
+    private readonly dialog: MatDialog,
+    private readonly http: HttpClient,
+    private readonly authService: AuthService
+  ) {}
+
+  async ngOnInit(): Promise<void> {
+    await this.loadRuntimeConfig();
+    await this.loadClientUsers();
+  }
 
   get platformSummary(): MasterAdminPlatformSummary {
     return {
@@ -220,7 +178,8 @@ export class MasterAdminComponent {
   }
 
   get canAddUser(): boolean {
-    return !this.isEditingClient
+    return !this.isLoadingUsers
+      && !this.isEditingClient
       && !this.isCreatingClient
       && !this.isEditingUser
       && !this.isCreatingUser
@@ -229,6 +188,7 @@ export class MasterAdminComponent {
 
   get canEditSelectedUser(): boolean {
     return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingClient
       && !this.isCreatingClient
       && !this.isEditingUser
@@ -237,6 +197,7 @@ export class MasterAdminComponent {
 
   get canDisableSelectedUser(): boolean {
     return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingClient
       && !this.isCreatingClient
       && !this.isEditingUser
@@ -246,6 +207,7 @@ export class MasterAdminComponent {
 
   get canActivateSelectedUser(): boolean {
     return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingClient
       && !this.isCreatingClient
       && !this.isEditingUser
@@ -255,6 +217,7 @@ export class MasterAdminComponent {
 
   get canRemoveSelectedUser(): boolean {
     return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingClient
       && !this.isCreatingClient
       && !this.isEditingUser
@@ -263,7 +226,7 @@ export class MasterAdminComponent {
       && this.selectedUser.role !== 'client_admin';
   }
 
-  selectClientById(clientId: string): void {
+  async selectClientById(clientId: string): Promise<void> {
     if (this.isEditingClient || this.isCreatingClient || this.isEditingUser || this.isCreatingUser) {
       return;
     }
@@ -278,6 +241,8 @@ export class MasterAdminComponent {
     this.selectedUser = null;
     this.syncEditableClientFields();
     this.clearEditableUserFields();
+
+    await this.loadClientUsers();
   }
 
   addClient(): void {
@@ -574,19 +539,161 @@ export class MasterAdminComponent {
     this.dialog.closeAll();
   }
 
+  private async loadRuntimeConfig(): Promise<void> {
+    try {
+      this.runtimeConfig = await firstValueFrom(
+        this.http.get<TracksterRuntimeConfig>(this.configPath)
+      );
+    } catch (error) {
+      console.error('Unable to load Trackster runtime config.', error);
+      this.runtimeConfig = {};
+    }
+  }
+
+  private async loadClientUsers(): Promise<void> {
+    this.isLoadingUsers = true;
+
+    try {
+      const response = this.isDevelopmentMode()
+        ? await this.loadClientUsersFromMock()
+        : await this.loadClientUsersFromApi();
+
+      if (!response.success) {
+        this.openMessageDialog(
+          'Client Users Error',
+          response.error || 'Unable to load client users.'
+        );
+        return;
+      }
+
+      this.users = [
+        ...this.users.filter((user) => user.clientId !== response.clientId),
+        ...response.users.map((user) => ({
+          ...user,
+          status: this.normalizeStatus(user.status),
+          role: this.normalizeUserRole(user.role)
+        }))
+      ];
+
+      this.refreshClientCounters(response.clientId);
+      this.selectedUser = null;
+      this.clearEditableUserFields();
+    } catch (error) {
+      console.error('Unable to load client users.', error);
+
+      this.openMessageDialog(
+        'Client Users Error',
+        'Unable to load client users.'
+      );
+    } finally {
+      this.isLoadingUsers = false;
+    }
+  }
+
+  private async loadClientUsersFromMock(): Promise<AdminClientUsersResponse> {
+    const response = await firstValueFrom(
+      this.http.get<AdminClientUsersResponse>(this.devClientUsersMockPath)
+    );
+
+    return {
+      ...response,
+      clientId: this.selectedClient.clientId,
+      users: response.users.map((user) => ({
+        ...user,
+        clientId: this.selectedClient.clientId
+      }))
+    };
+  }
+
+  private async loadClientUsersFromApi(): Promise<AdminClientUsersResponse> {
+    const apiUrl = this.getClientUsersApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        clientId: this.selectedClient.clientId,
+        users: [],
+        error: 'Client users API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        clientId: this.selectedClient.clientId,
+        users: [],
+        error: 'Access token was not found.'
+      };
+    }
+
+    const url = `${apiUrl}?clientId=${encodeURIComponent(this.selectedClient.clientId)}`;
+
+    return await firstValueFrom(
+      this.http.get<AdminClientUsersResponse>(url, {
+        headers: new HttpHeaders({
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      })
+    );
+  }
+
+  private getClientUsersApiUrl(): string {
+    return (
+      this.runtimeConfig.clientUsersInfoGetUrl ||
+      this.runtimeConfig.clientUsersInfoUrl ||
+      ''
+    ).trim();
+  }
+
+  private isDevelopmentMode(): boolean {
+    const authServiceAsAny = this.authService as any;
+
+    if (typeof authServiceAsAny.isDevelopmentMode === 'function') {
+      return !!authServiceAsAny.isDevelopmentMode();
+    }
+
+    if (typeof authServiceAsAny.isDevMode === 'function') {
+      return !!authServiceAsAny.isDevMode();
+    }
+
+    return window.location.hostname === 'localhost'
+      || window.location.hostname === '127.0.0.1';
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const authServiceAsAny = this.authService as any;
+
+    if (typeof authServiceAsAny.getAccessToken === 'function') {
+      const token = await authServiceAsAny.getAccessToken();
+      return String(token || '').trim();
+    }
+
+    if (typeof authServiceAsAny.getCurrentAccessToken === 'function') {
+      const token = await authServiceAsAny.getCurrentAccessToken();
+      return String(token || '').trim();
+    }
+
+    if (typeof authServiceAsAny.getToken === 'function') {
+      const token = await authServiceAsAny.getToken();
+      return String(token || '').trim();
+    }
+
+    if (typeof authServiceAsAny.accessToken === 'string') {
+      return authServiceAsAny.accessToken.trim();
+    }
+
+    return '';
+  }
+
   private confirmSaveClient(): void {
     this.selectedClient.name = this.editableClientName.trim();
     this.selectedClient.email = this.editableClientEmail.trim();
     this.selectedClient.contactName = this.editableClientContactName.trim();
     this.selectedClient.phone = this.editableClientPhone.trim();
     this.selectedClient.country = this.editableClientCountry.trim();
-
-    /*
-      TODO: Replace the local update above with the Admin Client Lambda call.
-
-      Example:
-      await this.masterAdminService.saveClient(this.selectedClient);
-    */
 
     this.isEditingClient = false;
     this.isCreatingClient = false;
@@ -600,35 +707,14 @@ export class MasterAdminComponent {
 
   private confirmDisableClient(): void {
     this.selectedClient.status = 'Inactive';
-
-    /*
-      TODO: Replace the local status update above with the Admin Client Lambda call.
-
-      Example:
-      await this.masterAdminService.updateClientStatus(this.selectedClient.clientId, 'Inactive');
-    */
   }
 
   private confirmActivateClient(): void {
     this.selectedClient.status = 'Active';
-
-    /*
-      TODO: Replace the local status update above with the Admin Client Lambda call.
-
-      Example:
-      await this.masterAdminService.updateClientStatus(this.selectedClient.clientId, 'Active');
-    */
   }
 
   private confirmRemoveClient(): void {
     const removedClientId = this.selectedClient.clientId;
-
-    /*
-      TODO: Replace the local removal below with the Admin Client Lambda call.
-
-      Example:
-      await this.masterAdminService.removeClient(removedClientId);
-    */
 
     this.clients = this.clients.filter((client) => client.clientId !== removedClientId);
     this.users = this.users.filter((user) => user.clientId !== removedClientId);
@@ -679,13 +765,6 @@ export class MasterAdminComponent {
         clientId: this.selectedClient.clientId
       };
 
-      /*
-        TODO: Replace the local create below with the Admin User Lambda call.
-
-        Example:
-        await this.masterAdminService.createUser(this.selectedClient.clientId, newUser);
-      */
-
       this.users = [...this.users, newUser];
       this.selectedUser = newUser;
     } else if (this.selectedUser) {
@@ -695,13 +774,6 @@ export class MasterAdminComponent {
       this.selectedUser.role = nextRole;
       this.selectedUser.status = nextStatus;
       this.selectedUser.clientId = this.selectedClient.clientId;
-
-      /*
-        TODO: Replace the local update above with the Admin User Lambda call.
-
-        Example:
-        await this.masterAdminService.updateUser(this.selectedClient.clientId, this.selectedUser);
-      */
     }
 
     this.isEditingUser = false;
@@ -721,18 +793,6 @@ export class MasterAdminComponent {
     }
 
     this.selectedUser.status = 'Inactive';
-
-    /*
-      TODO: Replace the local status update above with the Admin User Lambda call.
-
-      Example:
-      await this.masterAdminService.updateUserStatus(
-        this.selectedClient.clientId,
-        this.selectedUser.username,
-        'Inactive'
-      );
-    */
-
     this.syncEditableUserFields();
     this.refreshSelectedClientCounters();
   }
@@ -743,18 +803,6 @@ export class MasterAdminComponent {
     }
 
     this.selectedUser.status = 'Active';
-
-    /*
-      TODO: Replace the local status update above with the Admin User Lambda call.
-
-      Example:
-      await this.masterAdminService.updateUserStatus(
-        this.selectedClient.clientId,
-        this.selectedUser.username,
-        'Active'
-      );
-    */
-
     this.syncEditableUserFields();
     this.refreshSelectedClientCounters();
   }
@@ -766,13 +814,6 @@ export class MasterAdminComponent {
 
     const removedUsername = this.selectedUser.username;
     const removedClientId = this.selectedUser.clientId;
-
-    /*
-      TODO: Replace the local removal below with the Admin User Lambda call.
-
-      Example:
-      await this.masterAdminService.removeUser(removedClientId, removedUsername);
-    */
 
     this.users = this.users.filter(
       (user) => !(user.username === removedUsername && user.clientId === removedClientId)
@@ -939,13 +980,43 @@ export class MasterAdminComponent {
   }
 
   private refreshSelectedClientCounters(): void {
+    this.refreshClientCounters(this.selectedClient.clientId);
+  }
+
+  private refreshClientCounters(clientId: string): void {
+    const client = this.clients.find((item) => item.clientId === clientId);
+
+    if (!client) {
+      return;
+    }
+
     const clientUsers = this.users.filter(
-      (user) => user.clientId === this.selectedClient.clientId
+      (user) => user.clientId === client.clientId
     );
 
-    this.selectedClient.users = clientUsers.length;
-    this.selectedClient.admins = clientUsers.filter(
+    client.users = clientUsers.length;
+    client.admins = clientUsers.filter(
       (user) => user.role === 'client_admin'
     ).length;
+  }
+
+  private normalizeStatus(status: string): ClientStatus {
+    if (status === 'Active' || status === 'active') {
+      return 'Active';
+    }
+
+    if (status === 'Suspended' || status === 'suspended') {
+      return 'Suspended';
+    }
+
+    return 'Inactive';
+  }
+
+  private normalizeUserRole(role: string): UserRole {
+    if (role === 'client_admin') {
+      return 'client_admin';
+    }
+
+    return 'client_user';
   }
 }
