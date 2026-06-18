@@ -1,0 +1,33 @@
+{
+    "success": true,
+    "user": {
+        "id": "943becde-dc9b-482f-8868-07033a0708e4",
+        "username": "kadut",
+        "email": "technical@trackster.pt",
+        "fullName": "Ricardo Tardelli",
+        "status": "active",
+        "globalRole": "trackster_admin",
+        "clientRole": "client_admin",
+        "clientId": "00000000",
+        "companyName": "Trackster Co.",
+        "companyEmail": "contact@trackster.pt",
+        "contactName": "Ricardo Tardelli",
+        "country": "Portugal",
+        "phone": "+351910869867",
+        "createdAt": "2026-06-12T01:36:00.205Z",
+        "updatedAt": "2026-06-15T23:01:55.917Z",
+        "clientAssociations": [
+            {
+                "clientId": "00000000",
+                "clientRole": "client_admin",
+                "status": "active",
+                "companyName": "Trackster Co.",
+                "companyEmail": "contact@trackster.pt",
+                "contactName": "Ricardo Tardelli",
+                "country": "Portugal",
+                "phone": "+351910869867",
+                "clientStatus": "active"
+            }
+        ]
+    }
+}

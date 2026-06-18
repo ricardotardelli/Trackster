@@ -1,0 +1,16 @@
+{
+  "name": "user-info-get",
+  "version": "1.0.0",
+  "description": "Trackster Lambda for retrieving authenticated user information from PostgreSQL.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "pg": "^8.21.0"
+  }
+}

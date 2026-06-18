@@ -33,6 +33,7 @@ interface TracksterRuntimeConfig {
   usermanagementApi?: {
     changePassword?: string;
     userInfoUpdate?: string;
+    userInfoGet?: string;
   };
 }
 
@@ -54,6 +55,40 @@ interface UserInfoUpdateResponse {
     status?: string;
     createdAt?: string;
     updatedAt?: string;
+  };
+}
+
+interface UserInfoGetResponse {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  user?: {
+    id?: string;
+    username?: string;
+    email?: string;
+    fullName?: string;
+    status?: string;
+    globalRole?: TracksterGlobalRole;
+    clientRole?: TracksterClientRole;
+    clientId?: string;
+    companyName?: string;
+    companyEmail?: string;
+    contactName?: string;
+    country?: string;
+    phone?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    clientAssociations?: Array<{
+      clientId?: string;
+      clientRole?: TracksterClientRole;
+      status?: string;
+      companyName?: string;
+      companyEmail?: string;
+      contactName?: string;
+      country?: string;
+      phone?: string;
+      clientStatus?: string;
+    }>;
   };
 }
 
@@ -407,6 +442,58 @@ export class AppComponent implements OnInit {
     this.userMenuOpen = false;
   }
 
+  private async getUserInfo(): Promise<UserInfoGetResponse> {
+    if (this.isDevelopmentMode()) {
+      return await this.loadDevelopmentUserInfoGetResponse();
+    }
+
+    const config = await this.getRuntimeConfig();
+    const userInfoGetUrl = config.usermanagementApi?.userInfoGet;
+
+    if (!userInfoGetUrl) {
+      throw new Error('User information API URL is not configured.');
+    }
+
+    if (!this.accessToken) {
+      throw new Error('Authenticated access token is not available.');
+    }
+
+    const response = await fetch(userInfoGetUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const payload = await this.readJsonResponse<UserInfoGetResponse>(response);
+
+    if (!response.ok || payload.success === false) {
+      throw new Error(payload.error || payload.message || 'Unable to load user information.');
+    }
+
+    return payload;
+  }
+
+  private async loadDevelopmentUserInfoGetResponse(): Promise<UserInfoGetResponse> {
+    const response = await fetch('/assets/mock/user-info-get-response.json', {
+      method: 'GET',
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error('Development user information response file was not found.');
+    }
+
+    const payload = await this.readJsonResponse<UserInfoGetResponse>(response);
+
+    if (payload.success === false) {
+      throw new Error(payload.error || payload.message || 'Unable to load user information.');
+    }
+
+    return payload;
+  }
+
   private async updateUserInfo(fullName: string, email: string): Promise<UserInfoUpdateResponse> {
     if (this.isDevelopmentMode()) {
       return await this.loadDevelopmentUserInfoUpdateResponse();
@@ -659,7 +746,16 @@ export class AppComponent implements OnInit {
         throw new Error('Authenticated session is not available.');
       }
 
-      this.applyUserAccessContext(accessContext);
+      this.applyAuthenticationContext(accessContext);
+
+      const userInfoResponse = await this.getUserInfo();
+
+      if (!userInfoResponse.user) {
+        throw new Error('User information was not returned by the API.');
+      }
+
+      this.applyUserInfoFromApi(userInfoResponse);
+
       this.authReady = true;
     } catch {
       this.isAuthenticated = false;
@@ -668,22 +764,33 @@ export class AppComponent implements OnInit {
     }
   }
 
-  private applyUserAccessContext(accessContext: TracksterUserAccessContext): void {
+  private applyAuthenticationContext(accessContext: TracksterUserAccessContext): void {
     this.userAccessContext = accessContext;
 
     this.isAuthenticated = accessContext.isAuthenticated;
-    this.username = accessContext.username || 'User';
-
-    this.globalRole = accessContext.globalRole;
-    this.clientRole = accessContext.clientRole;
-    this.clientId = accessContext.clientId;
 
     this.cognitoSub = accessContext.cognitoSub;
-    this.email = accessContext.email;
-    this.name = accessContext.name;
     this.groups = accessContext.groups;
     this.idToken = accessContext.idToken;
     this.accessToken = accessContext.accessToken;
+
+    this.username = accessContext.username || 'User';
+  }
+
+  private applyUserInfoFromApi(response: UserInfoGetResponse): void {
+    const user = response.user;
+
+    if (!user) {
+      throw new Error('User information was not returned by the API.');
+    }
+
+    this.username = user.username || this.username || 'User';
+    this.email = user.email || '';
+    this.name = user.fullName || '';
+
+    this.globalRole = user.globalRole ?? null;
+    this.clientRole = user.clientRole ?? null;
+    this.clientId = user.clientId || '';
 
     this.syncEditableProfileFields();
 
