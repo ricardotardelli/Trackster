@@ -56,8 +56,7 @@ interface AdminClientUsersResponse {
 }
 
 interface TracksterRuntimeConfig {
-  clientUsersInfoGetUrl?: string;
-  clientUsersInfoUrl?: string;
+  clientUsersInfoGet?: string;
 }
 
 @Component({
@@ -641,11 +640,7 @@ export class MasterAdminComponent implements OnInit {
   }
 
   private getClientUsersApiUrl(): string {
-    return (
-      this.runtimeConfig.clientUsersInfoGetUrl ||
-      this.runtimeConfig.clientUsersInfoUrl ||
-      ''
-    ).trim();
+    return (this.runtimeConfig.clientUsersInfoGet || '').trim();
   }
 
   private isDevelopmentMode(): boolean {
