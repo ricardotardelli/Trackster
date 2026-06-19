@@ -1170,7 +1170,7 @@ export class MasterAdminComponent implements OnInit {
 
     this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
       width: '440px',
-      panelClass: 'trackster-admin-dialog-panel',
+      panelClass: 'trackster-admin-workflow-dialog-panel',
       disableClose: true
     });
   }

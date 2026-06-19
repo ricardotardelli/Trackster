@@ -1,8 +1,4 @@
-import {
-  CognitoIdentityProviderClient,
-  AdminCreateUserCommand,
-  AdminGetUserCommand
-} from '@aws-sdk/client-cognito-identity-provider';
+import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 
 const cognitoClient = new CognitoIdentityProviderClient({
   region: process.env.AWS_REGION || process.env.LAMBDA_REGION || 'us-east-1'
@@ -97,10 +93,6 @@ export const handler = async (event) => {
       {
         Name: 'email',
         Value: email
-      },
-      {
-        Name: 'email_verified',
-        Value: 'true'
       }
     ];
 

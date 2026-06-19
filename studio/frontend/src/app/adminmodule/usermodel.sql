@@ -61,9 +61,6 @@ CREATE TABLE trackster_users (
     CONSTRAINT uq_trackster_users_username
         UNIQUE (username),
 
-    CONSTRAINT uq_trackster_users_email
-        UNIQUE (email),
-
     CONSTRAINT ck_trackster_users_status
         CHECK (status IN (
             'active',
@@ -224,62 +221,6 @@ VALUES
     'active'
 );
 
-INSERT INTO trackster_users (
-    username,
-    email,
-    full_name,
-    status
-)
-VALUES
-(
-    'trackster.co.user',
-    'co.user@trackster.local',
-    'Trackster Co. User',
-    'active'
-),
-(
-    'trackster.co.ops',
-    'co.ops@trackster.local',
-    'Trackster Co. Ops',
-    'inactive'
-),
-(
-    'client.a.admin',
-    'admin-a@example.com',
-    'Client A Admin',
-    'active'
-),
-(
-    'client.a.user',
-    'user-a@example.com',
-    'Client A User',
-    'active'
-),
-(
-    'client.b.admin',
-    'admin-b@example.com',
-    'Client B Admin',
-    'active'
-),
-(
-    'client.b.ops',
-    'ops-b@example.com',
-    'Client B Ops',
-    'active'
-),
-(
-    'client.b.user.one',
-    'user-one-b@example.com',
-    'Client B User One',
-    'active'
-),
-(
-    'client.b.user.two',
-    'user-two-b@example.com',
-    'Client B User Two',
-    'suspended'
-);
-
 INSERT INTO trackster_client_users (
     client_id,
     user_id,
@@ -290,72 +231,10 @@ SELECT
     '00000000',
     u.id,
     r.id,
-    u.status
+    'active'
 FROM trackster_users u
 JOIN trackster_roles r
-    ON r.role_code =
-        CASE
-            WHEN u.username = 'kadut'
-                THEN 'client_admin'
-            ELSE 'client_user'
-        END
-WHERE u.username IN (
-    'kadut',
-    'trackster.co.user',
-    'trackster.co.ops'
-);
-
-INSERT INTO trackster_client_users (
-    client_id,
-    user_id,
-    role_id,
-    status
-)
-SELECT
-    '00000001',
-    u.id,
-    r.id,
-    u.status
-FROM trackster_users u
-JOIN trackster_roles r
-    ON r.role_code =
-        CASE
-            WHEN u.username = 'client.a.admin'
-                THEN 'client_admin'
-            ELSE 'client_user'
-        END
-WHERE u.username IN (
-    'client.a.admin',
-    'client.a.user'
-);
-
-INSERT INTO trackster_client_users (
-    client_id,
-    user_id,
-    role_id,
-    status
-)
-SELECT
-    '00000002',
-    u.id,
-    r.id,
-    u.status
-FROM trackster_users u
-JOIN trackster_roles r
-    ON r.role_code =
-        CASE
-            WHEN u.username IN (
-                'client.b.admin',
-                'client.b.ops'
-            )
-                THEN 'client_admin'
-            ELSE 'client_user'
-        END
-WHERE u.username IN (
-    'client.b.admin',
-    'client.b.ops',
-    'client.b.user.one',
-    'client.b.user.two'
-);
+    ON r.role_code = 'client_admin'
+WHERE u.username = 'kadut';
 
 COMMIT;
