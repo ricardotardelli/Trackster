@@ -111,6 +111,7 @@ interface TracksterRuntimeConfig {
 export class MasterAdminComponent implements OnInit {
   @ViewChild('confirmationDialog') confirmationDialog?: TemplateRef<unknown>;
   @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
+  @ViewChild('processingDialog') processingDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
 
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
@@ -189,6 +190,9 @@ export class MasterAdminComponent implements OnInit {
 
   messageTitle = '';
   messageText = '';
+
+  processingTitle = '';
+  processingMessage = '';
 
   constructor(
     private readonly dialog: MatDialog,
@@ -966,8 +970,15 @@ export class MasterAdminComponent implements OnInit {
 
     this.isLoadingUsers = true;
 
+    this.openProcessingDialog(
+      'Creating User',
+      'Please wait while Trackster creates the user account in Cognito and the application database.'
+    );
+
     try {
       const response = await this.createClientUser(newUserRequest);
+
+      this.dialog.closeAll();
 
       if (!response.success) {
         this.openMessageDialog(
@@ -1008,6 +1019,8 @@ export class MasterAdminComponent implements OnInit {
     } catch (error) {
       console.error('Unable to create client user.', error);
 
+      this.dialog.closeAll();
+
       this.openMessageDialog(
         'User Create Error',
         'Unable to create user.'
@@ -1047,8 +1060,15 @@ export class MasterAdminComponent implements OnInit {
 
     this.isLoadingUsers = true;
 
+    this.openProcessingDialog(
+      'Removing User',
+      'Please wait while Trackster removes the user from Cognito and the application database.'
+    );
+
     try {
       const response = await this.deleteClientUser(removedUsername, removedClientId);
+
+      this.dialog.closeAll();
 
       if (!response.success) {
         this.openMessageDialog(
@@ -1074,6 +1094,8 @@ export class MasterAdminComponent implements OnInit {
       );
     } catch (error) {
       console.error('Unable to remove client user.', error);
+
+      this.dialog.closeAll();
 
       this.openMessageDialog(
         'User Remove Error',
@@ -1115,6 +1137,21 @@ export class MasterAdminComponent implements OnInit {
     this.dialog.open(this.messageDialog, {
       width: '420px',
       panelClass: 'trackster-admin-dialog-panel'
+    });
+  }
+
+  private openProcessingDialog(title: string, message: string): void {
+    if (!this.processingDialog) {
+      return;
+    }
+
+    this.processingTitle = title;
+    this.processingMessage = message;
+
+    this.dialog.open(this.processingDialog, {
+      width: '420px',
+      panelClass: 'trackster-admin-dialog-panel',
+      disableClose: true
     });
   }
 

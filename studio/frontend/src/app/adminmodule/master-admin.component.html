@@ -417,6 +417,17 @@
   </div>
 </ng-template>
 
+
+<ng-template #processingDialog>
+  <div class="trackster-dialog processing-dialog">
+    <div class="processing-dialog-spinner" aria-hidden="true"></div>
+
+    <h2>{{ processingTitle }}</h2>
+
+    <p>{{ processingMessage }}</p>
+  </div>
+</ng-template>
+
 <ng-template #messageDialog>
   <div class="trackster-dialog">
     <h2>{{ messageTitle }}</h2>
