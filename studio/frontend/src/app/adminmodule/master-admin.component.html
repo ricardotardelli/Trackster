@@ -391,6 +391,68 @@
   </div>
 </ng-template>
 
+
+<ng-template #adminUserWorkflowDialog>
+  <div class="trackster-admin-workflow-dialog">
+    <div
+      class="trackster-admin-workflow-icon-shell"
+      [class.trackster-admin-workflow-icon-running]="adminUserWorkflowState === 'running'"
+      [class.trackster-admin-workflow-icon-success]="adminUserWorkflowState === 'success'"
+      [class.trackster-admin-workflow-icon-error]="adminUserWorkflowState === 'error'"
+      [class.trackster-admin-workflow-icon-confirm]="adminUserWorkflowState === 'confirm'"
+    >
+      <div
+        class="trackster-admin-workflow-spinner"
+        *ngIf="adminUserWorkflowState === 'running'"
+        aria-hidden="true"
+      ></div>
+
+      <mat-icon *ngIf="adminUserWorkflowState === 'confirm'">help</mat-icon>
+      <mat-icon *ngIf="adminUserWorkflowState === 'success'">check_circle</mat-icon>
+      <mat-icon *ngIf="adminUserWorkflowState === 'error'">error</mat-icon>
+    </div>
+
+    <h2>{{ adminUserWorkflowTitle }}</h2>
+
+    <p>{{ adminUserWorkflowMessage }}</p>
+
+    <p class="trackster-admin-workflow-details" *ngIf="adminUserWorkflowDetails">
+      {{ adminUserWorkflowDetails }}
+    </p>
+
+    <div class="trackster-dialog-actions" *ngIf="adminUserWorkflowState === 'confirm'">
+      <button
+        type="button"
+        class="trackster-admin-button secondary"
+        (click)="closeAdminUserWorkflowDialog()"
+      >
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="confirmAdminUserWorkflowAction()"
+      >
+        Confirm
+      </button>
+    </div>
+
+    <div
+      class="trackster-dialog-actions"
+      *ngIf="adminUserWorkflowState === 'success' || adminUserWorkflowState === 'error'"
+    >
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="closeAdminUserWorkflowDialog()"
+      >
+        OK
+      </button>
+    </div>
+  </div>
+</ng-template>
+
 <ng-template #confirmationDialog>
   <div class="trackster-dialog">
     <h2>{{ confirmationTitle }}</h2>

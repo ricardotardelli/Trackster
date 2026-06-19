@@ -12,6 +12,19 @@ function normalizeString(value) {
   return String(value || '').trim();
 }
 
+function buildTemporaryPassword(clientId, username, providedTemporaryPassword) {
+  const normalizedProvidedPassword = normalizeString(providedTemporaryPassword);
+
+  if (normalizedProvidedPassword) {
+    return normalizedProvidedPassword;
+  }
+
+  const normalizedClientId = normalizeString(clientId);
+  const normalizedUsername = normalizeString(username);
+
+  return `${normalizedClientId}.${normalizedUsername}#T1`;
+}
+
 async function cognitoUserExists(userPoolId, username) {
   try {
     await cognitoClient.send(
@@ -42,7 +55,12 @@ export const handler = async (event) => {
     const username = normalizeString(event?.username);
     const email = normalizeString(event?.email);
     const fullName = normalizeString(event?.fullName);
-    const temporaryPassword = normalizeString(event?.temporaryPassword);
+    const clientId = normalizeString(event?.clientId);
+    const temporaryPassword = buildTemporaryPassword(
+      clientId,
+      username,
+      event?.temporaryPassword
+    );
 
     if (!username) {
       return {
@@ -55,6 +73,13 @@ export const handler = async (event) => {
       return {
         success: false,
         message: 'Missing required field: email.'
+      };
+    }
+
+    if (!clientId) {
+      return {
+        success: false,
+        message: 'Missing required field: clientId.'
       };
     }
 
@@ -86,19 +111,14 @@ export const handler = async (event) => {
       });
     }
 
-    const commandInput = {
-      UserPoolId: userPoolId,
-      Username: username,
-      UserAttributes: userAttributes,
-      DesiredDeliveryMediums: ['EMAIL']
-    };
-
-    if (temporaryPassword) {
-      commandInput.TemporaryPassword = temporaryPassword;
-    }
-
     const result = await cognitoClient.send(
-      new AdminCreateUserCommand(commandInput)
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId,
+        Username: username,
+        TemporaryPassword: temporaryPassword,
+        UserAttributes: userAttributes,
+        DesiredDeliveryMediums: ['EMAIL']
+      })
     );
 
     return {
@@ -107,6 +127,7 @@ export const handler = async (event) => {
       externalLoginCreated: true,
       username,
       email,
+      temporaryPasswordCreated: true,
       userStatus: result?.User?.UserStatus || null
     };
   } catch (error) {

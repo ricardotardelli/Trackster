@@ -86,7 +86,7 @@ async function createDbClient() {
   return client;
 }
 
-async function createUserInIdentityProvider(payload) {
+async function createUserInIdentityProvider(identityPayload) {
   const functionName = process.env.IDENTITY_CREATE_FUNCTION_NAME;
 
   if (!functionName) {
@@ -96,32 +96,32 @@ async function createUserInIdentityProvider(payload) {
   const command = new InvokeCommand({
     FunctionName: functionName,
     InvocationType: 'RequestResponse',
-    Payload: Buffer.from(JSON.stringify(payload))
+    Payload: Buffer.from(JSON.stringify(identityPayload))
   });
 
   const result = await lambdaClient.send(command);
 
   if (result.FunctionError) {
-    const payloadText = result.Payload
+    const resultPayloadText = result.Payload
       ? Buffer.from(result.Payload).toString('utf8')
       : '';
 
-    console.error('Identity create function error:', payloadText);
+    console.error('Identity create function error:', resultPayloadText);
 
     throw new Error('Unable to create external login account.');
   }
 
-  const payloadText = result.Payload
+  const resultPayloadText = result.Payload
     ? Buffer.from(result.Payload).toString('utf8')
     : '{}';
 
-  const responsePayload = JSON.parse(payloadText);
+  const parsedIdentityResponse = JSON.parse(resultPayloadText);
 
-  if (!responsePayload.success) {
-    throw new Error(responsePayload.message || 'Unable to create external login account.');
+  if (!parsedIdentityResponse.success) {
+    throw new Error(parsedIdentityResponse.message || 'Unable to create external login account.');
   }
 
-  return responsePayload;
+  return parsedIdentityResponse;
 }
 
 async function deleteUserFromIdentityProviderIfExists(username) {
@@ -143,11 +143,11 @@ async function deleteUserFromIdentityProviderIfExists(username) {
   const result = await lambdaClient.send(command);
 
   if (result.FunctionError) {
-    const payloadText = result.Payload
+    const resultPayloadText = result.Payload
       ? Buffer.from(result.Payload).toString('utf8')
       : '';
 
-    console.error('Identity cleanup function error:', payloadText);
+    console.error('Identity cleanup function error:', resultPayloadText);
 
     return {
       deleted: false,
@@ -155,15 +155,15 @@ async function deleteUserFromIdentityProviderIfExists(username) {
     };
   }
 
-  const payloadText = result.Payload
+  const resultPayloadText = result.Payload
     ? Buffer.from(result.Payload).toString('utf8')
     : '{}';
 
-  const payload = JSON.parse(payloadText);
+  const parsedIdentityResponse = JSON.parse(resultPayloadText);
 
   return {
-    deleted: !!payload.externalLoginDeleted,
-    wasMissing: !!payload.externalLoginWasMissing
+    deleted: !!parsedIdentityResponse.externalLoginDeleted,
+    wasMissing: !!parsedIdentityResponse.externalLoginWasMissing
   };
 }
 
@@ -281,6 +281,18 @@ export const handler = async (event) => {
       });
     }
 
+    if (
+      requester.user_status !== 'active' ||
+      (requesterIsClientAdmin && requester.client_user_status !== 'active')
+    ) {
+      await client.query('ROLLBACK');
+
+      return response(403, {
+        success: false,
+        message: 'Your administrator account is inactive.'
+      });
+    }
+
     const targetClientId = requesterIsTracksterAdmin
       ? requestedClientId
       : requester.client_id;
@@ -345,14 +357,12 @@ export const handler = async (event) => {
       `
       SELECT
         id,
-        username,
-        email
+        username
       FROM trackster_users
       WHERE username = $1
-         OR LOWER(email) = LOWER($2)
       LIMIT 1
       `,
-      [username, email]
+      [username]
     );
 
     if (existingUserResult.rowCount > 0) {
@@ -360,7 +370,7 @@ export const handler = async (event) => {
 
       return response(409, {
         success: false,
-        message: 'A user with this username or email already exists.'
+        message: 'A user with this username already exists.'
       });
     }
 
@@ -391,6 +401,7 @@ export const handler = async (event) => {
       username,
       email,
       fullName,
+      clientId: targetClient.client_id,
       temporaryPassword
     });
 
@@ -465,6 +476,7 @@ export const handler = async (event) => {
       success: true,
       message: 'User created successfully.',
       externalLoginCreated: !!identityCreateResult.externalLoginCreated,
+      temporaryPasswordCreated: !!identityCreateResult.temporaryPasswordCreated,
       createdUser: {
         username: insertedUser.username,
         email: insertedUser.email,

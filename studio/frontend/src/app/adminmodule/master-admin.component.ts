@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
 import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { firstValueFrom } from 'rxjs';
@@ -10,6 +10,9 @@ import { AuthService } from '../auth/auth.service';
 
 type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
 type UserRole = 'client_admin' | 'client_user';
+
+type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
+type AdminUserWorkflowAction = 'createUser' | 'removeUser';
 
 type ConfirmationAction =
   | 'saveClient'
@@ -113,6 +116,7 @@ export class MasterAdminComponent implements OnInit {
   @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
   @ViewChild('processingDialog') processingDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
+  @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
 
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
@@ -124,6 +128,7 @@ export class MasterAdminComponent implements OnInit {
 
   private runtimeConfig: TracksterRuntimeConfig = {};
   private isLoadingUsers = false;
+  private adminUserWorkflowDialogRef?: MatDialogRef<unknown>;
 
   clients: MasterAdminClientSummary[] = [
     {
@@ -193,6 +198,12 @@ export class MasterAdminComponent implements OnInit {
 
   processingTitle = '';
   processingMessage = '';
+
+  adminUserWorkflowState: AdminUserWorkflowState = 'idle';
+  adminUserWorkflowAction: AdminUserWorkflowAction | null = null;
+  adminUserWorkflowTitle = '';
+  adminUserWorkflowMessage = '';
+  adminUserWorkflowDetails = '';
 
   constructor(
     private readonly dialog: MatDialog,
@@ -470,11 +481,14 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
+    if (this.isCreatingUser) {
+      this.openCreateUserWorkflowDialog();
+      return;
+    }
+
     this.openConfirmationDialog(
-      this.isCreatingUser ? 'Create User' : 'Save User',
-      this.isCreatingUser
-        ? `Confirm creation of this user for client "${this.selectedClient.name || this.selectedClient.clientId}"?`
-        : `Confirm changes to user "${this.selectedUser?.username}"?`,
+      'Save User',
+      `Confirm changes to user "${this.selectedUser?.username}"?`,
       'saveUser'
     );
   }
@@ -529,11 +543,7 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Remove User',
-      `Remove user "${this.selectedUser.username}" from client "${this.selectedClient.name || this.selectedClient.clientId}"? This action will remove the user from the database and Cognito.`,
-      'removeUser'
-    );
+    this.openRemoveUserWorkflowDialog();
   }
 
   async confirmDialogAction(): Promise<void> {
@@ -565,7 +575,7 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (action === 'saveUser') {
-      await this.confirmSaveUser();
+      this.confirmSaveUser();
       return;
     }
 
@@ -580,12 +590,42 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (action === 'removeUser') {
-      await this.confirmRemoveUser();
+      await this.confirmRemoveUserWithWorkflow();
     }
   }
 
   closeDialogs(): void {
     this.dialog.closeAll();
+  }
+
+  closeAdminUserWorkflowDialog(): void {
+    if (this.adminUserWorkflowState === 'running') {
+      return;
+    }
+
+    const shouldCloseAllDialogs = this.adminUserWorkflowState === 'success';
+
+    this.closeAdminUserWorkflowDialogOnly();
+    this.resetAdminUserWorkflowDialog();
+
+    if (shouldCloseAllDialogs) {
+      this.dialog.closeAll();
+    }
+  }
+
+  async confirmAdminUserWorkflowAction(): Promise<void> {
+    if (this.adminUserWorkflowState !== 'confirm' || !this.adminUserWorkflowAction) {
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'createUser') {
+      await this.confirmCreateUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'removeUser') {
+      await this.confirmRemoveUserWithWorkflow();
+    }
   }
 
   private async loadRuntimeConfig(): Promise<void> {
@@ -896,7 +936,7 @@ export class MasterAdminComponent implements OnInit {
     this.refreshSelectedClientCounters();
   }
 
-  private async confirmSaveUser(): Promise<void> {
+  private confirmSaveUser(): void {
     const nextUsername = this.editableUsername.trim();
     const nextFullName = this.editableFullName.trim();
     const nextEmail = this.editableUserEmail.trim();
@@ -922,13 +962,7 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (this.isCreatingUser) {
-      await this.confirmCreateUserFromApi(
-        nextUsername,
-        nextFullName,
-        nextEmail,
-        nextRole,
-        nextStatus
-      );
+      this.openCreateUserWorkflowDialog();
       return;
     }
 
@@ -952,13 +986,13 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
-  private async confirmCreateUserFromApi(
-    username: string,
-    fullName: string,
-    email: string,
-    role: UserRole,
-    status: ClientStatus
-  ): Promise<void> {
+  private async confirmCreateUserWithWorkflow(): Promise<void> {
+    const username = this.editableUsername.trim();
+    const fullName = this.editableFullName.trim();
+    const email = this.editableUserEmail.trim();
+    const role = this.editableUserRole;
+    const status = this.editableUserStatus;
+
     const newUserRequest: MasterAdminUser = {
       username,
       fullName,
@@ -969,22 +1003,19 @@ export class MasterAdminComponent implements OnInit {
     };
 
     this.isLoadingUsers = true;
-
-    this.openProcessingDialog(
-      'Creating User',
-      'Please wait while Trackster creates the user account in Cognito and the application database.'
-    );
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Creating user...';
+    this.adminUserWorkflowMessage = 'Please wait while Trackster creates the user account.';
+    this.adminUserWorkflowDetails = 'The account is being created in Cognito and the application database.';
 
     try {
       const response = await this.createClientUser(newUserRequest);
 
-      this.dialog.closeAll();
-
       if (!response.success) {
-        this.openMessageDialog(
-          'User Create Error',
-          response.message || response.error || 'Unable to create user.'
-        );
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'User creation failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to create user.';
+        this.adminUserWorkflowDetails = 'Please review the user information and try again.';
         return;
       }
 
@@ -1012,19 +1043,17 @@ export class MasterAdminComponent implements OnInit {
       this.syncEditableUserFields();
       this.refreshClientCounters(newUser.clientId);
 
-      this.openMessageDialog(
-        'User Created',
-        response.message || 'User created successfully.'
-      );
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'User created';
+      this.adminUserWorkflowMessage = response.message || 'User created successfully.';
+      this.adminUserWorkflowDetails = 'The user was created in Cognito and associated with the selected client.';
     } catch (error) {
       console.error('Unable to create client user.', error);
 
-      this.dialog.closeAll();
-
-      this.openMessageDialog(
-        'User Create Error',
-        'Unable to create user.'
-      );
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'User creation failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to create user.');
+      this.adminUserWorkflowDetails = 'Please review the user information and try again.';
     } finally {
       this.isLoadingUsers = false;
     }
@@ -1050,7 +1079,7 @@ export class MasterAdminComponent implements OnInit {
     this.refreshSelectedClientCounters();
   }
 
-  private async confirmRemoveUser(): Promise<void> {
+  private async confirmRemoveUserWithWorkflow(): Promise<void> {
     if (!this.selectedUser) {
       return;
     }
@@ -1059,22 +1088,19 @@ export class MasterAdminComponent implements OnInit {
     const removedClientId = this.selectedUser.clientId;
 
     this.isLoadingUsers = true;
-
-    this.openProcessingDialog(
-      'Removing User',
-      'Please wait while Trackster removes the user from Cognito and the application database.'
-    );
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Removing user...';
+    this.adminUserWorkflowMessage = 'Please wait while Trackster removes the user account.';
+    this.adminUserWorkflowDetails = 'The account is being removed from Cognito and the application database.';
 
     try {
       const response = await this.deleteClientUser(removedUsername, removedClientId);
 
-      this.dialog.closeAll();
-
       if (!response.success) {
-        this.openMessageDialog(
-          'User Remove Error',
-          response.message || response.error || 'Unable to remove user.'
-        );
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'User removal failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to remove user.';
+        this.adminUserWorkflowDetails = 'Please try again or check the browser console for details.';
         return;
       }
 
@@ -1088,22 +1114,91 @@ export class MasterAdminComponent implements OnInit {
       this.clearEditableUserFields();
       this.refreshSelectedClientCounters();
 
-      this.openMessageDialog(
-        'User Removed',
-        response.message || 'User was removed successfully.'
-      );
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'User removed';
+      this.adminUserWorkflowMessage = response.message || 'User was removed successfully.';
+      this.adminUserWorkflowDetails = 'The user was removed from Cognito and the application database.';
     } catch (error) {
       console.error('Unable to remove client user.', error);
 
-      this.dialog.closeAll();
-
-      this.openMessageDialog(
-        'User Remove Error',
-        'Unable to remove user.'
-      );
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'User removal failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to remove user.');
+      this.adminUserWorkflowDetails = 'Please try again or check the browser console for details.';
     } finally {
       this.isLoadingUsers = false;
     }
+  }
+
+  private openCreateUserWorkflowDialog(): void {
+    this.openAdminUserWorkflowDialog(
+      'createUser',
+      'Create user?',
+      `Create user "${this.editableUsername.trim()}" for client "${this.selectedClient.name || this.selectedClient.clientId}"?`,
+      'The user will be created in Cognito and associated with the selected client.'
+    );
+  }
+
+  private openRemoveUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'removeUser',
+      'Remove user?',
+      `Remove user "${this.selectedUser.username}" from client "${this.selectedClient.name || this.selectedClient.clientId}"?`,
+      'This action will remove the user from Cognito and the application database.'
+    );
+  }
+
+  private openAdminUserWorkflowDialog(
+    action: AdminUserWorkflowAction,
+    title: string,
+    message: string,
+    details: string
+  ): void {
+    if (!this.adminUserWorkflowDialog) {
+      return;
+    }
+
+    this.adminUserWorkflowAction = action;
+    this.adminUserWorkflowState = 'confirm';
+    this.adminUserWorkflowTitle = title;
+    this.adminUserWorkflowMessage = message;
+    this.adminUserWorkflowDetails = details;
+
+    this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
+      width: '440px',
+      panelClass: 'trackster-admin-dialog-panel',
+      disableClose: true
+    });
+  }
+
+  private closeAdminUserWorkflowDialogOnly(): void {
+    if (this.adminUserWorkflowDialogRef) {
+      this.adminUserWorkflowDialogRef.close();
+      this.adminUserWorkflowDialogRef = undefined;
+    }
+  }
+
+  private resetAdminUserWorkflowDialog(): void {
+    this.adminUserWorkflowState = 'idle';
+    this.adminUserWorkflowAction = null;
+    this.adminUserWorkflowTitle = '';
+    this.adminUserWorkflowMessage = '';
+    this.adminUserWorkflowDetails = '';
+  }
+
+  private getHttpErrorMessage(error: unknown, fallbackMessage: string): string {
+    const errorAsAny = error as any;
+
+    return String(
+      errorAsAny?.error?.message ||
+      errorAsAny?.error?.error ||
+      errorAsAny?.message ||
+      fallbackMessage
+    );
   }
 
   private openConfirmationDialog(
