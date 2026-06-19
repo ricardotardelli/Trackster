@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "message": "User was removed successfully.",
+  "deletedUser": {
+    "username": "00000000.demo.user",
+    "email": "demo.user@example.com",
+    "fullName": "Demo User",
+    "globalRole": "client_user",
+    "clientRole": "client_user",
+    "clientId": "00000000"
+  }
+}

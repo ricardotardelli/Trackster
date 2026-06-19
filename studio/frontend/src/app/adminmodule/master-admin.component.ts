@@ -55,9 +55,42 @@ interface AdminClientUsersResponse {
   error?: string;
 }
 
+interface AdminClientUserDeleteResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  deletedUser?: {
+    username?: string;
+    email?: string;
+    fullName?: string;
+    globalRole?: string;
+    clientRole?: string;
+    clientId?: string;
+  };
+}
+
+interface AdminClientUserAddResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  externalLoginCreated?: boolean;
+  createdUser?: {
+    username?: string;
+    email?: string;
+    fullName?: string;
+    globalRole?: string | null;
+    clientRole?: string;
+    role?: string;
+    clientId?: string;
+    status?: string;
+  };
+}
+
 interface TracksterRuntimeConfig {
   usermanagementApi?: {
     clientUserInfoGet?: string;
+    clientUserDelete?: string;
+    clientUserAdd?: string;
   };
 }
 
@@ -85,6 +118,8 @@ export class MasterAdminComponent implements OnInit {
 
   private readonly configPath = 'assets/config.json';
   private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
+  private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
+  private readonly devClientUserAddMockPath = 'assets/mock/client-users.add-response.json';
 
   private runtimeConfig: TracksterRuntimeConfig = {};
   private isLoadingUsers = false;
@@ -217,14 +252,23 @@ export class MasterAdminComponent implements OnInit {
   }
 
   get canRemoveSelectedUser(): boolean {
-    return !!this.selectedUser
-      && !this.isLoadingUsers
-      && !this.isEditingClient
-      && !this.isCreatingClient
-      && !this.isEditingUser
-      && !this.isCreatingUser
-      && this.selectedUser.status !== 'Active'
-      && this.selectedUser.role !== 'client_admin';
+    if (!this.selectedUser
+      || this.isLoadingUsers
+      || this.isEditingClient
+      || this.isCreatingClient
+      || this.isEditingUser
+      || this.isCreatingUser
+      || this.selectedUser.status === 'Active') {
+      return false;
+    }
+
+    if (this.selectedUser.role !== 'client_admin') {
+      return true;
+    }
+
+    return this.selectedClientUsers.some((user) => user.username !== this.selectedUser?.username
+      && user.role === 'client_admin'
+      && user.status === 'Active');
   }
 
   async selectClientById(clientId: string): Promise<void> {
@@ -473,22 +517,22 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    if (this.selectedUser.role === 'client_admin') {
+    if (!this.canRemoveSelectedUser) {
       this.openMessageDialog(
         'User Cannot Be Removed',
-        'Client administrators cannot be removed directly. Change the role to client_user first.'
+        'This user cannot be removed because the selected client must keep at least one active client administrator.'
       );
       return;
     }
 
     this.openConfirmationDialog(
       'Remove User',
-      `Remove user "${this.selectedUser.username}" from client "${this.selectedClient.name || this.selectedClient.clientId}"? This action cannot be undone.`,
+      `Remove user "${this.selectedUser.username}" from client "${this.selectedClient.name || this.selectedClient.clientId}"? This action will remove the user from the database and Cognito.`,
       'removeUser'
     );
   }
 
-  confirmDialogAction(): void {
+  async confirmDialogAction(): Promise<void> {
     const action = this.confirmationAction;
     this.dialog.closeAll();
 
@@ -517,7 +561,7 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (action === 'saveUser') {
-      this.confirmSaveUser();
+      await this.confirmSaveUser();
       return;
     }
 
@@ -532,7 +576,7 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (action === 'removeUser') {
-      this.confirmRemoveUser();
+      await this.confirmRemoveUser();
     }
   }
 
@@ -641,8 +685,129 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
+  private async createClientUser(user: MasterAdminUser): Promise<AdminClientUserAddResponse> {
+    return this.isDevelopmentMode()
+      ? await this.createClientUserFromMock(user)
+      : await this.createClientUserFromApi(user);
+  }
+
+  private async createClientUserFromMock(user: MasterAdminUser): Promise<AdminClientUserAddResponse> {
+    const response = await firstValueFrom(
+      this.http.get<AdminClientUserAddResponse>(this.devClientUserAddMockPath)
+    );
+
+    return {
+      ...response,
+      success: response.success,
+      message: response.message || 'User created successfully.',
+      createdUser: {
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        clientRole: user.role,
+        clientId: user.clientId,
+        status: user.status
+      }
+    };
+  }
+
+  private async createClientUserFromApi(user: MasterAdminUser): Promise<AdminClientUserAddResponse> {
+    const apiUrl = this.getClientUserAddApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Client user add API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<AdminClientUserAddResponse>(
+        apiUrl,
+        {
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          clientId: user.clientId
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
+  private async deleteClientUser(username: string, clientId: string): Promise<AdminClientUserDeleteResponse> {
+    return this.isDevelopmentMode()
+      ? await this.deleteClientUserFromMock()
+      : await this.deleteClientUserFromApi(username, clientId);
+  }
+
+  private async deleteClientUserFromMock(): Promise<AdminClientUserDeleteResponse> {
+    return await firstValueFrom(
+      this.http.get<AdminClientUserDeleteResponse>(this.devClientUserDeleteMockPath)
+    );
+  }
+
+  private async deleteClientUserFromApi(username: string, clientId: string): Promise<AdminClientUserDeleteResponse> {
+    const apiUrl = this.getClientUserDeleteApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Client user delete API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<AdminClientUserDeleteResponse>(
+        apiUrl,
+        {
+          username,
+          clientId
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
   private getClientUsersApiUrl(): string {
     return (this.runtimeConfig.usermanagementApi?.clientUserInfoGet || '').trim();
+  }
+
+  private getClientUserDeleteApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserDelete || '').trim();
+  }
+
+  private getClientUserAddApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserAdd || '').trim();
   }
 
   private isDevelopmentMode(): boolean {
@@ -727,7 +892,7 @@ export class MasterAdminComponent implements OnInit {
     this.refreshSelectedClientCounters();
   }
 
-  private confirmSaveUser(): void {
+  private async confirmSaveUser(): Promise<void> {
     const nextUsername = this.editableUsername.trim();
     const nextFullName = this.editableFullName.trim();
     const nextEmail = this.editableUserEmail.trim();
@@ -753,18 +918,17 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (this.isCreatingUser) {
-      const newUser: MasterAdminUser = {
-        username: nextUsername,
-        fullName: nextFullName,
-        email: nextEmail,
-        role: nextRole,
-        status: nextStatus,
-        clientId: this.selectedClient.clientId
-      };
+      await this.confirmCreateUserFromApi(
+        nextUsername,
+        nextFullName,
+        nextEmail,
+        nextRole,
+        nextStatus
+      );
+      return;
+    }
 
-      this.users = [...this.users, newUser];
-      this.selectedUser = newUser;
-    } else if (this.selectedUser) {
+    if (this.selectedUser) {
       this.selectedUser.username = nextUsername;
       this.selectedUser.fullName = nextFullName;
       this.selectedUser.email = nextEmail;
@@ -782,6 +946,75 @@ export class MasterAdminComponent implements OnInit {
       'User Saved',
       'User information was saved successfully.'
     );
+  }
+
+  private async confirmCreateUserFromApi(
+    username: string,
+    fullName: string,
+    email: string,
+    role: UserRole,
+    status: ClientStatus
+  ): Promise<void> {
+    const newUserRequest: MasterAdminUser = {
+      username,
+      fullName,
+      email,
+      role,
+      status,
+      clientId: this.selectedClient.clientId
+    };
+
+    this.isLoadingUsers = true;
+
+    try {
+      const response = await this.createClientUser(newUserRequest);
+
+      if (!response.success) {
+        this.openMessageDialog(
+          'User Create Error',
+          response.message || response.error || 'Unable to create user.'
+        );
+        return;
+      }
+
+      const createdUser = response.createdUser || {};
+
+      const newUser: MasterAdminUser = {
+        username: String(createdUser.username || username).trim(),
+        fullName: String(createdUser.fullName || fullName).trim(),
+        email: String(createdUser.email || email).trim(),
+        role: this.normalizeUserRole(String(createdUser.clientRole || createdUser.role || role)),
+        status: this.normalizeStatus(String(createdUser.status || status)),
+        clientId: String(createdUser.clientId || this.selectedClient.clientId).trim()
+      };
+
+      this.users = [
+        ...this.users.filter(
+          (user) => !(user.username === newUser.username && user.clientId === newUser.clientId)
+        ),
+        newUser
+      ];
+
+      this.selectedUser = newUser;
+      this.isEditingUser = false;
+      this.isCreatingUser = false;
+      this.syncEditableUserFields();
+      this.refreshClientCounters(newUser.clientId);
+
+      this.openMessageDialog(
+        'User Created',
+        response.message || 'User created successfully.'
+      );
+    } catch (error) {
+      console.error('Unable to create client user.', error);
+
+      this.openMessageDialog(
+        'User Create Error',
+        'Unable to create user.'
+      );
+    } finally {
+      this.isLoadingUsers = false;
+    }
   }
 
   private confirmDisableUser(): void {
@@ -804,7 +1037,7 @@ export class MasterAdminComponent implements OnInit {
     this.refreshSelectedClientCounters();
   }
 
-  private confirmRemoveUser(): void {
+  private async confirmRemoveUser(): Promise<void> {
     if (!this.selectedUser) {
       return;
     }
@@ -812,15 +1045,43 @@ export class MasterAdminComponent implements OnInit {
     const removedUsername = this.selectedUser.username;
     const removedClientId = this.selectedUser.clientId;
 
-    this.users = this.users.filter(
-      (user) => !(user.username === removedUsername && user.clientId === removedClientId)
-    );
+    this.isLoadingUsers = true;
 
-    this.selectedUser = null;
-    this.isEditingUser = false;
-    this.isCreatingUser = false;
-    this.clearEditableUserFields();
-    this.refreshSelectedClientCounters();
+    try {
+      const response = await this.deleteClientUser(removedUsername, removedClientId);
+
+      if (!response.success) {
+        this.openMessageDialog(
+          'User Remove Error',
+          response.message || response.error || 'Unable to remove user.'
+        );
+        return;
+      }
+
+      this.users = this.users.filter(
+        (user) => !(user.username === removedUsername && user.clientId === removedClientId)
+      );
+
+      this.selectedUser = null;
+      this.isEditingUser = false;
+      this.isCreatingUser = false;
+      this.clearEditableUserFields();
+      this.refreshSelectedClientCounters();
+
+      this.openMessageDialog(
+        'User Removed',
+        response.message || 'User was removed successfully.'
+      );
+    } catch (error) {
+      console.error('Unable to remove client user.', error);
+
+      this.openMessageDialog(
+        'User Remove Error',
+        'Unable to remove user.'
+      );
+    } finally {
+      this.isLoadingUsers = false;
+    }
   }
 
   private openConfirmationDialog(
