@@ -802,10 +802,13 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
-  private async updateClientUser(user: MasterAdminUser): Promise<AdminClientUserUpdateResponse> {
+  private async updateClientUser(
+    user: MasterAdminUser,
+    action: AdminUserWorkflowAction = 'updateUser'
+  ): Promise<AdminClientUserUpdateResponse> {
     return this.isDevelopmentMode()
       ? await this.updateClientUserFromMock(user)
-      : await this.updateClientUserFromApi(user);
+      : await this.updateClientUserFromApi(user, action);
   }
 
   private async updateClientUserFromMock(user: MasterAdminUser): Promise<AdminClientUserUpdateResponse> {
@@ -828,7 +831,10 @@ export class MasterAdminComponent implements OnInit {
     };
   }
 
-  private async updateClientUserFromApi(user: MasterAdminUser): Promise<AdminClientUserUpdateResponse> {
+  private async updateClientUserFromApi(
+    user: MasterAdminUser,
+    action: AdminUserWorkflowAction
+  ): Promise<AdminClientUserUpdateResponse> {
     const apiUrl = this.getClientUserUpdateApiUrl();
 
     if (!apiUrl) {
@@ -847,6 +853,13 @@ export class MasterAdminComponent implements OnInit {
       };
     }
 
+    const normalizedApiStatus = user.status === 'Active' ? 'active' : 'inactive';
+    const normalizedAction = action === 'activateUser'
+      ? 'activate'
+      : action === 'disableUser'
+        ? 'deactivate'
+        : 'update';
+
     return await firstValueFrom(
       this.http.post<AdminClientUserUpdateResponse>(
         apiUrl,
@@ -855,8 +868,11 @@ export class MasterAdminComponent implements OnInit {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          status: user.status,
-          clientId: user.clientId
+          clientRole: user.role,
+          status: normalizedApiStatus,
+          clientId: user.clientId,
+          action: normalizedAction,
+          enabled: normalizedApiStatus === 'active'
         },
         {
           headers: new HttpHeaders({
@@ -1083,7 +1099,8 @@ export class MasterAdminComponent implements OnInit {
       'The account is being updated in Cognito and the application database.',
       'User updated',
       'User updated successfully.',
-      'The user information was updated successfully.'
+      'The user information was updated successfully.',
+      'updateUser'
     );
   }
 
@@ -1108,7 +1125,8 @@ export class MasterAdminComponent implements OnInit {
       'The account is being disabled in Cognito and the application database.',
       'User disabled',
       'User disabled successfully.',
-      'The user was disabled successfully.'
+      'The user was disabled successfully.',
+      'disableUser'
     );
   }
 
@@ -1133,7 +1151,8 @@ export class MasterAdminComponent implements OnInit {
       'The account is being activated in Cognito and the application database.',
       'User activated',
       'User activated successfully.',
-      'The user was activated successfully.'
+      'The user was activated successfully.',
+      'activateUser'
     );
   }
 
@@ -1202,7 +1221,8 @@ export class MasterAdminComponent implements OnInit {
     runningDetails: string,
     successTitle: string,
     successMessage: string,
-    successDetails: string
+    successDetails: string,
+    workflowAction: AdminUserWorkflowAction = 'updateUser'
   ): Promise<void> {
     const previousUsername = this.selectedUser?.username || updatedUserRequest.username;
     const previousClientId = this.selectedUser?.clientId || updatedUserRequest.clientId;
@@ -1214,7 +1234,7 @@ export class MasterAdminComponent implements OnInit {
     this.adminUserWorkflowDetails = runningDetails;
 
     try {
-      const response = await this.updateClientUser(updatedUserRequest);
+      const response = await this.updateClientUser(updatedUserRequest, workflowAction);
 
       if (!response.success) {
         this.adminUserWorkflowState = 'error';
