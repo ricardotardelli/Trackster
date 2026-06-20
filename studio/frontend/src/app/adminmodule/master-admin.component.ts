@@ -12,17 +12,19 @@ type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
 type UserRole = 'client_admin' | 'client_user';
 
 type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
-type AdminUserWorkflowAction = 'createUser' | 'updateUser' | 'removeUser';
+type AdminUserWorkflowAction =
+  | 'createUser'
+  | 'updateUser'
+  | 'disableUser'
+  | 'activateUser'
+  | 'removeUser';
 
 type ConfirmationAction =
   | 'saveClient'
   | 'disableClient'
   | 'activateClient'
   | 'removeClient'
-  | 'saveUser'
-  | 'disableUser'
-  | 'activateUser'
-  | 'removeUser';
+  | 'saveUser';
 
 interface MasterAdminPlatformSummary {
   clients: number;
@@ -525,11 +527,7 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Disable User',
-      `Disable user "${this.selectedUser.username}"?`,
-      'disableUser'
-    );
+    this.openDisableUserWorkflowDialog();
   }
 
   activateUser(): void {
@@ -537,11 +535,7 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Activate User',
-      `Activate user "${this.selectedUser.username}"?`,
-      'activateUser'
-    );
+    this.openActivateUserWorkflowDialog();
   }
 
   removeUser(): void {
@@ -590,21 +584,6 @@ export class MasterAdminComponent implements OnInit {
 
     if (action === 'saveUser') {
       this.confirmSaveUser();
-      return;
-    }
-
-    if (action === 'disableUser') {
-      await this.confirmDisableUser();
-      return;
-    }
-
-    if (action === 'activateUser') {
-      await this.confirmActivateUser();
-      return;
-    }
-
-    if (action === 'removeUser') {
-      await this.confirmRemoveUserWithWorkflow();
     }
   }
 
@@ -639,6 +618,16 @@ export class MasterAdminComponent implements OnInit {
 
     if (this.adminUserWorkflowAction === 'updateUser') {
       await this.confirmUpdateUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'disableUser') {
+      await this.confirmDisableUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'activateUser') {
+      await this.confirmActivateUserWithWorkflow();
       return;
     }
 
@@ -1070,6 +1059,85 @@ export class MasterAdminComponent implements OnInit {
       clientId: this.selectedClient.clientId
     };
 
+    await this.executeCreateUserWorkflow(newUserRequest);
+  }
+
+  private async confirmUpdateUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: MasterAdminUser = {
+      username: this.editableUsername.trim(),
+      fullName: this.editableFullName.trim(),
+      email: this.editableUserEmail.trim(),
+      role: this.editableUserRole,
+      status: this.editableUserStatus,
+      clientId: this.selectedClient.clientId
+    };
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Updating user...',
+      'Please wait while Trackster updates the user account.',
+      'The account is being updated in Cognito and the application database.',
+      'User updated',
+      'User updated successfully.',
+      'The user information was updated successfully.'
+    );
+  }
+
+  private async confirmDisableUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: MasterAdminUser = {
+      username: this.selectedUser.username,
+      fullName: this.selectedUser.fullName,
+      email: this.selectedUser.email,
+      role: this.selectedUser.role,
+      status: 'Inactive',
+      clientId: this.selectedUser.clientId
+    };
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Disabling user...',
+      `Please wait while Trackster disables user "${updatedUserRequest.username}".`,
+      'The account is being disabled in Cognito and the application database.',
+      'User disabled',
+      'User disabled successfully.',
+      'The user was disabled successfully.'
+    );
+  }
+
+  private async confirmActivateUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: MasterAdminUser = {
+      username: this.selectedUser.username,
+      fullName: this.selectedUser.fullName,
+      email: this.selectedUser.email,
+      role: this.selectedUser.role,
+      status: 'Active',
+      clientId: this.selectedUser.clientId
+    };
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Activating user...',
+      `Please wait while Trackster activates user "${updatedUserRequest.username}".`,
+      'The account is being activated in Cognito and the application database.',
+      'User activated',
+      'User activated successfully.',
+      'The user was activated successfully.'
+    );
+  }
+
+  private async executeCreateUserWorkflow(newUserRequest: MasterAdminUser): Promise<void> {
     this.isLoadingUsers = true;
     this.adminUserWorkflowState = 'running';
     this.adminUserWorkflowTitle = 'Creating user...';
@@ -1090,12 +1158,12 @@ export class MasterAdminComponent implements OnInit {
       const createdUser = response.createdUser || {};
 
       const newUser: MasterAdminUser = {
-        username: String(createdUser.username || username).trim(),
-        fullName: String(createdUser.fullName || fullName).trim(),
-        email: String(createdUser.email || email).trim(),
-        role: this.normalizeUserRole(String(createdUser.clientRole || createdUser.role || role)),
-        status: this.normalizeStatus(String(createdUser.status || status)),
-        clientId: String(createdUser.clientId || this.selectedClient.clientId).trim()
+        username: String(createdUser.username || newUserRequest.username).trim(),
+        fullName: String(createdUser.fullName || newUserRequest.fullName).trim(),
+        email: String(createdUser.email || newUserRequest.email).trim(),
+        role: this.normalizeUserRole(String(createdUser.clientRole || createdUser.role || newUserRequest.role)),
+        status: this.normalizeStatus(String(createdUser.status || newUserRequest.status)),
+        clientId: String(createdUser.clientId || newUserRequest.clientId).trim()
       };
 
       this.users = [
@@ -1127,90 +1195,18 @@ export class MasterAdminComponent implements OnInit {
     }
   }
 
-  private async confirmUpdateUserWithWorkflow(): Promise<void> {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    const updatedUserRequest: MasterAdminUser = {
-      username: this.editableUsername.trim(),
-      fullName: this.editableFullName.trim(),
-      email: this.editableUserEmail.trim(),
-      role: this.editableUserRole,
-      status: this.editableUserStatus,
-      clientId: this.selectedClient.clientId
-    };
-
-    await this.executeUpdateUserWorkflow(
-      updatedUserRequest,
-      'Updating user...',
-      'Please wait while Trackster updates the user account.',
-      'The account is being updated in Cognito and the application database.',
-      'User updated',
-      'The user information was updated successfully.'
-    );
-  }
-
-  private async confirmDisableUser(): Promise<void> {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    const updatedUserRequest: MasterAdminUser = {
-      ...this.selectedUser,
-      status: 'Inactive'
-    };
-
-    this.openAdminUserRunningWorkflowDialog(
-      'Updating user...',
-      `Please wait while Trackster disables user "${updatedUserRequest.username}".`,
-      'The account is being disabled in Cognito and the application database.'
-    );
-
-    await this.executeUpdateUserWorkflow(
-      updatedUserRequest,
-      'Updating user...',
-      `Please wait while Trackster disables user "${updatedUserRequest.username}".`,
-      'The account is being disabled in Cognito and the application database.',
-      'User disabled',
-      'The user was disabled successfully.'
-    );
-  }
-
-  private async confirmActivateUser(): Promise<void> {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    const updatedUserRequest: MasterAdminUser = {
-      ...this.selectedUser,
-      status: 'Active'
-    };
-
-    this.openAdminUserRunningWorkflowDialog(
-      'Updating user...',
-      `Please wait while Trackster activates user "${updatedUserRequest.username}".`,
-      'The account is being activated in Cognito and the application database.'
-    );
-
-    await this.executeUpdateUserWorkflow(
-      updatedUserRequest,
-      'Updating user...',
-      `Please wait while Trackster activates user "${updatedUserRequest.username}".`,
-      'The account is being activated in Cognito and the application database.',
-      'User activated',
-      'The user was activated successfully.'
-    );
-  }
-
   private async executeUpdateUserWorkflow(
     updatedUserRequest: MasterAdminUser,
     runningTitle: string,
     runningMessage: string,
     runningDetails: string,
     successTitle: string,
+    successMessage: string,
     successDetails: string
   ): Promise<void> {
+    const previousUsername = this.selectedUser?.username || updatedUserRequest.username;
+    const previousClientId = this.selectedUser?.clientId || updatedUserRequest.clientId;
+
     this.isLoadingUsers = true;
     this.adminUserWorkflowState = 'running';
     this.adminUserWorkflowTitle = runningTitle;
@@ -1240,8 +1236,8 @@ export class MasterAdminComponent implements OnInit {
       };
 
       this.users = this.users.map((user) => {
-        const isCurrentUser = user.username === this.selectedUser?.username
-          && user.clientId === this.selectedUser?.clientId;
+        const isCurrentUser = user.username === previousUsername
+          && user.clientId === previousClientId;
 
         return isCurrentUser ? updatedUser : user;
       });
@@ -1254,7 +1250,7 @@ export class MasterAdminComponent implements OnInit {
 
       this.adminUserWorkflowState = 'success';
       this.adminUserWorkflowTitle = successTitle;
-      this.adminUserWorkflowMessage = response.message || 'User updated successfully.';
+      this.adminUserWorkflowMessage = response.message || successMessage;
       this.adminUserWorkflowDetails = successDetails;
     } catch (error) {
       console.error('Unable to update client user.', error);
@@ -1341,6 +1337,32 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
+  private openDisableUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'disableUser',
+      'Disable user?',
+      `Disable user "${this.selectedUser.username}"?`,
+      'The user will be disabled in Cognito and the application database.'
+    );
+  }
+
+  private openActivateUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'activateUser',
+      'Activate user?',
+      `Activate user "${this.selectedUser.username}"?`,
+      'The user will be activated in Cognito and the application database.'
+    );
+  }
+
   private openRemoveUserWorkflowDialog(): void {
     if (!this.selectedUser) {
       return;
@@ -1366,28 +1388,6 @@ export class MasterAdminComponent implements OnInit {
 
     this.adminUserWorkflowAction = action;
     this.adminUserWorkflowState = 'confirm';
-    this.adminUserWorkflowTitle = title;
-    this.adminUserWorkflowMessage = message;
-    this.adminUserWorkflowDetails = details;
-
-    this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
-      width: '440px',
-      panelClass: 'trackster-admin-workflow-dialog-panel',
-      disableClose: true
-    });
-  }
-
-  private openAdminUserRunningWorkflowDialog(
-    title: string,
-    message: string,
-    details: string
-  ): void {
-    if (!this.adminUserWorkflowDialog) {
-      return;
-    }
-
-    this.adminUserWorkflowAction = 'updateUser';
-    this.adminUserWorkflowState = 'running';
     this.adminUserWorkflowTitle = title;
     this.adminUserWorkflowMessage = message;
     this.adminUserWorkflowDetails = details;
