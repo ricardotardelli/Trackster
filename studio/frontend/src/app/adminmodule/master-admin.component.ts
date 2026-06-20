@@ -594,12 +594,12 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (action === 'disableUser') {
-      this.confirmDisableUser();
+      await this.confirmDisableUser();
       return;
     }
 
     if (action === 'activateUser') {
-      this.confirmActivateUser();
+      await this.confirmActivateUser();
       return;
     }
 
@@ -1141,11 +1141,81 @@ export class MasterAdminComponent implements OnInit {
       clientId: this.selectedClient.clientId
     };
 
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Updating user...',
+      'Please wait while Trackster updates the user account.',
+      'The account is being updated in Cognito and the application database.',
+      'User updated',
+      'The user information was updated successfully.'
+    );
+  }
+
+  private async confirmDisableUser(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: MasterAdminUser = {
+      ...this.selectedUser,
+      status: 'Inactive'
+    };
+
+    this.openAdminUserRunningWorkflowDialog(
+      'Updating user...',
+      `Please wait while Trackster disables user "${updatedUserRequest.username}".`,
+      'The account is being disabled in Cognito and the application database.'
+    );
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Updating user...',
+      `Please wait while Trackster disables user "${updatedUserRequest.username}".`,
+      'The account is being disabled in Cognito and the application database.',
+      'User disabled',
+      'The user was disabled successfully.'
+    );
+  }
+
+  private async confirmActivateUser(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: MasterAdminUser = {
+      ...this.selectedUser,
+      status: 'Active'
+    };
+
+    this.openAdminUserRunningWorkflowDialog(
+      'Updating user...',
+      `Please wait while Trackster activates user "${updatedUserRequest.username}".`,
+      'The account is being activated in Cognito and the application database.'
+    );
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Updating user...',
+      `Please wait while Trackster activates user "${updatedUserRequest.username}".`,
+      'The account is being activated in Cognito and the application database.',
+      'User activated',
+      'The user was activated successfully.'
+    );
+  }
+
+  private async executeUpdateUserWorkflow(
+    updatedUserRequest: MasterAdminUser,
+    runningTitle: string,
+    runningMessage: string,
+    runningDetails: string,
+    successTitle: string,
+    successDetails: string
+  ): Promise<void> {
     this.isLoadingUsers = true;
     this.adminUserWorkflowState = 'running';
-    this.adminUserWorkflowTitle = 'Updating user...';
-    this.adminUserWorkflowMessage = 'Please wait while Trackster updates the user account.';
-    this.adminUserWorkflowDetails = 'The account is being updated in the application database.';
+    this.adminUserWorkflowTitle = runningTitle;
+    this.adminUserWorkflowMessage = runningMessage;
+    this.adminUserWorkflowDetails = runningDetails;
 
     try {
       const response = await this.updateClientUser(updatedUserRequest);
@@ -1183,9 +1253,9 @@ export class MasterAdminComponent implements OnInit {
       this.refreshClientCounters(updatedUser.clientId);
 
       this.adminUserWorkflowState = 'success';
-      this.adminUserWorkflowTitle = 'User updated';
+      this.adminUserWorkflowTitle = successTitle;
       this.adminUserWorkflowMessage = response.message || 'User updated successfully.';
-      this.adminUserWorkflowDetails = 'The user information was updated successfully.';
+      this.adminUserWorkflowDetails = successDetails;
     } catch (error) {
       console.error('Unable to update client user.', error);
 
@@ -1196,26 +1266,6 @@ export class MasterAdminComponent implements OnInit {
     } finally {
       this.isLoadingUsers = false;
     }
-  }
-
-  private confirmDisableUser(): void {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    this.selectedUser.status = 'Inactive';
-    this.syncEditableUserFields();
-    this.refreshSelectedClientCounters();
-  }
-
-  private confirmActivateUser(): void {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    this.selectedUser.status = 'Active';
-    this.syncEditableUserFields();
-    this.refreshSelectedClientCounters();
   }
 
   private async confirmRemoveUserWithWorkflow(): Promise<void> {
@@ -1287,7 +1337,7 @@ export class MasterAdminComponent implements OnInit {
       'updateUser',
       'Update user?',
       `Update user "${this.editableUsername.trim()}" for client "${this.selectedClient.name || this.selectedClient.clientId}"?`,
-      'The user information will be updated in the application database.'
+      'The user information will be updated in Cognito and the application database.'
     );
   }
 
@@ -1316,6 +1366,28 @@ export class MasterAdminComponent implements OnInit {
 
     this.adminUserWorkflowAction = action;
     this.adminUserWorkflowState = 'confirm';
+    this.adminUserWorkflowTitle = title;
+    this.adminUserWorkflowMessage = message;
+    this.adminUserWorkflowDetails = details;
+
+    this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
+      width: '440px',
+      panelClass: 'trackster-admin-workflow-dialog-panel',
+      disableClose: true
+    });
+  }
+
+  private openAdminUserRunningWorkflowDialog(
+    title: string,
+    message: string,
+    details: string
+  ): void {
+    if (!this.adminUserWorkflowDialog) {
+      return;
+    }
+
+    this.adminUserWorkflowAction = 'updateUser';
+    this.adminUserWorkflowState = 'running';
     this.adminUserWorkflowTitle = title;
     this.adminUserWorkflowMessage = message;
     this.adminUserWorkflowDetails = details;
@@ -1504,7 +1576,7 @@ export class MasterAdminComponent implements OnInit {
     return String(nextNumber).padStart(8, '0');
   }
 
-    private refreshSelectedClientCounters(): void {
+  private refreshSelectedClientCounters(): void {
     this.refreshClientCounters(this.selectedClient.clientId);
   }
 
