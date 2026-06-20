@@ -12,7 +12,7 @@ type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
 type UserRole = 'client_admin' | 'client_user';
 
 type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
-type AdminUserWorkflowAction = 'createUser' | 'removeUser';
+type AdminUserWorkflowAction = 'createUser' | 'updateUser' | 'removeUser';
 
 type ConfirmationAction =
   | 'saveClient'
@@ -89,11 +89,28 @@ interface AdminClientUserAddResponse {
   };
 }
 
+interface AdminClientUserUpdateResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  updatedUser?: {
+    username?: string;
+    email?: string;
+    fullName?: string;
+    globalRole?: string | null;
+    clientRole?: string;
+    role?: string;
+    clientId?: string;
+    status?: string;
+  };
+}
+
 interface TracksterRuntimeConfig {
   usermanagementApi?: {
     clientUserInfoGet?: string;
     clientUserDelete?: string;
     clientUserAdd?: string;
+    clientUserUpdate?: string;
   };
 }
 
@@ -125,6 +142,7 @@ export class MasterAdminComponent implements OnInit {
   private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
   private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
   private readonly devClientUserAddMockPath = 'assets/mock/client-users.add-response.json';
+  private readonly devClientUserUpdateMockPath = 'assets/mock/client-users.update-response.json';
 
   private runtimeConfig: TracksterRuntimeConfig = {};
   private isLoadingUsers = false;
@@ -453,7 +471,7 @@ export class MasterAdminComponent implements OnInit {
     this.selectedUser = null;
     this.isCreatingUser = true;
     this.isEditingUser = true;
-    this.editableUsername = this.createNewUsername();
+    this.editableUsername = '';
     this.editableFullName = '';
     this.editableUserEmail = '';
     this.editableUserRole = 'client_user';
@@ -486,11 +504,7 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Save User',
-      `Confirm changes to user "${this.selectedUser?.username}"?`,
-      'saveUser'
-    );
+    this.openUpdateUserWorkflowDialog();
   }
 
   cancelUserEdit(): void {
@@ -620,6 +634,11 @@ export class MasterAdminComponent implements OnInit {
 
     if (this.adminUserWorkflowAction === 'createUser') {
       await this.confirmCreateUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'updateUser') {
+      await this.confirmUpdateUserWithWorkflow();
       return;
     }
 
@@ -794,6 +813,72 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
+  private async updateClientUser(user: MasterAdminUser): Promise<AdminClientUserUpdateResponse> {
+    return this.isDevelopmentMode()
+      ? await this.updateClientUserFromMock(user)
+      : await this.updateClientUserFromApi(user);
+  }
+
+  private async updateClientUserFromMock(user: MasterAdminUser): Promise<AdminClientUserUpdateResponse> {
+    const response = await firstValueFrom(
+      this.http.get<AdminClientUserUpdateResponse>(this.devClientUserUpdateMockPath)
+    );
+
+    return {
+      ...response,
+      success: response.success,
+      message: response.message || 'User updated successfully.',
+      updatedUser: {
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        clientRole: user.role,
+        clientId: user.clientId,
+        status: user.status
+      }
+    };
+  }
+
+  private async updateClientUserFromApi(user: MasterAdminUser): Promise<AdminClientUserUpdateResponse> {
+    const apiUrl = this.getClientUserUpdateApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Client user update API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<AdminClientUserUpdateResponse>(
+        apiUrl,
+        {
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          status: user.status,
+          clientId: user.clientId
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
   private async deleteClientUser(username: string, clientId: string): Promise<AdminClientUserDeleteResponse> {
     return this.isDevelopmentMode()
       ? await this.deleteClientUserFromMock()
@@ -852,6 +937,10 @@ export class MasterAdminComponent implements OnInit {
 
   private getClientUserAddApiUrl(): string {
     return (this.runtimeConfig.usermanagementApi?.clientUserAdd || '').trim();
+  }
+
+  private getClientUserUpdateApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserUpdate || '').trim();
   }
 
   private isDevelopmentMode(): boolean {
@@ -938,10 +1027,6 @@ export class MasterAdminComponent implements OnInit {
 
   private confirmSaveUser(): void {
     const nextUsername = this.editableUsername.trim();
-    const nextFullName = this.editableFullName.trim();
-    const nextEmail = this.editableUserEmail.trim();
-    const nextRole = this.editableUserRole;
-    const nextStatus = this.editableUserStatus;
 
     const duplicateUser = this.users.some((user) => {
       const isSameCurrentUser = !!this.selectedUser
@@ -966,24 +1051,7 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    if (this.selectedUser) {
-      this.selectedUser.username = nextUsername;
-      this.selectedUser.fullName = nextFullName;
-      this.selectedUser.email = nextEmail;
-      this.selectedUser.role = nextRole;
-      this.selectedUser.status = nextStatus;
-      this.selectedUser.clientId = this.selectedClient.clientId;
-    }
-
-    this.isEditingUser = false;
-    this.isCreatingUser = false;
-    this.syncEditableUserFields();
-    this.refreshSelectedClientCounters();
-
-    this.openMessageDialog(
-      'User Saved',
-      'User information was saved successfully.'
-    );
+    this.openUpdateUserWorkflowDialog();
   }
 
   private async confirmCreateUserWithWorkflow(): Promise<void> {
@@ -1053,6 +1121,77 @@ export class MasterAdminComponent implements OnInit {
       this.adminUserWorkflowState = 'error';
       this.adminUserWorkflowTitle = 'User creation failed';
       this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to create user.');
+      this.adminUserWorkflowDetails = 'Please review the user information and try again.';
+    } finally {
+      this.isLoadingUsers = false;
+    }
+  }
+
+  private async confirmUpdateUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: MasterAdminUser = {
+      username: this.editableUsername.trim(),
+      fullName: this.editableFullName.trim(),
+      email: this.editableUserEmail.trim(),
+      role: this.editableUserRole,
+      status: this.editableUserStatus,
+      clientId: this.selectedClient.clientId
+    };
+
+    this.isLoadingUsers = true;
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Updating user...';
+    this.adminUserWorkflowMessage = 'Please wait while Trackster updates the user account.';
+    this.adminUserWorkflowDetails = 'The account is being updated in the application database.';
+
+    try {
+      const response = await this.updateClientUser(updatedUserRequest);
+
+      if (!response.success) {
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'User update failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to update user.';
+        this.adminUserWorkflowDetails = 'Please review the user information and try again.';
+        return;
+      }
+
+      const updatedUserResponse = response.updatedUser || {};
+
+      const updatedUser: MasterAdminUser = {
+        username: String(updatedUserResponse.username || updatedUserRequest.username).trim(),
+        fullName: String(updatedUserResponse.fullName || updatedUserRequest.fullName).trim(),
+        email: String(updatedUserResponse.email || updatedUserRequest.email).trim(),
+        role: this.normalizeUserRole(String(updatedUserResponse.clientRole || updatedUserResponse.role || updatedUserRequest.role)),
+        status: this.normalizeStatus(String(updatedUserResponse.status || updatedUserRequest.status)),
+        clientId: String(updatedUserResponse.clientId || updatedUserRequest.clientId).trim()
+      };
+
+      this.users = this.users.map((user) => {
+        const isCurrentUser = user.username === this.selectedUser?.username
+          && user.clientId === this.selectedUser?.clientId;
+
+        return isCurrentUser ? updatedUser : user;
+      });
+
+      this.selectedUser = updatedUser;
+      this.isEditingUser = false;
+      this.isCreatingUser = false;
+      this.syncEditableUserFields();
+      this.refreshClientCounters(updatedUser.clientId);
+
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'User updated';
+      this.adminUserWorkflowMessage = response.message || 'User updated successfully.';
+      this.adminUserWorkflowDetails = 'The user information was updated successfully.';
+    } catch (error) {
+      console.error('Unable to update client user.', error);
+
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'User update failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to update user.');
       this.adminUserWorkflowDetails = 'Please review the user information and try again.';
     } finally {
       this.isLoadingUsers = false;
@@ -1136,6 +1275,19 @@ export class MasterAdminComponent implements OnInit {
       'Create user?',
       `Create user "${this.editableUsername.trim()}" for client "${this.selectedClient.name || this.selectedClient.clientId}"?`,
       'The user will be created in Cognito and associated with the selected client.'
+    );
+  }
+
+  private openUpdateUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'updateUser',
+      'Update user?',
+      `Update user "${this.editableUsername.trim()}" for client "${this.selectedClient.name || this.selectedClient.clientId}"?`,
+      'The user information will be updated in the application database.'
     );
   }
 
@@ -1352,24 +1504,7 @@ export class MasterAdminComponent implements OnInit {
     return String(nextNumber).padStart(8, '0');
   }
 
-  private createNewUsername(): string {
-    const baseUsername = `${this.selectedClient.clientId}.new.user`;
-    let candidateUsername = baseUsername;
-    let counter = 1;
-
-    while (
-      this.users.some(
-        (user) => user.username === candidateUsername && user.clientId === this.selectedClient.clientId
-      )
-    ) {
-      candidateUsername = `${baseUsername}.${counter}`;
-      counter += 1;
-    }
-
-    return candidateUsername;
-  }
-
-  private refreshSelectedClientCounters(): void {
+    private refreshSelectedClientCounters(): void {
     this.refreshClientCounters(this.selectedClient.clientId);
   }
 

@@ -35,7 +35,8 @@
       "userInfoGet": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/userinfo-get",
       "clientUserInfoGet": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/clientusersinfo-get",
       "clientUserDelete": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/clientusers-delete",
-      "clientUserAdd": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/clientusers-add"
+      "clientUserAdd": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/clientusers-add",
+      "clientUserUpdate": "https://6d92ch4nc8.execute-api.us-east-1.amazonaws.com/clientusers-update"
    },
    "gpsAreas":  [
                   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",

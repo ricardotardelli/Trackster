@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "message": "User updated successfully.",
+  "updatedUser": {
+    "username": "demo.user",
+    "email": "demo.user@example.com",
+    "fullName": "Demo User",
+    "clientRole": "client_user",
+    "clientId": "00000000",
+    "status": "Active"
+  }
+}

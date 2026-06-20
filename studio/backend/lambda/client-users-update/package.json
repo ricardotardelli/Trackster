@@ -1,0 +1,9 @@
+{
+  "name": "trackster-client-user-update",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.699.0",
+    "pg": "^8.13.1"
+  }
+}
