@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "clients": [
+    {
+      "clientId": "00000001",
+      "name": "Client A",
+      "email": "admin-a@example.com",
+      "contactName": "Client A Administrator",
+      "phone": "+351911111111",
+      "country": "Portugal",
+      "status": "Active",
+      "users": 0,
+      "admins": 0
+    },
+    {
+      "clientId": "00000002",
+      "name": "Client B",
+      "email": "admin-b@example.com",
+      "contactName": "Client B Administrator",
+      "phone": "+351922222222",
+      "country": "Portugal",
+      "status": "Active",
+      "users": 0,
+      "admins": 0
+    }
+  ]
+}

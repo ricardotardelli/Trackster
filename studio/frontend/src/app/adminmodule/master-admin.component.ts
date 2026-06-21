@@ -44,6 +44,12 @@ interface MasterAdminClientSummary {
   admins: number;
 }
 
+interface AdminClientsResponse {
+  success: boolean;
+  clients: MasterAdminClientSummary[];
+  error?: string;
+}
+
 interface MasterAdminUser {
   username: string;
   fullName: string;
@@ -124,6 +130,7 @@ interface TracksterRuntimeConfig {
     clientUserDelete?: string;
     clientUserAdd?: string;
     clientUserUpdate?: string;
+    clientsInfoGet?: string;
   };
 }
 
@@ -152,6 +159,7 @@ export class MasterAdminComponent implements OnInit {
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
 
   private readonly configPath = 'assets/config.json';
+  private readonly devClientsInfoGetMockPath = 'assets/mock/clients-info-get-response.json';
   private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
   private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
   private readonly devClientUserAddMockPath = 'assets/mock/client-users.add-response.json';
@@ -244,13 +252,14 @@ export class MasterAdminComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.loadRuntimeConfig();
+    await this.loadClients();
     await this.loadClientUsers();
   }
 
   get platformSummary(): MasterAdminPlatformSummary {
     return {
       clients: this.clients.length,
-      users: this.users.length,
+      users: this.clients.reduce((total, client) => total + Number(client.users || 0), 0),
       tracksterAdmins: 1
     };
   }
@@ -658,6 +667,87 @@ export class MasterAdminComponent implements OnInit {
     }
   }
 
+  private async loadClients(): Promise<void> {
+    try {
+      const response = this.isDevelopmentMode()
+        ? await this.loadClientsFromMock()
+        : await this.loadClientsFromApi();
+
+      if (!response.success) {
+        this.openMessageDialog(
+          'Clients Error',
+          response.error || 'Unable to load clients.'
+        );
+        return;
+      }
+
+      const loadedClients = response.clients.map((client) => this.mapClientFromResponse(client));
+
+      if (loadedClients.length === 0) {
+        this.openMessageDialog(
+          'Clients Error',
+          'No clients were returned by the clients API.'
+        );
+        return;
+      }
+
+      const previousSelectedClientId = this.selectedClient?.clientId || '';
+      const nextSelectedClient = loadedClients.find(
+        (client) => client.clientId === previousSelectedClientId
+      ) || loadedClients[0];
+
+      this.clients = loadedClients;
+      this.selectedClient = nextSelectedClient;
+      this.selectedUser = null;
+      this.syncEditableClientFields();
+      this.clearEditableUserFields();
+    } catch (error) {
+      console.error('Unable to load clients.', error);
+
+      this.openMessageDialog(
+        'Clients Error',
+        'Unable to load clients.'
+      );
+    }
+  }
+
+  private async loadClientsFromMock(): Promise<AdminClientsResponse> {
+    return await firstValueFrom(
+      this.http.get<AdminClientsResponse>(this.devClientsInfoGetMockPath)
+    );
+  }
+
+  private async loadClientsFromApi(): Promise<AdminClientsResponse> {
+    const apiUrl = this.getClientsInfoApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        clients: [],
+        error: 'Clients info API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        clients: [],
+        error: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.get<AdminClientsResponse>(apiUrl, {
+        headers: new HttpHeaders({
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      })
+    );
+  }
+
   private async loadClientUsers(): Promise<void> {
     this.isLoadingUsers = true;
 
@@ -941,6 +1031,10 @@ export class MasterAdminComponent implements OnInit {
         }
       )
     );
+  }
+
+  private getClientsInfoApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientsInfoGet || '').trim();
   }
 
   private getClientUsersApiUrl(): string {
@@ -1640,6 +1734,20 @@ export class MasterAdminComponent implements OnInit {
     }
 
     return 'Inactive';
+  }
+
+  private mapClientFromResponse(client: any): MasterAdminClientSummary {
+    return {
+      clientId: String(client?.clientId || client?.client_id || '').trim(),
+      name: String(client?.name || client?.companyName || client?.company_name || '').trim(),
+      email: String(client?.email || client?.companyEmail || client?.company_email || '').trim(),
+      contactName: String(client?.contactName || client?.contact_name || '').trim(),
+      phone: String(client?.phone || '').trim(),
+      country: String(client?.country || '').trim(),
+      status: this.normalizeStatus(String(client?.status || 'Inactive')),
+      users: Number(client?.users || client?.usersCount || client?.users_count || 0),
+      admins: Number(client?.admins || client?.adminsCount || client?.admins_count || 0)
+    };
   }
 
   private mapUserFromResponse(user: any, fallbackClientId: string): MasterAdminUser {
