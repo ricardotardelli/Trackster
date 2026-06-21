@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 
 type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
-type UserRole = 'client_admin' | 'client_user' | 'trackster_admin';
+type UserRole = string;
 
 type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
 type AdminUserWorkflowAction =
@@ -49,6 +49,7 @@ interface MasterAdminUser {
   fullName: string;
   email: string;
   role: UserRole;
+  roleName: string;
   status: ClientStatus;
   clientId: string;
 }
@@ -85,7 +86,12 @@ interface AdminClientUserAddResponse {
     fullName?: string;
     globalRole?: string | null;
     clientRole?: string;
+    clientRoleName?: string;
     role?: string;
+    roleCode?: string;
+    roleName?: string;
+    role_code?: string;
+    role_name?: string;
     clientId?: string;
     status?: string;
   };
@@ -101,7 +107,12 @@ interface AdminClientUserUpdateResponse {
     fullName?: string;
     globalRole?: string | null;
     clientRole?: string;
+    clientRoleName?: string;
     role?: string;
+    roleCode?: string;
+    roleName?: string;
+    role_code?: string;
+    role_name?: string;
     clientId?: string;
     status?: string;
   };
@@ -665,11 +676,7 @@ export class MasterAdminComponent implements OnInit {
 
       this.users = [
         ...this.users.filter((user) => user.clientId !== response.clientId),
-        ...response.users.map((user) => ({
-          ...user,
-          status: this.normalizeStatus(user.status),
-          role: this.normalizeUserRole(user.role)
-        }))
+        ...response.users.map((user) => this.mapUserFromResponse(user, response.clientId))
       ];
 
       this.refreshClientCounters(response.clientId);
@@ -757,6 +764,7 @@ export class MasterAdminComponent implements OnInit {
         email: user.email,
         fullName: user.fullName,
         clientRole: user.role,
+        roleName: user.roleName,
         clientId: user.clientId,
         status: user.status
       }
@@ -790,6 +798,7 @@ export class MasterAdminComponent implements OnInit {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
+          roleName: user.roleName,
           clientId: user.clientId
         },
         {
@@ -825,6 +834,7 @@ export class MasterAdminComponent implements OnInit {
         email: user.email,
         fullName: user.fullName,
         clientRole: user.role,
+        roleName: user.roleName,
         clientId: user.clientId,
         status: user.status
       }
@@ -869,6 +879,7 @@ export class MasterAdminComponent implements OnInit {
           fullName: user.fullName,
           role: user.role,
           clientRole: user.role,
+          roleName: user.roleName,
           status: normalizedApiStatus,
           clientId: user.clientId,
           action: normalizedAction,
@@ -1071,6 +1082,7 @@ export class MasterAdminComponent implements OnInit {
       fullName,
       email,
       role,
+      roleName: this.getKnownRoleName(role),
       status,
       clientId: this.selectedClient.clientId
     };
@@ -1088,6 +1100,7 @@ export class MasterAdminComponent implements OnInit {
       fullName: this.editableFullName.trim(),
       email: this.editableUserEmail.trim(),
       role: this.editableUserRole,
+      roleName: this.getKnownRoleName(this.editableUserRole),
       status: this.editableUserStatus,
       clientId: this.selectedClient.clientId
     };
@@ -1114,6 +1127,7 @@ export class MasterAdminComponent implements OnInit {
       fullName: this.selectedUser.fullName,
       email: this.selectedUser.email,
       role: this.selectedUser.role,
+      roleName: this.selectedUser.roleName,
       status: 'Inactive',
       clientId: this.selectedUser.clientId
     };
@@ -1140,6 +1154,7 @@ export class MasterAdminComponent implements OnInit {
       fullName: this.selectedUser.fullName,
       email: this.selectedUser.email,
       role: this.selectedUser.role,
+      roleName: this.selectedUser.roleName,
       status: 'Active',
       clientId: this.selectedUser.clientId
     };
@@ -1176,14 +1191,13 @@ export class MasterAdminComponent implements OnInit {
 
       const createdUser = response.createdUser || {};
 
-      const newUser: MasterAdminUser = {
-        username: String(createdUser.username || newUserRequest.username).trim(),
-        fullName: String(createdUser.fullName || newUserRequest.fullName).trim(),
-        email: String(createdUser.email || newUserRequest.email).trim(),
-        role: this.normalizeUserRole(String(createdUser.clientRole || createdUser.role || newUserRequest.role)),
-        status: this.normalizeStatus(String(createdUser.status || newUserRequest.status)),
-        clientId: String(createdUser.clientId || newUserRequest.clientId).trim()
-      };
+      const newUser: MasterAdminUser = this.mapUserFromResponse(
+        {
+          ...newUserRequest,
+          ...createdUser
+        },
+        newUserRequest.clientId
+      );
 
       this.users = [
         ...this.users.filter(
@@ -1246,14 +1260,13 @@ export class MasterAdminComponent implements OnInit {
 
       const updatedUserResponse = response.updatedUser || {};
 
-      const updatedUser: MasterAdminUser = {
-        username: String(updatedUserResponse.username || updatedUserRequest.username).trim(),
-        fullName: String(updatedUserResponse.fullName || updatedUserRequest.fullName).trim(),
-        email: String(updatedUserResponse.email || updatedUserRequest.email).trim(),
-        role: this.normalizeUserRole(String(updatedUserResponse.clientRole || updatedUserResponse.role || updatedUserRequest.role)),
-        status: this.normalizeStatus(String(updatedUserResponse.status || updatedUserRequest.status)),
-        clientId: String(updatedUserResponse.clientId || updatedUserRequest.clientId).trim()
-      };
+      const updatedUser: MasterAdminUser = this.mapUserFromResponse(
+        {
+          ...updatedUserRequest,
+          ...updatedUserResponse
+        },
+        updatedUserRequest.clientId
+      );
 
       this.users = this.users.map((user) => {
         const isCurrentUser = user.username === previousUsername
@@ -1629,14 +1642,58 @@ export class MasterAdminComponent implements OnInit {
     return 'Inactive';
   }
 
-  private normalizeUserRole(role: string): UserRole {
-    if (role === 'client_admin') {
-      return 'client_admin';
-    }
-    else if (role === 'trackster_admin') {
-      return 'trackster_admin';
+  private mapUserFromResponse(user: any, fallbackClientId: string): MasterAdminUser {
+    const role = this.getRoleCodeFromResponse(user);
+    const roleName = this.getRoleNameFromResponse(user, role);
+
+    return {
+      username: String(user?.username || '').trim(),
+      fullName: String(user?.fullName || user?.full_name || '').trim(),
+      email: String(user?.email || '').trim(),
+      role,
+      roleName,
+      status: this.normalizeStatus(String(user?.status || 'Inactive')),
+      clientId: String(user?.clientId || user?.client_id || fallbackClientId || '').trim()
+    };
+  }
+
+  private getRoleCodeFromResponse(user: any): UserRole {
+    return String(
+      user?.roleCode ||
+      user?.role_code ||
+      user?.clientRole ||
+      user?.role ||
+      ''
+    ).trim();
+  }
+
+  private getRoleNameFromResponse(user: any, role: UserRole): string {
+    const roleName = String(
+      user?.roleName ||
+      user?.role_name ||
+      user?.clientRoleName ||
+      user?.client_role_name ||
+      user?.globalRoleName ||
+      user?.global_role_name ||
+      ''
+    ).trim();
+
+    return roleName || this.getKnownRoleName(role) || role || '-';
+  }
+
+  getKnownRoleName(role: UserRole): string {
+    if (role === 'trackster_admin') {
+      return 'Trackster Administrator';
     }
 
-    return 'client_user';
+    if (role === 'client_admin') {
+      return 'Client Administrator';
+    }
+
+    if (role === 'client_user') {
+      return 'Client User';
+    }
+
+    return role;
   }
 }

@@ -278,7 +278,7 @@
                       >
                         <td>{{ user.username }}</td>
                         <td>{{ user.fullName || '-' }}</td>
-                        <td>{{ user.role }}</td>
+                        <td>{{ user.roleName || user.role || '-' }}</td>
                         <td>
                           <span
                             class="status-badge"
@@ -349,7 +349,7 @@
             *ngFor="let role of userRoles"
             [value]="role"
           >
-            {{ role }}
+            {{ getKnownRoleName(role) }}
           </mat-option>
         </mat-select>
       </label>
