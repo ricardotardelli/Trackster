@@ -114,12 +114,9 @@ async function getUserInfo(username) {
       u.created_at AS user_created_at,
       u.updated_at AS user_updated_at,
 
-      gr.role_code AS global_role,
+      r.role_code AS user_role,
 
       cu.client_id,
-      cu.status AS client_user_status,
-
-      cr.role_code AS client_role,
 
       c.company_name,
       c.company_email,
@@ -130,14 +127,11 @@ async function getUserInfo(username) {
 
     FROM trackster_users u
 
-    LEFT JOIN trackster_roles gr
-      ON gr.id = u.global_role_id
+    INNER JOIN trackster_roles r
+      ON r.id = u.role_id
 
     LEFT JOIN trackster_client_users cu
       ON cu.user_id = u.id
-
-    LEFT JOIN trackster_roles cr
-      ON cr.id = cu.role_id
 
     LEFT JOIN trackster_clients c
       ON c.client_id = cu.client_id
@@ -145,7 +139,7 @@ async function getUserInfo(username) {
     WHERE LOWER(u.username) = LOWER($1)
 
     ORDER BY
-      CASE WHEN cu.status = 'active' THEN 0 ELSE 1 END,
+      CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
       cu.created_at ASC
   `;
 
@@ -161,8 +155,8 @@ async function getUserInfo(username) {
     .filter((row) => row.client_id)
     .map((row) => ({
       clientId: row.client_id,
-      clientRole: row.client_role || null,
-      status: row.client_user_status || null,
+      clientRole: firstRow.user_role || null,
+      status: firstRow.user_status || null,
       companyName: row.company_name || "",
       companyEmail: row.company_email || "",
       contactName: row.contact_name || "",
@@ -172,7 +166,7 @@ async function getUserInfo(username) {
     }));
 
   const primaryClient =
-    clientAssociations.find((client) => client.status === "active") ||
+    clientAssociations.find((client) => client.clientStatus === "active") ||
     clientAssociations[0] ||
     null;
 
@@ -182,8 +176,8 @@ async function getUserInfo(username) {
     email: firstRow.email || "",
     fullName: firstRow.full_name || "",
     status: firstRow.user_status,
-    globalRole: firstRow.global_role || null,
-    clientRole: primaryClient?.clientRole || null,
+    globalRole: firstRow.user_role === "trackster_admin" ? "trackster_admin" : null,
+    clientRole: firstRow.user_role !== "trackster_admin" ? firstRow.user_role : null,
     clientId: primaryClient?.clientId || "",
     companyName: primaryClient?.companyName || "",
     companyEmail: primaryClient?.companyEmail || "",

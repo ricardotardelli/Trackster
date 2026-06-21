@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 
 type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
-type UserRole = 'client_admin' | 'client_user';
+type UserRole = 'client_admin' | 'client_user' | 'trackster_admin';
 
 type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
 type AdminUserWorkflowAction =
@@ -137,7 +137,7 @@ export class MasterAdminComponent implements OnInit {
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
   @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
 
-  readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
+  readonly userRoles: UserRole[] = ['trackster_admin', 'client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
 
   private readonly configPath = 'assets/config.json';
@@ -1632,6 +1632,9 @@ export class MasterAdminComponent implements OnInit {
   private normalizeUserRole(role: string): UserRole {
     if (role === 'client_admin') {
       return 'client_admin';
+    }
+    else if (role === 'trackster_admin') {
+      return 'trackster_admin';
     }
 
     return 'client_user';

@@ -199,7 +199,7 @@ export const handler = async (event) => {
     const body = parseBody(event);
 
     const username = normalizeString(body.username);
-    const email = normalizeString(body.email);
+    const email = normalizeString(body.email).toLowerCase();
     const fullName = normalizeString(body.fullName);
     const requestedClientId = normalizeString(body.clientId);
     const requestedRole = normalizeRole(body.role);
@@ -238,18 +238,20 @@ export const handler = async (event) => {
         u.email,
         u.full_name,
         u.status AS user_status,
-        gr.role_code AS global_role_code,
+        r.role_code AS role_code,
         cu.client_id,
-        cr.role_code AS client_role_code,
-        cu.status AS client_user_status
+        c.status AS client_status
       FROM trackster_users u
-      LEFT JOIN trackster_roles gr
-        ON gr.id = u.global_role_id
+      INNER JOIN trackster_roles r
+        ON r.id = u.role_id
       LEFT JOIN trackster_client_users cu
         ON cu.user_id = u.id
-      LEFT JOIN trackster_roles cr
-        ON cr.id = cu.role_id
-      WHERE u.username = $1
+      LEFT JOIN trackster_clients c
+        ON c.client_id = cu.client_id
+      WHERE LOWER(u.username) = LOWER($1)
+      ORDER BY
+        CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
+        cu.created_at ASC
       LIMIT 1
       `,
       [authenticatedUsername]
@@ -267,10 +269,10 @@ export const handler = async (event) => {
     const requester = requesterResult.rows[0];
 
     const requesterIsTracksterAdmin =
-      requester.global_role_code === 'trackster_admin';
+      requester.role_code === 'trackster_admin';
 
     const requesterIsClientAdmin =
-      requester.client_role_code === 'client_admin';
+      requester.role_code === 'client_admin';
 
     if (!requesterIsTracksterAdmin && !requesterIsClientAdmin) {
       await client.query('ROLLBACK');
@@ -283,7 +285,7 @@ export const handler = async (event) => {
 
     if (
       requester.user_status !== 'active' ||
-      (requesterIsClientAdmin && requester.client_user_status !== 'active')
+      (requesterIsClientAdmin && requester.client_status !== 'active')
     ) {
       await client.query('ROLLBACK');
 
@@ -359,7 +361,7 @@ export const handler = async (event) => {
         id,
         username
       FROM trackster_users
-      WHERE username = $1
+      WHERE LOWER(username) = LOWER($1)
       LIMIT 1
       `,
       [username]
@@ -395,7 +397,7 @@ export const handler = async (event) => {
       });
     }
 
-    const clientRole = roleResult.rows[0];
+    const userRole = roleResult.rows[0];
 
     const identityCreateResult = await createUserInIdentityProvider({
       username,
@@ -414,8 +416,8 @@ export const handler = async (event) => {
         username,
         email,
         full_name,
+        role_id,
         status,
-        global_role_id,
         created_at,
         updated_at
       )
@@ -423,8 +425,8 @@ export const handler = async (event) => {
         $1,
         $2,
         $3,
+        $4,
         'active',
-        NULL,
         NOW(),
         NOW()
       )
@@ -438,7 +440,8 @@ export const handler = async (event) => {
       [
         username,
         email,
-        fullName
+        fullName,
+        userRole.id
       ]
     );
 
@@ -449,24 +452,19 @@ export const handler = async (event) => {
       INSERT INTO trackster_client_users (
         client_id,
         user_id,
-        role_id,
-        status,
         created_at,
         updated_at
       )
       VALUES (
         $1,
         $2,
-        $3,
-        'active',
         NOW(),
         NOW()
       )
       `,
       [
         targetClient.client_id,
-        insertedUser.id,
-        clientRole.id
+        insertedUser.id
       ]
     );
 
@@ -481,8 +479,9 @@ export const handler = async (event) => {
         username: insertedUser.username,
         email: insertedUser.email,
         fullName: insertedUser.full_name,
-        globalRole: null,
-        clientRole: clientRole.role_code,
+        globalRole: userRole.role_code === 'trackster_admin' ? 'trackster_admin' : null,
+        clientRole: userRole.role_code !== 'trackster_admin' ? userRole.role_code : null,
+        role: userRole.role_code,
         clientId: targetClient.client_id,
         status: insertedUser.status
       }

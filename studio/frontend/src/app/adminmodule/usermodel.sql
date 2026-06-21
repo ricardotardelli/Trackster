@@ -53,7 +53,7 @@ CREATE TABLE trackster_users (
     username VARCHAR(100) NOT NULL,
     email VARCHAR(255),
     full_name VARCHAR(255),
-    global_role_id UUID,
+    role_id UUID NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -68,26 +68,19 @@ CREATE TABLE trackster_users (
             'suspended'
         )),
 
-    CONSTRAINT fk_trackster_users_global_role
-        FOREIGN KEY (global_role_id)
+    CONSTRAINT fk_trackster_users_role
+        FOREIGN KEY (role_id)
         REFERENCES trackster_roles(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 CREATE TABLE trackster_client_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id VARCHAR(32) NOT NULL,
     user_id UUID NOT NULL,
-    role_id UUID NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT ck_trackster_client_users_status
-        CHECK (status IN (
-            'active',
-            'inactive',
-            'suspended'
-        )),
 
     CONSTRAINT fk_trackster_client_users_client
         FOREIGN KEY (client_id)
@@ -98,12 +91,6 @@ CREATE TABLE trackster_client_users (
     CONSTRAINT fk_trackster_client_users_user
         FOREIGN KEY (user_id)
         REFERENCES trackster_users(id)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_trackster_client_users_role
-        FOREIGN KEY (role_id)
-        REFERENCES trackster_roles(id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
@@ -123,8 +110,8 @@ ON trackster_clients(status);
 CREATE INDEX idx_trackster_users_username
 ON trackster_users(username);
 
-CREATE INDEX idx_trackster_users_global_role
-ON trackster_users(global_role_id);
+CREATE INDEX idx_trackster_users_role_id
+ON trackster_users(role_id);
 
 CREATE INDEX idx_trackster_users_status
 ON trackster_users(status);
@@ -134,12 +121,6 @@ ON trackster_client_users(client_id);
 
 CREATE INDEX idx_trackster_client_users_user_id
 ON trackster_client_users(user_id);
-
-CREATE INDEX idx_trackster_client_users_role_id
-ON trackster_client_users(role_id);
-
-CREATE INDEX idx_trackster_client_users_status
-ON trackster_client_users(status);
 
 INSERT INTO trackster_roles (
     role_code,
@@ -205,7 +186,7 @@ INSERT INTO trackster_users (
     username,
     email,
     full_name,
-    global_role_id,
+    role_id,
     status
 )
 VALUES
@@ -223,18 +204,12 @@ VALUES
 
 INSERT INTO trackster_client_users (
     client_id,
-    user_id,
-    role_id,
-    status
+    user_id
 )
 SELECT
     '00000000',
-    u.id,
-    r.id,
-    'active'
+    u.id
 FROM trackster_users u
-JOIN trackster_roles r
-    ON r.role_code = 'client_admin'
 WHERE u.username = 'kadut';
 
 COMMIT;

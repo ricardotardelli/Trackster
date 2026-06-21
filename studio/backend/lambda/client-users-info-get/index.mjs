@@ -130,25 +130,19 @@ async function getAuthenticatedUserContext(username) {
       u.full_name,
       u.status AS user_status,
 
-      gr.role_code AS global_role,
+      r.role_code AS user_role,
 
       cu.client_id,
-      cu.status AS client_user_status,
-
-      cr.role_code AS client_role,
 
       c.status AS client_status
 
     FROM trackster_users u
 
-    LEFT JOIN trackster_roles gr
-      ON gr.id = u.global_role_id
+    INNER JOIN trackster_roles r
+      ON r.id = u.role_id
 
     LEFT JOIN trackster_client_users cu
       ON cu.user_id = u.id
-
-    LEFT JOIN trackster_roles cr
-      ON cr.id = cu.role_id
 
     LEFT JOIN trackster_clients c
       ON c.client_id = cu.client_id
@@ -156,7 +150,7 @@ async function getAuthenticatedUserContext(username) {
     WHERE LOWER(u.username) = LOWER($1)
 
     ORDER BY
-      CASE WHEN cu.status = 'active' THEN 0 ELSE 1 END,
+      CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
       cu.created_at ASC
   `;
 
@@ -174,20 +168,18 @@ async function getAuthenticatedUserContext(username) {
     email: firstRow.email || "",
     fullName: firstRow.full_name || "",
     status: firstRow.user_status,
-    globalRole: firstRow.global_role || null,
+    role: firstRow.user_role || null,
     clientAssociations: result.rows
       .filter((row) => row.client_id)
       .map((row) => ({
         clientId: row.client_id,
-        clientRole: row.client_role || null,
-        status: row.client_user_status || null,
         clientStatus: row.client_status || null
       }))
   };
 }
 
 function resolveAuthorizedClientId(authenticatedUser, requestedClientId) {
-  if (authenticatedUser.globalRole === "trackster_admin") {
+  if (authenticatedUser.role === "trackster_admin") {
     if (!requestedClientId) {
       return {
         success: false,
@@ -202,14 +194,19 @@ function resolveAuthorizedClientId(authenticatedUser, requestedClientId) {
     };
   }
 
-  const activeClientAdminAssociation = authenticatedUser.clientAssociations.find(
-    (association) =>
-      association.clientRole === "client_admin" &&
-      association.status === "active" &&
-      association.clientStatus === "active"
+  if (authenticatedUser.role !== "client_admin") {
+    return {
+      success: false,
+      statusCode: 403,
+      error: "Only trackster_admin or active client_admin users can list client users."
+    };
+  }
+
+  const activeClientAssociation = authenticatedUser.clientAssociations.find(
+    (association) => association.clientStatus === "active"
   );
 
-  if (!activeClientAdminAssociation) {
+  if (!activeClientAssociation) {
     return {
       success: false,
       statusCode: 403,
@@ -219,7 +216,7 @@ function resolveAuthorizedClientId(authenticatedUser, requestedClientId) {
 
   if (
     requestedClientId &&
-    requestedClientId !== activeClientAdminAssociation.clientId
+    requestedClientId !== activeClientAssociation.clientId
   ) {
     return {
       success: false,
@@ -230,7 +227,7 @@ function resolveAuthorizedClientId(authenticatedUser, requestedClientId) {
 
   return {
     success: true,
-    clientId: activeClientAdminAssociation.clientId
+    clientId: activeClientAssociation.clientId
   };
 }
 
@@ -242,10 +239,9 @@ async function listClientUsers(clientId) {
       u.email,
       u.status AS user_status,
 
-      cu.client_id,
-      cu.status AS client_user_status,
+      r.role_code AS user_role,
 
-      r.role_code AS client_role
+      cu.client_id
 
     FROM trackster_client_users cu
 
@@ -253,7 +249,7 @@ async function listClientUsers(clientId) {
       ON u.id = cu.user_id
 
     INNER JOIN trackster_roles r
-      ON r.id = cu.role_id
+      ON r.id = u.role_id
 
     WHERE cu.client_id = $1
 
@@ -271,8 +267,8 @@ async function listClientUsers(clientId) {
     username: row.username,
     fullName: row.full_name || "",
     email: row.email || "",
-    role: row.client_role,
-    status: toUiStatus(row.client_user_status || row.user_status),
+    role: row.user_role,
+    status: toUiStatus(row.user_status),
     clientId: row.client_id
   }));
 }
