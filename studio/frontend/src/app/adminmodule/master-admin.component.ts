@@ -13,18 +13,16 @@ type UserRole = string;
 
 type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
 type AdminUserWorkflowAction =
+  | 'createClient'
+  | 'saveClient'
+  | 'disableClient'
+  | 'activateClient'
+  | 'removeClient'
   | 'createUser'
   | 'updateUser'
   | 'disableUser'
   | 'activateUser'
   | 'removeUser';
-
-type ConfirmationAction =
-  | 'saveClient'
-  | 'disableClient'
-  | 'activateClient'
-  | 'removeClient'
-  | 'saveUser';
 
 interface MasterAdminPlatformSummary {
   clients: number;
@@ -157,9 +155,6 @@ interface TracksterRuntimeConfig {
   styleUrl: './master-admin.component.css'
 })
 export class MasterAdminComponent implements OnInit {
-  @ViewChild('confirmationDialog') confirmationDialog?: TemplateRef<unknown>;
-  @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
-  @ViewChild('processingDialog') processingDialog?: TemplateRef<unknown>;
   @ViewChild('clientDialog') clientDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
   @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
@@ -216,16 +211,6 @@ export class MasterAdminComponent implements OnInit {
   editableUserEmail = '';
   editableUserRole: UserRole = 'client_user';
   editableUserStatus: ClientStatus = 'Active';
-
-  confirmationTitle = '';
-  confirmationMessage = '';
-  confirmationAction: ConfirmationAction | null = null;
-
-  messageTitle = '';
-  messageText = '';
-
-  processingTitle = '';
-  processingMessage = '';
 
   adminUserWorkflowState: AdminUserWorkflowState = 'idle';
   adminUserWorkflowAction: AdminUserWorkflowAction | null = null;
@@ -385,7 +370,7 @@ export class MasterAdminComponent implements OnInit {
       this.isCreatingClient
         ? 'Confirm creation of this new Trackster client?'
         : `Confirm changes to client "${this.selectedClient.name}"?`,
-      'saveClient'
+      this.isCreatingClient ? 'createClient' : 'saveClient'
     );
   }
 
@@ -561,39 +546,6 @@ export class MasterAdminComponent implements OnInit {
     this.openRemoveUserWorkflowDialog();
   }
 
-  async confirmDialogAction(): Promise<void> {
-    const action = this.confirmationAction;
-    this.dialog.closeAll();
-
-    if (!action) {
-      return;
-    }
-
-    if (action === 'saveClient') {
-      await this.confirmSaveClient();
-      return;
-    }
-
-    if (action === 'disableClient') {
-      this.confirmDisableClient();
-      return;
-    }
-
-    if (action === 'activateClient') {
-      this.confirmActivateClient();
-      return;
-    }
-
-    if (action === 'removeClient') {
-      this.confirmRemoveClient();
-      return;
-    }
-
-    if (action === 'saveUser') {
-      this.confirmSaveUser();
-    }
-  }
-
   closeDialogs(): void {
     this.dialog.closeAll();
   }
@@ -615,6 +567,38 @@ export class MasterAdminComponent implements OnInit {
 
   async confirmAdminUserWorkflowAction(): Promise<void> {
     if (this.adminUserWorkflowState !== 'confirm' || !this.adminUserWorkflowAction) {
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'createClient' || this.adminUserWorkflowAction === 'saveClient') {
+      await this.confirmSaveClient();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'disableClient') {
+      this.confirmDisableClient();
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'Client disabled';
+      this.adminUserWorkflowMessage = 'The client was disabled successfully.';
+      this.adminUserWorkflowDetails = '';
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'activateClient') {
+      this.confirmActivateClient();
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'Client activated';
+      this.adminUserWorkflowMessage = 'The client was activated successfully.';
+      this.adminUserWorkflowDetails = '';
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'removeClient') {
+      this.confirmRemoveClient();
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'Client removed';
+      this.adminUserWorkflowMessage = 'The client was removed successfully.';
+      this.adminUserWorkflowDetails = '';
       return;
     }
 
@@ -1191,20 +1175,22 @@ export class MasterAdminComponent implements OnInit {
   }
 
   private async confirmCreateClient(clientRequest: MasterAdminClientSummary): Promise<void> {
-    this.openProcessingDialog(
-      'Creating Client',
-      'Please wait while Trackster creates the client.'
-    );
+    this.closeClientDialogOnly();
+    this.ensureAdminWorkflowDialogOpen();
+
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Creating client...';
+    this.adminUserWorkflowMessage = 'Please wait while Trackster creates the client.';
+    this.adminUserWorkflowDetails = 'The client is being created in the application database.';
 
     try {
       const response = await this.createClient(clientRequest);
 
       if (!response.success) {
-        this.dialog.closeAll();
-        this.openMessageDialog(
-          'Client Creation Failed',
-          response.message || response.error || 'Unable to create client.'
-        );
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'Client creation failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to create client.';
+        this.adminUserWorkflowDetails = 'Please review the client information and try again.';
         return;
       }
 
@@ -1230,19 +1216,17 @@ export class MasterAdminComponent implements OnInit {
       this.syncEditableClientFields();
       this.clearEditableUserFields();
 
-      this.dialog.closeAll();
-      this.openMessageDialog(
-        'Client Created',
-        response.message || 'Client added successfully.'
-      );
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'Client created';
+      this.adminUserWorkflowMessage = response.message || 'Client added successfully.';
+      this.adminUserWorkflowDetails = 'The client was created and selected in the administration workspace.';
     } catch (error) {
       console.error('Unable to create client.', error);
 
-      this.dialog.closeAll();
-      this.openMessageDialog(
-        'Client Creation Failed',
-        this.getHttpErrorMessage(error, 'Unable to create client.')
-      );
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'Client creation failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to create client.');
+      this.adminUserWorkflowDetails = 'Please review the client information and try again.';
     }
   }
 
@@ -1655,11 +1639,7 @@ export class MasterAdminComponent implements OnInit {
     this.adminUserWorkflowMessage = message;
     this.adminUserWorkflowDetails = details;
 
-    this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
-      width: '440px',
-      panelClass: 'trackster-admin-workflow-dialog-panel',
-      disableClose: true
-    });
+    this.ensureAdminWorkflowDialogOpen();
   }
 
   private closeAdminUserWorkflowDialogOnly(): void {
@@ -1691,50 +1671,58 @@ export class MasterAdminComponent implements OnInit {
   private openConfirmationDialog(
     title: string,
     message: string,
-    action: ConfirmationAction
+    action: AdminUserWorkflowAction
   ): void {
-    if (!this.confirmationDialog) {
-      return;
-    }
-
-    this.confirmationTitle = title;
-    this.confirmationMessage = message;
-    this.confirmationAction = action;
-
-    this.dialog.open(this.confirmationDialog, {
-      width: '420px',
-      panelClass: 'trackster-admin-dialog-panel',
-      disableClose: true
-    });
+    this.openAdminUserWorkflowDialog(
+      action,
+      title,
+      message,
+      action === 'createClient' || action === 'saveClient'
+        ? 'The client information will be saved in the application database.'
+        : 'Please confirm this administration action.'
+    );
   }
 
   private openMessageDialog(title: string, message: string): void {
-    if (!this.messageDialog) {
-      return;
-    }
+    this.adminUserWorkflowAction = null;
+    this.adminUserWorkflowState = 'error';
+    this.adminUserWorkflowTitle = title;
+    this.adminUserWorkflowMessage = message;
+    this.adminUserWorkflowDetails = '';
 
-    this.messageTitle = title;
-    this.messageText = message;
-
-    this.dialog.open(this.messageDialog, {
-      width: '420px',
-      panelClass: 'trackster-admin-dialog-panel'
-    });
+    this.ensureAdminWorkflowDialogOpen();
   }
 
   private openProcessingDialog(title: string, message: string): void {
-    if (!this.processingDialog) {
+    this.adminUserWorkflowAction = null;
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = title;
+    this.adminUserWorkflowMessage = message;
+    this.adminUserWorkflowDetails = '';
+
+    this.ensureAdminWorkflowDialogOpen();
+  }
+
+  private ensureAdminWorkflowDialogOpen(): void {
+    if (!this.adminUserWorkflowDialog || this.adminUserWorkflowDialogRef) {
       return;
     }
 
-    this.processingTitle = title;
-    this.processingMessage = message;
-
-    this.dialog.open(this.processingDialog, {
-      width: '420px',
-      panelClass: 'trackster-admin-dialog-panel',
+    this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
+      width: '440px',
+      panelClass: 'trackster-admin-workflow-dialog-panel',
       disableClose: true
     });
+  }
+
+  private closeClientDialogOnly(): void {
+    this.dialog.openDialogs
+      .filter((dialogRef) => dialogRef.componentInstance === null)
+      .forEach((dialogRef) => {
+        if (dialogRef !== this.adminUserWorkflowDialogRef) {
+          dialogRef.close();
+        }
+      });
   }
 
   private openClientDialog(): void {
