@@ -90,12 +90,11 @@
                     panelClass="trackster-admin-select-panel"
                     [value]="selectedClient.clientId"
                     (selectionChange)="selectClientById($event.value)"
-                    [disabled]="isEditingClient || isCreatingClient || isEditingUser || isCreatingUser"
-                  >
-                    <mat-option
-                      *ngFor="let client of clients"
-                      [value]="client.clientId"
-                    >
+                    [disabled]="isEditingClient || isCreatingClient || isEditingUser || isCreatingUser">
+                    <mat-option value="">
+                      Select a Client
+                    </mat-option>
+                    <mat-option *ngFor="let client of clients" [value]="client.clientId">
                       {{ client.clientId }} - {{ client.name || 'New Client' }}
                     </mat-option>
                   </mat-select>

@@ -128,6 +128,8 @@ async function getAuthenticatedUserContext(username) {
       ON r.id = u.role_id
 
     WHERE LOWER(u.username) = LOWER($1)
+
+    ORDER BY u.username
   `;
 
   const result = await pool.query(query, [username]);
@@ -180,8 +182,8 @@ async function listClients() {
       ON r.id = u.role_id
 
     GROUP BY
-      c.client_id,
       c.company_name,
+      c.client_id,
       c.company_email,
       c.contact_name,
       c.phone,
