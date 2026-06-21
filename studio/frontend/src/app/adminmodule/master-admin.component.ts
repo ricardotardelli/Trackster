@@ -171,7 +171,7 @@ export class MasterAdminComponent implements OnInit {
   private readonly devClientUserUpdateMockPath = 'assets/mock/client-users.update-response.json';
 
   private runtimeConfig: TracksterRuntimeConfig = {};
-  private isLoadingUsers = false;
+  isLoadingUsers = false;
   private adminUserWorkflowDialogRef?: MatDialogRef<unknown>;
 
   private readonly emptyClient: MasterAdminClientSummary = {
