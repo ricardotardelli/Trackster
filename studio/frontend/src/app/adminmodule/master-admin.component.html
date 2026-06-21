@@ -21,7 +21,7 @@
 
         <p>
           <strong>Selected Client:</strong>
-          <span class="status-value status-ok">{{ selectedClient.name || 'New Client' }}</span>
+          <span class="status-value status-ok">{{ selectedClient.clientId ? selectedClient.name || 'New Client' : 'Select a Client' }}</span>
         </p>
 
         <p>
@@ -90,11 +90,16 @@
                     panelClass="trackster-admin-select-panel"
                     [value]="selectedClient.clientId"
                     (selectionChange)="selectClientById($event.value)"
-                    [disabled]="isEditingClient || isCreatingClient || isEditingUser || isCreatingUser">
+                    [disabled]="isEditingClient || isCreatingClient || isEditingUser || isCreatingUser"
+                  >
                     <mat-option value="">
                       Select a Client
                     </mat-option>
-                    <mat-option *ngFor="let client of clients" [value]="client.clientId">
+
+                    <mat-option
+                      *ngFor="let client of clients"
+                      [value]="client.clientId"
+                    >
                       {{ client.clientId }} - {{ client.name || 'New Client' }}
                     </mat-option>
                   </mat-select>
@@ -224,7 +229,7 @@
                 <div class="admin-users-header">
                   <div>
                     <h3>Client Users</h3>
-                    <p>Users associated with {{ selectedClient.name || 'New Client' }}.</p>
+                    <p>Users associated with {{ selectedClient.clientId ? selectedClient.name || 'New Client' : 'Select a Client' }}.</p>
                   </div>
                 </div>
 

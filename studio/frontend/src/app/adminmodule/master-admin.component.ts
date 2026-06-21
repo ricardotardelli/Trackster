@@ -169,44 +169,6 @@ export class MasterAdminComponent implements OnInit {
   private isLoadingUsers = false;
   private adminUserWorkflowDialogRef?: MatDialogRef<unknown>;
 
-  clients: MasterAdminClientSummary[] = [
-    {
-      clientId: '00000000',
-      name: 'Trackster Demo',
-      email: 'kadut3@gmail.com',
-      contactName: 'Ricardo Tardelli',
-      phone: '+351 000 000 000',
-      country: 'Portugal',
-      status: 'Active',
-      users: 0,
-      admins: 0
-    },
-    {
-      clientId: '00000001',
-      name: 'Client A',
-      email: 'admin-a@example.com',
-      contactName: 'Client A Admin',
-      phone: '+351 111 111 111',
-      country: 'Portugal',
-      status: 'Active',
-      users: 0,
-      admins: 0
-    },
-    {
-      clientId: '00000002',
-      name: 'Client B',
-      email: 'admin-b@example.com',
-      contactName: 'Client B Admin',
-      phone: '+351 222 222 222',
-      country: 'Portugal',
-      status: 'Active',
-      users: 0,
-      admins: 0
-    }
-  ];
-
-  users: MasterAdminUser[] = [];
-
   private readonly emptyClient: MasterAdminClientSummary = {
     clientId: '',
     name: '',
@@ -219,8 +181,11 @@ export class MasterAdminComponent implements OnInit {
     admins: 0
   };
 
-  selectedClient: MasterAdminClientSummary = this.emptyClient;
+  clients: MasterAdminClientSummary[] = [];
 
+  users: MasterAdminUser[] = [];
+
+  selectedClient: MasterAdminClientSummary = this.emptyClient;
   selectedUser: MasterAdminUser | null = null;
 
   isEditingClient = false;
@@ -266,7 +231,6 @@ export class MasterAdminComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.loadRuntimeConfig();
     await this.loadClients();
-    await this.loadClientUsers();
   }
 
   get platformSummary(): MasterAdminPlatformSummary {
@@ -341,6 +305,15 @@ export class MasterAdminComponent implements OnInit {
 
   async selectClientById(clientId: string): Promise<void> {
     if (this.isEditingClient || this.isCreatingClient || this.isEditingUser || this.isCreatingUser) {
+      return;
+    }
+
+    if (!clientId) {
+      this.selectedClient = this.emptyClient;
+      this.users = [];
+      this.selectedUser = null;
+      this.syncEditableClientFields();
+      this.clearEditableUserFields();
       return;
     }
 
@@ -705,12 +678,13 @@ export class MasterAdminComponent implements OnInit {
       }
 
       const previousSelectedClientId = this.selectedClient?.clientId || '';
-      const nextSelectedClient = loadedClients.find(
-        (client) => client.clientId === previousSelectedClientId
-      ) || loadedClients[0];
+      const nextSelectedClient = previousSelectedClientId
+        ? loadedClients.find((client) => client.clientId === previousSelectedClientId) || this.emptyClient
+        : this.emptyClient;
 
       this.clients = loadedClients;
       this.selectedClient = nextSelectedClient;
+      this.users = previousSelectedClientId ? this.users : [];
       this.selectedUser = null;
       this.syncEditableClientFields();
       this.clearEditableUserFields();
@@ -762,6 +736,13 @@ export class MasterAdminComponent implements OnInit {
   }
 
   private async loadClientUsers(): Promise<void> {
+    if (!this.selectedClient.clientId) {
+      this.users = [];
+      this.selectedUser = null;
+      this.clearEditableUserFields();
+      return;
+    }
+
     this.isLoadingUsers = true;
 
     try {
