@@ -1965,4 +1965,14 @@ export class MasterAdminComponent implements OnInit {
 
     return role;
   }
+
+  sortUsers(column: keyof MasterAdminUser): void {
+    this.users = [...this.users].sort((a, b) =>
+      String(a[column] || '').localeCompare(
+        String(b[column] || ''),
+        undefined,
+        { sensitivity: 'base' }
+      )
+    );
+  }
 }

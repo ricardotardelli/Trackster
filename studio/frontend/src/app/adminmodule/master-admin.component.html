@@ -261,15 +261,45 @@
                 </div>
 
                 <div class="users-table-shell">
-                  <div class="users-loading-state" *ngIf="isLoadingUsers">Loading users...</div>
-                  <table class="users-table">
+                  <div
+                    class="users-empty-state"
+                    *ngIf="!selectedClient.clientId && !isLoadingUsers"
+                  >
+                    Select a client to load its users.
+                  </div>
+
+                  <div
+                    class="users-empty-state"
+                    *ngIf="selectedClient.clientId && isLoadingUsers"
+                  >
+                    Loading users for {{ selectedClient.name || selectedClient.clientId }}...
+                  </div>
+
+                  <table
+                    class="users-table"
+                    *ngIf="selectedClient.clientId && !isLoadingUsers && selectedClientUsers.length > 0"
+                  >
                     <thead>
                       <tr>
-                        <th>Username</th>
-                        <th>Full Name</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Email</th>
+                        <th (click)="sortUsers('username')">
+                          Username
+                        </th>
+
+                        <th (click)="sortUsers('fullName')">
+                          Full Name
+                        </th>
+
+                        <th (click)="sortUsers('roleName')">
+                          Role
+                        </th>
+
+                        <th (click)="sortUsers('status')">
+                          Status
+                        </th>
+
+                        <th (click)="sortUsers('email')">
+                          Email
+                        </th>
                       </tr>
                     </thead>
 
@@ -297,8 +327,11 @@
                     </tbody>
                   </table>
 
-                  <div class="users-empty-state" *ngIf="selectedClientUsers.length === 0">
-                    No users associated with this client.
+                  <div
+                    class="users-empty-state"
+                    *ngIf="selectedClient.clientId && !isLoadingUsers && selectedClientUsers.length === 0"
+                  >
+                    No users are associated with this client yet.
                   </div>
                 </div>
               </article>
