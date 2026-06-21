@@ -309,6 +309,87 @@
   </div>
 </div>
 
+
+<ng-template #clientDialog>
+  <div class="trackster-dialog user-dialog">
+    <h2>Create Client</h2>
+
+    <p>
+      Create a new Trackster client tenant.
+    </p>
+
+    <div class="user-dialog-fields-grid">
+      <label class="client-field">
+        <span>Client ID</span>
+        <input
+          type="text"
+          [(ngModel)]="editableClientId"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Company</span>
+        <input
+          type="text"
+          [(ngModel)]="editableClientName"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Contact Name</span>
+        <input
+          type="text"
+          [(ngModel)]="editableClientContactName"
+        />
+      </label>
+
+      <label class="client-field user-field-full">
+        <span>Email</span>
+        <input
+          type="text"
+          [(ngModel)]="editableClientEmail"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Phone</span>
+        <input
+          type="text"
+          [(ngModel)]="editableClientPhone"
+        />
+      </label>
+
+      <label class="client-field">
+        <span>Country</span>
+        <input
+          type="text"
+          [(ngModel)]="editableClientCountry"
+        />
+      </label>
+    </div>
+
+    <div class="trackster-dialog-actions">
+      <button
+        type="button"
+        class="trackster-admin-button secondary"
+        (click)="cancelClientEdit()"
+      >
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
+      </button>
+
+      <button
+        type="button"
+        class="trackster-admin-button primary"
+        (click)="saveClient()"
+      >
+        <mat-icon>save</mat-icon>
+        <span>Save</span>
+      </button>
+    </div>
+  </div>
+</ng-template>
+
 <ng-template #userDialog>
   <div class="trackster-dialog user-dialog">
     <h2>{{ isCreatingUser ? 'Create User' : 'Edit User' }}</h2>
