@@ -207,7 +207,20 @@ export class MasterAdminComponent implements OnInit {
 
   users: MasterAdminUser[] = [];
 
-  selectedClient: MasterAdminClientSummary = this.clients[0];
+  private readonly emptyClient: MasterAdminClientSummary = {
+    clientId: '',
+    name: '',
+    email: '',
+    contactName: '',
+    phone: '',
+    country: '',
+    status: 'Inactive',
+    users: 0,
+    admins: 0
+  };
+
+  selectedClient: MasterAdminClientSummary = this.emptyClient;
+
   selectedUser: MasterAdminUser | null = null;
 
   isEditingClient = false;
