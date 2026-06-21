@@ -377,7 +377,8 @@
         class="trackster-admin-button secondary"
         (click)="cancelUserEdit()"
       >
-        Cancel
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
       </button>
 
       <button
@@ -385,7 +386,8 @@
         class="trackster-admin-button primary"
         (click)="saveUser()"
       >
-        Save
+        <mat-icon>save</mat-icon>
+        <span>Save</span>
       </button>
     </div>
   </div>
@@ -431,26 +433,30 @@
       *ngIf="adminUserWorkflowState === 'confirm'">
       <button
         type="button"
-        class="decoder-dialog-cancel-button"
+        class="trackster-admin-button secondary"
         (click)="closeAdminUserWorkflowDialog()">
-        Cancel
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
       </button>
 
       <button
         type="button"
-        [class.decoder-dialog-delete-button]="adminUserWorkflowAction === 'removeUser'"
-        [class.decoder-dialog-confirm-button]="adminUserWorkflowAction !== 'removeUser'"
+        class="trackster-admin-button"
+        [class.danger]="adminUserWorkflowAction === 'removeUser'"
+        [class.primary]="adminUserWorkflowAction !== 'removeUser'"
         (click)="confirmAdminUserWorkflowAction()">
-        {{ adminUserWorkflowAction === 'removeUser' ? 'Delete' : 'Confirm' }}
+        <mat-icon>{{ adminUserWorkflowAction === 'removeUser' ? 'delete' : 'check_circle' }}</mat-icon>
+        <span>{{ adminUserWorkflowAction === 'removeUser' ? 'Delete' : 'Confirm' }}</span>
       </button>
     </div>
 
     <button
       type="button"
-      class="decoder-export-ok-button"
+      class="trackster-admin-button primary"
       *ngIf="adminUserWorkflowState !== 'running' && adminUserWorkflowState !== 'confirm'"
       (click)="closeAdminUserWorkflowDialog()">
-      OK
+      <mat-icon>check_circle</mat-icon>
+      <span>OK</span>
     </button>
   </div>
 </ng-template>
@@ -467,7 +473,8 @@
         class="trackster-admin-button secondary"
         (click)="closeDialogs()"
       >
-        Cancel
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
       </button>
 
       <button
@@ -475,7 +482,8 @@
         class="trackster-admin-button primary"
         (click)="confirmDialogAction()"
       >
-        Confirm
+        <mat-icon>check_circle</mat-icon>
+        <span>Confirm</span>
       </button>
     </div>
   </div>
@@ -504,7 +512,8 @@
         class="trackster-admin-button primary"
         (click)="closeDialogs()"
       >
-        OK
+        <mat-icon>check_circle</mat-icon>
+        <span>OK</span>
       </button>
     </div>
   </div>

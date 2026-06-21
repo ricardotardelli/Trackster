@@ -720,27 +720,15 @@
   color: #dc2626;
 }
 
-.decoder-export-ok-button {
-  min-width: 96px;
-  margin-top: 22px;
-  padding: 9px 18px;
-  border: 0;
-  border-radius: 999px;
-  background: #2563eb;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.decoder-export-ok-button:hover {
-  background: #1d4ed8;
-}
 
 @keyframes decoder-export-spin {
   to {
     transform: rotate(360deg);
   }
+}
+
+.decoder-export-modal > .trackster-admin-button {
+  margin: 22px auto 0;
 }
 
 .decoder-dialog-actions {
@@ -750,59 +738,6 @@
   margin-top: 22px;
 }
 
-.decoder-dialog-cancel-button,
-.decoder-dialog-delete-button,
-.decoder-dialog-confirm-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 30px;
-  min-width: 0;
-  padding: 0 14px;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease;
-}
-
-.decoder-dialog-cancel-button {
-  border: 1px solid rgba(191, 219, 254, 0.9);
-  background: #ffffff;
-  color: #102349;
-}
-
-.decoder-dialog-cancel-button:hover {
-  background: #f8fbff;
-}
-
-.decoder-dialog-confirm-button {
-  border: 0;
-  background: #0284c7;
-  color: #ffffff;
-}
-
-.decoder-dialog-confirm-button:hover {
-  background: #0369a1;
-}
-
-.decoder-dialog-delete-button {
-  border: 1px solid rgba(248, 113, 113, 0.6);
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.decoder-dialog-delete-button:hover {
-  background: #fecaca;
-}
 
 
 @media (max-width: 1200px) {
