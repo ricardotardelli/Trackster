@@ -50,6 +50,13 @@ interface AdminClientsResponse {
   error?: string;
 }
 
+interface AdminClientAddResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  client?: MasterAdminClientSummary;
+}
+
 interface MasterAdminUser {
   username: string;
   fullName: string;
@@ -131,6 +138,7 @@ interface TracksterRuntimeConfig {
     clientUserAdd?: string;
     clientUserUpdate?: string;
     clientsInfoGet?: string;
+    clientsAdd?: string;
   };
 }
 
@@ -160,6 +168,7 @@ export class MasterAdminComponent implements OnInit {
 
   private readonly configPath = 'assets/config.json';
   private readonly devClientsInfoGetMockPath = 'assets/mock/clients-info-get-response.json';
+  private readonly devClientsAddMockPath = 'assets/mock/clients-add-response.json';
   private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
   private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
   private readonly devClientUserAddMockPath = 'assets/mock/client-users.add-response.json';
@@ -569,7 +578,7 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (action === 'saveClient') {
-      this.confirmSaveClient();
+      await this.confirmSaveClient();
       return;
     }
 
@@ -732,6 +741,70 @@ export class MasterAdminComponent implements OnInit {
           'Content-Type': 'application/json'
         })
       })
+    );
+  }
+
+
+  private async createClient(client: MasterAdminClientSummary): Promise<AdminClientAddResponse> {
+    return this.isDevelopmentMode()
+      ? await this.createClientFromMock(client)
+      : await this.createClientFromApi(client);
+  }
+
+  private async createClientFromMock(client: MasterAdminClientSummary): Promise<AdminClientAddResponse> {
+    const response = await firstValueFrom(
+      this.http.get<AdminClientAddResponse>(this.devClientsAddMockPath)
+    );
+
+    return {
+      ...response,
+      success: response.success,
+      message: response.message || 'Client added successfully.',
+      client: {
+        ...client,
+        ...(response.client || {})
+      }
+    };
+  }
+
+  private async createClientFromApi(client: MasterAdminClientSummary): Promise<AdminClientAddResponse> {
+    const apiUrl = this.getClientsAddApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Clients add API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<AdminClientAddResponse>(
+        apiUrl,
+        {
+          clientId: client.clientId,
+          companyName: client.name,
+          companyEmail: client.email,
+          contactName: client.contactName,
+          country: client.country,
+          phone: client.phone,
+          status: this.toApiClientStatus(client.status)
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
     );
   }
 
@@ -1047,6 +1120,10 @@ export class MasterAdminComponent implements OnInit {
     return (this.runtimeConfig.usermanagementApi?.clientUserUpdate || '').trim();
   }
 
+  private getClientsAddApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientsAdd || '').trim();
+  }
+
   private isDevelopmentMode(): boolean {
     const authServiceAsAny = this.authService as any;
 
@@ -1087,12 +1164,29 @@ export class MasterAdminComponent implements OnInit {
     return '';
   }
 
-  private confirmSaveClient(): void {
-    this.selectedClient.name = this.editableClientName.trim();
-    this.selectedClient.email = this.editableClientEmail.trim();
-    this.selectedClient.contactName = this.editableClientContactName.trim();
-    this.selectedClient.phone = this.editableClientPhone.trim();
-    this.selectedClient.country = this.editableClientCountry.trim();
+  private async confirmSaveClient(): Promise<void> {
+    const clientRequest: MasterAdminClientSummary = {
+      clientId: this.selectedClient.clientId,
+      name: this.editableClientName.trim(),
+      email: this.editableClientEmail.trim(),
+      contactName: this.editableClientContactName.trim(),
+      phone: this.editableClientPhone.trim(),
+      country: this.editableClientCountry.trim(),
+      status: this.selectedClient.status,
+      users: Number(this.selectedClient.users || 0),
+      admins: Number(this.selectedClient.admins || 0)
+    };
+
+    if (this.isCreatingClient) {
+      await this.confirmCreateClient(clientRequest);
+      return;
+    }
+
+    this.selectedClient.name = clientRequest.name;
+    this.selectedClient.email = clientRequest.email;
+    this.selectedClient.contactName = clientRequest.contactName;
+    this.selectedClient.phone = clientRequest.phone;
+    this.selectedClient.country = clientRequest.country;
 
     this.isEditingClient = false;
     this.isCreatingClient = false;
@@ -1102,6 +1196,57 @@ export class MasterAdminComponent implements OnInit {
       'Client Saved',
       'Client information was saved successfully.'
     );
+  }
+
+  private async confirmCreateClient(clientRequest: MasterAdminClientSummary): Promise<void> {
+    this.openProcessingDialog(
+      'Creating Client',
+      'Please wait while Trackster creates the client.'
+    );
+
+    try {
+      const response = await this.createClient(clientRequest);
+
+      if (!response.success) {
+        this.dialog.closeAll();
+        this.openMessageDialog(
+          'Client Creation Failed',
+          response.message || response.error || 'Unable to create client.'
+        );
+        return;
+      }
+
+      const createdClient = this.mapClientFromResponse({
+        ...clientRequest,
+        ...(response.client || {})
+      });
+
+      this.clients = this.clients.map((client) => (
+        client.clientId === clientRequest.clientId ? createdClient : client
+      ));
+
+      this.selectedClient = createdClient;
+      this.selectedUser = null;
+      this.users = this.users.filter((user) => user.clientId !== createdClient.clientId);
+      this.isEditingClient = false;
+      this.isCreatingClient = false;
+      this.syncEditableClientFields();
+      this.clearEditableUserFields();
+
+      this.dialog.closeAll();
+      this.openMessageDialog(
+        'Client Created',
+        response.message || 'Client added successfully.'
+      );
+    } catch (error) {
+      console.error('Unable to create client.', error);
+
+      this.dialog.closeAll();
+      this.openMessageDialog(
+        'Client Creation Failed',
+        this.getHttpErrorMessage(error, 'Unable to create client.')
+      );
+    }
   }
 
   private confirmDisableClient(): void {
@@ -1728,6 +1873,18 @@ export class MasterAdminComponent implements OnInit {
     }
 
     return 'Inactive';
+  }
+
+  private toApiClientStatus(status: ClientStatus): string {
+    if (status === 'Active') {
+      return 'active';
+    }
+
+    if (status === 'Suspended') {
+      return 'suspended';
+    }
+
+    return 'inactive';
   }
 
   private mapClientFromResponse(client: any): MasterAdminClientSummary {
