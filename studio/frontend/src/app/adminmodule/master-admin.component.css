@@ -804,3 +804,13 @@
     flex-wrap: wrap;
   }
 }
+
+.users-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  color: #5f6f89;
+  font-size: 14px;
+  font-weight: 500;
+}
