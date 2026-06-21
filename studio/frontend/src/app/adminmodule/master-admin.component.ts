@@ -160,6 +160,7 @@ export class MasterAdminComponent implements OnInit {
   @ViewChild('confirmationDialog') confirmationDialog?: TemplateRef<unknown>;
   @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
   @ViewChild('processingDialog') processingDialog?: TemplateRef<unknown>;
+  @ViewChild('clientDialog') clientDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
   @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
 
@@ -203,6 +204,7 @@ export class MasterAdminComponent implements OnInit {
   isEditingUser = false;
   isCreatingUser = false;
 
+  editableClientId = this.selectedClient.clientId;
   editableClientName = this.selectedClient.name;
   editableClientEmail = this.selectedClient.email;
   editableClientContactName = this.selectedClient.contactName;
@@ -345,25 +347,19 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    const newClient: MasterAdminClientSummary = {
-      clientId: this.createNextClientId(),
-      name: '',
-      email: '',
-      contactName: '',
-      phone: '',
-      country: '',
-      status: 'Inactive',
-      users: 0,
-      admins: 0
-    };
-
-    this.clients = [...this.clients, newClient];
-    this.selectedClient = newClient;
     this.selectedUser = null;
     this.isCreatingClient = true;
     this.isEditingClient = true;
-    this.syncEditableClientFields();
+
+    this.editableClientId = this.createNextClientId();
+    this.editableClientName = '';
+    this.editableClientEmail = '';
+    this.editableClientContactName = '';
+    this.editableClientPhone = '';
+    this.editableClientCountry = '';
     this.clearEditableUserFields();
+
+    this.openClientDialog();
   }
 
   editClient(): void {
@@ -395,16 +391,12 @@ export class MasterAdminComponent implements OnInit {
 
   cancelClientEdit(): void {
     if (this.isCreatingClient) {
-      this.clients = this.clients.filter(
-        (client) => client.clientId !== this.selectedClient.clientId
-      );
-
-      this.selectedClient = this.clients[0];
       this.selectedUser = null;
       this.isCreatingClient = false;
       this.isEditingClient = false;
       this.syncEditableClientFields();
       this.clearEditableUserFields();
+      this.closeDialogs();
       return;
     }
 
@@ -1166,15 +1158,15 @@ export class MasterAdminComponent implements OnInit {
 
   private async confirmSaveClient(): Promise<void> {
     const clientRequest: MasterAdminClientSummary = {
-      clientId: this.selectedClient.clientId,
+      clientId: this.isCreatingClient ? this.editableClientId.trim() : this.selectedClient.clientId,
       name: this.editableClientName.trim(),
       email: this.editableClientEmail.trim(),
       contactName: this.editableClientContactName.trim(),
       phone: this.editableClientPhone.trim(),
       country: this.editableClientCountry.trim(),
-      status: this.selectedClient.status,
-      users: Number(this.selectedClient.users || 0),
-      admins: Number(this.selectedClient.admins || 0)
+      status: this.isCreatingClient ? 'Active' : this.selectedClient.status,
+      users: this.isCreatingClient ? 0 : Number(this.selectedClient.users || 0),
+      admins: this.isCreatingClient ? 0 : Number(this.selectedClient.admins || 0)
     };
 
     if (this.isCreatingClient) {
@@ -1221,9 +1213,14 @@ export class MasterAdminComponent implements OnInit {
         ...(response.client || {})
       });
 
-      this.clients = this.clients.map((client) => (
-        client.clientId === clientRequest.clientId ? createdClient : client
-      ));
+      this.clients = [
+        ...this.clients.filter((client) => client.clientId !== createdClient.clientId),
+        createdClient
+      ].sort((firstClient, secondClient) => {
+        const firstName = (firstClient.name || firstClient.clientId).toLowerCase();
+        const secondName = (secondClient.name || secondClient.clientId).toLowerCase();
+        return firstName.localeCompare(secondName);
+      });
 
       this.selectedClient = createdClient;
       this.selectedUser = null;
@@ -1740,6 +1737,18 @@ export class MasterAdminComponent implements OnInit {
     });
   }
 
+  private openClientDialog(): void {
+    if (!this.clientDialog) {
+      return;
+    }
+
+    this.dialog.open(this.clientDialog, {
+      width: '520px',
+      panelClass: 'trackster-admin-dialog-panel',
+      disableClose: true
+    });
+  }
+
   private openUserDialog(): void {
     if (!this.userDialog) {
       return;
@@ -1753,6 +1762,18 @@ export class MasterAdminComponent implements OnInit {
   }
 
   private getClientValidationMessage(): string {
+    if (this.isCreatingClient && !this.editableClientId.trim()) {
+      return 'Client ID is required.';
+    }
+
+    if (this.isCreatingClient && !/^[A-Za-z0-9_-]+$/.test(this.editableClientId.trim())) {
+      return 'Client ID can only contain letters, numbers, underscores, and hyphens.';
+    }
+
+    if (this.isCreatingClient && this.clients.some((client) => client.clientId.toLowerCase() === this.editableClientId.trim().toLowerCase())) {
+      return 'A client with this Client ID already exists.';
+    }
+
     if (!this.editableClientName.trim()) {
       return 'Company is required.';
     }
@@ -1805,6 +1826,7 @@ export class MasterAdminComponent implements OnInit {
   }
 
   private syncEditableClientFields(): void {
+    this.editableClientId = this.selectedClient.clientId;
     this.editableClientName = this.selectedClient.name;
     this.editableClientEmail = this.selectedClient.email;
     this.editableClientContactName = this.selectedClient.contactName;
