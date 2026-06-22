@@ -55,6 +55,14 @@ interface AdminClientAddResponse {
   client?: MasterAdminClientSummary;
 }
 
+interface AdminClientUpdateResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  client?: MasterAdminClientSummary;
+  updatedClient?: MasterAdminClientSummary;
+}
+
 interface MasterAdminUser {
   username: string;
   fullName: string;
@@ -137,6 +145,7 @@ interface TracksterRuntimeConfig {
     clientUserUpdate?: string;
     clientsInfoGet?: string;
     clientsAdd?: string;
+    clientsUpdate?: string;
   };
 }
 
@@ -165,6 +174,7 @@ export class MasterAdminComponent implements OnInit {
   private readonly configPath = 'assets/config.json';
   private readonly devClientsInfoGetMockPath = 'assets/mock/clients-info-get-response.json';
   private readonly devClientsAddMockPath = 'assets/mock/clients-add-response.json';
+  private readonly devClientsUpdateMockPath = 'assets/mock/clients-update-response.json';
   private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
   private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
   private readonly devClientUserAddMockPath = 'assets/mock/client-users.add-response.json';
@@ -348,13 +358,14 @@ export class MasterAdminComponent implements OnInit {
   }
 
   editClient(): void {
-    if (this.isEditingClient || this.isEditingUser || this.isCreatingUser) {
+    if (this.isEditingClient || this.isEditingUser || this.isCreatingUser || !this.selectedClient.clientId) {
       return;
     }
 
     this.isEditingClient = true;
     this.isCreatingClient = false;
     this.syncEditableClientFields();
+    this.openClientDialog();
   }
 
   saveClient(): void {
@@ -784,6 +795,68 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
+
+  private async updateClient(client: MasterAdminClientSummary): Promise<AdminClientUpdateResponse> {
+    return this.isDevelopmentMode()
+      ? await this.updateClientFromMock(client)
+      : await this.updateClientFromApi(client);
+  }
+
+  private async updateClientFromMock(client: MasterAdminClientSummary): Promise<AdminClientUpdateResponse> {
+    const response = await firstValueFrom(
+      this.http.get<AdminClientUpdateResponse>(this.devClientsUpdateMockPath)
+    );
+
+    return {
+      ...response,
+      success: response.success,
+      message: response.message || 'Client updated successfully.',
+      updatedClient: {
+        ...client,
+        ...(response.updatedClient || response.client || {})
+      }
+    };
+  }
+
+  private async updateClientFromApi(client: MasterAdminClientSummary): Promise<AdminClientUpdateResponse> {
+    const apiUrl = this.getClientsUpdateApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Clients update API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<AdminClientUpdateResponse>(
+        apiUrl,
+        {
+          clientId: client.clientId,
+          contactName: client.contactName,
+          email: client.email,
+          phone: client.phone,
+          country: client.country
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
   private async loadClientUsers(): Promise<void> {
     if (!this.selectedClient.clientId) {
       this.users = [];
@@ -1100,6 +1173,10 @@ export class MasterAdminComponent implements OnInit {
     return (this.runtimeConfig.usermanagementApi?.clientsAdd || '').trim();
   }
 
+  private getClientsUpdateApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientsUpdate || '').trim();
+  }
+
   private isDevelopmentMode(): boolean {
     const authServiceAsAny = this.authService as any;
 
@@ -1143,7 +1220,7 @@ export class MasterAdminComponent implements OnInit {
   private async confirmSaveClient(): Promise<void> {
     const clientRequest: MasterAdminClientSummary = {
       clientId: this.isCreatingClient ? this.editableClientId.trim() : this.selectedClient.clientId,
-      name: this.editableClientName.trim(),
+      name: this.isCreatingClient ? this.editableClientName.trim() : this.selectedClient.name,
       email: this.editableClientEmail.trim(),
       contactName: this.editableClientContactName.trim(),
       phone: this.editableClientPhone.trim(),
@@ -1158,20 +1235,53 @@ export class MasterAdminComponent implements OnInit {
       return;
     }
 
-    this.selectedClient.name = clientRequest.name;
-    this.selectedClient.email = clientRequest.email;
-    this.selectedClient.contactName = clientRequest.contactName;
-    this.selectedClient.phone = clientRequest.phone;
-    this.selectedClient.country = clientRequest.country;
+    await this.confirmUpdateClient(clientRequest);
+  }
 
-    this.isEditingClient = false;
-    this.isCreatingClient = false;
-    this.syncEditableClientFields();
+  private async confirmUpdateClient(clientRequest: MasterAdminClientSummary): Promise<void> {
+    this.closeClientDialogOnly();
+    this.ensureAdminWorkflowDialogOpen();
 
-    this.openMessageDialog(
-      'Client Saved',
-      'Client information was saved successfully.'
-    );
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Updating client...';
+    this.adminUserWorkflowMessage = `Please wait while Trackster updates client "${clientRequest.name || clientRequest.clientId}".`;
+    this.adminUserWorkflowDetails = 'The client contact information is being updated in the application database.';
+
+    try {
+      const response = await this.updateClient(clientRequest);
+
+      if (!response.success) {
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'Client update failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to update client.';
+        this.adminUserWorkflowDetails = 'Please review the client information and try again.';
+        return;
+      }
+
+      const updatedClient = this.mapClientFromResponse({
+        ...this.selectedClient,
+        ...clientRequest,
+        ...(response.updatedClient || response.client || {})
+      });
+
+      this.clients = this.clients.map((client) => client.clientId === updatedClient.clientId ? updatedClient : client);
+      this.selectedClient = updatedClient;
+      this.isEditingClient = false;
+      this.isCreatingClient = false;
+      this.syncEditableClientFields();
+
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'Client updated';
+      this.adminUserWorkflowMessage = response.message || 'Client updated successfully.';
+      this.adminUserWorkflowDetails = 'The client contact information was updated successfully.';
+    } catch (error) {
+      console.error('Unable to update client.', error);
+
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'Client update failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to update client.');
+      this.adminUserWorkflowDetails = 'Please review the client information and try again.';
+    }
   }
 
   private async confirmCreateClient(clientRequest: MasterAdminClientSummary): Promise<void> {

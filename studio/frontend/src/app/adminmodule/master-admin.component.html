@@ -167,6 +167,7 @@
                     type="button"
                     class="trackster-admin-button secondary"
                     *ngIf="!isEditingClient"
+                    [disabled]="!selectedClient.clientId"
                     (click)="editClient()"
                   >
                     <mat-icon>edit</mat-icon>
@@ -346,10 +347,10 @@
 
 <ng-template #clientDialog>
   <div class="trackster-dialog user-dialog">
-    <h2>Create Client</h2>
+    <h2>{{ isCreatingClient ? 'Create Client' : 'Edit Client' }}</h2>
 
     <p>
-      Create a new Trackster client tenant.
+      {{ isCreatingClient ? 'Create a new Trackster client tenant.' : 'Update the selected client contact information.' }}
     </p>
 
     <div class="user-dialog-fields-grid">
@@ -358,6 +359,7 @@
         <input
           type="text"
           [(ngModel)]="editableClientId"
+          [readonly]="!isCreatingClient"
         />
       </label>
 
@@ -366,6 +368,7 @@
         <input
           type="text"
           [(ngModel)]="editableClientName"
+          [readonly]="!isCreatingClient"
         />
       </label>
 
