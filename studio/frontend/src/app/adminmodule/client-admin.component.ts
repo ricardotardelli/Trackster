@@ -59,60 +59,21 @@ interface ClientUserAddResponse {
   success: boolean;
   message?: string;
   error?: string;
-  createdUser?: {
-    username?: string;
-    email?: string;
-    fullName?: string;
-    full_name?: string;
-    clientRole?: string;
-    role?: string;
-    roleCode?: string;
-    role_code?: string;
-    roleName?: string;
-    role_name?: string;
-    clientId?: string;
-    client_id?: string;
-    status?: string;
-  };
+  createdUser?: any;
 }
 
 interface ClientUserUpdateResponse {
   success: boolean;
   message?: string;
   error?: string;
-  updatedUser?: {
-    username?: string;
-    email?: string;
-    fullName?: string;
-    full_name?: string;
-    clientRole?: string;
-    role?: string;
-    roleCode?: string;
-    role_code?: string;
-    roleName?: string;
-    role_name?: string;
-    clientId?: string;
-    client_id?: string;
-    status?: string;
-  };
+  updatedUser?: any;
 }
 
 interface ClientUserDeleteResponse {
   success: boolean;
   message?: string;
   error?: string;
-  deletedUser?: {
-    username?: string;
-    email?: string;
-    fullName?: string;
-    full_name?: string;
-    clientRole?: string;
-    role?: string;
-    roleCode?: string;
-    role_code?: string;
-    clientId?: string;
-    client_id?: string;
-  };
+  deletedUser?: any;
 }
 
 interface TracksterRuntimeConfig {
@@ -421,31 +382,14 @@ export class ClientAdminComponent implements OnInit {
   private async initializeCurrentClient(): Promise<void> {
     const authProfile = await this.getAuthenticatedProfile();
 
-    const clientId = String(
-      authProfile?.clientId ||
-      authProfile?.client_id ||
-      authProfile?.['custom:clientId'] ||
-      ''
-    ).trim();
+    const clientId = String(authProfile?.clientId || '').trim();
 
     this.currentClient = {
       clientId,
-      name: String(
-        authProfile?.companyName ||
-        authProfile?.company_name ||
-        authProfile?.clientName ||
-        authProfile?.client_name ||
-        clientId ||
-        'Client'
-      ).trim(),
-      contactName: String(
-        authProfile?.fullName ||
-        authProfile?.full_name ||
-        authProfile?.name ||
-        ''
-      ).trim(),
-      country: String(authProfile?.country || '').trim(),
-      status: 'Active',
+      name: clientId || 'Client',
+      contactName: String(authProfile?.name || '').trim(),
+      country: '',
+      status: clientId ? 'Active' : 'Inactive',
       users: 0,
       admins: 0
     };
@@ -496,7 +440,7 @@ export class ClientAdminComponent implements OnInit {
 
       const responseClientId = String(response.clientId || this.currentClient.clientId).trim();
 
-      this.users = response.users.map((user) => this.mapUserFromResponse(user, responseClientId));
+      this.users = (response.users || []).map((user) => this.mapUserFromResponse(user, responseClientId));
 
       if (response.client) {
         this.currentClient = this.mapClientFromResponse(response.client, this.currentClient);
@@ -1032,24 +976,8 @@ export class ClientAdminComponent implements OnInit {
   private async getAuthenticatedProfile(): Promise<any> {
     const authServiceAsAny = this.authService as any;
 
-    if (typeof authServiceAsAny.getCurrentUserProfile === 'function') {
-      return await authServiceAsAny.getCurrentUserProfile();
-    }
-
-    if (typeof authServiceAsAny.getUserProfile === 'function') {
-      return await authServiceAsAny.getUserProfile();
-    }
-
-    if (typeof authServiceAsAny.getProfile === 'function') {
-      return await authServiceAsAny.getProfile();
-    }
-
-    if (typeof authServiceAsAny.currentUserProfile === 'object') {
-      return authServiceAsAny.currentUserProfile;
-    }
-
-    if (typeof authServiceAsAny.profile === 'object') {
-      return authServiceAsAny.profile;
+    if (typeof authServiceAsAny.getUserAccessContext === 'function') {
+      return await authServiceAsAny.getUserAccessContext();
     }
 
     return {};
