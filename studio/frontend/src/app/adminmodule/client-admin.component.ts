@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
-import { AfterViewInit, Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -106,10 +106,18 @@ interface TracksterRuntimeConfig {
   templateUrl: './client-admin.component.html',
   styleUrl: './client-admin.component.css'
 })
-export class ClientAdminComponent implements OnInit, AfterViewInit {
+export class ClientAdminComponent implements OnInit {
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
   @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
-  @ViewChild(MatSort) userSort?: MatSort;
+
+  @ViewChild(MatSort)
+  set matSort(sort: MatSort | undefined) {
+    this.userSort = sort;
+
+    if (this.userSort) {
+      this.usersDataSource.sort = this.userSort;
+    }
+  }
 
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
@@ -125,6 +133,7 @@ export class ClientAdminComponent implements OnInit, AfterViewInit {
 
   private runtimeConfig: TracksterRuntimeConfig = {};
   private adminUserWorkflowDialogRef?: MatDialogRef<unknown>;
+  private userSort?: MatSort;
 
   currentClient: ClientAdminTenantSummary = {
     clientId: '',
@@ -162,7 +171,7 @@ export class ClientAdminComponent implements OnInit, AfterViewInit {
   ) {
     this.usersDataSource.sortingDataAccessor = (user, property) => {
       if (property === 'roleName') {
-        return user.roleName || user.role;
+        return (user.roleName || user.role || '').toLowerCase();
       }
 
       const value = user[property as keyof ClientAdminUser];
@@ -175,10 +184,6 @@ export class ClientAdminComponent implements OnInit, AfterViewInit {
     await this.loadRuntimeConfig();
     await this.initializeCurrentClient();
     await this.loadClientUsers();
-  }
-
-  ngAfterViewInit(): void {
-    this.usersDataSource.sort = this.userSort || null;
   }
 
   get currentClientUsers(): ClientAdminUser[] {
