@@ -1,9 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, TemplateRef, ViewChild } from '@angular/core';
+import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
+import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
 type UserRole = 'client_admin' | 'client_user';
@@ -33,12 +36,101 @@ interface ClientAdminUser {
   clientId: string;
 }
 
+interface ClientUsersResponse {
+  success: boolean;
+  clientId: string;
+  users: ClientAdminUser[];
+  error?: string;
+  message?: string;
+  client?: {
+    clientId?: string;
+    client_id?: string;
+    name?: string;
+    companyName?: string;
+    company_name?: string;
+    contactName?: string;
+    contact_name?: string;
+    country?: string;
+    status?: string;
+  };
+}
+
+interface ClientUserAddResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  createdUser?: {
+    username?: string;
+    email?: string;
+    fullName?: string;
+    full_name?: string;
+    clientRole?: string;
+    role?: string;
+    roleCode?: string;
+    role_code?: string;
+    roleName?: string;
+    role_name?: string;
+    clientId?: string;
+    client_id?: string;
+    status?: string;
+  };
+}
+
+interface ClientUserUpdateResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  updatedUser?: {
+    username?: string;
+    email?: string;
+    fullName?: string;
+    full_name?: string;
+    clientRole?: string;
+    role?: string;
+    roleCode?: string;
+    role_code?: string;
+    roleName?: string;
+    role_name?: string;
+    clientId?: string;
+    client_id?: string;
+    status?: string;
+  };
+}
+
+interface ClientUserDeleteResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  deletedUser?: {
+    username?: string;
+    email?: string;
+    fullName?: string;
+    full_name?: string;
+    clientRole?: string;
+    role?: string;
+    roleCode?: string;
+    role_code?: string;
+    clientId?: string;
+    client_id?: string;
+  };
+}
+
+interface TracksterRuntimeConfig {
+  usermanagementApi?: {
+    clientUserInfoGet?: string;
+    clientUserDelete?: string;
+    clientUserAdd?: string;
+    clientUserUpdate?: string;
+  };
+}
+
 @Component({
   selector: 'app-client-admin',
   standalone: true,
   imports: [
     CommonModule,
     FormsModule,
+    HttpClientModule,
     MatDialogModule,
     MatIconModule,
     MatSelectModule
@@ -46,7 +138,7 @@ interface ClientAdminUser {
   templateUrl: './client-admin.component.html',
   styleUrl: './client-admin.component.css'
 })
-export class ClientAdminComponent {
+export class ClientAdminComponent implements OnInit {
   @ViewChild('confirmationDialog') confirmationDialog?: TemplateRef<unknown>;
   @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
@@ -54,45 +146,28 @@ export class ClientAdminComponent {
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
 
+  private readonly configPath = 'assets/config.json';
+  private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
+  private readonly devClientUserAddMockPath = 'assets/mock/client-users.add-response.json';
+  private readonly devClientUserUpdateMockPath = 'assets/mock/client-users.update-response.json';
+  private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
+
+  private runtimeConfig: TracksterRuntimeConfig = {};
+
   currentClient: ClientAdminTenantSummary = {
-    clientId: '00000000',
-    name: 'Trackster Demo',
-    contactName: 'Ricardo Tardelli',
-    country: 'Portugal',
-    status: 'Active',
-    users: 3,
-    admins: 1
+    clientId: '',
+    name: '',
+    contactName: '',
+    country: '',
+    status: 'Inactive',
+    users: 0,
+    admins: 0
   };
 
-  users: ClientAdminUser[] = [
-    {
-      username: 'kadut',
-      fullName: 'Ricardo Tardelli',
-      email: 'kadut3@gmail.com',
-      role: 'client_admin',
-      status: 'Active',
-      clientId: '00000000'
-    },
-    {
-      username: 'trackster.demo.user',
-      fullName: 'Trackster Demo User',
-      email: 'demo.user@trackster.local',
-      role: 'client_user',
-      status: 'Active',
-      clientId: '00000000'
-    },
-    {
-      username: 'trackster.demo.ops',
-      fullName: 'Trackster Demo Ops',
-      email: 'demo.ops@trackster.local',
-      role: 'client_user',
-      status: 'Inactive',
-      clientId: '00000000'
-    }
-  ];
-
+  users: ClientAdminUser[] = [];
   selectedUser: ClientAdminUser | null = null;
 
+  isLoadingUsers = false;
   isEditingUser = false;
   isCreatingUser = false;
 
@@ -109,8 +184,16 @@ export class ClientAdminComponent {
   messageTitle = '';
   messageText = '';
 
-  constructor(private readonly dialog: MatDialog) {
-    this.refreshCurrentClientCounters();
+  constructor(
+    private readonly dialog: MatDialog,
+    private readonly http: HttpClient,
+    private readonly authService: AuthService
+  ) {}
+
+  async ngOnInit(): Promise<void> {
+    await this.loadRuntimeConfig();
+    await this.initializeCurrentClient();
+    await this.loadClientUsers();
   }
 
   get currentClientUsers(): ClientAdminUser[] {
@@ -118,19 +201,22 @@ export class ClientAdminComponent {
   }
 
   get canAddUser(): boolean {
-    return !this.isEditingUser
+    return !this.isLoadingUsers
+      && !this.isEditingUser
       && !this.isCreatingUser
       && this.currentClient.status === 'Active';
   }
 
   get canEditSelectedUser(): boolean {
     return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingUser
       && !this.isCreatingUser;
   }
 
   get canDisableSelectedUser(): boolean {
     return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingUser
       && !this.isCreatingUser
       && this.selectedUser.status === 'Active';
@@ -138,17 +224,29 @@ export class ClientAdminComponent {
 
   get canActivateSelectedUser(): boolean {
     return !!this.selectedUser
-      && !this.isEditingUser
-      && !this.isCreatingUser
-      && this.selectedUser.status !== 'Active';
-  }
-
-  get canRemoveSelectedUser(): boolean {
-    return !!this.selectedUser
+      && !this.isLoadingUsers
       && !this.isEditingUser
       && !this.isCreatingUser
       && this.selectedUser.status !== 'Active'
-      && this.selectedUser.role !== 'client_admin';
+      && this.currentClient.status === 'Active';
+  }
+
+  get canRemoveSelectedUser(): boolean {
+    if (!this.selectedUser
+      || this.isLoadingUsers
+      || this.isEditingUser
+      || this.isCreatingUser
+      || this.selectedUser.status === 'Active') {
+      return false;
+    }
+
+    if (this.selectedUser.role !== 'client_admin') {
+      return true;
+    }
+
+    return this.currentClientUsers.some((user) => user.username !== this.selectedUser?.username
+      && user.role === 'client_admin'
+      && user.status === 'Active');
   }
 
   selectUser(user: ClientAdminUser): void {
@@ -183,7 +281,7 @@ export class ClientAdminComponent {
     this.selectedUser = null;
     this.isCreatingUser = true;
     this.isEditingUser = true;
-    this.editableUsername = this.createNewUsername();
+    this.editableUsername = '';
     this.editableFullName = '';
     this.editableUserEmail = '';
     this.editableUserRole = 'client_user';
@@ -262,10 +360,10 @@ export class ClientAdminComponent {
       return;
     }
 
-    if (this.selectedUser.role === 'client_admin') {
+    if (!this.canRemoveSelectedUser) {
       this.openMessageDialog(
         'User Cannot Be Removed',
-        'Client administrators cannot be removed directly. Change the role to client_user first.'
+        'This user cannot be removed because the client must keep at least one active client administrator.'
       );
       return;
     }
@@ -277,7 +375,7 @@ export class ClientAdminComponent {
     );
   }
 
-  confirmDialogAction(): void {
+  async confirmDialogAction(): Promise<void> {
     const action = this.confirmationAction;
     this.dialog.closeAll();
 
@@ -286,22 +384,22 @@ export class ClientAdminComponent {
     }
 
     if (action === 'saveUser') {
-      this.confirmSaveUser();
+      await this.confirmSaveUser();
       return;
     }
 
     if (action === 'disableUser') {
-      this.confirmDisableUser();
+      await this.confirmDisableUser();
       return;
     }
 
     if (action === 'activateUser') {
-      this.confirmActivateUser();
+      await this.confirmActivateUser();
       return;
     }
 
     if (action === 'removeUser') {
-      this.confirmRemoveUser();
+      await this.confirmRemoveUser();
     }
   }
 
@@ -309,7 +407,167 @@ export class ClientAdminComponent {
     this.dialog.closeAll();
   }
 
-  private confirmSaveUser(): void {
+  private async loadRuntimeConfig(): Promise<void> {
+    try {
+      this.runtimeConfig = await firstValueFrom(
+        this.http.get<TracksterRuntimeConfig>(this.configPath)
+      );
+    } catch (error) {
+      console.error('Unable to load Trackster runtime config.', error);
+      this.runtimeConfig = {};
+    }
+  }
+
+  private async initializeCurrentClient(): Promise<void> {
+    const authProfile = await this.getAuthenticatedProfile();
+
+    const clientId = String(
+      authProfile?.clientId ||
+      authProfile?.client_id ||
+      authProfile?.['custom:clientId'] ||
+      ''
+    ).trim();
+
+    this.currentClient = {
+      clientId,
+      name: String(
+        authProfile?.companyName ||
+        authProfile?.company_name ||
+        authProfile?.clientName ||
+        authProfile?.client_name ||
+        clientId ||
+        'Client'
+      ).trim(),
+      contactName: String(
+        authProfile?.fullName ||
+        authProfile?.full_name ||
+        authProfile?.name ||
+        ''
+      ).trim(),
+      country: String(authProfile?.country || '').trim(),
+      status: 'Active',
+      users: 0,
+      admins: 0
+    };
+
+    if (!this.currentClient.clientId && this.isDevelopmentMode()) {
+      this.currentClient = {
+        clientId: '00000000',
+        name: 'Trackster Demo',
+        contactName: 'Ricardo Tardelli',
+        country: 'Portugal',
+        status: 'Active',
+        users: 0,
+        admins: 0
+      };
+    }
+
+    if (!this.currentClient.clientId) {
+      this.currentClient.status = 'Inactive';
+      this.openMessageDialog(
+        'Client Error',
+        'Client ID was not found in the authenticated user profile.'
+      );
+    }
+  }
+
+  private async loadClientUsers(): Promise<void> {
+    if (!this.currentClient.clientId) {
+      this.users = [];
+      this.selectedUser = null;
+      this.refreshCurrentClientCounters();
+      return;
+    }
+
+    this.isLoadingUsers = true;
+
+    try {
+      const response = this.isDevelopmentMode()
+        ? await this.loadClientUsersFromMock()
+        : await this.loadClientUsersFromApi();
+
+      if (!response.success) {
+        this.openMessageDialog(
+          'Client Users Error',
+          response.message || response.error || 'Unable to load client users.'
+        );
+        return;
+      }
+
+      const responseClientId = String(response.clientId || this.currentClient.clientId).trim();
+
+      this.users = response.users.map((user) => this.mapUserFromResponse(user, responseClientId));
+
+      if (response.client) {
+        this.currentClient = this.mapClientFromResponse(response.client, this.currentClient);
+      }
+
+      this.selectedUser = null;
+      this.clearEditableUserFields();
+      this.refreshCurrentClientCounters();
+    } catch (error) {
+      console.error('Unable to load client users.', error);
+
+      this.openMessageDialog(
+        'Client Users Error',
+        this.getHttpErrorMessage(error, 'Unable to load client users.')
+      );
+    } finally {
+      this.isLoadingUsers = false;
+    }
+  }
+
+  private async loadClientUsersFromMock(): Promise<ClientUsersResponse> {
+    const response = await firstValueFrom(
+      this.http.get<ClientUsersResponse>(this.devClientUsersMockPath)
+    );
+
+    return {
+      ...response,
+      clientId: this.currentClient.clientId,
+      users: (response.users || []).map((user) => ({
+        ...user,
+        clientId: this.currentClient.clientId
+      }))
+    };
+  }
+
+  private async loadClientUsersFromApi(): Promise<ClientUsersResponse> {
+    const apiUrl = this.getClientUsersApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        clientId: this.currentClient.clientId,
+        users: [],
+        message: 'Client users API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        clientId: this.currentClient.clientId,
+        users: [],
+        message: 'Access token was not found.'
+      };
+    }
+
+    const url = `${apiUrl}?clientId=${encodeURIComponent(this.currentClient.clientId)}`;
+
+    return await firstValueFrom(
+      this.http.get<ClientUsersResponse>(url, {
+        headers: new HttpHeaders({
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        })
+      })
+    );
+  }
+
+  private async confirmSaveUser(): Promise<void> {
     const nextUsername = this.editableUsername.trim();
     const nextFullName = this.editableFullName.trim();
     const nextEmail = this.editableUserEmail.trim();
@@ -334,97 +592,202 @@ export class ClientAdminComponent {
       return;
     }
 
-    if (this.isCreatingUser) {
-      const newUser: ClientAdminUser = {
-        username: nextUsername,
-        fullName: nextFullName,
-        email: nextEmail,
-        role: nextRole,
-        status: nextStatus,
-        clientId: this.currentClient.clientId
-      };
+    const userRequest: ClientAdminUser = {
+      username: nextUsername,
+      fullName: nextFullName,
+      email: nextEmail,
+      role: nextRole,
+      status: nextStatus,
+      clientId: this.currentClient.clientId
+    };
 
-      /*
-        TODO: Replace the local create below with the Client Admin User Lambda call.
+    try {
+      if (this.isCreatingUser) {
+        const response = await this.createClientUser(userRequest);
 
-        Example:
-        await this.clientAdminService.createUser(this.currentClient.clientId, newUser);
-      */
+        if (!response.success) {
+          this.openMessageDialog(
+            'User Creation Failed',
+            response.message || response.error || 'Unable to create user.'
+          );
+          return;
+        }
 
-      this.users = [...this.users, newUser];
-      this.selectedUser = newUser;
-    } else if (this.selectedUser) {
-      this.selectedUser.username = nextUsername;
-      this.selectedUser.fullName = nextFullName;
-      this.selectedUser.email = nextEmail;
-      this.selectedUser.role = nextRole;
-      this.selectedUser.status = nextStatus;
-      this.selectedUser.clientId = this.currentClient.clientId;
+        const createdUser = this.mapUserFromResponse(
+          {
+            ...userRequest,
+            ...(response.createdUser || {})
+          },
+          userRequest.clientId
+        );
 
-      /*
-        TODO: Replace the local update above with the Client Admin User Lambda call.
+        this.users = [
+          ...this.users.filter(
+            (user) => !(user.username === createdUser.username && user.clientId === createdUser.clientId)
+          ),
+          createdUser
+        ];
 
-        Example:
-        await this.clientAdminService.updateUser(this.currentClient.clientId, this.selectedUser);
-      */
+        this.selectedUser = createdUser;
+        this.isEditingUser = false;
+        this.isCreatingUser = false;
+        this.syncEditableUserFields();
+        this.refreshCurrentClientCounters();
+
+        this.openMessageDialog(
+          'User Created',
+          response.message || 'User created successfully.'
+        );
+
+        return;
+      }
+
+      if (!this.selectedUser) {
+        this.openMessageDialog(
+          'User Update Failed',
+          'No user is currently selected.'
+        );
+        return;
+      }
+
+      const previousUsername = this.selectedUser.username;
+      const previousClientId = this.selectedUser.clientId;
+
+      const response = await this.updateClientUser(userRequest, 'updateUser');
+
+      if (!response.success) {
+        this.openMessageDialog(
+          'User Update Failed',
+          response.message || response.error || 'Unable to update user.'
+        );
+        return;
+      }
+
+      const updatedUser = this.mapUserFromResponse(
+        {
+          ...userRequest,
+          ...(response.updatedUser || {})
+        },
+        userRequest.clientId
+      );
+
+      this.users = this.users.map((user) => {
+        const isCurrentUser = user.username === previousUsername
+          && user.clientId === previousClientId;
+
+        return isCurrentUser ? updatedUser : user;
+      });
+
+      this.selectedUser = updatedUser;
+      this.isEditingUser = false;
+      this.isCreatingUser = false;
+      this.syncEditableUserFields();
+      this.refreshCurrentClientCounters();
+
+      this.openMessageDialog(
+        'User Saved',
+        response.message || 'User information was saved successfully.'
+      );
+    } catch (error) {
+      console.error('Unable to save client user.', error);
+
+      this.openMessageDialog(
+        this.isCreatingUser ? 'User Creation Failed' : 'User Update Failed',
+        this.getHttpErrorMessage(error, 'Unable to save user.')
+      );
+    }
+  }
+
+  private async confirmDisableUser(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
     }
 
-    this.isEditingUser = false;
-    this.isCreatingUser = false;
-    this.syncEditableUserFields();
-    this.refreshCurrentClientCounters();
+    const updatedUserRequest: ClientAdminUser = {
+      ...this.selectedUser,
+      status: 'Inactive'
+    };
 
-    this.openMessageDialog(
-      'User Saved',
-      'User information was saved successfully.'
+    await this.executeUserStatusUpdate(
+      updatedUserRequest,
+      'disableUser',
+      'User Disabled',
+      'User disabled successfully.',
+      'User Disable Failed'
     );
   }
 
-  private confirmDisableUser(): void {
+  private async confirmActivateUser(): Promise<void> {
     if (!this.selectedUser) {
       return;
     }
 
-    this.selectedUser.status = 'Inactive';
+    const updatedUserRequest: ClientAdminUser = {
+      ...this.selectedUser,
+      status: 'Active'
+    };
 
-    /*
-      TODO: Replace the local status update above with the Client Admin User Lambda call.
-
-      Example:
-      await this.clientAdminService.updateUserStatus(
-        this.currentClient.clientId,
-        this.selectedUser.username,
-        'Inactive'
-      );
-    */
-
-    this.syncEditableUserFields();
-    this.refreshCurrentClientCounters();
+    await this.executeUserStatusUpdate(
+      updatedUserRequest,
+      'activateUser',
+      'User Activated',
+      'User activated successfully.',
+      'User Activation Failed'
+    );
   }
 
-  private confirmActivateUser(): void {
-    if (!this.selectedUser) {
-      return;
+  private async executeUserStatusUpdate(
+    updatedUserRequest: ClientAdminUser,
+    action: ConfirmationAction,
+    successTitle: string,
+    successMessage: string,
+    errorTitle: string
+  ): Promise<void> {
+    try {
+      const response = await this.updateClientUser(updatedUserRequest, action);
+
+      if (!response.success) {
+        this.openMessageDialog(
+          errorTitle,
+          response.message || response.error || 'Unable to update user status.'
+        );
+        return;
+      }
+
+      const updatedUser = this.mapUserFromResponse(
+        {
+          ...updatedUserRequest,
+          ...(response.updatedUser || {})
+        },
+        updatedUserRequest.clientId
+      );
+
+      this.users = this.users.map((user) => {
+        const isCurrentUser = user.username === updatedUser.username
+          && user.clientId === updatedUser.clientId;
+
+        return isCurrentUser ? updatedUser : user;
+      });
+
+      this.selectedUser = updatedUser;
+      this.syncEditableUserFields();
+      this.refreshCurrentClientCounters();
+
+      this.openMessageDialog(
+        successTitle,
+        response.message || successMessage
+      );
+    } catch (error) {
+      console.error('Unable to update client user status.', error);
+
+      this.openMessageDialog(
+        errorTitle,
+        this.getHttpErrorMessage(error, 'Unable to update user status.')
+      );
     }
-
-    this.selectedUser.status = 'Active';
-
-    /*
-      TODO: Replace the local status update above with the Client Admin User Lambda call.
-
-      Example:
-      await this.clientAdminService.updateUserStatus(
-        this.currentClient.clientId,
-        this.selectedUser.username,
-        'Active'
-      );
-    */
-
-    this.syncEditableUserFields();
-    this.refreshCurrentClientCounters();
   }
 
-  private confirmRemoveUser(): void {
+  private async confirmRemoveUser(): Promise<void> {
     if (!this.selectedUser) {
       return;
     }
@@ -432,22 +795,320 @@ export class ClientAdminComponent {
     const removedUsername = this.selectedUser.username;
     const removedClientId = this.selectedUser.clientId;
 
-    /*
-      TODO: Replace the local removal below with the Client Admin User Lambda call.
+    try {
+      const response = await this.deleteClientUser(removedUsername, removedClientId);
 
-      Example:
-      await this.clientAdminService.removeUser(removedClientId, removedUsername);
-    */
+      if (!response.success) {
+        this.openMessageDialog(
+          'User Removal Failed',
+          response.message || response.error || 'Unable to remove user.'
+        );
+        return;
+      }
 
-    this.users = this.users.filter(
-      (user) => !(user.username === removedUsername && user.clientId === removedClientId)
+      this.users = this.users.filter(
+        (user) => !(user.username === removedUsername && user.clientId === removedClientId)
+      );
+
+      this.selectedUser = null;
+      this.isEditingUser = false;
+      this.isCreatingUser = false;
+      this.clearEditableUserFields();
+      this.refreshCurrentClientCounters();
+
+      this.openMessageDialog(
+        'User Removed',
+        response.message || 'User was removed successfully.'
+      );
+    } catch (error) {
+      console.error('Unable to remove client user.', error);
+
+      this.openMessageDialog(
+        'User Removal Failed',
+        this.getHttpErrorMessage(error, 'Unable to remove user.')
+      );
+    }
+  }
+
+  private async createClientUser(user: ClientAdminUser): Promise<ClientUserAddResponse> {
+    return this.isDevelopmentMode()
+      ? await this.createClientUserFromMock(user)
+      : await this.createClientUserFromApi(user);
+  }
+
+  private async createClientUserFromMock(user: ClientAdminUser): Promise<ClientUserAddResponse> {
+    const response = await firstValueFrom(
+      this.http.get<ClientUserAddResponse>(this.devClientUserAddMockPath)
     );
 
-    this.selectedUser = null;
-    this.isEditingUser = false;
-    this.isCreatingUser = false;
-    this.clearEditableUserFields();
-    this.refreshCurrentClientCounters();
+    return {
+      ...response,
+      success: response.success,
+      message: response.message || 'User created successfully.',
+      createdUser: {
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        clientRole: user.role,
+        role: user.role,
+        clientId: user.clientId,
+        status: user.status
+      }
+    };
+  }
+
+  private async createClientUserFromApi(user: ClientAdminUser): Promise<ClientUserAddResponse> {
+    const apiUrl = this.getClientUserAddApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Client user add API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<ClientUserAddResponse>(
+        apiUrl,
+        {
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          roleName: this.getKnownRoleName(user.role),
+          clientId: user.clientId
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
+  private async updateClientUser(
+    user: ClientAdminUser,
+    action: ConfirmationAction | 'updateUser'
+  ): Promise<ClientUserUpdateResponse> {
+    return this.isDevelopmentMode()
+      ? await this.updateClientUserFromMock(user)
+      : await this.updateClientUserFromApi(user, action);
+  }
+
+  private async updateClientUserFromMock(user: ClientAdminUser): Promise<ClientUserUpdateResponse> {
+    const response = await firstValueFrom(
+      this.http.get<ClientUserUpdateResponse>(this.devClientUserUpdateMockPath)
+    );
+
+    return {
+      ...response,
+      success: response.success,
+      message: response.message || 'User updated successfully.',
+      updatedUser: {
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        clientRole: user.role,
+        role: user.role,
+        clientId: user.clientId,
+        status: user.status
+      }
+    };
+  }
+
+  private async updateClientUserFromApi(
+    user: ClientAdminUser,
+    action: ConfirmationAction | 'updateUser'
+  ): Promise<ClientUserUpdateResponse> {
+    const apiUrl = this.getClientUserUpdateApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Client user update API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    const normalizedApiStatus = this.toApiStatus(user.status);
+    const normalizedAction = action === 'activateUser'
+      ? 'activate'
+      : action === 'disableUser'
+        ? 'deactivate'
+        : 'update';
+
+    return await firstValueFrom(
+      this.http.post<ClientUserUpdateResponse>(
+        apiUrl,
+        {
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          clientRole: user.role,
+          roleName: this.getKnownRoleName(user.role),
+          status: normalizedApiStatus,
+          clientId: user.clientId,
+          action: normalizedAction,
+          enabled: normalizedApiStatus === 'active'
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
+  private async deleteClientUser(username: string, clientId: string): Promise<ClientUserDeleteResponse> {
+    return this.isDevelopmentMode()
+      ? await this.deleteClientUserFromMock()
+      : await this.deleteClientUserFromApi(username, clientId);
+  }
+
+  private async deleteClientUserFromMock(): Promise<ClientUserDeleteResponse> {
+    return await firstValueFrom(
+      this.http.get<ClientUserDeleteResponse>(this.devClientUserDeleteMockPath)
+    );
+  }
+
+  private async deleteClientUserFromApi(username: string, clientId: string): Promise<ClientUserDeleteResponse> {
+    const apiUrl = this.getClientUserDeleteApiUrl();
+
+    if (!apiUrl) {
+      return {
+        success: false,
+        message: 'Client user delete API URL was not found in assets/config.json.'
+      };
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      return {
+        success: false,
+        message: 'Access token was not found.'
+      };
+    }
+
+    return await firstValueFrom(
+      this.http.post<ClientUserDeleteResponse>(
+        apiUrl,
+        {
+          username,
+          clientId
+        },
+        {
+          headers: new HttpHeaders({
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          })
+        }
+      )
+    );
+  }
+
+  private async getAuthenticatedProfile(): Promise<any> {
+    const authServiceAsAny = this.authService as any;
+
+    if (typeof authServiceAsAny.getCurrentUserProfile === 'function') {
+      return await authServiceAsAny.getCurrentUserProfile();
+    }
+
+    if (typeof authServiceAsAny.getUserProfile === 'function') {
+      return await authServiceAsAny.getUserProfile();
+    }
+
+    if (typeof authServiceAsAny.getProfile === 'function') {
+      return await authServiceAsAny.getProfile();
+    }
+
+    if (typeof authServiceAsAny.currentUserProfile === 'object') {
+      return authServiceAsAny.currentUserProfile;
+    }
+
+    if (typeof authServiceAsAny.profile === 'object') {
+      return authServiceAsAny.profile;
+    }
+
+    return {};
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const authServiceAsAny = this.authService as any;
+
+    if (typeof authServiceAsAny.getAccessToken === 'function') {
+      const token = await authServiceAsAny.getAccessToken();
+      return String(token || '').trim();
+    }
+
+    if (typeof authServiceAsAny.getCurrentAccessToken === 'function') {
+      const token = await authServiceAsAny.getCurrentAccessToken();
+      return String(token || '').trim();
+    }
+
+    if (typeof authServiceAsAny.getToken === 'function') {
+      const token = await authServiceAsAny.getToken();
+      return String(token || '').trim();
+    }
+
+    if (typeof authServiceAsAny.accessToken === 'string') {
+      return authServiceAsAny.accessToken.trim();
+    }
+
+    return '';
+  }
+
+  private getClientUsersApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserInfoGet || '').trim();
+  }
+
+  private getClientUserDeleteApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserDelete || '').trim();
+  }
+
+  private getClientUserAddApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserAdd || '').trim();
+  }
+
+  private getClientUserUpdateApiUrl(): string {
+    return (this.runtimeConfig.usermanagementApi?.clientUserUpdate || '').trim();
+  }
+
+  private isDevelopmentMode(): boolean {
+    const authServiceAsAny = this.authService as any;
+
+    if (typeof authServiceAsAny.isDevelopmentMode === 'function') {
+      return !!authServiceAsAny.isDevelopmentMode();
+    }
+
+    if (typeof authServiceAsAny.isDevMode === 'function') {
+      return !!authServiceAsAny.isDevMode();
+    }
+
+    return window.location.hostname === 'localhost'
+      || window.location.hostname === '127.0.0.1';
   }
 
   private openConfirmationDialog(
@@ -545,23 +1206,6 @@ export class ClientAdminComponent {
     this.editableUserStatus = 'Active';
   }
 
-  private createNewUsername(): string {
-    const baseUsername = `${this.currentClient.clientId}.new.user`;
-    let candidateUsername = baseUsername;
-    let counter = 1;
-
-    while (
-      this.users.some(
-        (user) => user.username === candidateUsername && user.clientId === this.currentClient.clientId
-      )
-    ) {
-      candidateUsername = `${baseUsername}.${counter}`;
-      counter += 1;
-    }
-
-    return candidateUsername;
-  }
-
   private refreshCurrentClientCounters(): void {
     const clientUsers = this.users.filter(
       (user) => user.clientId === this.currentClient.clientId
@@ -571,5 +1215,85 @@ export class ClientAdminComponent {
     this.currentClient.admins = clientUsers.filter(
       (user) => user.role === 'client_admin'
     ).length;
+  }
+
+  private normalizeStatus(status: string): ClientStatus {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+
+    if (normalizedStatus === 'active') {
+      return 'Active';
+    }
+
+    if (normalizedStatus === 'suspended') {
+      return 'Suspended';
+    }
+
+    return 'Inactive';
+  }
+
+  private toApiStatus(status: ClientStatus): string {
+    if (status === 'Active') {
+      return 'active';
+    }
+
+    if (status === 'Suspended') {
+      return 'suspended';
+    }
+
+    return 'inactive';
+  }
+
+  private normalizeUserRole(role: string): UserRole {
+    return role === 'client_admin' ? 'client_admin' : 'client_user';
+  }
+
+  private mapUserFromResponse(user: any, fallbackClientId: string): ClientAdminUser {
+    const role = this.normalizeUserRole(String(
+      user?.roleCode ||
+      user?.role_code ||
+      user?.clientRole ||
+      user?.role ||
+      ''
+    ).trim());
+
+    return {
+      username: String(user?.username || '').trim(),
+      fullName: String(user?.fullName || user?.full_name || '').trim(),
+      email: String(user?.email || '').trim(),
+      role,
+      status: this.normalizeStatus(String(user?.status || 'Inactive')),
+      clientId: String(user?.clientId || user?.client_id || fallbackClientId || '').trim()
+    };
+  }
+
+  private mapClientFromResponse(client: any, fallbackClient: ClientAdminTenantSummary): ClientAdminTenantSummary {
+    return {
+      clientId: String(client?.clientId || client?.client_id || fallbackClient.clientId || '').trim(),
+      name: String(client?.name || client?.companyName || client?.company_name || fallbackClient.name || '').trim(),
+      contactName: String(client?.contactName || client?.contact_name || fallbackClient.contactName || '').trim(),
+      country: String(client?.country || fallbackClient.country || '').trim(),
+      status: this.normalizeStatus(String(client?.status || fallbackClient.status || 'Inactive')),
+      users: fallbackClient.users,
+      admins: fallbackClient.admins
+    };
+  }
+
+  private getKnownRoleName(role: UserRole): string {
+    if (role === 'client_admin') {
+      return 'Client Administrator';
+    }
+
+    return 'Client User';
+  }
+
+  private getHttpErrorMessage(error: unknown, fallbackMessage: string): string {
+    const errorAsAny = error as any;
+
+    return String(
+      errorAsAny?.error?.message ||
+      errorAsAny?.error?.error ||
+      errorAsAny?.message ||
+      fallbackMessage
+    );
   }
 }

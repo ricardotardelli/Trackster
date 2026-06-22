@@ -6,12 +6,24 @@
 
         <p>
           <strong>Client:</strong>
-          <span class="status-value status-ok">{{ currentClient.name }}</span>
+          <span
+            class="status-value"
+            [class.status-ok]="currentClient.name"
+            [class.status-error]="!currentClient.name"
+          >
+            {{ currentClient.name || '-' }}
+          </span>
         </p>
 
         <p>
           <strong>Client ID:</strong>
-          <span class="status-value status-ok">{{ currentClient.clientId }}</span>
+          <span
+            class="status-value"
+            [class.status-ok]="currentClient.clientId"
+            [class.status-error]="!currentClient.clientId"
+          >
+            {{ currentClient.clientId || '-' }}
+          </span>
         </p>
 
         <p>
@@ -60,7 +72,9 @@
             <div class="admin-users-header">
               <div>
                 <h3>Client Users</h3>
-                <p>Users associated with {{ currentClient.name || currentClient.clientId }}.</p>
+                <p>
+                  Users associated with {{ currentClient.name || currentClient.clientId || 'the current client' }}.
+                </p>
               </div>
             </div>
 
@@ -118,7 +132,10 @@
             </div>
 
             <div class="users-table-shell">
-              <table class="users-table">
+              <table
+                class="users-table"
+                *ngIf="!isLoadingUsers && currentClient.clientId && currentClientUsers.length > 0"
+              >
                 <thead>
                   <tr>
                     <th>Username</th>
@@ -153,7 +170,18 @@
                 </tbody>
               </table>
 
-              <div class="users-empty-state" *ngIf="currentClientUsers.length === 0">
+              <div class="users-empty-state" *ngIf="isLoadingUsers">
+                Loading users...
+              </div>
+
+              <div class="users-empty-state" *ngIf="!isLoadingUsers && !currentClient.clientId">
+                Client ID was not found for the authenticated user.
+              </div>
+
+              <div
+                class="users-empty-state"
+                *ngIf="!isLoadingUsers && currentClient.clientId && currentClientUsers.length === 0"
+              >
                 No users associated with this client.
               </div>
             </div>
@@ -178,6 +206,7 @@
         <input
           type="text"
           [(ngModel)]="editableUsername"
+          [readonly]="!isCreatingUser"
         />
       </label>
 
@@ -236,7 +265,8 @@
         class="trackster-admin-button secondary"
         (click)="cancelUserEdit()"
       >
-        Cancel
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
       </button>
 
       <button
@@ -244,7 +274,8 @@
         class="trackster-admin-button primary"
         (click)="saveUser()"
       >
-        Save
+        <mat-icon>save</mat-icon>
+        <span>Save</span>
       </button>
     </div>
   </div>
@@ -262,7 +293,8 @@
         class="trackster-admin-button secondary"
         (click)="closeDialogs()"
       >
-        Cancel
+        <mat-icon>close</mat-icon>
+        <span>Cancel</span>
       </button>
 
       <button
@@ -270,7 +302,8 @@
         class="trackster-admin-button primary"
         (click)="confirmDialogAction()"
       >
-        Confirm
+        <mat-icon>check_circle</mat-icon>
+        <span>Confirm</span>
       </button>
     </div>
   </div>
@@ -288,7 +321,8 @@
         class="trackster-admin-button primary"
         (click)="closeDialogs()"
       >
-        OK
+        <mat-icon>check_circle</mat-icon>
+        <span>OK</span>
       </button>
     </div>
   </div>
