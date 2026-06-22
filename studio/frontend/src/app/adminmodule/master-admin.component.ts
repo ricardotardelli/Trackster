@@ -17,7 +17,6 @@ type AdminUserWorkflowAction =
   | 'saveClient'
   | 'disableClient'
   | 'activateClient'
-  | 'removeClient'
   | 'createUser'
   | 'updateUser'
   | 'disableUser'
@@ -424,26 +423,6 @@ export class MasterAdminComponent implements OnInit {
     );
   }
 
-  removeClient(): void {
-    if (this.isEditingClient || this.selectedClient.status === 'Active') {
-      return;
-    }
-
-    if (this.selectedClientUsers.length > 0) {
-      this.openMessageDialog(
-        'Client Cannot Be Removed',
-        'This client cannot be removed because it still has associated users.'
-      );
-      return;
-    }
-
-    this.openConfirmationDialog(
-      'Remove Client',
-      `Remove client "${this.selectedClient.name}"? This action cannot be undone.`,
-      'removeClient'
-    );
-  }
-
   selectUser(user: MasterAdminUser): void {
     if (this.isEditingClient || this.isCreatingClient || this.isEditingUser || this.isCreatingUser) {
       return;
@@ -587,29 +566,12 @@ export class MasterAdminComponent implements OnInit {
     }
 
     if (this.adminUserWorkflowAction === 'disableClient') {
-      this.confirmDisableClient();
-      this.adminUserWorkflowState = 'success';
-      this.adminUserWorkflowTitle = 'Client disabled';
-      this.adminUserWorkflowMessage = 'The client was disabled successfully.';
-      this.adminUserWorkflowDetails = '';
+      await this.confirmDisableClientWithWorkflow();
       return;
     }
 
     if (this.adminUserWorkflowAction === 'activateClient') {
-      this.confirmActivateClient();
-      this.adminUserWorkflowState = 'success';
-      this.adminUserWorkflowTitle = 'Client activated';
-      this.adminUserWorkflowMessage = 'The client was activated successfully.';
-      this.adminUserWorkflowDetails = '';
-      return;
-    }
-
-    if (this.adminUserWorkflowAction === 'removeClient') {
-      this.confirmRemoveClient();
-      this.adminUserWorkflowState = 'success';
-      this.adminUserWorkflowTitle = 'Client removed';
-      this.adminUserWorkflowMessage = 'The client was removed successfully.';
-      this.adminUserWorkflowDetails = '';
+      await this.confirmActivateClientWithWorkflow();
       return;
     }
 
@@ -796,10 +758,13 @@ export class MasterAdminComponent implements OnInit {
   }
 
 
-  private async updateClient(client: MasterAdminClientSummary): Promise<AdminClientUpdateResponse> {
+  private async updateClient(
+    client: MasterAdminClientSummary,
+    action: AdminUserWorkflowAction = 'saveClient'
+  ): Promise<AdminClientUpdateResponse> {
     return this.isDevelopmentMode()
       ? await this.updateClientFromMock(client)
-      : await this.updateClientFromApi(client);
+      : await this.updateClientFromApi(client, action);
   }
 
   private async updateClientFromMock(client: MasterAdminClientSummary): Promise<AdminClientUpdateResponse> {
@@ -818,7 +783,10 @@ export class MasterAdminComponent implements OnInit {
     };
   }
 
-  private async updateClientFromApi(client: MasterAdminClientSummary): Promise<AdminClientUpdateResponse> {
+  private async updateClientFromApi(
+    client: MasterAdminClientSummary,
+    action: AdminUserWorkflowAction
+  ): Promise<AdminClientUpdateResponse> {
     const apiUrl = this.getClientsUpdateApiUrl();
 
     if (!apiUrl) {
@@ -845,7 +813,14 @@ export class MasterAdminComponent implements OnInit {
           contactName: client.contactName,
           email: client.email,
           phone: client.phone,
-          country: client.country
+          country: client.country,
+          status: this.toApiClientStatus(client.status),
+          action: action === 'activateClient'
+            ? 'activate'
+            : action === 'disableClient'
+              ? 'deactivate'
+              : 'update',
+          enabled: client.status === 'Active'
         },
         {
           headers: new HttpHeaders({
@@ -1340,29 +1315,95 @@ export class MasterAdminComponent implements OnInit {
     }
   }
 
-  private confirmDisableClient(): void {
-    this.selectedClient.status = 'Inactive';
+  private async confirmDisableClientWithWorkflow(): Promise<void> {
+    if (!this.selectedClient.clientId) {
+      return;
+    }
+
+    await this.executeUpdateClientStatusWorkflow(
+      'Inactive',
+      'disableClient',
+      'Disabling client...',
+      `Please wait while Trackster disables client "${this.selectedClient.name || this.selectedClient.clientId}".`,
+      'The client status is being updated in the application database.',
+      'Client disabled',
+      'Client disabled successfully.',
+      'The client was disabled successfully.'
+    );
   }
 
-  private confirmActivateClient(): void {
-    this.selectedClient.status = 'Active';
+  private async confirmActivateClientWithWorkflow(): Promise<void> {
+    if (!this.selectedClient.clientId) {
+      return;
+    }
+
+    await this.executeUpdateClientStatusWorkflow(
+      'Active',
+      'activateClient',
+      'Activating client...',
+      `Please wait while Trackster activates client "${this.selectedClient.name || this.selectedClient.clientId}".`,
+      'The client status is being updated in the application database.',
+      'Client activated',
+      'Client activated successfully.',
+      'The client was activated successfully.'
+    );
   }
 
-  private confirmRemoveClient(): void {
-    const removedClientId = this.selectedClient.clientId;
+  private async executeUpdateClientStatusWorkflow(
+    nextStatus: ClientStatus,
+    workflowAction: AdminUserWorkflowAction,
+    runningTitle: string,
+    runningMessage: string,
+    runningDetails: string,
+    successTitle: string,
+    successMessage: string,
+    successDetails: string
+  ): Promise<void> {
+    const clientRequest: MasterAdminClientSummary = {
+      ...this.selectedClient,
+      status: nextStatus
+    };
 
-    this.clients = this.clients.filter((client) => client.clientId !== removedClientId);
-    this.users = this.users.filter((user) => user.clientId !== removedClientId);
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = runningTitle;
+    this.adminUserWorkflowMessage = runningMessage;
+    this.adminUserWorkflowDetails = runningDetails;
 
-    this.selectedClient = this.clients[0];
-    this.selectedUser = null;
-    this.isEditingClient = false;
-    this.isCreatingClient = false;
-    this.isEditingUser = false;
-    this.isCreatingUser = false;
-    this.syncEditableClientFields();
-    this.clearEditableUserFields();
-    this.refreshSelectedClientCounters();
+    try {
+      const response = await this.updateClient(clientRequest, workflowAction);
+
+      if (!response.success) {
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'Client status update failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to update client status.';
+        this.adminUserWorkflowDetails = 'Please try again or check the browser console for details.';
+        return;
+      }
+
+      const updatedClient = this.mapClientFromResponse({
+        ...this.selectedClient,
+        ...clientRequest,
+        ...(response.updatedClient || response.client || {})
+      });
+
+      this.clients = this.clients.map((client) => client.clientId === updatedClient.clientId ? updatedClient : client);
+      this.selectedClient = updatedClient;
+      this.isEditingClient = false;
+      this.isCreatingClient = false;
+      this.syncEditableClientFields();
+
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = successTitle;
+      this.adminUserWorkflowMessage = response.message || successMessage;
+      this.adminUserWorkflowDetails = successDetails;
+    } catch (error) {
+      console.error('Unable to update client status.', error);
+
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'Client status update failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to update client status.');
+      this.adminUserWorkflowDetails = 'Please try again or check the browser console for details.';
+    }
   }
 
   private confirmSaveUser(): void {
