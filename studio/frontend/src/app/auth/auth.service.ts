@@ -172,7 +172,6 @@ export class AuthService {
 
       console.log('Trackster Cognito access token:', accessToken);
       console.log('Trackster Cognito id token:', idToken);
-      // console.log( 'ACCESS TOKEN PAYLOAD', session.tokens?.accessToken?.payload );
 
       const groups = this.getStringArrayClaim(
         idTokenPayload,
@@ -193,7 +192,7 @@ export class AuthService {
 
       const globalRole = this.resolveGlobalRole(idTokenPayload, accessTokenPayload, groups);
       const clientRole = this.resolveClientRole(idTokenPayload, accessTokenPayload, groups, globalRole);
-      const clientId = this.resolveClientId(idTokenPayload, accessTokenPayload);
+      const clientId = this.resolveClientId(idTokenPayload);
 
       return {
         isAuthenticated: true,
@@ -363,15 +362,8 @@ export class AuthService {
     return null;
   }
 
-  private resolveClientId(
-    idTokenPayload: Record<string, unknown>,
-    accessTokenPayload: Record<string, unknown>
-  ): string {
-    return this.getStringClaim(idTokenPayload, 'custom:client_id')
-      || this.getStringClaim(accessTokenPayload, 'custom:client_id')
-      || this.getStringClaim(idTokenPayload, 'client_id')
-      || this.getStringClaim(accessTokenPayload, 'client_id')
-      || '';
+  private resolveClientId(idTokenPayload: Record<string, unknown>): string {
+    return this.getStringClaim(idTokenPayload, 'custom:clientId');
   }
 
   private getStringClaim(payload: Record<string, unknown>, claimName: string): string {
