@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
 import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { firstValueFrom } from 'rxjs';
@@ -11,8 +11,10 @@ import { AuthService } from '../auth/auth.service';
 type ClientStatus = 'Active' | 'Suspended' | 'Inactive';
 type UserRole = 'client_admin' | 'client_user';
 
-type ConfirmationAction =
-  | 'saveUser'
+type AdminUserWorkflowState = 'idle' | 'confirm' | 'running' | 'success' | 'error';
+type AdminUserWorkflowAction =
+  | 'createUser'
+  | 'updateUser'
   | 'disableUser'
   | 'activateUser'
   | 'removeUser';
@@ -32,6 +34,7 @@ interface ClientAdminUser {
   fullName: string;
   email: string;
   role: UserRole;
+  roleName: string;
   status: ClientStatus;
   clientId: string;
 }
@@ -100,9 +103,8 @@ interface TracksterRuntimeConfig {
   styleUrl: './client-admin.component.css'
 })
 export class ClientAdminComponent implements OnInit {
-  @ViewChild('confirmationDialog') confirmationDialog?: TemplateRef<unknown>;
-  @ViewChild('messageDialog') messageDialog?: TemplateRef<unknown>;
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
+  @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
 
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
@@ -114,6 +116,7 @@ export class ClientAdminComponent implements OnInit {
   private readonly devClientUserDeleteMockPath = 'assets/mock/client-users.delete-response.json';
 
   private runtimeConfig: TracksterRuntimeConfig = {};
+  private adminUserWorkflowDialogRef?: MatDialogRef<unknown>;
 
   currentClient: ClientAdminTenantSummary = {
     clientId: '',
@@ -138,12 +141,11 @@ export class ClientAdminComponent implements OnInit {
   editableUserRole: UserRole = 'client_user';
   editableUserStatus: ClientStatus = 'Active';
 
-  confirmationTitle = '';
-  confirmationMessage = '';
-  confirmationAction: ConfirmationAction | null = null;
-
-  messageTitle = '';
-  messageText = '';
+  adminUserWorkflowState: AdminUserWorkflowState = 'idle';
+  adminUserWorkflowAction: AdminUserWorkflowAction | null = null;
+  adminUserWorkflowTitle = '';
+  adminUserWorkflowMessage = '';
+  adminUserWorkflowDetails = '';
 
   constructor(
     private readonly dialog: MatDialog,
@@ -211,7 +213,7 @@ export class ClientAdminComponent implements OnInit {
   }
 
   selectUser(user: ClientAdminUser): void {
-    if (this.isEditingUser || this.isCreatingUser) {
+    if (this.isEditingUser || this.isCreatingUser || this.isLoadingUsers) {
       return;
     }
 
@@ -220,7 +222,7 @@ export class ClientAdminComponent implements OnInit {
   }
 
   openUserForEdit(user: ClientAdminUser): void {
-    if (this.isEditingUser || this.isCreatingUser) {
+    if (this.isEditingUser || this.isCreatingUser || this.isLoadingUsers) {
       return;
     }
 
@@ -270,13 +272,12 @@ export class ClientAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      this.isCreatingUser ? 'Create User' : 'Save User',
-      this.isCreatingUser
-        ? `Confirm creation of this user for client "${this.currentClient.name || this.currentClient.clientId}"?`
-        : `Confirm changes to user "${this.selectedUser?.username}"?`,
-      'saveUser'
-    );
+    if (this.isCreatingUser) {
+      this.openCreateUserWorkflowDialog();
+      return;
+    }
+
+    this.openUpdateUserWorkflowDialog();
   }
 
   cancelUserEdit(): void {
@@ -297,11 +298,7 @@ export class ClientAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Disable User',
-      `Disable user "${this.selectedUser.username}"?`,
-      'disableUser'
-    );
+    this.openDisableUserWorkflowDialog();
   }
 
   activateUser(): void {
@@ -309,11 +306,7 @@ export class ClientAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Activate User',
-      `Activate user "${this.selectedUser.username}"?`,
-      'activateUser'
-    );
+    this.openActivateUserWorkflowDialog();
   }
 
   removeUser(): void {
@@ -329,43 +322,56 @@ export class ClientAdminComponent implements OnInit {
       return;
     }
 
-    this.openConfirmationDialog(
-      'Remove User',
-      `Remove user "${this.selectedUser.username}" from client "${this.currentClient.name || this.currentClient.clientId}"? This action cannot be undone.`,
-      'removeUser'
-    );
-  }
-
-  async confirmDialogAction(): Promise<void> {
-    const action = this.confirmationAction;
-    this.dialog.closeAll();
-
-    if (!action) {
-      return;
-    }
-
-    if (action === 'saveUser') {
-      await this.confirmSaveUser();
-      return;
-    }
-
-    if (action === 'disableUser') {
-      await this.confirmDisableUser();
-      return;
-    }
-
-    if (action === 'activateUser') {
-      await this.confirmActivateUser();
-      return;
-    }
-
-    if (action === 'removeUser') {
-      await this.confirmRemoveUser();
-    }
+    this.openRemoveUserWorkflowDialog();
   }
 
   closeDialogs(): void {
     this.dialog.closeAll();
+  }
+
+  closeAdminUserWorkflowDialog(): void {
+    if (this.adminUserWorkflowState === 'running') {
+      return;
+    }
+
+    const shouldCloseAllDialogs = this.adminUserWorkflowState === 'success';
+
+    this.closeAdminUserWorkflowDialogOnly();
+    this.resetAdminUserWorkflowDialog();
+
+    if (shouldCloseAllDialogs) {
+      this.dialog.closeAll();
+    }
+  }
+
+  async confirmAdminUserWorkflowAction(): Promise<void> {
+    if (this.adminUserWorkflowState !== 'confirm' || !this.adminUserWorkflowAction) {
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'createUser') {
+      await this.confirmCreateUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'updateUser') {
+      await this.confirmUpdateUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'disableUser') {
+      await this.confirmDisableUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'activateUser') {
+      await this.confirmActivateUserWithWorkflow();
+      return;
+    }
+
+    if (this.adminUserWorkflowAction === 'removeUser') {
+      await this.confirmRemoveUserWithWorkflow();
+    }
   }
 
   private async loadRuntimeConfig(): Promise<void> {
@@ -381,7 +387,6 @@ export class ClientAdminComponent implements OnInit {
 
   private async initializeCurrentClient(): Promise<void> {
     const authProfile = await this.getAuthenticatedProfile();
-
     const clientId = String(authProfile?.clientId || '').trim();
 
     this.currentClient = {
@@ -511,108 +516,185 @@ export class ClientAdminComponent implements OnInit {
     );
   }
 
-  private async confirmSaveUser(): Promise<void> {
-    const nextUsername = this.editableUsername.trim();
-    const nextFullName = this.editableFullName.trim();
-    const nextEmail = this.editableUserEmail.trim();
-    const nextRole = this.editableUserRole;
-    const nextStatus = this.editableUserStatus;
-
-    const duplicateUser = this.users.some((user) => {
-      const isSameCurrentUser = !!this.selectedUser
-        && user.username === this.selectedUser.username
-        && user.clientId === this.selectedUser.clientId;
-
-      return !isSameCurrentUser
-        && user.username.toLowerCase() === nextUsername.toLowerCase()
-        && user.clientId === this.currentClient.clientId;
-    });
-
-    if (duplicateUser) {
-      this.openMessageDialog(
-        'Duplicate User',
-        'A user with this username already exists for the current client.'
-      );
-      return;
-    }
-
-    const userRequest: ClientAdminUser = {
-      username: nextUsername,
-      fullName: nextFullName,
-      email: nextEmail,
-      role: nextRole,
-      status: nextStatus,
+  private async confirmCreateUserWithWorkflow(): Promise<void> {
+    const newUserRequest: ClientAdminUser = {
+      username: this.editableUsername.trim(),
+      fullName: this.editableFullName.trim(),
+      email: this.editableUserEmail.trim(),
+      role: this.editableUserRole,
+      roleName: this.getKnownRoleName(this.editableUserRole),
+      status: this.editableUserStatus,
       clientId: this.currentClient.clientId
     };
 
+    this.closeUserDialogOnly();
+    this.ensureAdminWorkflowDialogOpen();
+
+    this.isLoadingUsers = true;
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Creating user...';
+    this.adminUserWorkflowMessage = 'Please wait while Trackster creates the user account.';
+    this.adminUserWorkflowDetails = 'The account is being created in Cognito and the application database.';
+
     try {
-      if (this.isCreatingUser) {
-        const response = await this.createClientUser(userRequest);
-
-        if (!response.success) {
-          this.openMessageDialog(
-            'User Creation Failed',
-            response.message || response.error || 'Unable to create user.'
-          );
-          return;
-        }
-
-        const createdUser = this.mapUserFromResponse(
-          {
-            ...userRequest,
-            ...(response.createdUser || {})
-          },
-          userRequest.clientId
-        );
-
-        this.users = [
-          ...this.users.filter(
-            (user) => !(user.username === createdUser.username && user.clientId === createdUser.clientId)
-          ),
-          createdUser
-        ];
-
-        this.selectedUser = createdUser;
-        this.isEditingUser = false;
-        this.isCreatingUser = false;
-        this.syncEditableUserFields();
-        this.refreshCurrentClientCounters();
-
-        this.openMessageDialog(
-          'User Created',
-          response.message || 'User created successfully.'
-        );
-
-        return;
-      }
-
-      if (!this.selectedUser) {
-        this.openMessageDialog(
-          'User Update Failed',
-          'No user is currently selected.'
-        );
-        return;
-      }
-
-      const previousUsername = this.selectedUser.username;
-      const previousClientId = this.selectedUser.clientId;
-
-      const response = await this.updateClientUser(userRequest, 'updateUser');
+      const response = await this.createClientUser(newUserRequest);
 
       if (!response.success) {
-        this.openMessageDialog(
-          'User Update Failed',
-          response.message || response.error || 'Unable to update user.'
-        );
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'User creation failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to create user.';
+        this.adminUserWorkflowDetails = 'Please review the user information and try again.';
+        return;
+      }
+
+      const createdUser = this.mapUserFromResponse(
+        {
+          ...newUserRequest,
+          ...(response.createdUser || {})
+        },
+        newUserRequest.clientId
+      );
+
+      this.users = [
+        ...this.users.filter(
+          (user) => !(user.username === createdUser.username && user.clientId === createdUser.clientId)
+        ),
+        createdUser
+      ];
+
+      this.selectedUser = createdUser;
+      this.isEditingUser = false;
+      this.isCreatingUser = false;
+      this.syncEditableUserFields();
+      this.refreshCurrentClientCounters();
+
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'User created';
+      this.adminUserWorkflowMessage = response.message || 'User created successfully.';
+      this.adminUserWorkflowDetails = 'The user was created in Cognito and associated with the current client.';
+    } catch (error) {
+      console.error('Unable to create client user.', error);
+
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'User creation failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to create user.');
+      this.adminUserWorkflowDetails = 'Please review the user information and try again.';
+    } finally {
+      this.isLoadingUsers = false;
+    }
+  }
+
+  private async confirmUpdateUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: ClientAdminUser = {
+      username: this.editableUsername.trim(),
+      fullName: this.editableFullName.trim(),
+      email: this.editableUserEmail.trim(),
+      role: this.editableUserRole,
+      roleName: this.getKnownRoleName(this.editableUserRole),
+      status: this.editableUserStatus,
+      clientId: this.currentClient.clientId
+    };
+
+    this.closeUserDialogOnly();
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Updating user...',
+      'Please wait while Trackster updates the user account.',
+      'The account is being updated in Cognito and the application database.',
+      'User updated',
+      'User updated successfully.',
+      'The user information was updated successfully.',
+      'updateUser'
+    );
+  }
+
+  private async confirmDisableUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: ClientAdminUser = {
+      ...this.selectedUser,
+      status: 'Inactive'
+    };
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Disabling user...',
+      `Please wait while Trackster disables user "${updatedUserRequest.username}".`,
+      'The account is being disabled in Cognito and the application database.',
+      'User disabled',
+      'User disabled successfully.',
+      'The user was disabled successfully.',
+      'disableUser'
+    );
+  }
+
+  private async confirmActivateUserWithWorkflow(): Promise<void> {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    const updatedUserRequest: ClientAdminUser = {
+      ...this.selectedUser,
+      status: 'Active'
+    };
+
+    await this.executeUpdateUserWorkflow(
+      updatedUserRequest,
+      'Activating user...',
+      `Please wait while Trackster activates user "${updatedUserRequest.username}".`,
+      'The account is being activated in Cognito and the application database.',
+      'User activated',
+      'User activated successfully.',
+      'The user was activated successfully.',
+      'activateUser'
+    );
+  }
+
+  private async executeUpdateUserWorkflow(
+    updatedUserRequest: ClientAdminUser,
+    runningTitle: string,
+    runningMessage: string,
+    runningDetails: string,
+    successTitle: string,
+    successMessage: string,
+    successDetails: string,
+    workflowAction: AdminUserWorkflowAction = 'updateUser'
+  ): Promise<void> {
+    const previousUsername = this.selectedUser?.username || updatedUserRequest.username;
+    const previousClientId = this.selectedUser?.clientId || updatedUserRequest.clientId;
+
+    this.ensureAdminWorkflowDialogOpen();
+
+    this.isLoadingUsers = true;
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = runningTitle;
+    this.adminUserWorkflowMessage = runningMessage;
+    this.adminUserWorkflowDetails = runningDetails;
+
+    try {
+      const response = await this.updateClientUser(updatedUserRequest, workflowAction);
+
+      if (!response.success) {
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'User update failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to update user.';
+        this.adminUserWorkflowDetails = 'Please review the user information and try again.';
         return;
       }
 
       const updatedUser = this.mapUserFromResponse(
         {
-          ...userRequest,
+          ...updatedUserRequest,
           ...(response.updatedUser || {})
         },
-        userRequest.clientId
+        updatedUserRequest.clientId
       );
 
       this.users = this.users.map((user) => {
@@ -628,110 +710,23 @@ export class ClientAdminComponent implements OnInit {
       this.syncEditableUserFields();
       this.refreshCurrentClientCounters();
 
-      this.openMessageDialog(
-        'User Saved',
-        response.message || 'User information was saved successfully.'
-      );
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = successTitle;
+      this.adminUserWorkflowMessage = response.message || successMessage;
+      this.adminUserWorkflowDetails = successDetails;
     } catch (error) {
-      console.error('Unable to save client user.', error);
+      console.error('Unable to update client user.', error);
 
-      this.openMessageDialog(
-        this.isCreatingUser ? 'User Creation Failed' : 'User Update Failed',
-        this.getHttpErrorMessage(error, 'Unable to save user.')
-      );
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'User update failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to update user.');
+      this.adminUserWorkflowDetails = 'Please review the user information and try again.';
+    } finally {
+      this.isLoadingUsers = false;
     }
   }
 
-  private async confirmDisableUser(): Promise<void> {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    const updatedUserRequest: ClientAdminUser = {
-      ...this.selectedUser,
-      status: 'Inactive'
-    };
-
-    await this.executeUserStatusUpdate(
-      updatedUserRequest,
-      'disableUser',
-      'User Disabled',
-      'User disabled successfully.',
-      'User Disable Failed'
-    );
-  }
-
-  private async confirmActivateUser(): Promise<void> {
-    if (!this.selectedUser) {
-      return;
-    }
-
-    const updatedUserRequest: ClientAdminUser = {
-      ...this.selectedUser,
-      status: 'Active'
-    };
-
-    await this.executeUserStatusUpdate(
-      updatedUserRequest,
-      'activateUser',
-      'User Activated',
-      'User activated successfully.',
-      'User Activation Failed'
-    );
-  }
-
-  private async executeUserStatusUpdate(
-    updatedUserRequest: ClientAdminUser,
-    action: ConfirmationAction,
-    successTitle: string,
-    successMessage: string,
-    errorTitle: string
-  ): Promise<void> {
-    try {
-      const response = await this.updateClientUser(updatedUserRequest, action);
-
-      if (!response.success) {
-        this.openMessageDialog(
-          errorTitle,
-          response.message || response.error || 'Unable to update user status.'
-        );
-        return;
-      }
-
-      const updatedUser = this.mapUserFromResponse(
-        {
-          ...updatedUserRequest,
-          ...(response.updatedUser || {})
-        },
-        updatedUserRequest.clientId
-      );
-
-      this.users = this.users.map((user) => {
-        const isCurrentUser = user.username === updatedUser.username
-          && user.clientId === updatedUser.clientId;
-
-        return isCurrentUser ? updatedUser : user;
-      });
-
-      this.selectedUser = updatedUser;
-      this.syncEditableUserFields();
-      this.refreshCurrentClientCounters();
-
-      this.openMessageDialog(
-        successTitle,
-        response.message || successMessage
-      );
-    } catch (error) {
-      console.error('Unable to update client user status.', error);
-
-      this.openMessageDialog(
-        errorTitle,
-        this.getHttpErrorMessage(error, 'Unable to update user status.')
-      );
-    }
-  }
-
-  private async confirmRemoveUser(): Promise<void> {
+  private async confirmRemoveUserWithWorkflow(): Promise<void> {
     if (!this.selectedUser) {
       return;
     }
@@ -739,14 +734,22 @@ export class ClientAdminComponent implements OnInit {
     const removedUsername = this.selectedUser.username;
     const removedClientId = this.selectedUser.clientId;
 
+    this.ensureAdminWorkflowDialogOpen();
+
+    this.isLoadingUsers = true;
+    this.adminUserWorkflowState = 'running';
+    this.adminUserWorkflowTitle = 'Removing user...';
+    this.adminUserWorkflowMessage = 'Please wait while Trackster removes the user account.';
+    this.adminUserWorkflowDetails = 'The account is being removed from Cognito and the application database.';
+
     try {
       const response = await this.deleteClientUser(removedUsername, removedClientId);
 
       if (!response.success) {
-        this.openMessageDialog(
-          'User Removal Failed',
-          response.message || response.error || 'Unable to remove user.'
-        );
+        this.adminUserWorkflowState = 'error';
+        this.adminUserWorkflowTitle = 'User removal failed';
+        this.adminUserWorkflowMessage = response.message || response.error || 'Unable to remove user.';
+        this.adminUserWorkflowDetails = 'Please try again or check the browser console for details.';
         return;
       }
 
@@ -760,18 +763,159 @@ export class ClientAdminComponent implements OnInit {
       this.clearEditableUserFields();
       this.refreshCurrentClientCounters();
 
-      this.openMessageDialog(
-        'User Removed',
-        response.message || 'User was removed successfully.'
-      );
+      this.adminUserWorkflowState = 'success';
+      this.adminUserWorkflowTitle = 'User removed';
+      this.adminUserWorkflowMessage = response.message || 'User was removed successfully.';
+      this.adminUserWorkflowDetails = 'The user was removed from Cognito and the application database.';
     } catch (error) {
       console.error('Unable to remove client user.', error);
 
-      this.openMessageDialog(
-        'User Removal Failed',
-        this.getHttpErrorMessage(error, 'Unable to remove user.')
-      );
+      this.adminUserWorkflowState = 'error';
+      this.adminUserWorkflowTitle = 'User removal failed';
+      this.adminUserWorkflowMessage = this.getHttpErrorMessage(error, 'Unable to remove user.');
+      this.adminUserWorkflowDetails = 'Please try again or check the browser console for details.';
+    } finally {
+      this.isLoadingUsers = false;
     }
+  }
+
+  private openCreateUserWorkflowDialog(): void {
+    this.openAdminUserWorkflowDialog(
+      'createUser',
+      'Create user?',
+      `Create user "${this.editableUsername.trim()}" for client "${this.currentClient.name || this.currentClient.clientId}"?`,
+      'The user will be created in Cognito and associated with the current client.'
+    );
+  }
+
+  private openUpdateUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'updateUser',
+      'Update user?',
+      `Update user "${this.editableUsername.trim()}" for client "${this.currentClient.name || this.currentClient.clientId}"?`,
+      'The user information will be updated in Cognito and the application database.'
+    );
+  }
+
+  private openDisableUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'disableUser',
+      'Disable user?',
+      `Disable user "${this.selectedUser.username}"?`,
+      'The user will be disabled in Cognito and the application database.'
+    );
+  }
+
+  private openActivateUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'activateUser',
+      'Activate user?',
+      `Activate user "${this.selectedUser.username}"?`,
+      'The user will be activated in Cognito and the application database.'
+    );
+  }
+
+  private openRemoveUserWorkflowDialog(): void {
+    if (!this.selectedUser) {
+      return;
+    }
+
+    this.openAdminUserWorkflowDialog(
+      'removeUser',
+      'Remove user?',
+      `Remove user "${this.selectedUser.username}" from client "${this.currentClient.name || this.currentClient.clientId}"?`,
+      'This action will remove the user from Cognito and the application database.'
+    );
+  }
+
+  private openAdminUserWorkflowDialog(
+    action: AdminUserWorkflowAction,
+    title: string,
+    message: string,
+    details: string
+  ): void {
+    if (!this.adminUserWorkflowDialog) {
+      return;
+    }
+
+    this.adminUserWorkflowAction = action;
+    this.adminUserWorkflowState = 'confirm';
+    this.adminUserWorkflowTitle = title;
+    this.adminUserWorkflowMessage = message;
+    this.adminUserWorkflowDetails = details;
+
+    this.ensureAdminWorkflowDialogOpen();
+  }
+
+  private ensureAdminWorkflowDialogOpen(): void {
+    if (!this.adminUserWorkflowDialog || this.adminUserWorkflowDialogRef) {
+      return;
+    }
+
+    this.adminUserWorkflowDialogRef = this.dialog.open(this.adminUserWorkflowDialog, {
+      width: '440px',
+      panelClass: 'trackster-admin-workflow-dialog-panel',
+      disableClose: true
+    });
+  }
+
+  private closeAdminUserWorkflowDialogOnly(): void {
+    if (this.adminUserWorkflowDialogRef) {
+      this.adminUserWorkflowDialogRef.close();
+      this.adminUserWorkflowDialogRef = undefined;
+    }
+  }
+
+  private resetAdminUserWorkflowDialog(): void {
+    this.adminUserWorkflowState = 'idle';
+    this.adminUserWorkflowAction = null;
+    this.adminUserWorkflowTitle = '';
+    this.adminUserWorkflowMessage = '';
+    this.adminUserWorkflowDetails = '';
+  }
+
+  private closeUserDialogOnly(): void {
+    this.dialog.openDialogs
+      .filter((dialogRef) => dialogRef.componentInstance === null)
+      .forEach((dialogRef) => {
+        if (dialogRef !== this.adminUserWorkflowDialogRef) {
+          dialogRef.close();
+        }
+      });
+  }
+
+  private openMessageDialog(title: string, message: string): void {
+    this.adminUserWorkflowAction = null;
+    this.adminUserWorkflowState = 'error';
+    this.adminUserWorkflowTitle = title;
+    this.adminUserWorkflowMessage = message;
+    this.adminUserWorkflowDetails = '';
+
+    this.ensureAdminWorkflowDialogOpen();
+  }
+
+  private openUserDialog(): void {
+    if (!this.userDialog) {
+      return;
+    }
+
+    this.dialog.open(this.userDialog, {
+      width: '520px',
+      panelClass: 'trackster-admin-dialog-panel',
+      disableClose: true
+    });
   }
 
   private async createClientUser(user: ClientAdminUser): Promise<ClientUserAddResponse> {
@@ -794,7 +938,7 @@ export class ClientAdminComponent implements OnInit {
         email: user.email,
         fullName: user.fullName,
         clientRole: user.role,
-        role: user.role,
+        roleName: user.roleName,
         clientId: user.clientId,
         status: user.status
       }
@@ -828,7 +972,7 @@ export class ClientAdminComponent implements OnInit {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          roleName: this.getKnownRoleName(user.role),
+          roleName: user.roleName,
           clientId: user.clientId
         },
         {
@@ -843,7 +987,7 @@ export class ClientAdminComponent implements OnInit {
 
   private async updateClientUser(
     user: ClientAdminUser,
-    action: ConfirmationAction | 'updateUser'
+    action: AdminUserWorkflowAction = 'updateUser'
   ): Promise<ClientUserUpdateResponse> {
     return this.isDevelopmentMode()
       ? await this.updateClientUserFromMock(user)
@@ -864,7 +1008,7 @@ export class ClientAdminComponent implements OnInit {
         email: user.email,
         fullName: user.fullName,
         clientRole: user.role,
-        role: user.role,
+        roleName: user.roleName,
         clientId: user.clientId,
         status: user.status
       }
@@ -873,7 +1017,7 @@ export class ClientAdminComponent implements OnInit {
 
   private async updateClientUserFromApi(
     user: ClientAdminUser,
-    action: ConfirmationAction | 'updateUser'
+    action: AdminUserWorkflowAction
   ): Promise<ClientUserUpdateResponse> {
     const apiUrl = this.getClientUserUpdateApiUrl();
 
@@ -909,7 +1053,7 @@ export class ClientAdminComponent implements OnInit {
           fullName: user.fullName,
           role: user.role,
           clientRole: user.role,
-          roleName: this.getKnownRoleName(user.role),
+          roleName: user.roleName,
           status: normalizedApiStatus,
           clientId: user.clientId,
           action: normalizedAction,
@@ -991,20 +1135,6 @@ export class ClientAdminComponent implements OnInit {
       return String(token || '').trim();
     }
 
-    if (typeof authServiceAsAny.getCurrentAccessToken === 'function') {
-      const token = await authServiceAsAny.getCurrentAccessToken();
-      return String(token || '').trim();
-    }
-
-    if (typeof authServiceAsAny.getToken === 'function') {
-      const token = await authServiceAsAny.getToken();
-      return String(token || '').trim();
-    }
-
-    if (typeof authServiceAsAny.accessToken === 'string') {
-      return authServiceAsAny.accessToken.trim();
-    }
-
     return '';
   }
 
@@ -1037,52 +1167,6 @@ export class ClientAdminComponent implements OnInit {
 
     return window.location.hostname === 'localhost'
       || window.location.hostname === '127.0.0.1';
-  }
-
-  private openConfirmationDialog(
-    title: string,
-    message: string,
-    action: ConfirmationAction
-  ): void {
-    if (!this.confirmationDialog) {
-      return;
-    }
-
-    this.confirmationTitle = title;
-    this.confirmationMessage = message;
-    this.confirmationAction = action;
-
-    this.dialog.open(this.confirmationDialog, {
-      width: '420px',
-      panelClass: 'trackster-admin-dialog-panel',
-      disableClose: true
-    });
-  }
-
-  private openMessageDialog(title: string, message: string): void {
-    if (!this.messageDialog) {
-      return;
-    }
-
-    this.messageTitle = title;
-    this.messageText = message;
-
-    this.dialog.open(this.messageDialog, {
-      width: '420px',
-      panelClass: 'trackster-admin-dialog-panel'
-    });
-  }
-
-  private openUserDialog(): void {
-    if (!this.userDialog) {
-      return;
-    }
-
-    this.dialog.open(this.userDialog, {
-      width: '520px',
-      panelClass: 'trackster-admin-dialog-panel',
-      disableClose: true
-    });
   }
 
   private getUserValidationMessage(): string {
@@ -1189,6 +1273,13 @@ export class ClientAdminComponent implements OnInit {
       fullName: String(user?.fullName || user?.full_name || '').trim(),
       email: String(user?.email || '').trim(),
       role,
+      roleName: String(
+        user?.roleName ||
+        user?.role_name ||
+        user?.clientRoleName ||
+        user?.client_role_name ||
+        this.getKnownRoleName(role)
+      ).trim(),
       status: this.normalizeStatus(String(user?.status || 'Inactive')),
       clientId: String(user?.clientId || user?.client_id || fallbackClientId || '').trim()
     };
@@ -1206,7 +1297,7 @@ export class ClientAdminComponent implements OnInit {
     };
   }
 
-  private getKnownRoleName(role: UserRole): string {
+  getKnownRoleName(role: UserRole): string {
     if (role === 'client_admin') {
       return 'Client Administrator';
     }

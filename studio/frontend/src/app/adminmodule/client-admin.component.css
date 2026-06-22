@@ -302,14 +302,16 @@
 }
 
 .status-badge {
-  display: inline-block;
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 12px;
   border-radius: 999px;
   background: #dcfce7;
   color: #166534;
   font-size: 0.62rem;
   font-weight: 700;
-  line-height: 1;
   text-transform: capitalize;
 }
 
@@ -383,6 +385,12 @@
   outline: none;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.client-field input[readonly] {
+  background: #f8fbff;
+  color: #64748b;
+  cursor: default;
 }
 
 .client-field input:focus {
@@ -553,6 +561,101 @@
 
 ::ng-deep .trackster-admin-dialog-panel .mat-mdc-dialog-container .mdc-dialog__actions {
   padding: 0;
+}
+
+::ng-deep .trackster-admin-workflow-dialog-panel .mat-mdc-dialog-container {
+  --mdc-dialog-container-shape: 18px;
+  padding: 0;
+}
+
+::ng-deep .trackster-admin-workflow-dialog-panel .mdc-dialog__surface,
+::ng-deep .trackster-admin-workflow-dialog-panel .mat-mdc-dialog-surface {
+  border-radius: 18px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+::ng-deep .trackster-admin-workflow-dialog-panel .mat-mdc-dialog-container .mdc-dialog__content {
+  padding: 0;
+}
+
+::ng-deep .trackster-admin-workflow-dialog-panel .mat-mdc-dialog-container .mdc-dialog__actions {
+  padding: 0;
+}
+
+.decoder-export-modal {
+  width: min(420px, calc(100vw - 48px));
+  padding: 28px 30px 26px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+  text-align: center;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.decoder-export-modal h3 {
+  margin: 18px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.decoder-export-modal p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.decoder-export-details {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.decoder-export-spinner {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
+  border: 4px solid #dbeafe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: decoder-export-spin 0.8s linear infinite;
+}
+
+.decoder-export-success-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 48px;
+  color: #16a34a;
+}
+
+.decoder-export-error-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 48px;
+  color: #dc2626;
+}
+
+@keyframes decoder-export-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.decoder-export-modal > .trackster-admin-button {
+  margin: 22px auto 0;
+}
+
+.decoder-dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 @media (max-width: 1200px) {

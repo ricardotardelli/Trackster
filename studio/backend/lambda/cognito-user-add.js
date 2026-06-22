@@ -93,6 +93,10 @@ export const handler = async (event) => {
       {
         Name: 'email',
         Value: email
+      },
+      {
+        Name: 'custom:clientId',
+        Value: clientId
       }
     ];
 

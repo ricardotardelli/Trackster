@@ -15,7 +15,7 @@ function normalizeString(value) {
 }
 
 function normalizeStatus(value) {
-  return normalizeString(value);
+  return normalizeString(value).toLowerCase();
 }
 
 async function cognitoUserExists(userPoolId, username) {
@@ -107,7 +107,7 @@ export const handler = async (event) => {
       })
     );
 
-    if (status === 'Active') {
+    if (status === 'active') {
       await cognitoClient.send(
         new AdminEnableUserCommand({
           UserPoolId: userPoolId,
@@ -116,7 +116,7 @@ export const handler = async (event) => {
       );
     }
 
-    if (status === 'Inactive' || status === 'Suspended') {
+    if (status === 'inactive' || status === 'suspended') {
       await cognitoClient.send(
         new AdminDisableUserCommand({
           UserPoolId: userPoolId,

@@ -156,7 +156,7 @@
                   >
                     <td>{{ user.username }}</td>
                     <td>{{ user.fullName || '-' }}</td>
-                    <td>{{ user.role }}</td>
+                    <td>{{ user.roleName || user.role || '-' }}</td>
                     <td>
                       <span
                         class="status-badge"
@@ -237,7 +237,7 @@
             *ngFor="let role of userRoles"
             [value]="role"
           >
-            {{ role }}
+            {{ getKnownRoleName(role) }}
           </mat-option>
         </mat-select>
       </label>
@@ -281,17 +281,46 @@
   </div>
 </ng-template>
 
-<ng-template #confirmationDialog>
-  <div class="trackster-dialog">
-    <h2>{{ confirmationTitle }}</h2>
+<ng-template #adminUserWorkflowDialog>
+  <div class="decoder-export-modal">
+    <div
+      class="decoder-export-spinner"
+      *ngIf="adminUserWorkflowState === 'running'"
+    ></div>
 
-    <p>{{ confirmationMessage }}</p>
+    <mat-icon
+      class="decoder-export-success-icon"
+      *ngIf="adminUserWorkflowState === 'success'"
+    >
+      check_circle
+    </mat-icon>
 
-    <div class="trackster-dialog-actions">
+    <mat-icon
+      class="decoder-export-error-icon"
+      *ngIf="adminUserWorkflowState === 'error'"
+    >
+      error
+    </mat-icon>
+
+    <h3>{{ adminUserWorkflowTitle }}</h3>
+
+    <p>{{ adminUserWorkflowMessage }}</p>
+
+    <span
+      class="decoder-export-details"
+      *ngIf="adminUserWorkflowDetails"
+    >
+      {{ adminUserWorkflowDetails }}
+    </span>
+
+    <div
+      class="decoder-dialog-actions"
+      *ngIf="adminUserWorkflowState === 'confirm'"
+    >
       <button
         type="button"
         class="trackster-admin-button secondary"
-        (click)="closeDialogs()"
+        (click)="closeAdminUserWorkflowDialog()"
       >
         <mat-icon>close</mat-icon>
         <span>Cancel</span>
@@ -300,30 +329,21 @@
       <button
         type="button"
         class="trackster-admin-button primary"
-        (click)="confirmDialogAction()"
+        (click)="confirmAdminUserWorkflowAction()"
       >
         <mat-icon>check_circle</mat-icon>
         <span>Confirm</span>
       </button>
     </div>
-  </div>
-</ng-template>
 
-<ng-template #messageDialog>
-  <div class="trackster-dialog">
-    <h2>{{ messageTitle }}</h2>
-
-    <p>{{ messageText }}</p>
-
-    <div class="trackster-dialog-actions">
-      <button
-        type="button"
-        class="trackster-admin-button primary"
-        (click)="closeDialogs()"
-      >
-        <mat-icon>check_circle</mat-icon>
-        <span>OK</span>
-      </button>
-    </div>
+    <button
+      type="button"
+      class="trackster-admin-button primary"
+      *ngIf="adminUserWorkflowState === 'success' || adminUserWorkflowState === 'error'"
+      (click)="closeAdminUserWorkflowDialog()"
+    >
+      <mat-icon>check_circle</mat-icon>
+      <span>OK</span>
+    </button>
   </div>
 </ng-template>

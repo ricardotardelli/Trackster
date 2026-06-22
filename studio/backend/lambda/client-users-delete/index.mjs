@@ -142,6 +142,7 @@ export const handler = async (event) => {
 
     const body = parseBody(event);
     const targetUsername = String(body.username || '').trim();
+    const requestedClientId = String(body.clientId || '').trim();
 
     if (!targetUsername) {
       return response(400, {
@@ -169,18 +170,20 @@ export const handler = async (event) => {
         u.email,
         u.full_name,
         u.status AS user_status,
-        gr.role_code AS global_role_code,
+        r.role_code AS role_code,
         cu.client_id,
-        cr.role_code AS client_role_code,
-        cu.status AS client_user_status
+        c.status AS client_status
       FROM trackster_users u
-      LEFT JOIN trackster_roles gr
-        ON gr.id = u.global_role_id
+      INNER JOIN trackster_roles r
+        ON r.id = u.role_id
       LEFT JOIN trackster_client_users cu
         ON cu.user_id = u.id
-      LEFT JOIN trackster_roles cr
-        ON cr.id = cu.role_id
-      WHERE u.username = $1
+      LEFT JOIN trackster_clients c
+        ON c.client_id = cu.client_id
+      WHERE LOWER(u.username) = LOWER($1)
+      ORDER BY
+        CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
+        cu.created_at ASC
       LIMIT 1
       `,
       [authenticatedUsername]
@@ -198,10 +201,10 @@ export const handler = async (event) => {
     const requester = requesterResult.rows[0];
 
     const requesterIsTracksterAdmin =
-      requester.global_role_code === 'trackster_admin';
+      requester.role_code === 'trackster_admin';
 
     const requesterIsClientAdmin =
-      requester.client_role_code === 'client_admin';
+      requester.role_code === 'client_admin';
 
     if (!requesterIsTracksterAdmin && !requesterIsClientAdmin) {
       await client.query('ROLLBACK');
@@ -209,6 +212,31 @@ export const handler = async (event) => {
       return response(403, {
         success: false,
         message: 'Access denied. Only administrators can delete users.'
+      });
+    }
+
+    if (
+      requester.user_status !== 'active' ||
+      (requesterIsClientAdmin && requester.client_status !== 'active')
+    ) {
+      await client.query('ROLLBACK');
+
+      return response(403, {
+        success: false,
+        message: 'Your administrator account is inactive.'
+      });
+    }
+
+    const targetClientId = requesterIsTracksterAdmin
+      ? requestedClientId
+      : requester.client_id;
+
+    if (!targetClientId) {
+      await client.query('ROLLBACK');
+
+      return response(400, {
+        success: false,
+        message: 'Missing required field: clientId.'
       });
     }
 
@@ -220,21 +248,18 @@ export const handler = async (event) => {
         u.email,
         u.full_name,
         u.status AS user_status,
-        gr.role_code AS global_role_code,
-        cu.client_id,
-        cr.role_code AS client_role_code,
-        cu.status AS client_user_status
+        r.role_code AS role_code,
+        cu.client_id
       FROM trackster_users u
-      LEFT JOIN trackster_roles gr
-        ON gr.id = u.global_role_id
-      LEFT JOIN trackster_client_users cu
+      INNER JOIN trackster_roles r
+        ON r.id = u.role_id
+      INNER JOIN trackster_client_users cu
         ON cu.user_id = u.id
-      LEFT JOIN trackster_roles cr
-        ON cr.id = cu.role_id
-      WHERE u.username = $1
+      WHERE LOWER(u.username) = LOWER($1)
+        AND cu.client_id = $2
       LIMIT 1
       `,
-      [targetUsername]
+      [targetUsername, targetClientId]
     );
 
     if (targetResult.rowCount === 0) {
@@ -242,7 +267,7 @@ export const handler = async (event) => {
 
       return response(404, {
         success: false,
-        message: 'Target user not found.'
+        message: 'Target user not found for the selected client.'
       });
     }
 
@@ -262,7 +287,7 @@ export const handler = async (event) => {
 
     if (
       requesterIsClientAdmin &&
-      target.global_role_code === 'trackster_admin'
+      target.role_code === 'trackster_admin'
     ) {
       await client.query('ROLLBACK');
 
@@ -272,22 +297,24 @@ export const handler = async (event) => {
       });
     }
 
-    if (target.client_role_code === 'client_admin') {
+    if (target.role_code === 'client_admin') {
       const remainingAdminsResult = await client.query(
         `
         SELECT COUNT(*)::int AS total
         FROM trackster_client_users cu
-        JOIN trackster_roles r
-          ON r.id = cu.role_id
+        INNER JOIN trackster_users u
+          ON u.id = cu.user_id
+        INNER JOIN trackster_roles r
+          ON r.id = u.role_id
         WHERE cu.client_id = $1
           AND r.role_code = 'client_admin'
-          AND cu.status = 'active'
-          AND cu.user_id <> $2
+          AND u.status = 'active'
+          AND u.id <> $2
         `,
         [target.client_id, target.id]
       );
 
-      const remainingAdmins = remainingAdminsResult.rows[0].total;
+      const remainingAdmins = Number(remainingAdminsResult.rows[0]?.total || 0);
 
       if (remainingAdmins < 1) {
         await client.query('ROLLBACK');
@@ -304,9 +331,10 @@ export const handler = async (event) => {
     await client.query(
       `
       DELETE FROM trackster_client_users
-      WHERE user_id = $1
+      WHERE client_id = $1
+        AND user_id = $2
       `,
-      [target.id]
+      [target.client_id, target.id]
     );
 
     await client.query(
@@ -332,8 +360,9 @@ export const handler = async (event) => {
         username: target.username,
         email: target.email,
         fullName: target.full_name,
-        globalRole: target.global_role_code,
-        clientRole: target.client_role_code,
+        globalRole: target.role_code === 'trackster_admin' ? 'trackster_admin' : null,
+        clientRole: target.role_code !== 'trackster_admin' ? target.role_code : null,
+        role: target.role_code,
         clientId: target.client_id
       }
     });
