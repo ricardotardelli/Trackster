@@ -1,10 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule, HttpHeaders } from '@angular/common/http';
-import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSort, MatSortModule } from '@angular/material/sort';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 
@@ -97,17 +99,23 @@ interface TracksterRuntimeConfig {
     HttpClientModule,
     MatDialogModule,
     MatIconModule,
-    MatSelectModule
+    MatSelectModule,
+    MatSortModule,
+    MatTableModule
   ],
   templateUrl: './client-admin.component.html',
   styleUrl: './client-admin.component.css'
 })
-export class ClientAdminComponent implements OnInit {
+export class ClientAdminComponent implements OnInit, AfterViewInit {
   @ViewChild('userDialog') userDialog?: TemplateRef<unknown>;
   @ViewChild('adminUserWorkflowDialog') adminUserWorkflowDialog?: TemplateRef<unknown>;
+  @ViewChild(MatSort) userSort?: MatSort;
 
   readonly userRoles: UserRole[] = ['client_admin', 'client_user'];
   readonly userStatuses: ClientStatus[] = ['Active', 'Inactive', 'Suspended'];
+  readonly displayedUserColumns: string[] = ['username', 'fullName', 'roleName', 'status', 'email'];
+
+  usersDataSource = new MatTableDataSource<ClientAdminUser>([]);
 
   private readonly configPath = 'assets/config.json';
   private readonly devClientUsersMockPath = 'assets/mock/client-users-info-response.json';
@@ -151,12 +159,26 @@ export class ClientAdminComponent implements OnInit {
     private readonly dialog: MatDialog,
     private readonly http: HttpClient,
     private readonly authService: AuthService
-  ) {}
+  ) {
+    this.usersDataSource.sortingDataAccessor = (user, property) => {
+      if (property === 'roleName') {
+        return user.roleName || user.role;
+      }
+
+      const value = user[property as keyof ClientAdminUser];
+
+      return typeof value === 'string' ? value.toLowerCase() : value;
+    };
+  }
 
   async ngOnInit(): Promise<void> {
     await this.loadRuntimeConfig();
     await this.initializeCurrentClient();
     await this.loadClientUsers();
+  }
+
+  ngAfterViewInit(): void {
+    this.usersDataSource.sort = this.userSort || null;
   }
 
   get currentClientUsers(): ClientAdminUser[] {
@@ -371,6 +393,14 @@ export class ClientAdminComponent implements OnInit {
 
     if (this.adminUserWorkflowAction === 'removeUser') {
       await this.confirmRemoveUserWithWorkflow();
+    }
+  }
+
+  private updateUsersDataSource(): void {
+    this.usersDataSource.data = this.currentClientUsers;
+
+    if (this.userSort) {
+      this.usersDataSource.sort = this.userSort;
     }
   }
 
@@ -1227,6 +1257,8 @@ export class ClientAdminComponent implements OnInit {
     this.currentClient.admins = clientUsers.filter(
       (user) => user.role === 'client_admin'
     ).length;
+
+    this.updateUsersDataSource();
   }
 
   private normalizeStatus(status: string): ClientStatus {
