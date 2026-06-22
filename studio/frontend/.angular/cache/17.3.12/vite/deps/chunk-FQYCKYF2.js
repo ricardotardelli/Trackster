@@ -11,7 +11,7 @@ import {
   coerceNumberProperty,
   getRtlScrollAxisType,
   supportsScrollBehavior
-} from "./chunk-LG46DQC3.js";
+} from "./chunk-WJMTFGVQ.js";
 import {
   BidiModule,
   Directionality
@@ -1649,4 +1649,4 @@ export {
   CdkScrollableModule,
   ScrollingModule
 };
-//# sourceMappingURL=chunk-NUVNT3KC.js.map
+//# sourceMappingURL=chunk-FQYCKYF2.js.map

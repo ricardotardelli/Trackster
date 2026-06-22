@@ -108,11 +108,17 @@
                 <div class="client-fields-grid">
                   <label class="client-field client-field-full">
                     <span>Company</span>
-                    <input
-                      type="text"
-                      [(ngModel)]="editableClientName"
-                      [readonly]="!isEditingClient"
-                    />
+
+                    <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                      <input
+                        type="text"
+                        [(ngModel)]="editableClientName"
+                        [readonly]="!isEditingClient"
+                        style="flex: 1 1 auto; min-width: 0;"
+                      />
+
+                      
+                    </div>
                   </label>
 
                   <label class="client-field client-field-full">
@@ -369,6 +375,22 @@
           type="text"
           [(ngModel)]="editableClientContactName"
         />
+      </label>
+
+      <label class="client-field">
+        <span>Status</span>
+        <mat-select
+          class="admin-client-select user-dialog-select"
+          panelClass="trackster-admin-select-panel"
+          [(ngModel)]="editableClientStatus"
+        >
+          <mat-option
+            *ngFor="let status of userStatuses"
+            [value]="status"
+          >
+            {{ status }}
+          </mat-option>
+        </mat-select>
       </label>
 
       <label class="client-field user-field-full">

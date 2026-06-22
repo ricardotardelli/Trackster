@@ -157,7 +157,7 @@ interface TracksterRuntimeConfig {
     HttpClientModule,
     MatDialogModule,
     MatIconModule,
-    MatSelectModule
+    MatSelectModule,
   ],
   templateUrl: './master-admin.component.html',
   styleUrl: './master-admin.component.css'
@@ -214,6 +214,7 @@ export class MasterAdminComponent implements OnInit {
   editableClientContactName = this.selectedClient.contactName;
   editableClientPhone = this.selectedClient.phone;
   editableClientCountry = this.selectedClient.country;
+  editableClientStatus: ClientStatus = this.selectedClient.status;
 
   editableUsername = '';
   editableFullName = '';
@@ -248,6 +249,14 @@ export class MasterAdminComponent implements OnInit {
 
   get selectedClientUsers(): MasterAdminUser[] {
     return this.users.filter((user) => user.clientId === this.selectedClient.clientId);
+  }
+
+  get selectedClientStatusLabel(): ClientStatus | '-' {
+    return this.selectedClient.clientId ? this.selectedClient.status : '-';
+  }
+
+  get isSelectedClientActive(): boolean {
+    return this.selectedClient.clientId ? this.selectedClient.status === 'Active' : false;
   }
 
   get canAddUser(): boolean {
@@ -351,6 +360,7 @@ export class MasterAdminComponent implements OnInit {
     this.editableClientContactName = '';
     this.editableClientPhone = '';
     this.editableClientCountry = '';
+    this.editableClientStatus = 'Active';
     this.clearEditableUserFields();
 
     this.openClientDialog();
@@ -397,6 +407,7 @@ export class MasterAdminComponent implements OnInit {
 
     this.isEditingClient = false;
     this.syncEditableClientFields();
+    this.closeDialogs();
   }
 
   disableClient(): void {
@@ -1200,7 +1211,7 @@ export class MasterAdminComponent implements OnInit {
       contactName: this.editableClientContactName.trim(),
       phone: this.editableClientPhone.trim(),
       country: this.editableClientCountry.trim(),
-      status: this.isCreatingClient ? 'Active' : this.selectedClient.status,
+      status: this.editableClientStatus,
       users: this.isCreatingClient ? 0 : Number(this.selectedClient.users || 0),
       admins: this.isCreatingClient ? 0 : Number(this.selectedClient.admins || 0)
     };
@@ -1933,6 +1944,10 @@ export class MasterAdminComponent implements OnInit {
       return 'Country is required.';
     }
 
+    if (!this.editableClientStatus) {
+      return 'Status is required.';
+    }
+
     return '';
   }
 
@@ -1971,6 +1986,7 @@ export class MasterAdminComponent implements OnInit {
     this.editableClientContactName = this.selectedClient.contactName;
     this.editableClientPhone = this.selectedClient.phone;
     this.editableClientCountry = this.selectedClient.country;
+    this.editableClientStatus = this.selectedClient.status;
   }
 
   private syncEditableUserFields(): void {

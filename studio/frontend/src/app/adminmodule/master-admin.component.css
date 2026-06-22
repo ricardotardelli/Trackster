@@ -453,14 +453,16 @@
 }
 
 .status-badge {
-  display: inline-block;
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 12px;
   border-radius: 999px;
   background: #dcfce7;
   color: #166534;
   font-size: 0.62rem;
   font-weight: 700;
-  line-height: 1;
   text-transform: capitalize;
 }
 
