@@ -105,6 +105,203 @@ OK - BLF/MF4 export
 - Replay engine
 - Physical coherence AI
 - AI-assisted checksum metadata for compiled DBC files (DBC Studio)
-- Multi client/user architecture
+OK - Multi client/user architecture
 
 
+Angular
+  → API Gateway
+    → Lambda scenario-ai
+      → Amazon Bedrock
+      → JSON scenario
+    → Lambda generator atual
+      → S3 BIN
+      → Manifest
+
+
+
+- Prompt enviado ao Bedrock 
+
+You are a strict JSON generator for a CAN telemetry simulator.
+
+Return ONLY valid JSON.
+Do not include markdown.
+Do not include explanations.
+Do not add fields not present in the schema.
+
+Generate a realistic 20 minute urban driving scenario.
+
+Available signal names:
+- VehicleSpeedKph
+- EngineRpm
+- CoolantTemperatureC
+- FuelLevelPercent
+- AcceleratorPedalPercent
+- BrakePedalPercent
+
+Hard rules:
+- Use ONLY the available signal names.
+- Create exactly 10 events.
+- Event times must be ordered.
+- Event times must be between 0 and 1200.
+- VehicleSpeedKph must be between 0 and 70.
+- EngineRpm must be between 700 and 4000.
+- CoolantTemperatureC must be between 25 and 95.
+- FuelLevelPercent must start at exactly 95.0.
+- FuelLevelPercent must never increase.
+- FuelLevelPercent must end between 93.5 and 95.0.
+- FuelLevelPercent total drop = first FuelLevelPercent - last FuelLevelPercent.
+- FuelLevelPercent total drop must be less than or equal to 1.5.
+- AcceleratorPedalPercent and BrakePedalPercent must not both be above 20 in the same event.
+
+Before returning the JSON:
+- Calculate the fuel drop.
+- If fuel drop is greater than 1.5, fix all FuelLevelPercent values.
+- If any value violates a range, fix it.
+- If the validationNotes say a rule passed, the numeric values must prove it.
+
+Required JSON schema:
+
+{
+  "scenarioName": "string",
+  "durationSeconds": 1200,
+  "sampleIntervalSeconds": 5,
+  "signals": [
+    {
+      "signalName": "string",
+      "unit": "string",
+      "minValue": 0,
+      "maxValue": 0,
+      "pattern": "string"
+    }
+  ],
+  "events": [
+    {
+      "timeSeconds": 0,
+      "eventType": "string",
+      "description": "string",
+      "values": {
+        "VehicleSpeedKph": 0,
+        "EngineRpm": 0,
+        "CoolantTemperatureC": 0,
+        "FuelLevelPercent": 95.0,
+        "AcceleratorPedalPercent": 0,
+        "BrakePedalPercent": 0
+      }
+    }
+  ],
+  "validation": {
+    "firstFuelLevelPercent": 95.0,
+    "lastFuelLevelPercent": 0,
+    "fuelDropPercent": 0,
+    "fuelDropLimitPercent": 1.5,
+    "fuelDropValid": true,
+    "rangeValidationPassed": true,
+    "eventCount": 10
+  },
+  "validationNotes": [
+    "string"
+  ]
+}      
+
+
+
+
+- Google Gemma 4 E2B
+JSON válido:              PASS
+Schema respeitado:        PASS
+10 eventos:               PASS
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: PASS
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      PASS
+
+- QWEN3 32B
+JSON válido:              PASS
+Schema respeitado:        PASS
+10 eventos:               PASS
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: PASS
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      REGULAR (1000RPM em 30Km/h)
+
+- GPT OSS 20B
+JSON válido:              PASS
+Schema respeitado:        PASS
+10 eventos:               PASS
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: PASS
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      FAIL ("eventType": "StopAtLight", "description": "Traffic light green", "VehicleSpeedKph": 50)
+
+- NVIDIA Nemotron Nano 9B v2
+JSON válido:              FAIL (text with conversation among agents)
+Schema respeitado:        PASS
+10 eventos:               PASS
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: FAIL
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      FAIL (general fail points)
+
+- DeepSeek V3.2
+JSON válido:              PASS
+Schema respeitado:        PASS
+10 eventos:               PASS
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: PASS
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      PASS
+
+- Voxtral Mini 3B 2507
+JSON válido:              FAIL
+Schema respeitado:        FAIL
+10 eventos:               FAIL
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: PASS
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      PASS
+
+- Gemma 4 31B
+JSON válido:              FAIL
+Schema respeitado:        FAIL
+10 eventos:               FAIL
+Fuel start 95.0:          PASS
+Fuel final 94.1:          PASS
+Fuel drop 0.9:            PASS
+Conta matemática correta: PASS
+Ranges respeitados:       PASS
+Sem texto fora do JSON:   PASS
+Coerencia Automotiva      PASS
+
+
+| Modelo                     | Nota   | Comentário                                                                                     |
+| -------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| DeepSeek V3.2              | 9.4/10 | Segundo Melhor resultado técnico geral. Cenário mais realista. Matemática correta. JSON bom    |
+| Gemma 4 E2B                | 9.2/10 | Quase empatado com DeepSeek. Melhor custo disparado. Muito obediente ao prompt.                |
+| Gemma 4 31B                | 9.5/10 | Melhor resultado JSON puro,Schema perfeito,Matemática correta,Eventos coerentes.               |
+| Qwen3 32B                  | 8.4/10 | Muito disciplinado, boa matemática, mas cenário menos natural e cobertura temporal incompleta. |
+| GPT OSS 20B                | 6.8/10 | Estrutura boa, mas entendimento automotivo fraco e várias inconsistências semânticas.          |
+| NVIDIA Nemotron Nano 9B v2 | 4.5/10 | Ignorou "JSON only". Produziu raciocínio inteiro antes do resultado. Inaceitável para API.     |
+| Voxtral Mini 3B 2507       | 2.5/10 | JSON inválido, validações quebradas, duração incorreta.                                        |
+
+
+Model ID:
+google.gemma-4-31b
+BEDROCK_MODEL_ID=google.gemma-4-31b

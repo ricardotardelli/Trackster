@@ -16,6 +16,7 @@
 
 const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
 const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
 const REGION = "us-east-1";
 const SQS_BATCH = 10;
@@ -25,6 +26,7 @@ const MAX_SAFE_SQS_BYTES = 900 * 1024;
 
 const DEFAULT_CLIENT_ID = process.env.CUSTOMER_ID || process.env.CLIENT_ID || "00000000";
 const COMPILED_DBC_BUCKET = process.env.COMPILED_DBC_BUCKET || "trackster-customer-dbc";
+const AI_ASSIST_LAMBDA_NAME = process.env.AI_ASSIST_LAMBDA_NAME || "trackster-simulator-ai-assist";
 
 const RUNTIME_DBC_VERSION = 2;
 
@@ -705,6 +707,172 @@ async function buildRuntimeCompiledDbc(s3, clientId, dbcFiles, canFrames) {
   };
 }
 
+
+function buildAiScenarioName(payload, runId) {
+  const explicitName = String(payload?.aiScenarioName || payload?.scenarioName || "").trim();
+
+  if (explicitName) {
+    return explicitName;
+  }
+
+  return `Trackster Simulator Scenario ${runId}`;
+}
+
+function buildAiRequestedContext(payload, durationSec, speed, unity, driverProfile) {
+  const explicitContext = String(
+    payload?.aiRequestedContext ||
+    payload?.requestedContext ||
+    payload?.scenarioContext ||
+    payload?.scenarioDescription ||
+    ""
+  ).trim();
+
+  if (explicitContext) {
+    return explicitContext;
+  }
+
+  return [
+    `Generate a realistic simulator behavior plan for a ${durationSec} second drive.`,
+    `Driver profile: ${driverProfile || "Balanced"}.`,
+    `Reference speed from simulator request: ${speed} ${unity}/h.`,
+    "The vehicle should behave like a realistic urban driving session with parking lot departure, city traffic, traffic lights, congestion, steady urban cruising, and final parking."
+  ].join(" ");
+}
+
+function parseInvokedLambdaPayload(payload) {
+  if (!payload) {
+    return null;
+  }
+
+  const text = Buffer.from(payload).toString("utf8");
+
+  if (!text) {
+    return null;
+  }
+
+  return JSON.parse(text);
+}
+
+function parseInvokedLambdaBody(lambdaResponse) {
+  if (!lambdaResponse || typeof lambdaResponse !== "object") {
+    throw new Error("AI assist Lambda returned an empty response.");
+  }
+
+  if (typeof lambdaResponse.body === "string") {
+    return JSON.parse(lambdaResponse.body);
+  }
+
+  if (lambdaResponse.body && typeof lambdaResponse.body === "object") {
+    return lambdaResponse.body;
+  }
+
+  return lambdaResponse;
+}
+
+function validateAiBehaviorPlan(aiResult, expectedDurationSec) {
+  const scenario = aiResult?.scenario || aiResult?.aiBehaviorPlan || aiResult;
+
+  if (!scenario || typeof scenario !== "object") {
+    throw new Error("AI assist response does not contain a scenario object.");
+  }
+
+  if (Number(scenario.durationSeconds) !== Number(expectedDurationSec)) {
+    throw new Error(
+      `AI behavior plan duration mismatch. Expected ${expectedDurationSec}, received ${scenario.durationSeconds}.`
+    );
+  }
+
+  if (!Array.isArray(scenario.behaviorPlan) || !scenario.behaviorPlan.length) {
+    throw new Error("AI behavior plan is empty or invalid.");
+  }
+
+  let expectedStart = 0;
+
+  for (let index = 0; index < scenario.behaviorPlan.length; index++) {
+    const phase = scenario.behaviorPlan[index];
+
+    if (!phase || typeof phase !== "object") {
+      throw new Error(`AI behavior phase ${index} is invalid.`);
+    }
+
+    if (Number(phase.startTimeSeconds) !== expectedStart) {
+      throw new Error(
+        `AI behavior phase ${index} has invalid startTimeSeconds. Expected ${expectedStart}, received ${phase.startTimeSeconds}.`
+      );
+    }
+
+    const duration = Number(phase.durationSeconds);
+
+    if (!Number.isFinite(duration) || duration <= 0) {
+      throw new Error(`AI behavior phase ${index} has invalid durationSeconds.`);
+    }
+
+    expectedStart += duration;
+  }
+
+  if (expectedStart !== Number(expectedDurationSec)) {
+    throw new Error(
+      `AI behavior plan does not end at expected duration. Expected ${expectedDurationSec}, received ${expectedStart}.`
+    );
+  }
+
+  return scenario;
+}
+
+async function invokeAiAssist(lambda, payload, durationSec, speed, unity, driverProfile, runId) {
+  const aiRequestBody = {
+    scenarioName: buildAiScenarioName(payload, runId),
+    durationSeconds: durationSec,
+    requestedContext: buildAiRequestedContext(payload, durationSec, speed, unity, driverProfile)
+  };
+
+  const aiEvent = {
+    requestContext: {
+      http: {
+        method: "POST"
+      }
+    },
+    httpMethod: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(aiRequestBody)
+  };
+
+  const response = await lambda.send(
+    new InvokeCommand({
+      FunctionName: AI_ASSIST_LAMBDA_NAME,
+      InvocationType: "RequestResponse",
+      Payload: Buffer.from(JSON.stringify(aiEvent), "utf8")
+    })
+  );
+
+  if (response.FunctionError) {
+    throw new Error(`AI assist Lambda failed with FunctionError=${response.FunctionError}`);
+  }
+
+  const lambdaResponse = parseInvokedLambdaPayload(response.Payload);
+  const statusCode = Number(lambdaResponse?.statusCode || 200);
+  const parsedBody = parseInvokedLambdaBody(lambdaResponse);
+
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(`AI assist Lambda returned HTTP ${statusCode}: ${JSON.stringify(parsedBody)}`);
+  }
+
+  if (parsedBody?.success === false) {
+    throw new Error(`AI assist Lambda returned success=false: ${JSON.stringify(parsedBody)}`);
+  }
+
+  return {
+    source: "trackster-simulator-ai-assist",
+    lambdaName: AI_ASSIST_LAMBDA_NAME,
+    modelId: parsedBody?.modelId || null,
+    requestedAt: new Date().toISOString(),
+    request: aiRequestBody,
+    scenario: validateAiBehaviorPlan(parsedBody, durationSec)
+  };
+}
+
 function assertSafeSqsMessageSize(messageBody) {
   const sizeBytes = Buffer.byteLength(messageBody, "utf8");
 
@@ -841,6 +1009,18 @@ module.exports.handler = async (event, context) => {
       });
     }
 
+    const lambda = new LambdaClient({ region: REGION });
+
+    const aiBehaviorPlan = await invokeAiAssist(
+      lambda,
+      p,
+      durationSec,
+      speed,
+      unity,
+      driverProfile,
+      runId
+    );
+
     const s3 = new S3Client({ region: REGION });
 
     const {
@@ -874,7 +1054,8 @@ module.exports.handler = async (event, context) => {
 
       s3Bucket,
 
-      compiledDbc
+      compiledDbc,
+      aiBehaviorPlan
     };
 
     const probeBody = JSON.stringify({
@@ -928,6 +1109,10 @@ module.exports.handler = async (event, context) => {
         gpsCoordinates,
         gpsCoordinateRuns: gpsCoordinates.length,
         gpsBlockCount
+      },
+
+      ai: {
+        aiBehaviorPlan
       },
 
       dbc: {
@@ -1040,6 +1225,7 @@ module.exports.handler = async (event, context) => {
       runManifestKey,
       runFolder: `${clientId}/${runId}`,
 
+      aiBehaviorPlan,
       sqsPayloadPreview
     });
   }

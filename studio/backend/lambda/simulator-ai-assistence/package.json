@@ -1,0 +1,16 @@
+{
+  "name": "simulator-ai-assistence",
+  "version": "1.0.0",
+  "description": "Trackster Simulator AI assistance Lambda using Amazon Bedrock Mantle",
+  "main": "simulator-ai-assistence.js",
+  "type": "module",
+  "scripts": {
+    "zip": "powershell Compress-Archive -Path index.mjs,package.json,package-lock.json,node_modules -DestinationPath simulator-ai-assistence.zip -Force"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/credential-provider-node": "^3.948.0",
+    "@smithy/protocol-http": "^5.3.5",
+    "@smithy/signature-v4": "^5.3.5"
+  }
+}
