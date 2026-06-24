@@ -381,12 +381,20 @@
     </div>
 
     <div class="actions">
-      <button type="button" class="payload-inline-toggle" (click)="openPayloadModal()">
+      <button type="button" class="payload-inline-toggle" (click)="openPayloadModal()" [disabled]="isSubmitting">
         Show payload preview
       </button>
       <button type="submit" [disabled]="form.invalid || isSubmitting">
         {{ isSubmitting ? 'Generating...' : 'Generate Simulation' }}
       </button>
+    </div>
+  </div>
+
+  <div class="generation-modal-backdrop" *ngIf="isGenerationModalOpen" role="presentation">
+    <div class="decoder-export-modal" role="dialog" aria-modal="true" aria-live="polite">
+      <div class="decoder-export-spinner" aria-hidden="true"></div>
+      <h2>{{ generationModalMessage }}</h2>
+      <p class="decoder-export-details">{{ generationModalDetails }}</p>
     </div>
   </div>
 </form>

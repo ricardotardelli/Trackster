@@ -15,6 +15,8 @@ import {
 } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { ComponentType } from '@angular/cdk/portal';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 
 import { AuthService } from '../auth/auth.service';
 import { environment } from '../../environments/environment';
@@ -81,6 +83,12 @@ interface DevelopmentRunManifest {
     resolvedCanFrames?: DevelopmentRunManifestResolvedCanFrame[];
     canFrames?: DevelopmentRunManifestResolvedCanFrame[];
   };
+}
+
+interface GenerationMonitor {
+  bucket: string;
+  prefix: string;
+  expectedBinCount: number;
 }
 
 @Component({
@@ -189,8 +197,11 @@ export class SimulatorComponent implements OnInit {
 
   isSubmitting = false;
   isConfigLoaded = false;
+  isGenerationModalOpen = false;
+  generationModalMessage = '';
+  generationModalDetails = '';
 
-  formStatus: 'pending' | 'awaiting_response' | 'generated' | 'error' = 'pending';
+  formStatus: 'pending' | 'awaiting_response' | 'generating' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
 
   isLoadingDbcOptions = false;
@@ -200,6 +211,9 @@ export class SimulatorComponent implements OnInit {
   private formValueChangesBound = false;
   private canFrameCatalog: CanFrameOption[] = [];
   private readonly developmentRunManifestUrl = 'assets/mock/run-manifest.json';
+  private readonly generationPollIntervalMs = 5000;
+  private readonly maxGenerationPollAttempts = 240;
+  private s3Region = 'us-east-1';
 
   readonly form = this.fb.nonNullable.group({
     amountOfVehicles: [1, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
@@ -271,6 +285,9 @@ export class SimulatorComponent implements OnInit {
   get formStatusLabel(): string {
     if (this.formStatus === 'awaiting_response') {
       return 'Awaiting Response';
+    }
+    if (this.formStatus === 'generating') {
+      return 'Generating';
     }
     if (this.formStatus === 'generated') {
       return 'Generated';
@@ -529,6 +546,10 @@ export class SimulatorComponent implements OnInit {
     this.generationTimestamp = this.makeGenerationTimestamp();
     this.formStatus = 'awaiting_response';
     this.isSubmitting = true;
+    this.openGenerationModal(
+      'Starting generation...',
+      'Sending the simulation request to the orchestrator.'
+    );
 
     try {
       if (this.isAuthDisabled()) {
@@ -555,6 +576,7 @@ export class SimulatorComponent implements OnInit {
 
         this.formStatus = 'generated';
         this.setPayloadValue(JSON.stringify(localResult, null, 2));
+        this.closeGenerationModal();
         return;
       }
 
@@ -612,12 +634,35 @@ export class SimulatorComponent implements OnInit {
       }
 
       if (response.ok) {
-        this.formStatus = 'generated';
-      }
+        const monitor = this.resolveGenerationMonitor(responseBody, request.body);
 
-      this.setPayloadValue(JSON.stringify(result, null, 2));
+        this.setPayloadValue(JSON.stringify(result, null, 2));
+
+        if (monitor) {
+          this.formStatus = 'generating';
+          this.openGenerationModal(
+            'Generating CAN frames...',
+            `Waiting for ${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} in S3.`
+          );
+
+          await this.waitForGeneratedBins(monitor);
+
+          this.formStatus = 'generated';
+          this.openGenerationModal(
+            'Generation completed.',
+            `${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} found in S3.`
+          );
+          this.closeGenerationModal();
+        } else {
+          this.formStatus = 'generated';
+          this.closeGenerationModal();
+        }
+      } else {
+        this.setPayloadValue(JSON.stringify(result, null, 2));
+      }
     } catch (error: unknown) {
       this.formStatus = 'error';
+      this.closeGenerationModal();
       const details = this.describeFetchError(error);
       this.setPayloadValue(JSON.stringify({
         request: {
@@ -645,6 +690,9 @@ export class SimulatorComponent implements OnInit {
     } finally {
       this.form.controls.payload.markAsTouched();
       this.isSubmitting = false;
+      if (this.formStatus !== 'generated') {
+        this.closeGenerationModal();
+      }
     }
   }
 
@@ -786,6 +834,10 @@ export class SimulatorComponent implements OnInit {
       throw new Error('s3Default missing or empty in config.json');
     }
 
+    if (typeof config.s3Region === 'string' && config.s3Region.trim()) {
+      this.s3Region = config.s3Region.trim();
+    }
+
     if (typeof config.engineURL !== 'string' || !config.engineURL.trim()) {
       throw new Error('engineURL missing or empty in config.json');
     }
@@ -872,6 +924,7 @@ export class SimulatorComponent implements OnInit {
     canFrames?: string[];
     workQueueUrl?: string;
     s3Default?: string;
+    s3Region?: string;
     engineURL?: string;
     dbcApi?: {
       folderCatalogUrl?: string;
@@ -903,6 +956,7 @@ export class SimulatorComponent implements OnInit {
           canFrames?: string[];
           workQueueUrl?: string;
           s3Default?: string;
+          s3Region?: string;
           engineURL?: string;
           dbcApi?: {
             folderCatalogUrl?: string;
@@ -1395,6 +1449,199 @@ export class SimulatorComponent implements OnInit {
       name: 'UnknownError',
       message: String(error)
     };
+  }
+
+  private openGenerationModal(message: string, details: string): void {
+    this.generationModalMessage = message;
+    this.generationModalDetails = details;
+    this.isGenerationModalOpen = true;
+  }
+
+  private closeGenerationModal(): void {
+    this.isGenerationModalOpen = false;
+    this.generationModalMessage = '';
+    this.generationModalDetails = '';
+  }
+
+  private async waitForGeneratedBins(monitor: GenerationMonitor): Promise<void> {
+    for (let attempt = 1; attempt <= this.maxGenerationPollAttempts; attempt += 1) {
+      const generatedBinCount = await this.countGeneratedBins(monitor.bucket, monitor.prefix);
+
+      this.generationModalDetails =
+        `Generated ${generatedBinCount}/${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'}.`;
+
+      if (generatedBinCount >= monitor.expectedBinCount) {
+        return;
+      }
+
+      await this.delay(this.generationPollIntervalMs);
+    }
+
+    throw new Error(
+      `Generation status check timed out. Expected ${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} under ${monitor.prefix}.`
+    );
+  }
+
+  private async countGeneratedBins(bucket: string, prefix: string): Promise<number> {
+    const session = await fetchAuthSession();
+
+    if (!session.credentials) {
+      throw new Error('Unable to retrieve AWS credentials for S3 status check.');
+    }
+
+    const s3Client = new S3Client({
+      region: this.s3Region,
+      credentials: session.credentials
+    });
+
+    let continuationToken: string | undefined;
+    let count = 0;
+
+    do {
+      const response = await s3Client.send(new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: this.normalizeS3Prefix(prefix),
+        ContinuationToken: continuationToken
+      }));
+
+      for (const object of response.Contents ?? []) {
+        const key = object.Key ?? '';
+        if (key.toLowerCase().endsWith('.bin') && (object.Size ?? 0) > 0) {
+          count += 1;
+        }
+      }
+
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return count;
+  }
+
+  private resolveGenerationMonitor(responseBody: unknown, requestBody: ReturnType<typeof this.buildEngineEnvelope>): GenerationMonitor | null {
+    const bucket =
+      this.extractFirstString(responseBody, ['bucket', 'bucketName', 's3Bucket', 'outputBucket']) ||
+      requestBody.s3Bucket;
+
+    const explicitPrefix = this.extractFirstString(responseBody, [
+      'prefix',
+      's3Prefix',
+      'outputPrefix',
+      'folder',
+      'folderName',
+      'outputFolder',
+      'destinationPrefix'
+    ]);
+
+    const binKey = this.extractFirstString(responseBody, [
+      'binKey',
+      's3Key',
+      'key',
+      'objectKey',
+      'outputKey',
+      'generatedBinKey'
+    ]);
+
+    const prefix = explicitPrefix || this.extractPrefixFromKey(binKey);
+
+    const expectedBinCount =
+      this.extractFirstNumber(responseBody, [
+        'expectedBinCount',
+        'expectedFiles',
+        'expectedFileCount',
+        'binCount',
+        'fileCount',
+        'amountOfVehicles'
+      ]) ?? Number(requestBody.amountOfVehicles);
+
+    if (!bucket || !prefix || !Number.isFinite(expectedBinCount) || expectedBinCount <= 0) {
+      return null;
+    }
+
+    return {
+      bucket: bucket.trim(),
+      prefix: this.normalizeS3Prefix(prefix),
+      expectedBinCount: Math.max(1, Math.floor(expectedBinCount))
+    };
+  }
+
+  private extractFirstString(value: unknown, keys: string[]): string | null {
+    const match = this.findFirstValueByKey(value, new Set(keys));
+
+    if (typeof match === 'string' && match.trim()) {
+      return match.trim();
+    }
+
+    return null;
+  }
+
+  private extractFirstNumber(value: unknown, keys: string[]): number | null {
+    const match = this.findFirstValueByKey(value, new Set(keys));
+
+    if (typeof match === 'number' && Number.isFinite(match)) {
+      return match;
+    }
+
+    if (typeof match === 'string' && match.trim() && Number.isFinite(Number(match))) {
+      return Number(match);
+    }
+
+    return null;
+  }
+
+  private findFirstValueByKey(value: unknown, keys: Set<string>): unknown {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = this.findFirstValueByKey(item, keys);
+        if (found !== null && found !== undefined) {
+          return found;
+        }
+      }
+      return null;
+    }
+
+    const record = value as Record<string, unknown>;
+
+    for (const key of Object.keys(record)) {
+      if (keys.has(key)) {
+        return record[key];
+      }
+    }
+
+    for (const key of Object.keys(record)) {
+      const found = this.findFirstValueByKey(record[key], keys);
+      if (found !== null && found !== undefined) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  private extractPrefixFromKey(key: string | null): string | null {
+    if (!key) {
+      return null;
+    }
+
+    const normalized = key.replace(/^\/+/, '');
+    const lastSlashIndex = normalized.lastIndexOf('/');
+
+    if (lastSlashIndex < 0) {
+      return '';
+    }
+
+    return normalized.slice(0, lastSlashIndex + 1);
+  }
+
+  private normalizeS3Prefix(prefix: string): string {
+    return prefix.replace(/^\/+/, '');
+  }
+
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
   }
 
   private describeHttpStatus(status: number): string {
