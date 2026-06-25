@@ -1,5 +1,6 @@
 import { Sha256 } from '@aws-crypto/sha256-js';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { HttpRequest } from '@smithy/protocol-http';
 import { SignatureV4 } from '@smithy/signature-v4';
 import { SQSClient, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
@@ -82,7 +83,8 @@ export const handler = async (event) => {
     console.error('Simulator AI assistance failed:', {
       name: error?.name,
       message: error?.message,
-      stack: error?.stack
+      stack: error?.stack,
+      validationErrors: error?.validationErrors || null
     });
 
     return buildResponse(500, {
@@ -92,7 +94,6 @@ export const handler = async (event) => {
     });
   }
 };
-
 
 function isDelegatedGenerationRequest(body) {
   return (
@@ -124,13 +125,21 @@ async function handleDelegatedGeneration(body) {
   const aiRequestBody = buildDelegatedScenarioRequestBody(body, baseMessage, vehicles);
   const scenarioResult = await generateValidatedSignalDeltaScenario(aiRequestBody);
 
+  const scenarioS3 = await saveScenarioJson({
+    body,
+    generation,
+    baseMessage,
+    scenarioResult
+  });
+
   const aiBehaviorPlan = {
     source: 'trackster-simulator-ai-assist',
     lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
     modelId,
     requestedAt: new Date().toISOString(),
     request: scenarioResult.scenarioRequest,
-    scenario: scenarioResult.scenario
+    scenario: scenarioResult.scenario,
+    scenarioS3
   };
 
   const enqueueResult = await enqueueWorkerMessages({
@@ -148,7 +157,9 @@ async function handleDelegatedGeneration(body) {
     clientId: body?.clientId || baseMessage?.clientId || null,
     vehicles: vehicles.length,
     sentBatches: enqueueResult.sentBatches,
-    messageSizeBytes: enqueueResult.messageSizeBytes
+    messageSizeBytes: enqueueResult.messageSizeBytes,
+    scenarioBucket: scenarioS3?.bucket || null,
+    scenarioKey: scenarioS3?.key || null
   });
 
   return {
@@ -161,7 +172,8 @@ async function handleDelegatedGeneration(body) {
     controlledSignals: scenarioResult.scenarioRequest.controlledSignals,
     enqueuedVehicles: vehicles.length,
     sentBatches: enqueueResult.sentBatches,
-    messageSizeBytes: enqueueResult.messageSizeBytes
+    messageSizeBytes: enqueueResult.messageSizeBytes,
+    scenarioS3
   };
 }
 
@@ -187,6 +199,127 @@ function buildDelegatedScenarioRequestBody(body, baseMessage, vehicles) {
     selectedCanFrames: Array.isArray(baseMessage.canFrames) ? baseMessage.canFrames.length : 0,
     availableSignals
   };
+}
+
+async function saveScenarioJson({ body, generation, baseMessage, scenarioResult }) {
+  const bucket = resolveScenarioBucket(generation, baseMessage);
+  const key = resolveScenarioKey(body, generation, baseMessage);
+
+  if (!bucket || !key) {
+    console.warn('Scenario JSON was not saved because the S3 bucket or key could not be resolved.', {
+      bucket,
+      key,
+      runId: body?.runId || baseMessage?.runId || null,
+      clientId: body?.clientId || baseMessage?.clientId || null
+    });
+
+    return null;
+  }
+
+  const scenarioDocument = {
+    schemaVersion: 'trackster-ai-scenario-file-v1',
+    generatedAt: new Date().toISOString(),
+    source: 'trackster-simulator-ai-assist',
+    lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
+    modelId,
+    requestId: body?.requestId || null,
+    runId: body?.runId || baseMessage?.runId || null,
+    clientId: body?.clientId || baseMessage?.clientId || null,
+    request: scenarioResult.scenarioRequest,
+    scenario: scenarioResult.scenario
+  };
+
+  const s3 = new S3Client({ region });
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: JSON.stringify(scenarioDocument, null, 2),
+      ContentType: 'application/json'
+    })
+  );
+
+  return {
+    bucket,
+    key,
+    fileName: 'scenario.json'
+  };
+}
+
+function resolveScenarioBucket(generation, baseMessage) {
+  return sanitizeText(
+    generation?.scenarioBucketName ||
+      generation?.bucketName ||
+      generation?.outputBucketName ||
+      generation?.rawBucketName ||
+      baseMessage?.scenarioBucketName ||
+      baseMessage?.bucketName ||
+      baseMessage?.outputBucketName ||
+      baseMessage?.rawBucketName ||
+      baseMessage?.s3BucketName ||
+      process.env.SCENARIO_BUCKET_NAME ||
+      process.env.OUTPUT_BUCKET_NAME ||
+      process.env.RAW_BUCKET_NAME ||
+      process.env.BIN_BUCKET_NAME ||
+      process.env.S3_BUCKET_NAME
+  );
+}
+
+function resolveScenarioKey(body, generation, baseMessage) {
+  const explicitKey = sanitizeText(
+    generation?.scenarioKey ||
+      generation?.scenarioJsonKey ||
+      baseMessage?.scenarioKey ||
+      baseMessage?.scenarioJsonKey
+  );
+
+  if (explicitKey) {
+    return normalizeS3Key(explicitKey);
+  }
+
+  const folder = sanitizeText(
+    generation?.outputPrefix ||
+      generation?.s3Prefix ||
+      generation?.folderKey ||
+      generation?.folderPath ||
+      generation?.runPrefix ||
+      baseMessage?.outputPrefix ||
+      baseMessage?.s3Prefix ||
+      baseMessage?.folderKey ||
+      baseMessage?.folderPath ||
+      baseMessage?.runPrefix
+  );
+
+  if (folder) {
+    return `${normalizeS3Prefix(folder)}scenario.json`;
+  }
+
+  const clientId = sanitizeText(body?.clientId || baseMessage?.clientId);
+  const runId = sanitizeText(body?.runId || baseMessage?.runId);
+
+  if (clientId && runId) {
+    return `${normalizeS3Prefix(clientId)}${normalizeS3Prefix(runId)}scenario.json`;
+  }
+
+  return '';
+}
+
+function normalizeS3Prefix(value) {
+  const normalized = normalizeS3Key(value);
+
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.endsWith('/') ? normalized : `${normalized}/`;
+}
+
+function normalizeS3Key(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\/{2,}/g, '/');
 }
 
 async function generateValidatedSignalDeltaScenario(body) {
@@ -741,6 +874,7 @@ function validateSignalBehavior(errors, behavior, signalName, phaseIndex, previo
 
   if (Number.isFinite(previousEnd) && Number.isFinite(start)) {
     const tolerance = Math.max(1, Math.abs(previousEnd) * 0.05);
+
     if (Math.abs(start - previousEnd) > tolerance) {
       errors.push(`${signalName} phase ${phaseIndex}: start is not coherent with previous phase end.`);
     }

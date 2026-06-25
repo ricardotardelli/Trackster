@@ -683,7 +683,7 @@ export class SimulatorComponent implements OnInit {
           });
           this.openGenerationSuccessModal(
             'Generation completed successfully.',
-            'Simulation files were generated successfully.'
+            this.buildGeneratedFilesSuccessMessage(generatedBinCount)
           );
         } else {
           this.formStatus = 'generated';
@@ -1587,7 +1587,7 @@ export class SimulatorComponent implements OnInit {
     for (let attempt = 1; attempt <= this.maxGenerationPollAttempts; attempt += 1) {
       const generatedBinCount = await this.countGeneratedBins(monitor.bucket, monitor.prefix);
 
-      this.generationWorkflowMessage = 'Esperando pela AI para que ela componha o cenário de simulação.';
+      this.generationWorkflowMessage = 'Trackster AI is generating the driver scenario based on selected parameters';
       this.generationWorkflowDetails =
         `Generated ${generatedBinCount}/${monitor.expectedBinCount} simulation file${monitor.expectedBinCount === 1 ? '' : 's'}.`;
 
@@ -1601,6 +1601,16 @@ export class SimulatorComponent implements OnInit {
     throw new Error(
       `Generation status check timed out. Expected ${monitor.expectedBinCount} simulation file${monitor.expectedBinCount === 1 ? '' : 's'}.`
     );
+  }
+
+  private buildGeneratedFilesSuccessMessage(generatedFiles: number): string {
+    const safeGeneratedFiles = Number.isFinite(generatedFiles)
+      ? Math.max(0, Math.floor(generatedFiles))
+      : 0;
+
+    const fileWord = safeGeneratedFiles === 1 ? 'file was' : 'files were';
+
+    return `${safeGeneratedFiles} simulation ${fileWord} generated successfully.`;
   }
 
   private async countGeneratedBins(bucket: string, prefix: string): Promise<number> {
