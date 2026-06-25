@@ -390,26 +390,48 @@
     </div>
   </div>
 
-  <div class="generation-modal-backdrop" *ngIf="isGenerationModalOpen" role="presentation">
-    <div class="decoder-export-modal" role="dialog" aria-modal="true" aria-live="polite">
-      <div class="decoder-export-spinner" aria-hidden="true"></div>
-      <h2>{{ generationModalMessage }}</h2>
-      <p class="decoder-export-details">{{ generationModalDetails }}</p>
-    </div>
-  </div>
-
-  <div class="generation-modal-backdrop" *ngIf="isGenerationSuccessModalOpen" role="presentation">
-    <div class="decoder-export-modal" role="dialog" aria-modal="true" aria-live="polite">
-      <div class="decoder-export-success-icon" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 24 24" focusable="false">
-          <path d="M9.2 16.2 4.8 11.8 3.4 13.2 9.2 19 21 7.2 19.6 5.8z"></path>
-        </svg>
-      </div>
-      <h2>{{ generationSuccessMessage }}</h2>
-      <p class="decoder-export-details">{{ generationSuccessDetails }}</p>
-      <div class="decoder-export-actions">
-        <button type="button" (click)="closeGenerationSuccessModal()">OK</button>
-      </div>
-    </div>
-  </div>
 </form>
+
+<ng-template #generationWorkflowDialog>
+  <div class="decoder-export-modal">
+    <div
+      class="decoder-export-spinner"
+      *ngIf="generationWorkflowState === 'running'"
+    ></div>
+
+    <mat-icon
+      class="decoder-export-success-icon"
+      *ngIf="generationWorkflowState === 'success'"
+    >
+      check_circle
+    </mat-icon>
+
+    <mat-icon
+      class="decoder-export-error-icon"
+      *ngIf="generationWorkflowState === 'error'"
+    >
+      error
+    </mat-icon>
+
+    <h3>{{ generationWorkflowTitle }}</h3>
+
+    <p>{{ generationWorkflowMessage }}</p>
+
+    <span
+      class="decoder-export-details"
+      *ngIf="generationWorkflowDetails"
+    >
+      {{ generationWorkflowDetails }}
+    </span>
+
+    <button
+      type="button"
+      class="trackster-admin-button primary"
+      *ngIf="generationWorkflowState === 'success' || generationWorkflowState === 'error'"
+      (click)="closeGenerationWorkflowDialog()"
+    >
+      <mat-icon>check_circle</mat-icon>
+      <span>OK</span>
+    </button>
+  </div>
+</ng-template>

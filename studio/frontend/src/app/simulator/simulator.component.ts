@@ -11,9 +11,12 @@ import {
   Component,
   ElementRef,
   HostListener,
-  OnInit
+  OnInit,
+  TemplateRef,
+  ViewChild
 } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 import { ComponentType } from '@angular/cdk/portal';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
@@ -91,18 +94,23 @@ interface GenerationMonitor {
   expectedBinCount: number;
 }
 
+type GenerationWorkflowState = 'idle' | 'running' | 'success' | 'error';
+
 @Component({
   selector: 'app-simulator',
   standalone: true,
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    FormsModule
+    FormsModule,
+    MatIconModule
   ],
   templateUrl: './simulator.component.html',
   styleUrl: './simulator.component.css'
 })
 export class SimulatorComponent implements OnInit {
+  @ViewChild('generationWorkflowDialog') generationWorkflowDialog?: TemplateRef<unknown>;
+
   constructor(
     private readonly fb: FormBuilder,
     private readonly elementRef: ElementRef<HTMLElement>,
@@ -197,12 +205,11 @@ export class SimulatorComponent implements OnInit {
 
   isSubmitting = false;
   isConfigLoaded = false;
-  isGenerationModalOpen = false;
-  generationModalMessage = '';
-  generationModalDetails = '';
-  isGenerationSuccessModalOpen = false;
-  generationSuccessMessage = '';
-  generationSuccessDetails = '';
+
+  generationWorkflowState: GenerationWorkflowState = 'idle';
+  generationWorkflowTitle = '';
+  generationWorkflowMessage = '';
+  generationWorkflowDetails = '';
 
   formStatus: 'pending' | 'awaiting_response' | 'generating' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
@@ -213,6 +220,7 @@ export class SimulatorComponent implements OnInit {
   private suppressFormReset = false;
   private formValueChangesBound = false;
   private canFrameCatalog: CanFrameOption[] = [];
+  private generationWorkflowDialogRef?: MatDialogRef<unknown>;
   private readonly developmentRunManifestUrl = 'assets/mock/run-manifest.json';
   private readonly generationPollIntervalMs = 5000;
   private readonly maxGenerationPollAttempts = 240;
@@ -547,7 +555,8 @@ export class SimulatorComponent implements OnInit {
     };
     const generationStartedAtMs = performance.now();
 
-    this.closeGenerationSuccessModal();
+    this.closeGenerationWorkflowDialogOnly();
+    this.resetGenerationWorkflowDialog();
     this.generationTimestamp = this.makeGenerationTimestamp();
     this.formStatus = 'awaiting_response';
     this.isSubmitting = true;
@@ -656,8 +665,8 @@ export class SimulatorComponent implements OnInit {
         if (monitor) {
           this.formStatus = 'generating';
           this.openGenerationModal(
-            'Generating CAN frames...',
-            `Waiting for ${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} in S3.`
+            'Generating simulation...',
+            'Esperando pela AI para que ela componha o cenário de simulação.'
           );
 
           const generatedBinCount = await this.waitForGeneratedBins(monitor);
@@ -674,7 +683,7 @@ export class SimulatorComponent implements OnInit {
           });
           this.openGenerationSuccessModal(
             'Generation completed successfully.',
-            `${generatedBinCount}/${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} generated in S3.`
+            'Simulation files were generated successfully.'
           );
         } else {
           this.formStatus = 'generated';
@@ -687,11 +696,16 @@ export class SimulatorComponent implements OnInit {
           });
           this.openGenerationSuccessModal(
             'Generation request accepted.',
-            'The orchestrator accepted the request, but no S3 monitor information was returned.'
+            'The simulation request was accepted successfully.'
           );
         }
       } else {
         this.setPayloadValue(JSON.stringify(result, null, 2));
+        this.openGenerationErrorModal(
+          'Generation failed',
+          `The simulation request failed with status ${response.status}.`,
+          this.describeHttpStatus(response.status)
+        );
       }
     } catch (error: unknown) {
       this.formStatus = 'error';
@@ -720,10 +734,16 @@ export class SimulatorComponent implements OnInit {
           ]
         }
       }, null, 2));
+
+      this.openGenerationErrorModal(
+        'Generation failed',
+        String(details['message'] || 'Unable to complete the simulation generation.'),
+        'Please check the browser console and try again.'
+      );
     } finally {
       this.form.controls.payload.markAsTouched();
       this.isSubmitting = false;
-      if (this.formStatus !== 'generated') {
+      if (this.formStatus !== 'generated' && this.generationWorkflowState === 'running') {
         this.closeGenerationModal();
       }
     }
@@ -1484,28 +1504,72 @@ export class SimulatorComponent implements OnInit {
     };
   }
 
-  private openGenerationModal(message: string, details: string): void {
-    this.generationModalMessage = message;
-    this.generationModalDetails = details;
-    this.isGenerationModalOpen = true;
+  private openGenerationModal(title: string, message: string, details = ''): void {
+    this.generationWorkflowState = 'running';
+    this.generationWorkflowTitle = title;
+    this.generationWorkflowMessage = message;
+    this.generationWorkflowDetails = details;
+
+    this.ensureGenerationWorkflowDialogOpen();
   }
 
   private closeGenerationModal(): void {
-    this.isGenerationModalOpen = false;
-    this.generationModalMessage = '';
-    this.generationModalDetails = '';
+    this.closeGenerationWorkflowDialogOnly();
   }
 
-  closeGenerationSuccessModal(): void {
-    this.isGenerationSuccessModalOpen = false;
-    this.generationSuccessMessage = '';
-    this.generationSuccessDetails = '';
+  closeGenerationWorkflowDialog(): void {
+    if (this.generationWorkflowState === 'running') {
+      return;
+    }
+
+    this.closeGenerationWorkflowDialogOnly();
+    this.resetGenerationWorkflowDialog();
   }
 
-  private openGenerationSuccessModal(message: string, details: string): void {
-    this.generationSuccessMessage = message;
-    this.generationSuccessDetails = details;
-    this.isGenerationSuccessModalOpen = true;
+  private openGenerationSuccessModal(title: string, message: string, details = ''): void {
+    this.generationWorkflowState = 'success';
+    this.generationWorkflowTitle = title;
+    this.generationWorkflowMessage = message;
+    this.generationWorkflowDetails = details;
+
+    this.ensureGenerationWorkflowDialogOpen();
+  }
+
+  private openGenerationErrorModal(title: string, message: string, details = ''): void {
+    this.generationWorkflowState = 'error';
+    this.generationWorkflowTitle = title;
+    this.generationWorkflowMessage = message;
+    this.generationWorkflowDetails = details;
+
+    this.ensureGenerationWorkflowDialogOpen();
+  }
+
+  private ensureGenerationWorkflowDialogOpen(): void {
+    if (!this.generationWorkflowDialog || this.generationWorkflowDialogRef) {
+      return;
+    }
+
+    this.generationWorkflowDialogRef = this.dialog.open(this.generationWorkflowDialog, {
+      width: '440px',
+      panelClass: 'trackster-admin-workflow-dialog-panel',
+      disableClose: true
+    });
+  }
+
+  private closeGenerationWorkflowDialogOnly(): void {
+    if (!this.generationWorkflowDialogRef) {
+      return;
+    }
+
+    this.generationWorkflowDialogRef.close();
+    this.generationWorkflowDialogRef = undefined;
+  }
+
+  private resetGenerationWorkflowDialog(): void {
+    this.generationWorkflowState = 'idle';
+    this.generationWorkflowTitle = '';
+    this.generationWorkflowMessage = '';
+    this.generationWorkflowDetails = '';
   }
 
   private logGenerationDuration(startedAtMs: number, details: Record<string, unknown>): void {
@@ -1523,8 +1587,9 @@ export class SimulatorComponent implements OnInit {
     for (let attempt = 1; attempt <= this.maxGenerationPollAttempts; attempt += 1) {
       const generatedBinCount = await this.countGeneratedBins(monitor.bucket, monitor.prefix);
 
-      this.generationModalDetails =
-        `Generated ${generatedBinCount}/${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'}.`;
+      this.generationWorkflowMessage = 'Esperando pela AI para que ela componha o cenário de simulação.';
+      this.generationWorkflowDetails =
+        `Generated ${generatedBinCount}/${monitor.expectedBinCount} simulation file${monitor.expectedBinCount === 1 ? '' : 's'}.`;
 
       if (generatedBinCount >= monitor.expectedBinCount) {
         return generatedBinCount;
@@ -1534,7 +1599,7 @@ export class SimulatorComponent implements OnInit {
     }
 
     throw new Error(
-      `Generation status check timed out. Expected ${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} under ${monitor.prefix}.`
+      `Generation status check timed out. Expected ${monitor.expectedBinCount} simulation file${monitor.expectedBinCount === 1 ? '' : 's'}.`
     );
   }
 
