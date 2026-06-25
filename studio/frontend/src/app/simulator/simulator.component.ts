@@ -665,8 +665,8 @@ export class SimulatorComponent implements OnInit {
         if (monitor) {
           this.formStatus = 'generating';
           this.openGenerationModal(
-            'Generating simulation...',
-            'Esperando pela AI para que ela componha o cenário de simulação.'
+            'Generating realistic simulation...',
+            'Trackster AI is composing a realistic driving scenario based on the selected signals.'
           );
 
           const generatedBinCount = await this.waitForGeneratedBins(monitor);
