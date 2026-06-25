@@ -11,10 +11,9 @@
 //     idf = "standard" | "extended"
 //   Store run-manifest.json in:
 //     <clientId>/<timestamp>/run-manifest.json
-//   Send one SQS message per vehicle.
+//   Prepare runtime payload and delegate AI-assisted SQS enqueue to ai-assistance.
 // ============================================================================
 
-const { SQSClient, SendMessageBatchCommand } = require("@aws-sdk/client-sqs");
 const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
@@ -707,6 +706,18 @@ async function buildRuntimeCompiledDbc(s3, clientId, dbcFiles, canFrames) {
   };
 }
 
+function assertSafeSqsMessageSize(messageBody) {
+  const sizeBytes = Buffer.byteLength(messageBody, "utf8");
+
+  if (sizeBytes > MAX_SAFE_SQS_BYTES) {
+    throw new Error(
+      `SQS message body too large (${sizeBytes} bytes). Safe limit is ${MAX_SAFE_SQS_BYTES} bytes.`
+    );
+  }
+
+  return sizeBytes;
+}
+
 
 function buildAiScenarioName(payload, runId) {
   const explicitName = String(payload?.aiScenarioName || payload?.scenarioName || "").trim();
@@ -739,94 +750,30 @@ function buildAiRequestedContext(payload, durationSec, speed, unity, driverProfi
   ].join(" ");
 }
 
-function parseInvokedLambdaPayload(payload) {
-  if (!payload) {
-    return null;
-  }
-
-  const text = Buffer.from(payload).toString("utf8");
-
-  if (!text) {
-    return null;
-  }
-
-  return JSON.parse(text);
-}
-
-function parseInvokedLambdaBody(lambdaResponse) {
-  if (!lambdaResponse || typeof lambdaResponse !== "object") {
-    throw new Error("AI assist Lambda returned an empty response.");
-  }
-
-  if (typeof lambdaResponse.body === "string") {
-    return JSON.parse(lambdaResponse.body);
-  }
-
-  if (lambdaResponse.body && typeof lambdaResponse.body === "object") {
-    return lambdaResponse.body;
-  }
-
-  return lambdaResponse;
-}
-
-function validateAiBehaviorPlan(aiResult, expectedDurationSec) {
-  const scenario = aiResult?.scenario || aiResult?.aiBehaviorPlan || aiResult;
-
-  if (!scenario || typeof scenario !== "object") {
-    throw new Error("AI assist response does not contain a scenario object.");
-  }
-
-  if (Number(scenario.durationSeconds) !== Number(expectedDurationSec)) {
-    throw new Error(
-      `AI behavior plan duration mismatch. Expected ${expectedDurationSec}, received ${scenario.durationSeconds}.`
-    );
-  }
-
-  if (!Array.isArray(scenario.behaviorPlan) || !scenario.behaviorPlan.length) {
-    throw new Error("AI behavior plan is empty or invalid.");
-  }
-
-  let expectedStart = 0;
-
-  for (let index = 0; index < scenario.behaviorPlan.length; index++) {
-    const phase = scenario.behaviorPlan[index];
-
-    if (!phase || typeof phase !== "object") {
-      throw new Error(`AI behavior phase ${index} is invalid.`);
-    }
-
-    if (Number(phase.startTimeSeconds) !== expectedStart) {
-      throw new Error(
-        `AI behavior phase ${index} has invalid startTimeSeconds. Expected ${expectedStart}, received ${phase.startTimeSeconds}.`
-      );
-    }
-
-    const duration = Number(phase.durationSeconds);
-
-    if (!Number.isFinite(duration) || duration <= 0) {
-      throw new Error(`AI behavior phase ${index} has invalid durationSeconds.`);
-    }
-
-    expectedStart += duration;
-  }
-
-  if (expectedStart !== Number(expectedDurationSec)) {
-    throw new Error(
-      `AI behavior plan does not end at expected duration. Expected ${expectedDurationSec}, received ${expectedStart}.`
-    );
-  }
-
-  return scenario;
-}
-
-async function invokeAiAssist(lambda, payload, durationSec, speed, unity, driverProfile, runId) {
+function buildAiAssistEvent({
+  requestId,
+  runId,
+  clientId,
+  originalPayload,
+  baseMessage,
+  vehicles,
+  workQueueUrl,
+  durationSec,
+  speed,
+  unity,
+  driverProfile,
+  sqsBatch,
+  maxSafeSqsBytes
+}) {
   const aiRequestBody = {
-    scenarioName: buildAiScenarioName(payload, runId),
+    scenarioName: buildAiScenarioName(originalPayload, runId),
     durationSeconds: durationSec,
-    requestedContext: buildAiRequestedContext(payload, durationSec, speed, unity, driverProfile)
+    requestedContext: buildAiRequestedContext(originalPayload, durationSec, speed, unity, driverProfile)
   };
 
-  const aiEvent = {
+  return {
+    source: "trackster-orchestrator",
+    action: "generate_ai_behavior_and_enqueue_worker_messages",
     requestContext: {
       http: {
         method: "POST"
@@ -836,53 +783,31 @@ async function invokeAiAssist(lambda, payload, durationSec, speed, unity, driver
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(aiRequestBody)
-  };
-
-  const response = await lambda.send(
-    new InvokeCommand({
-      FunctionName: AI_ASSIST_LAMBDA_NAME,
-      InvocationType: "RequestResponse",
-      Payload: Buffer.from(JSON.stringify(aiEvent), "utf8")
+    body: JSON.stringify({
+      requestId,
+      runId,
+      customerId: clientId,
+      clientId,
+      aiRequest: aiRequestBody,
+      generation: {
+        baseMessage,
+        vehicles,
+        workQueueUrl,
+        sqsBatch,
+        maxSafeSqsBytes
+      }
     })
-  );
-
-  if (response.FunctionError) {
-    throw new Error(`AI assist Lambda failed with FunctionError=${response.FunctionError}`);
-  }
-
-  const lambdaResponse = parseInvokedLambdaPayload(response.Payload);
-  const statusCode = Number(lambdaResponse?.statusCode || 200);
-  const parsedBody = parseInvokedLambdaBody(lambdaResponse);
-
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(`AI assist Lambda returned HTTP ${statusCode}: ${JSON.stringify(parsedBody)}`);
-  }
-
-  if (parsedBody?.success === false) {
-    throw new Error(`AI assist Lambda returned success=false: ${JSON.stringify(parsedBody)}`);
-  }
-
-  return {
-    source: "trackster-simulator-ai-assist",
-    lambdaName: AI_ASSIST_LAMBDA_NAME,
-    modelId: parsedBody?.modelId || null,
-    requestedAt: new Date().toISOString(),
-    request: aiRequestBody,
-    scenario: validateAiBehaviorPlan(parsedBody, durationSec)
   };
 }
 
-function assertSafeSqsMessageSize(messageBody) {
-  const sizeBytes = Buffer.byteLength(messageBody, "utf8");
-
-  if (sizeBytes > MAX_SAFE_SQS_BYTES) {
-    throw new Error(
-      `SQS message body too large (${sizeBytes} bytes). Safe limit is ${MAX_SAFE_SQS_BYTES} bytes.`
-    );
-  }
-
-  return sizeBytes;
+async function invokeAiAssistAsync(lambda, aiAssistEvent) {
+  await lambda.send(
+    new InvokeCommand({
+      FunctionName: AI_ASSIST_LAMBDA_NAME,
+      InvocationType: "Event",
+      Payload: Buffer.from(JSON.stringify(aiAssistEvent), "utf8")
+    })
+  );
 }
 
 module.exports.handler = async (event, context) => {
@@ -1009,18 +934,6 @@ module.exports.handler = async (event, context) => {
       });
     }
 
-    const lambda = new LambdaClient({ region: REGION });
-
-    const aiBehaviorPlan = await invokeAiAssist(
-      lambda,
-      p,
-      durationSec,
-      speed,
-      unity,
-      driverProfile,
-      runId
-    );
-
     const s3 = new S3Client({ region: REGION });
 
     const {
@@ -1054,8 +967,7 @@ module.exports.handler = async (event, context) => {
 
       s3Bucket,
 
-      compiledDbc,
-      aiBehaviorPlan
+      compiledDbc
     };
 
     const probeBody = JSON.stringify({
@@ -1111,10 +1023,6 @@ module.exports.handler = async (event, context) => {
         gpsBlockCount
       },
 
-      ai: {
-        aiBehaviorPlan
-      },
-
       dbc: {
         dbcFiles,
         canFrames,
@@ -1130,9 +1038,15 @@ module.exports.handler = async (event, context) => {
 
       vehicles,
 
+      ai: {
+        status: "pending_ai_assist",
+        lambdaName: AI_ASSIST_LAMBDA_NAME
+      },
+
       sqs: {
         queueUrl: workQueueUrl,
-        messageSizeBytes
+        messageSizeBytes,
+        enqueueOwner: "ai-assistance"
       }
     };
 
@@ -1146,42 +1060,29 @@ module.exports.handler = async (event, context) => {
       `[ORCHESTRATOR] requestId=${requestId} runId=${runId} clientId=${clientId} vehicles=${vehicles.length} canIds=${resolvedCanIds.length} canFrames=${resolvedCanFrames.length} messageSizeBytes=${messageSizeBytes} queue=${workQueueUrl}`
     );
 
-    const sqs = new SQSClient({ region: REGION });
+    const lambda = new LambdaClient({ region: REGION });
 
-    const allEntries = vehicles.map((v, idx) => ({
-      Id: `v-${idx}`,
-      MessageBody: JSON.stringify({
-        ...baseMessage,
-        vin: v.vin,
-        type: v.type,
-        vehicleIndex: idx
-      })
-    }));
+    const aiAssistEvent = buildAiAssistEvent({
+      requestId,
+      runId,
+      clientId,
+      originalPayload: p,
+      baseMessage,
+      vehicles,
+      workQueueUrl,
+      durationSec,
+      speed,
+      unity,
+      driverProfile,
+      sqsBatch: SQS_BATCH,
+      maxSafeSqsBytes: MAX_SAFE_SQS_BYTES
+    });
 
-    let sentBatches = 0;
+    await invokeAiAssistAsync(lambda, aiAssistEvent);
 
-    for (let i = 0; i < allEntries.length; i += SQS_BATCH) {
-      const batch = allEntries.slice(i, i + SQS_BATCH);
-
-      const resp = await sqs.send(
-        new SendMessageBatchCommand({
-          QueueUrl: workQueueUrl,
-          Entries: batch
-        })
-      );
-
-      sentBatches++;
-
-      if (resp.Failed && resp.Failed.length) {
-        console.error("[ORCHESTRATOR] SQS batch failures:", JSON.stringify(resp.Failed, null, 2));
-
-        return httpResp(500, {
-          requestId,
-          error: "SQS SendMessageBatch failed",
-          failed: resp.Failed
-        });
-      }
-    }
+    console.log(
+      `[ORCHESTRATOR] ai-assistance invoked asynchronously: lambda=${AI_ASSIST_LAMBDA_NAME} runId=${runId} vehicles=${vehicles.length}`
+    );
 
     return httpResp(202, {
       requestId,
@@ -1190,9 +1091,14 @@ module.exports.handler = async (event, context) => {
       customerId: clientId,
       clientId,
 
-      enqueued_vehicles: vehicles.length,
-      sentBatches,
+      status: "accepted",
+      processingMode: "async_ai_assist",
+      expectedBinCount: vehicles.length,
+      acceptedVehicles: vehicles.length,
+      enqueued_vehicles: 0,
+      sentBatches: 0,
       queue_url: workQueueUrl,
+      aiAssistLambdaName: AI_ASSIST_LAMBDA_NAME,
 
       intervalSec,
       durationSec,
@@ -1225,7 +1131,6 @@ module.exports.handler = async (event, context) => {
       runManifestKey,
       runFolder: `${clientId}/${runId}`,
 
-      aiBehaviorPlan,
       sqsPayloadPreview
     });
   }

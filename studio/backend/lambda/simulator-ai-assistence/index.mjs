@@ -2,6 +2,7 @@ import { Sha256 } from '@aws-crypto/sha256-js';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 import { HttpRequest } from '@smithy/protocol-http';
 import { SignatureV4 } from '@smithy/signature-v4';
+import { SQSClient, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
 
 const defaultHeaders = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
@@ -45,6 +46,8 @@ const PREFERRED_SIGNAL_NAMES = [
 const MAX_CONTROLLED_SIGNALS = Number.parseInt(process.env.MAX_AI_CONTROLLED_SIGNALS || '8', 10);
 const DEFAULT_PHASE_COUNT = Number.parseInt(process.env.AI_PHASE_COUNT || '6', 10);
 const DEFAULT_MAX_TOKENS = Number.parseInt(process.env.BEDROCK_MAX_TOKENS || '8192', 10);
+const DEFAULT_SQS_BATCH = Number.parseInt(process.env.SQS_BATCH || '10', 10);
+const DEFAULT_MAX_SAFE_SQS_BYTES = Number.parseInt(process.env.MAX_SAFE_SQS_BYTES || String(900 * 1024), 10);
 
 export const handler = async (event) => {
   if (event.requestContext?.http?.method === 'OPTIONS' || event.httpMethod === 'OPTIONS') {
@@ -60,29 +63,20 @@ export const handler = async (event) => {
 
   try {
     const body = parseBody(event.body);
-    const scenarioRequest = buildScenarioRequest(body);
-    const prompt = buildSignalDeltaPrompt(scenarioRequest);
-    const mantleResponse = await callBedrockMantle(prompt);
-    const responseText = extractTextFromMantleResponse(mantleResponse);
 
-    const scenario = parseJsonResponse(responseText);
-    const validation = validateSignalDeltaScenario(scenario, scenarioRequest);
-
-    if (!validation.valid) {
-      return buildResponse(422, {
-        success: false,
-        message: 'Bedrock returned an invalid signal delta scenario.',
-        validationErrors: validation.errors,
-        rawResponse: responseText
-      });
+    if (isDelegatedGenerationRequest(body)) {
+      const result = await handleDelegatedGeneration(body);
+      return buildResponse(202, result);
     }
+
+    const scenarioResult = await generateValidatedSignalDeltaScenario(body);
 
     return buildResponse(200, {
       success: true,
       modelId,
-      schemaVersion: scenarioRequest.schemaVersion,
-      controlledSignals: scenarioRequest.controlledSignals,
-      scenario
+      schemaVersion: scenarioResult.scenarioRequest.schemaVersion,
+      controlledSignals: scenarioResult.scenarioRequest.controlledSignals,
+      scenario: scenarioResult.scenario
     });
   } catch (error) {
     console.error('Simulator AI assistance failed:', {
@@ -98,6 +92,228 @@ export const handler = async (event) => {
     });
   }
 };
+
+
+function isDelegatedGenerationRequest(body) {
+  return (
+    body?.action === 'generate_ai_behavior_and_enqueue_worker_messages' ||
+    Boolean(body?.generation?.baseMessage && Array.isArray(body?.generation?.vehicles))
+  );
+}
+
+async function handleDelegatedGeneration(body) {
+  const generation = body?.generation || {};
+  const baseMessage = generation.baseMessage;
+  const vehicles = Array.isArray(generation.vehicles) ? generation.vehicles : [];
+  const workQueueUrl = String(generation.workQueueUrl || '').trim();
+  const sqsBatch = toPositiveInteger(generation.sqsBatch, DEFAULT_SQS_BATCH);
+  const maxSafeSqsBytes = toPositiveInteger(generation.maxSafeSqsBytes, DEFAULT_MAX_SAFE_SQS_BYTES);
+
+  if (!baseMessage || typeof baseMessage !== 'object') {
+    throw new Error('Delegated generation payload is missing generation.baseMessage.');
+  }
+
+  if (!vehicles.length) {
+    throw new Error('Delegated generation payload is missing generation.vehicles.');
+  }
+
+  if (!workQueueUrl) {
+    throw new Error('Delegated generation payload is missing generation.workQueueUrl.');
+  }
+
+  const aiRequestBody = buildDelegatedScenarioRequestBody(body, baseMessage, vehicles);
+  const scenarioResult = await generateValidatedSignalDeltaScenario(aiRequestBody);
+
+  const aiBehaviorPlan = {
+    source: 'trackster-simulator-ai-assist',
+    lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
+    modelId,
+    requestedAt: new Date().toISOString(),
+    request: scenarioResult.scenarioRequest,
+    scenario: scenarioResult.scenario
+  };
+
+  const enqueueResult = await enqueueWorkerMessages({
+    baseMessage,
+    vehicles,
+    workQueueUrl,
+    sqsBatch,
+    maxSafeSqsBytes,
+    aiBehaviorPlan
+  });
+
+  console.log('Simulator AI assistance completed delegated generation:', {
+    requestId: body?.requestId || null,
+    runId: body?.runId || baseMessage?.runId || null,
+    clientId: body?.clientId || baseMessage?.clientId || null,
+    vehicles: vehicles.length,
+    sentBatches: enqueueResult.sentBatches,
+    messageSizeBytes: enqueueResult.messageSizeBytes
+  });
+
+  return {
+    success: true,
+    status: 'enqueued',
+    requestId: body?.requestId || null,
+    runId: body?.runId || baseMessage?.runId || null,
+    clientId: body?.clientId || baseMessage?.clientId || null,
+    modelId,
+    controlledSignals: scenarioResult.scenarioRequest.controlledSignals,
+    enqueuedVehicles: vehicles.length,
+    sentBatches: enqueueResult.sentBatches,
+    messageSizeBytes: enqueueResult.messageSizeBytes
+  };
+}
+
+function buildDelegatedScenarioRequestBody(body, baseMessage, vehicles) {
+  const aiRequest = body?.aiRequest || {};
+  const availableSignals = normalizeStringArray(aiRequest.availableSignals).length
+    ? normalizeStringArray(aiRequest.availableSignals)
+    : extractAvailableSignalNamesFromCompiledDbc(baseMessage.compiledDbc);
+
+  return {
+    ...aiRequest,
+    durationSeconds: toPositiveInteger(aiRequest.durationSeconds, baseMessage.durationSec || 1200),
+    sampleIntervalSeconds: toPositiveInteger(aiRequest.sampleIntervalSeconds, baseMessage.intervalSec || 5),
+    requestedContext: sanitizeText(aiRequest.requestedContext) || 'realistic urban driving signal delta scenario',
+    driverProfile: sanitizeText(aiRequest.driverProfile) || sanitizeText(baseMessage.driverProfile) || 'Balanced',
+    targetSpeed: Number.isFinite(Number(aiRequest.targetSpeed)) ? Number(aiRequest.targetSpeed) : Number(baseMessage.speed),
+    distanceUnit: sanitizeText(aiRequest.distanceUnit) || sanitizeText(baseMessage.unity) || 'Km',
+    simulationMode: sanitizeText(aiRequest.simulationMode) || '',
+    generationType: sanitizeText(aiRequest.generationType) || '',
+    routeRegion: sanitizeText(aiRequest.routeRegion) || '',
+    initialDateTime: sanitizeText(aiRequest.initialDateTime) || '',
+    amountOfVehicles: vehicles.length,
+    selectedCanFrames: Array.isArray(baseMessage.canFrames) ? baseMessage.canFrames.length : 0,
+    availableSignals
+  };
+}
+
+async function generateValidatedSignalDeltaScenario(body) {
+  const scenarioRequest = buildScenarioRequest(body);
+  const prompt = buildSignalDeltaPrompt(scenarioRequest);
+  const mantleResponse = await callBedrockMantle(prompt);
+  const responseText = extractTextFromMantleResponse(mantleResponse);
+
+  const scenario = parseJsonResponse(responseText);
+  const validation = validateSignalDeltaScenario(scenario, scenarioRequest);
+
+  if (!validation.valid) {
+    const error = new Error('Bedrock returned an invalid signal delta scenario.');
+    error.validationErrors = validation.errors;
+    error.rawResponse = responseText;
+    throw error;
+  }
+
+  return {
+    scenarioRequest,
+    scenario,
+    rawResponse: responseText
+  };
+}
+
+function extractAvailableSignalNamesFromCompiledDbc(compiledDbc) {
+  const names = [];
+  const fields = Array.isArray(compiledDbc?.f) ? compiledDbc.f : [];
+  const nameIndex = fields.indexOf('n');
+
+  if (!compiledDbc?.m || typeof compiledDbc.m !== 'object') {
+    return names;
+  }
+
+  for (const entries of Object.values(compiledDbc.m)) {
+    if (!Array.isArray(entries)) {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const signals = Array.isArray(entry?.frame?.s) ? entry.frame.s : [];
+
+      for (const signal of signals) {
+        let signalName = '';
+
+        if (Array.isArray(signal)) {
+          const candidate = nameIndex >= 0 ? signal[nameIndex] : signal[8];
+          signalName = String(candidate || '').trim();
+        } else if (signal && typeof signal === 'object') {
+          signalName = String(signal.n || signal.name || '').trim();
+        }
+
+        if (signalName) {
+          names.push(signalName);
+        }
+      }
+    }
+  }
+
+  return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+}
+
+async function enqueueWorkerMessages({
+  baseMessage,
+  vehicles,
+  workQueueUrl,
+  sqsBatch,
+  maxSafeSqsBytes,
+  aiBehaviorPlan
+}) {
+  const sqs = new SQSClient({ region });
+
+  const allEntries = vehicles.map((vehicle, index) => {
+    const messageBody = JSON.stringify({
+      ...baseMessage,
+      aiBehaviorPlan,
+      vin: vehicle.vin,
+      type: vehicle.type || 'car',
+      vehicleIndex: index
+    });
+
+    return {
+      Id: `v-${index}`,
+      MessageBody: messageBody
+    };
+  });
+
+  const probeBody = allEntries[0]?.MessageBody || '';
+  const messageSizeBytes = assertSafeSqsMessageSize(probeBody, maxSafeSqsBytes);
+
+  let sentBatches = 0;
+
+  for (let index = 0; index < allEntries.length; index += sqsBatch) {
+    const batch = allEntries.slice(index, index + sqsBatch);
+
+    const response = await sqs.send(
+      new SendMessageBatchCommand({
+        QueueUrl: workQueueUrl,
+        Entries: batch
+      })
+    );
+
+    sentBatches += 1;
+
+    if (response.Failed && response.Failed.length) {
+      console.error('Simulator AI assistance SQS batch failures:', JSON.stringify(response.Failed, null, 2));
+      throw new Error(`SQS SendMessageBatch failed with ${response.Failed.length} failed message(s).`);
+    }
+  }
+
+  return {
+    sentBatches,
+    messageSizeBytes
+  };
+}
+
+function assertSafeSqsMessageSize(messageBody, maxSafeSqsBytes) {
+  const sizeBytes = Buffer.byteLength(messageBody, 'utf8');
+
+  if (sizeBytes > maxSafeSqsBytes) {
+    throw new Error(
+      `SQS message body too large (${sizeBytes} bytes). Safe limit is ${maxSafeSqsBytes} bytes.`
+    );
+  }
+
+  return sizeBytes;
+}
 
 async function callBedrockMantle(prompt) {
   const requestBody = JSON.stringify({

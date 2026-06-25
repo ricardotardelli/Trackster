@@ -200,6 +200,9 @@ export class SimulatorComponent implements OnInit {
   isGenerationModalOpen = false;
   generationModalMessage = '';
   generationModalDetails = '';
+  isGenerationSuccessModalOpen = false;
+  generationSuccessMessage = '';
+  generationSuccessDetails = '';
 
   formStatus: 'pending' | 'awaiting_response' | 'generating' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
@@ -542,7 +545,9 @@ export class SimulatorComponent implements OnInit {
       url: this.form.controls.engineUrl.value,
       body: envelope
     };
+    const generationStartedAtMs = performance.now();
 
+    this.closeGenerationSuccessModal();
     this.generationTimestamp = this.makeGenerationTimestamp();
     this.formStatus = 'awaiting_response';
     this.isSubmitting = true;
@@ -577,6 +582,16 @@ export class SimulatorComponent implements OnInit {
         this.formStatus = 'generated';
         this.setPayloadValue(JSON.stringify(localResult, null, 2));
         this.closeGenerationModal();
+        this.logGenerationDuration(generationStartedAtMs, {
+          status: 'generated',
+          mode: 'local',
+          expectedBinCount: 0,
+          generatedBinCount: 0
+        });
+        this.openGenerationSuccessModal(
+          'Generation completed successfully.',
+          'Local mode completed without sending the request to the orchestrator.'
+        );
         return;
       }
 
@@ -645,17 +660,35 @@ export class SimulatorComponent implements OnInit {
             `Waiting for ${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} in S3.`
           );
 
-          await this.waitForGeneratedBins(monitor);
+          const generatedBinCount = await this.waitForGeneratedBins(monitor);
 
           this.formStatus = 'generated';
-          this.openGenerationModal(
-            'Generation completed.',
-            `${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} found in S3.`
-          );
           this.closeGenerationModal();
+          this.logGenerationDuration(generationStartedAtMs, {
+            status: 'generated',
+            mode: 's3-polling',
+            bucket: monitor.bucket,
+            prefix: monitor.prefix,
+            expectedBinCount: monitor.expectedBinCount,
+            generatedBinCount
+          });
+          this.openGenerationSuccessModal(
+            'Generation completed successfully.',
+            `${generatedBinCount}/${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'} generated in S3.`
+          );
         } else {
           this.formStatus = 'generated';
           this.closeGenerationModal();
+          this.logGenerationDuration(generationStartedAtMs, {
+            status: 'generated',
+            mode: 'http-response-only',
+            expectedBinCount: Number(request.body.amountOfVehicles),
+            generatedBinCount: null
+          });
+          this.openGenerationSuccessModal(
+            'Generation request accepted.',
+            'The orchestrator accepted the request, but no S3 monitor information was returned.'
+          );
         }
       } else {
         this.setPayloadValue(JSON.stringify(result, null, 2));
@@ -1463,7 +1496,30 @@ export class SimulatorComponent implements OnInit {
     this.generationModalDetails = '';
   }
 
-  private async waitForGeneratedBins(monitor: GenerationMonitor): Promise<void> {
+  closeGenerationSuccessModal(): void {
+    this.isGenerationSuccessModalOpen = false;
+    this.generationSuccessMessage = '';
+    this.generationSuccessDetails = '';
+  }
+
+  private openGenerationSuccessModal(message: string, details: string): void {
+    this.generationSuccessMessage = message;
+    this.generationSuccessDetails = details;
+    this.isGenerationSuccessModalOpen = true;
+  }
+
+  private logGenerationDuration(startedAtMs: number, details: Record<string, unknown>): void {
+    const durationMs = Math.max(0, performance.now() - startedAtMs);
+    const durationSeconds = Number((durationMs / 1000).toFixed(3));
+
+    console.log('[SIMULATOR] Generation completed.', {
+      durationMs: Math.round(durationMs),
+      durationSeconds,
+      ...details
+    });
+  }
+
+  private async waitForGeneratedBins(monitor: GenerationMonitor): Promise<number> {
     for (let attempt = 1; attempt <= this.maxGenerationPollAttempts; attempt += 1) {
       const generatedBinCount = await this.countGeneratedBins(monitor.bucket, monitor.prefix);
 
@@ -1471,7 +1527,7 @@ export class SimulatorComponent implements OnInit {
         `Generated ${generatedBinCount}/${monitor.expectedBinCount} BIN file${monitor.expectedBinCount === 1 ? '' : 's'}.`;
 
       if (generatedBinCount >= monitor.expectedBinCount) {
-        return;
+        return generatedBinCount;
       }
 
       await this.delay(this.generationPollIntervalMs);
@@ -1528,6 +1584,7 @@ export class SimulatorComponent implements OnInit {
       'outputPrefix',
       'folder',
       'folderName',
+      'runFolder',
       'outputFolder',
       'destinationPrefix'
     ]);
@@ -1548,6 +1605,9 @@ export class SimulatorComponent implements OnInit {
         'expectedBinCount',
         'expectedFiles',
         'expectedFileCount',
+        'expectedVehicles',
+        'enqueued_vehicles',
+        'enqueuedVehicles',
         'binCount',
         'fileCount',
         'amountOfVehicles'

@@ -397,4 +397,19 @@
       <p class="decoder-export-details">{{ generationModalDetails }}</p>
     </div>
   </div>
+
+  <div class="generation-modal-backdrop" *ngIf="isGenerationSuccessModalOpen" role="presentation">
+    <div class="decoder-export-modal" role="dialog" aria-modal="true" aria-live="polite">
+      <div class="decoder-export-success-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" focusable="false">
+          <path d="M9.2 16.2 4.8 11.8 3.4 13.2 9.2 19 21 7.2 19.6 5.8z"></path>
+        </svg>
+      </div>
+      <h2>{{ generationSuccessMessage }}</h2>
+      <p class="decoder-export-details">{{ generationSuccessDetails }}</p>
+      <div class="decoder-export-actions">
+        <button type="button" (click)="closeGenerationSuccessModal()">OK</button>
+      </div>
+    </div>
+  </div>
 </form>
