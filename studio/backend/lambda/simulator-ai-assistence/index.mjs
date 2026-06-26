@@ -1,6 +1,10 @@
 import { Sha256 } from '@aws-crypto/sha256-js';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand
+} from '@aws-sdk/client-s3';
 import { HttpRequest } from '@smithy/protocol-http';
 import { SignatureV4 } from '@smithy/signature-v4';
 import { SQSClient, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
@@ -17,34 +21,8 @@ const modelId = process.env.BEDROCK_MODEL_ID || 'google.gemma-4-31b';
 const mantleHost = `bedrock-mantle.${region}.api.aws`;
 const mantlePath = '/openai/v1/chat/completions';
 
-const DEFAULT_CONTROLLED_SIGNALS = [
-  'VehicleSpeedKph',
-  'EngineRpm',
-  'CoolantTemperatureC',
-  'FuelLevelPercent',
-  'AcceleratorPedalPercent',
-  'BrakePedalPercent'
-];
+const s3Client = new S3Client({ region });
 
-const PREFERRED_SIGNAL_NAMES = [
-  'VehicleSpeedKph',
-  'Speed',
-  'WheelSpeed',
-  'EngineRpm',
-  'RPM',
-  'CoolantTemperatureC',
-  'EngineCoolantTemp',
-  'FuelLevelPercent',
-  'FuelLevel',
-  'AcceleratorPedalPercent',
-  'AcceleratorPedal',
-  'ThrottlePosition',
-  'BrakePedalPercent',
-  'BrakePedal',
-  'BrakePressure'
-];
-
-const MAX_CONTROLLED_SIGNALS = Number.parseInt(process.env.MAX_AI_CONTROLLED_SIGNALS || '8', 10);
 const DEFAULT_PHASE_COUNT = Number.parseInt(process.env.AI_PHASE_COUNT || '6', 10);
 const DEFAULT_MAX_TOKENS = Number.parseInt(process.env.BEDROCK_MAX_TOKENS || '8192', 10);
 const DEFAULT_SQS_BATCH = Number.parseInt(process.env.SQS_BATCH || '10', 10);
@@ -158,8 +136,10 @@ async function handleDelegatedGeneration(body) {
     vehicles: vehicles.length,
     sentBatches: enqueueResult.sentBatches,
     messageSizeBytes: enqueueResult.messageSizeBytes,
-    scenarioBucket: scenarioS3?.bucket || null,
-    scenarioKey: scenarioS3?.key || null
+    scenarioBucket: scenarioS3.bucket,
+    scenarioKey: scenarioS3.key,
+    promptBucket: scenarioResult.promptSource.bucket,
+    promptKey: scenarioResult.promptSource.key
   });
 
   return {
@@ -205,15 +185,12 @@ async function saveScenarioJson({ body, generation, baseMessage, scenarioResult 
   const bucket = resolveScenarioBucket(generation, baseMessage);
   const key = resolveScenarioKey(body, generation, baseMessage);
 
-  if (!bucket || !key) {
-    console.warn('Scenario JSON was not saved because the S3 bucket or key could not be resolved.', {
-      bucket,
-      key,
-      runId: body?.runId || baseMessage?.runId || null,
-      clientId: body?.clientId || baseMessage?.clientId || null
-    });
+  if (!bucket) {
+    throw new Error('Unable to save scenario.json because no S3 bucket was resolved.');
+  }
 
-    return null;
+  if (!key) {
+    throw new Error('Unable to save scenario.json because no S3 key or output folder was resolved.');
   }
 
   const scenarioDocument = {
@@ -222,6 +199,7 @@ async function saveScenarioJson({ body, generation, baseMessage, scenarioResult 
     source: 'trackster-simulator-ai-assist',
     lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
     modelId,
+    prompt: scenarioResult.promptSource,
     requestId: body?.requestId || null,
     runId: body?.runId || baseMessage?.runId || null,
     clientId: body?.clientId || baseMessage?.clientId || null,
@@ -229,9 +207,7 @@ async function saveScenarioJson({ body, generation, baseMessage, scenarioResult 
     scenario: scenarioResult.scenario
   };
 
-  const s3 = new S3Client({ region });
-
-  await s3.send(
+  await s3Client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -255,6 +231,7 @@ function resolveScenarioBucket(generation, baseMessage) {
       generation?.rawBucketName ||
       baseMessage?.scenarioBucketName ||
       baseMessage?.bucketName ||
+      baseMessage?.s3Bucket ||
       baseMessage?.outputBucketName ||
       baseMessage?.rawBucketName ||
       baseMessage?.s3BucketName ||
@@ -278,17 +255,43 @@ function resolveScenarioKey(body, generation, baseMessage) {
     return normalizeS3Key(explicitKey);
   }
 
+  const existingArtifactKey = sanitizeText(
+    generation?.manifestKey ||
+      generation?.runManifestKey ||
+      generation?.binKey ||
+      generation?.s3Key ||
+      generation?.objectKey ||
+      baseMessage?.manifestKey ||
+      baseMessage?.runManifestKey ||
+      baseMessage?.binKey ||
+      baseMessage?.s3Key ||
+      baseMessage?.objectKey
+  );
+
+  const artifactFolder = extractFolderFromS3Key(existingArtifactKey);
+  if (artifactFolder) {
+    return `${normalizeS3Prefix(artifactFolder)}scenario.json`;
+  }
+
   const folder = sanitizeText(
     generation?.outputPrefix ||
       generation?.s3Prefix ||
+      generation?.prefix ||
       generation?.folderKey ||
       generation?.folderPath ||
       generation?.runPrefix ||
+      generation?.runFolder ||
+      generation?.outputFolder ||
+      generation?.destinationPrefix ||
       baseMessage?.outputPrefix ||
       baseMessage?.s3Prefix ||
+      baseMessage?.prefix ||
       baseMessage?.folderKey ||
       baseMessage?.folderPath ||
-      baseMessage?.runPrefix
+      baseMessage?.runPrefix ||
+      baseMessage?.runFolder ||
+      baseMessage?.outputFolder ||
+      baseMessage?.destinationPrefix
   );
 
   if (folder) {
@@ -296,13 +299,29 @@ function resolveScenarioKey(body, generation, baseMessage) {
   }
 
   const clientId = sanitizeText(body?.clientId || baseMessage?.clientId);
-  const runId = sanitizeText(body?.runId || baseMessage?.runId);
+  const runId = sanitizeText(body?.runId || baseMessage?.runId || body?.requestId || baseMessage?.requestId);
 
   if (clientId && runId) {
     return `${normalizeS3Prefix(clientId)}${normalizeS3Prefix(runId)}scenario.json`;
   }
 
   return '';
+}
+
+function extractFolderFromS3Key(key) {
+  const normalized = normalizeS3Key(key);
+
+  if (!normalized) {
+    return '';
+  }
+
+  const lastSlashIndex = normalized.lastIndexOf('/');
+
+  if (lastSlashIndex < 0) {
+    return '';
+  }
+
+  return normalized.slice(0, lastSlashIndex + 1);
 }
 
 function normalizeS3Prefix(value) {
@@ -318,30 +337,350 @@ function normalizeS3Prefix(value) {
 function normalizeS3Key(value) {
   return String(value || '')
     .trim()
-    .replace(/^\/+/, '')
+    .replace(/^\/+/g, '')
     .replace(/\/{2,}/g, '/');
 }
 
 async function generateValidatedSignalDeltaScenario(body) {
   const scenarioRequest = buildScenarioRequest(body);
-  const prompt = buildSignalDeltaPrompt(scenarioRequest);
-  const mantleResponse = await callBedrockMantle(prompt);
-  const responseText = extractTextFromMantleResponse(mantleResponse);
 
-  const scenario = parseJsonResponse(responseText);
+  const phasePlanPromptTemplate = await loadPromptTemplate('PHASE_PLAN_PROMPT_KEY');
+  const phasePlanPrompt = buildPhasePlanPrompt(phasePlanPromptTemplate.template, scenarioRequest);
+  const phasePlanResponse = await callBedrockMantle(phasePlanPrompt);
+  const phasePlanText = extractTextFromMantleResponse(phasePlanResponse);
+  const phasePlan = parseJsonResponse(phasePlanText);
+
+  const phasePlanValidation = validatePhasePlan(phasePlan, scenarioRequest);
+  if (!phasePlanValidation.valid) {
+    const error = new Error('Bedrock returned an invalid phase plan.');
+    error.validationErrors = phasePlanValidation.errors;
+    error.rawResponse = phasePlanText;
+    throw error;
+  }
+
+  const phaseBehaviorPromptTemplate = await loadPromptTemplate('PHASE_BEHAVIOR_PROMPT_KEY');
+  const behaviorPhases = [];
+  const rawBehaviorResponses = [];
+
+  for (let phaseIndex = 0; phaseIndex < phasePlan.ph.length; phaseIndex += 1) {
+    const phase = phasePlan.ph[phaseIndex];
+    const previousPhase = behaviorPhases[phaseIndex - 1] || null;
+
+    const phaseBehaviorPrompt = buildPhaseBehaviorPrompt(
+      phaseBehaviorPromptTemplate.template,
+      scenarioRequest,
+      phasePlan,
+      phase,
+      phaseIndex,
+      previousPhase
+    );
+
+    const phaseBehaviorResponse = await callBedrockMantle(phaseBehaviorPrompt);
+    const phaseBehaviorText = extractTextFromMantleResponse(phaseBehaviorResponse);
+    const phaseBehavior = parseJsonResponse(phaseBehaviorText);
+
+    const normalizedPhaseBehavior = normalizePhaseBehaviorResponse(phaseBehavior, phase);
+    const phaseBehaviorValidation = validateSinglePhaseBehavior(
+      normalizedPhaseBehavior,
+      scenarioRequest,
+      phase,
+      phaseIndex,
+      previousPhase
+    );
+
+    if (!phaseBehaviorValidation.valid) {
+      const error = new Error(`Bedrock returned an invalid behavior for phase ${phaseIndex}.`);
+      error.validationErrors = phaseBehaviorValidation.errors;
+      error.rawResponse = phaseBehaviorText;
+      throw error;
+    }
+
+    behaviorPhases.push(normalizedPhaseBehavior);
+    rawBehaviorResponses.push({
+      phaseIndex,
+      phaseName: phase.n,
+      rawResponse: phaseBehaviorText
+    });
+  }
+
+  const scenario = {
+    n: scenarioRequest.scenarioName,
+    dur: scenarioRequest.durationSeconds,
+    dt: scenarioRequest.sampleIntervalSeconds,
+    ph: behaviorPhases
+  };
+
   const validation = validateSignalDeltaScenario(scenario, scenarioRequest);
 
   if (!validation.valid) {
-    const error = new Error('Bedrock returned an invalid signal delta scenario.');
+    const error = new Error('Merged signal delta scenario is invalid.');
     error.validationErrors = validation.errors;
-    error.rawResponse = responseText;
+    error.rawResponse = JSON.stringify({ phasePlan, behaviorPhases }, null, 2);
     throw error;
   }
 
   return {
     scenarioRequest,
+    phasePlan,
     scenario,
-    rawResponse: responseText
+    rawResponse: JSON.stringify({ phasePlan, behaviorPhases }, null, 2),
+    rawBehaviorResponses,
+    promptSource: {
+      phasePlan: phasePlanPromptTemplate.source,
+      phaseBehavior: phaseBehaviorPromptTemplate.source
+    }
+  };
+}
+
+async function loadPromptTemplate(promptKeyEnvironmentVariableName) {
+  const bucket = sanitizeText(process.env.PROMPT_BUCKET);
+  const key = normalizeS3Key(process.env[promptKeyEnvironmentVariableName]);
+
+  if (!bucket) {
+    throw new Error('PROMPT_BUCKET environment variable was not defined.');
+  }
+
+  if (!key) {
+    throw new Error(`${promptKeyEnvironmentVariableName} environment variable was not defined.`);
+  }
+
+  const response = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key
+    })
+  );
+
+  if (!response.Body) {
+    throw new Error(`Prompt file is empty or unreadable: s3://${bucket}/${key}`);
+  }
+
+  const template = await response.Body.transformToString('utf8');
+
+  if (!template.trim()) {
+    throw new Error(`Prompt file is empty: s3://${bucket}/${key}`);
+  }
+
+  return {
+    template,
+    source: {
+      bucket,
+      key
+    }
+  };
+}
+
+function buildPhasePlanPrompt(template, request) {
+  return renderPromptTemplate(template, {
+    scenarioName: request.scenarioName,
+    durationSeconds: String(request.durationSeconds),
+    sampleIntervalSeconds: String(request.sampleIntervalSeconds),
+    phaseCount: String(request.phaseCount),
+    requestedContext: request.requestedContext,
+    driverProfile: request.driverProfile,
+    targetSpeed: formatTargetSpeed(request),
+    simulationMode: request.simulationMode || 'not specified',
+    generationType: request.generationType || 'not specified',
+    routeRegion: request.routeRegion || 'not specified',
+    initialDateTime: request.initialDateTime || 'not specified',
+    selectedCanFrames: String(request.selectedCanFrames),
+    amountOfVehicles: String(request.amountOfVehicles)
+  });
+}
+
+function buildPhaseBehaviorPrompt(template, request, phasePlan, phase, phaseIndex, previousPhase) {
+  const availableSignalsText = request.controlledSignals.map((signal) => `- ${signal}`).join('\n');
+
+  return renderPromptTemplate(template, {
+    scenarioName: request.scenarioName,
+    durationSeconds: String(request.durationSeconds),
+    sampleIntervalSeconds: String(request.sampleIntervalSeconds),
+    phaseCount: String(request.phaseCount),
+    requestedContext: request.requestedContext,
+    driverProfile: request.driverProfile,
+    targetSpeed: formatTargetSpeed(request),
+    simulationMode: request.simulationMode || 'not specified',
+    generationType: request.generationType || 'not specified',
+    routeRegion: request.routeRegion || 'not specified',
+    initialDateTime: request.initialDateTime || 'not specified',
+    selectedCanFrames: String(request.selectedCanFrames),
+    amountOfVehicles: String(request.amountOfVehicles),
+    availableSignals: availableSignalsText,
+    phasePlanJson: JSON.stringify(phasePlan, null, 2),
+    phaseJson: JSON.stringify(phase, null, 2),
+    phaseIndex: String(phaseIndex),
+    phaseName: String(phase.n || ''),
+    phaseFrom: String(phase.from),
+    phaseTo: String(phase.to),
+    previousPhaseJson: previousPhase ? JSON.stringify(previousPhase, null, 2) : 'null'
+  });
+}
+
+function renderPromptTemplate(template, values) {
+  let rendered = String(template || '');
+
+  for (const [key, value] of Object.entries(values)) {
+    rendered = rendered.replaceAll(`{{${key}}}`, String(value ?? ''));
+  }
+
+  return rendered.trim();
+}
+
+function formatTargetSpeed(request) {
+  return Number.isFinite(request.targetSpeed)
+    ? `${request.targetSpeed} ${request.distanceUnit}/h`
+    : 'not specified';
+}
+
+function normalizePhaseBehaviorResponse(phaseBehavior, phasePlanPhase) {
+  if (phaseBehavior?.s && typeof phaseBehavior.s === 'object') {
+    return {
+      n: String(phaseBehavior.n || phasePlanPhase.n || '').trim(),
+      from: Number(phaseBehavior.from),
+      to: Number(phaseBehavior.to),
+      s: phaseBehavior.s
+    };
+  }
+
+  if (phaseBehavior?.phase?.s && typeof phaseBehavior.phase.s === 'object') {
+    return {
+      n: String(phaseBehavior.phase.n || phasePlanPhase.n || '').trim(),
+      from: Number(phaseBehavior.phase.from),
+      to: Number(phaseBehavior.phase.to),
+      s: phaseBehavior.phase.s
+    };
+  }
+
+  return phaseBehavior;
+}
+
+function validatePhasePlan(phasePlan, request) {
+  const errors = [];
+
+  if (!phasePlan || typeof phasePlan !== 'object') {
+    errors.push('Phase plan must be an object.');
+    return { valid: false, errors };
+  }
+
+  if (typeof phasePlan.n !== 'string' || !phasePlan.n.trim()) {
+    errors.push('Phase plan n must be a non-empty string.');
+  }
+
+  if (Number(phasePlan.dur) !== Number(request.durationSeconds)) {
+    errors.push(`Phase plan dur must be exactly ${request.durationSeconds}.`);
+  }
+
+  if (Number(phasePlan.dt) !== Number(request.sampleIntervalSeconds)) {
+    errors.push(`Phase plan dt must be exactly ${request.sampleIntervalSeconds}.`);
+  }
+
+  if (!Array.isArray(phasePlan.ph) || phasePlan.ph.length !== request.phaseCount) {
+    errors.push(`Phase plan ph must contain exactly ${request.phaseCount} phases.`);
+    return { valid: false, errors };
+  }
+
+  let expectedFrom = 0;
+
+  for (let phaseIndex = 0; phaseIndex < phasePlan.ph.length; phaseIndex += 1) {
+    const phase = phasePlan.ph[phaseIndex];
+
+    if (!phase || typeof phase !== 'object') {
+      errors.push(`Phase plan ph[${phaseIndex}] must be an object.`);
+      continue;
+    }
+
+    if (typeof phase.n !== 'string' || !phase.n.trim()) {
+      errors.push(`Phase plan ph[${phaseIndex}].n must be a non-empty string.`);
+    }
+
+    const from = Number(phase.from);
+    const to = Number(phase.to);
+
+    if (!Number.isFinite(from) || from !== expectedFrom) {
+      errors.push(`Phase plan ph[${phaseIndex}].from must be ${expectedFrom}.`);
+    }
+
+    if (!Number.isFinite(to) || to <= from) {
+      errors.push(`Phase plan ph[${phaseIndex}].to must be greater than from.`);
+    }
+
+    if (phase.s !== undefined) {
+      errors.push(`Phase plan ph[${phaseIndex}] must not contain signal behavior map s.`);
+    }
+
+    expectedFrom = to;
+  }
+
+  if (expectedFrom !== Number(request.durationSeconds)) {
+    errors.push(`Final phase plan phase must end at ${request.durationSeconds}.`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+function validateSinglePhaseBehavior(phaseBehavior, request, phasePlanPhase, phaseIndex, previousPhase) {
+  const errors = [];
+
+  if (!phaseBehavior || typeof phaseBehavior !== 'object') {
+    errors.push(`Phase behavior ${phaseIndex} must be an object.`);
+    return { valid: false, errors };
+  }
+
+  if (typeof phaseBehavior.n !== 'string' || !phaseBehavior.n.trim()) {
+    errors.push(`Phase behavior ${phaseIndex}.n must be a non-empty string.`);
+  }
+
+  if (String(phaseBehavior.n || '').trim() !== String(phasePlanPhase.n || '').trim()) {
+    errors.push(`Phase behavior ${phaseIndex}.n must match phase plan name ${phasePlanPhase.n}.`);
+  }
+
+  if (Number(phaseBehavior.from) !== Number(phasePlanPhase.from)) {
+    errors.push(`Phase behavior ${phaseIndex}.from must be ${phasePlanPhase.from}.`);
+  }
+
+  if (Number(phaseBehavior.to) !== Number(phasePlanPhase.to)) {
+    errors.push(`Phase behavior ${phaseIndex}.to must be ${phasePlanPhase.to}.`);
+  }
+
+  if (!phaseBehavior.s || typeof phaseBehavior.s !== 'object' || Array.isArray(phaseBehavior.s)) {
+    errors.push(`Phase behavior ${phaseIndex}.s must be a signal behavior map.`);
+    return { valid: false, errors };
+  }
+
+  const expectedSignals = new Set(request.controlledSignals);
+  const previousSignalEnds = new Map();
+
+  if (previousPhase?.s && typeof previousPhase.s === 'object') {
+    for (const [signalName, behavior] of Object.entries(previousPhase.s)) {
+      const end = Number(behavior?.end);
+      if (Number.isFinite(end)) {
+        previousSignalEnds.set(signalName, end);
+      }
+    }
+  }
+
+  for (const signalName of expectedSignals) {
+    if (!Object.prototype.hasOwnProperty.call(phaseBehavior.s, signalName)) {
+      errors.push(`Phase behavior ${phaseIndex}.s is missing signal ${signalName}.`);
+    }
+  }
+
+  for (const signalName of Object.keys(phaseBehavior.s)) {
+    if (!expectedSignals.has(signalName)) {
+      errors.push(`Phase behavior ${phaseIndex}.s contains unexpected signal ${signalName}.`);
+    }
+  }
+
+  for (const [signalName, behavior] of Object.entries(phaseBehavior.s)) {
+    validateSignalBehavior(errors, behavior, signalName, phaseIndex, previousSignalEnds.get(signalName));
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
   };
 }
 
@@ -536,158 +875,19 @@ function buildScenarioRequest(body) {
 }
 
 function resolveControlledSignals(availableSignals) {
-  if (!availableSignals.length) {
-    return DEFAULT_CONTROLLED_SIGNALS;
+  const uniqueSignals = Array.from(new Set(availableSignals));
+
+  if (!uniqueSignals.length) {
+    throw new Error('No available signals were found for AI scenario generation.');
   }
 
-  const remaining = new Set(availableSignals);
-  const selected = [];
-
-  for (const preferred of PREFERRED_SIGNAL_NAMES) {
-    const exact = availableSignals.find((name) => name === preferred);
-    const fuzzy = availableSignals.find((name) => {
-      const normalizedName = normalizeSignalNameForMatch(name);
-      const normalizedPreferred = normalizeSignalNameForMatch(preferred);
-      return normalizedName.includes(normalizedPreferred) || normalizedPreferred.includes(normalizedName);
-    });
-
-    const match = exact || fuzzy;
-
-    if (match && remaining.has(match) && selected.length < MAX_CONTROLLED_SIGNALS) {
-      selected.push(match);
-      remaining.delete(match);
-    }
-  }
-
-  for (const signalName of availableSignals) {
-    if (selected.length >= MAX_CONTROLLED_SIGNALS) {
-      break;
-    }
-
-    if (remaining.has(signalName)) {
-      selected.push(signalName);
-      remaining.delete(signalName);
-    }
-  }
-
-  return selected.length ? selected : DEFAULT_CONTROLLED_SIGNALS;
+  return uniqueSignals;
 }
 
 function normalizeSignalNameForMatch(value) {
   return String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
-}
-
-function buildSignalDeltaPrompt(request) {
-  const availableSignalsText = request.controlledSignals.map((signal) => `- ${signal}`).join('\n');
-  const targetSpeedText = Number.isFinite(request.targetSpeed)
-    ? `${request.targetSpeed} ${request.distanceUnit}/h`
-    : 'not specified';
-
-  return `
-You are generating executable signal behavior instructions for a CAN telemetry simulator.
-
-Return ONLY valid JSON.
-Do not include markdown.
-Do not include explanations.
-Do not include comments.
-Do not include any text outside the JSON.
-
-The worker will execute the result directly.
-
-Worker execution logic:
-- Each signal starts at "start".
-- At every dt seconds, the worker applies the next delta from "d".
-- When the delta array ends, the worker repeats it.
-- The worker clamps values between min and max.
-- The worker may validate that the calculated final value is close to "end".
-- The worker applies deltas until the phase time ends or the value reaches the configured min/max safety boundary.
-- Pay attention to deltas and make sure the repeated delta calculation moves the value close to the intended end value without depending on clamp.
-
-Generate a realistic urban driving scenario.
-
-Scenario context:
-- Scenario name: ${request.scenarioName}
-- Requested context: ${request.requestedContext}
-- Driver profile: ${request.driverProfile}
-- Target speed: ${targetSpeedText}
-- Simulation mode: ${request.simulationMode || 'not specified'}
-- Generation type: ${request.generationType || 'not specified'}
-- Route region: ${request.routeRegion || 'not specified'}
-- Initial date/time: ${request.initialDateTime || 'not specified'}
-- Selected CAN frames: ${request.selectedCanFrames}
-
-Available signals:
-${availableSignalsText}
-
-Global rules:
-- dur must be exactly ${request.durationSeconds}.
-- dt must be exactly ${request.sampleIntervalSeconds}.
-- Create exactly ${request.phaseCount} phases.
-- Phases must be ordered.
-- Phases must not overlap.
-- First phase starts at 0.
-- Final phase ends at ${request.durationSeconds}.
-- Every phase must contain every available signal listed above.
-
-Signal rules:
-- Every signal must contain: start, end, min, max, d.
-- start must be >= min.
-- start must be <= max.
-- end must be >= min.
-- end must be <= max.
-- min must be <= max.
-- d must contain only numeric values.
-- d length must be between 4 and 12.
-- min and max are safety limits, not target values.
-- Do not rely on clamp to hide unrealistic deltas.
-- Deltas must be coherent with the difference between start and end.
-- The expected final value after repeated deltas should be close to end.
-- The end of each phase should be coherent with the start of the next phase.
-
-Physical realism rules:
-- Vehicle speed signals should evolve realistically according to the phase.
-- Engine RPM signals must remain coherent with vehicle speed signals when both exist.
-- Temperature signals should warm up gradually and then stabilize.
-- Fuel level signals must never increase.
-- Accelerator or throttle signals and brake signals should not both increase aggressively in the same phase.
-- Values should evolve smoothly unless the phase explicitly represents a sudden event.
-- For any signal you do not fully understand, use conservative start/end values and small deltas relative to the signal range.
-
-Before returning JSON:
-- Verify every start and end are inside min/max.
-- Verify every min <= max.
-- Verify fuel-like signals never increase.
-- Verify phase transitions are coherent.
-- Verify deltas are realistic relative to the signal scale.
-- Verify repeated deltas approximately move from start to end.
-- Fix all violations before returning.
-
-Return exactly this schema and use only the available signal names listed above:
-
-{
-  "n": "string",
-  "dur": ${request.durationSeconds},
-  "dt": ${request.sampleIntervalSeconds},
-  "ph": [
-    {
-      "n": "string",
-      "from": 0,
-      "to": 0,
-      "s": {
-        "SignalName": {
-          "start": 0,
-          "end": 0,
-          "min": 0,
-          "max": 0,
-          "d": [0]
-        }
-      }
-    }
-  ]
-}
-`.trim();
 }
 
 function parseBody(rawBody) {
@@ -874,7 +1074,6 @@ function validateSignalBehavior(errors, behavior, signalName, phaseIndex, previo
 
   if (Number.isFinite(previousEnd) && Number.isFinite(start)) {
     const tolerance = Math.max(1, Math.abs(previousEnd) * 0.05);
-
     if (Math.abs(start - previousEnd) > tolerance) {
       errors.push(`${signalName} phase ${phaseIndex}: start is not coherent with previous phase end.`);
     }
