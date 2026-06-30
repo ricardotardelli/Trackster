@@ -417,12 +417,39 @@
 
     <p>{{ generationWorkflowMessage }}</p>
 
+    <mat-progress-bar
+      mode="determinate"
+      [value]="generationWorkflowProgress"
+      *ngIf="generationWorkflowState === 'running' || generationWorkflowProgress > 0"
+    ></mat-progress-bar>
+
     <span
       class="decoder-export-details"
       *ngIf="generationWorkflowDetails"
     >
       {{ generationWorkflowDetails }}
     </span>
+
+    <div class="generation-workflow-steps" *ngIf="generationWorkflowSteps.length > 0">
+      <div
+        class="generation-workflow-step"
+        *ngFor="let step of generationWorkflowSteps"
+        [class.step-completed]="step.status === 'completed'"
+        [class.step-running]="step.status === 'running'"
+        [class.step-error]="step.status === 'error'"
+        [class.step-pending]="step.status === 'pending'"
+      >
+        <mat-icon *ngIf="step.status === 'completed'">check_circle</mat-icon>
+        <mat-icon *ngIf="step.status === 'running'">autorenew</mat-icon>
+        <mat-icon *ngIf="step.status === 'error'">error</mat-icon>
+        <mat-icon *ngIf="step.status === 'pending'">radio_button_unchecked</mat-icon>
+
+        <div class="generation-workflow-step-text">
+          <strong>{{ step.label }}</strong>
+          <span>{{ step.detail }}</span>
+        </div>
+      </div>
+    </div>
 
     <button
       type="button"

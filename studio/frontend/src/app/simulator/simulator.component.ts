@@ -17,9 +17,10 @@ import {
 } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ComponentType } from '@angular/cdk/portal';
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 import { AuthService } from '../auth/auth.service';
 import { environment } from '../../environments/environment';
@@ -90,8 +91,45 @@ interface DevelopmentRunManifest {
 
 interface GenerationMonitor {
   bucket: string;
-  prefix: string;
+  scenarioKey: string;
+  runFolder: string;
   expectedBinCount: number;
+}
+
+interface ScenarioProgress {
+  totalPhases?: number;
+  completedPhases?: number;
+  failedPhases?: number;
+  processingPhases?: number;
+  percent?: number;
+  generatedBinCount?: number;
+  expectedBinCount?: number;
+}
+
+interface ScenarioLogEntry {
+  at?: string;
+  level?: string;
+  step?: string;
+  phaseId?: number | null;
+  message?: string;
+  validationErrors?: string[] | null;
+}
+
+interface ScenarioStatusDocument {
+  status?: string;
+  currentStep?: string;
+  progress?: ScenarioProgress;
+  logs?: ScenarioLogEntry[];
+  output?: {
+    generatedBinCount?: number;
+    expectedBinCount?: number;
+  };
+}
+
+interface GenerationWorkflowStep {
+  label: string;
+  status: 'pending' | 'running' | 'completed' | 'error';
+  detail: string;
 }
 
 type GenerationWorkflowState = 'idle' | 'running' | 'success' | 'error';
@@ -103,7 +141,8 @@ type GenerationWorkflowState = 'idle' | 'running' | 'success' | 'error';
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    MatIconModule
+    MatIconModule,
+    MatProgressBarModule
   ],
   templateUrl: './simulator.component.html',
   styleUrl: './simulator.component.css'
@@ -210,6 +249,8 @@ export class SimulatorComponent implements OnInit {
   generationWorkflowTitle = '';
   generationWorkflowMessage = '';
   generationWorkflowDetails = '';
+  generationWorkflowProgress = 0;
+  generationWorkflowSteps: GenerationWorkflowStep[] = [];
 
   formStatus: 'pending' | 'awaiting_response' | 'generating' | 'generated' | 'error' = 'pending';
   generationTimestamp = '';
@@ -669,21 +710,21 @@ export class SimulatorComponent implements OnInit {
             'Trackster AI is composing a realistic driving scenario based on the selected signals.'
           );
 
-          const generatedBinCount = await this.waitForGeneratedBins(monitor);
+          const scenarioDocument = await this.waitForScenarioCompletion(monitor);
+          const generatedBinCount = this.resolveGeneratedBinCountFromScenario(scenarioDocument);
 
           this.formStatus = 'generated';
-          this.closeGenerationModal();
           this.logGenerationDuration(generationStartedAtMs, {
             status: 'generated',
-            mode: 's3-polling',
+            mode: 'scenario-json-polling',
             bucket: monitor.bucket,
-            prefix: monitor.prefix,
+            scenarioKey: monitor.scenarioKey,
             expectedBinCount: monitor.expectedBinCount,
             generatedBinCount
           });
           this.openGenerationSuccessModal(
             'Generation completed successfully.',
-            this.buildGeneratedFilesSuccessMessage(generatedBinCount)
+            this.buildScenarioSuccessMessage(scenarioDocument, monitor)
           );
         } else {
           this.formStatus = 'generated';
@@ -1570,6 +1611,8 @@ export class SimulatorComponent implements OnInit {
     this.generationWorkflowTitle = '';
     this.generationWorkflowMessage = '';
     this.generationWorkflowDetails = '';
+    this.generationWorkflowProgress = 0;
+    this.generationWorkflowSteps = [];
   }
 
   private logGenerationDuration(startedAtMs: number, details: Record<string, unknown>): void {
@@ -1583,41 +1626,44 @@ export class SimulatorComponent implements OnInit {
     });
   }
 
-  private async waitForGeneratedBins(monitor: GenerationMonitor): Promise<number> {
+  private async waitForScenarioCompletion(monitor: GenerationMonitor): Promise<ScenarioStatusDocument> {
     for (let attempt = 1; attempt <= this.maxGenerationPollAttempts; attempt += 1) {
-      const generatedBinCount = await this.countGeneratedBins(monitor.bucket, monitor.prefix);
+      try {
+        const scenarioDocument = await this.readScenarioJson(monitor.bucket, monitor.scenarioKey);
+        this.applyScenarioDocumentToWorkflow(scenarioDocument, monitor);
 
-      this.generationWorkflowMessage = 'Trackster AI is generating the driver scenario based on selected parameters';
-      this.generationWorkflowDetails =
-        `Generated ${generatedBinCount}/${monitor.expectedBinCount} simulation file${monitor.expectedBinCount === 1 ? '' : 's'}.`;
+        if (this.isScenarioFailed(scenarioDocument)) {
+          throw new Error(this.buildScenarioFailureMessage(scenarioDocument));
+        }
 
-      if (generatedBinCount >= monitor.expectedBinCount) {
-        return generatedBinCount;
+        if (this.isScenarioCompleted(scenarioDocument)) {
+          return scenarioDocument;
+        }
+      } catch (error: unknown) {
+        if (!this.isS3NotFoundError(error)) {
+          throw error;
+        }
+
+        this.generationWorkflowTitle = 'Preparing simulation...';
+        this.generationWorkflowMessage = 'Waiting for Trackster AI to create the scenario log.';
+        this.generationWorkflowDetails = `Scenario file: ${monitor.scenarioKey}`;
+        this.generationWorkflowProgress = 0;
+        this.generationWorkflowSteps = this.buildDefaultWorkflowSteps('running');
       }
 
       await this.delay(this.generationPollIntervalMs);
     }
 
     throw new Error(
-      `Generation status check timed out. Expected ${monitor.expectedBinCount} simulation file${monitor.expectedBinCount === 1 ? '' : 's'}.`
+      `Generation status check timed out while reading scenario.json: s3://${monitor.bucket}/${monitor.scenarioKey}`
     );
   }
 
-  private buildGeneratedFilesSuccessMessage(generatedFiles: number): string {
-    const safeGeneratedFiles = Number.isFinite(generatedFiles)
-      ? Math.max(0, Math.floor(generatedFiles))
-      : 0;
-
-    const fileWord = safeGeneratedFiles === 1 ? 'file was' : 'files were';
-
-    return `${safeGeneratedFiles} simulation ${fileWord} generated successfully.`;
-  }
-
-  private async countGeneratedBins(bucket: string, prefix: string): Promise<number> {
+  private async readScenarioJson(bucket: string, key: string): Promise<ScenarioStatusDocument> {
     const session = await fetchAuthSession();
 
     if (!session.credentials) {
-      throw new Error('Unable to retrieve AWS credentials for S3 status check.');
+      throw new Error('Unable to retrieve AWS credentials for S3 scenario status check.');
     }
 
     const s3Client = new S3Client({
@@ -1625,55 +1671,409 @@ export class SimulatorComponent implements OnInit {
       credentials: session.credentials
     });
 
-    let continuationToken: string | undefined;
-    let count = 0;
+    const response = await s3Client.send(new GetObjectCommand({
+      Bucket: bucket,
+      Key: key
+    }));
 
-    do {
-      const response = await s3Client.send(new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: this.normalizeS3Prefix(prefix),
-        ContinuationToken: continuationToken
-      }));
+    const text = await this.s3BodyToText(response.Body);
 
-      for (const object of response.Contents ?? []) {
-        const key = object.Key ?? '';
-        if (key.toLowerCase().endsWith('.bin') && (object.Size ?? 0) > 0) {
-          count += 1;
+    if (!text.trim()) {
+      throw new Error(`scenario.json is empty: s3://${bucket}/${key}`);
+    }
+
+    return JSON.parse(text) as ScenarioStatusDocument;
+  }
+
+  private async s3BodyToText(body: unknown): Promise<string> {
+    if (!body) {
+      return '';
+    }
+
+    if (typeof body === 'string') {
+      return body;
+    }
+
+    if (body instanceof Blob) {
+      return await body.text();
+    }
+
+    if (body instanceof Uint8Array) {
+      return new TextDecoder('utf-8').decode(body);
+    }
+
+    const candidate = body as {
+      transformToString?: (encoding?: string) => Promise<string>;
+      getReader?: () => ReadableStreamDefaultReader<Uint8Array>;
+    };
+
+    if (typeof candidate.transformToString === 'function') {
+      return await candidate.transformToString('utf8');
+    }
+
+    if (typeof candidate.getReader === 'function') {
+      const reader = candidate.getReader();
+      const chunks: Uint8Array[] = [];
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        if (value) {
+          chunks.push(value);
         }
       }
 
-      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-    } while (continuationToken);
+      const totalLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
+      const merged = new Uint8Array(totalLength);
+      let offset = 0;
 
-    return count;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      return new TextDecoder('utf-8').decode(merged);
+    }
+
+    return String(body);
+  }
+
+  private applyScenarioDocumentToWorkflow(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): void {
+    const status = String(scenarioDocument.status || 'running');
+    const progress = scenarioDocument.progress || {};
+    const percent = this.resolveScenarioPercent(scenarioDocument);
+
+    this.generationWorkflowProgress = percent;
+    this.generationWorkflowTitle = this.resolveScenarioTitle(status);
+    this.generationWorkflowMessage = scenarioDocument.currentStep || this.resolveScenarioMessage(status);
+    this.generationWorkflowDetails = this.buildScenarioDetails(scenarioDocument, monitor);
+    this.generationWorkflowSteps = this.buildScenarioWorkflowSteps(scenarioDocument);
+
+    if (progress.failedPhases && progress.failedPhases > 0) {
+      this.generationWorkflowState = 'error';
+    }
+  }
+
+  private resolveScenarioPercent(scenarioDocument: ScenarioStatusDocument): number {
+    const progress = scenarioDocument.progress || {};
+    const directPercent = Number(progress.percent);
+
+    if (Number.isFinite(directPercent)) {
+      return Math.max(0, Math.min(100, Math.round(directPercent)));
+    }
+
+    const totalPhases = Number(progress.totalPhases);
+    const completedPhases = Number(progress.completedPhases);
+
+    if (Number.isFinite(totalPhases) && totalPhases > 0 && Number.isFinite(completedPhases)) {
+      return Math.max(0, Math.min(100, Math.round((completedPhases / totalPhases) * 100)));
+    }
+
+    return 0;
+  }
+
+  private resolveScenarioTitle(status: string): string {
+    if (this.isCompletedStatus(status)) {
+      return 'Simulation generated successfully.';
+    }
+
+    if (this.isFailedStatus(status)) {
+      return 'Generation failed';
+    }
+
+    if (status.includes('planner')) {
+      return 'Planning simulation...';
+    }
+
+    if (status.includes('behavior') || status.includes('behaviour')) {
+      return 'Generating signal behavior...';
+    }
+
+    if (status.includes('worker') || status.includes('queue')) {
+      return 'Queueing simulation workers...';
+    }
+
+    if (status.includes('bin')) {
+      return 'Generating BIN files...';
+    }
+
+    return 'Generating realistic simulation...';
+  }
+
+  private resolveScenarioMessage(status: string): string {
+    if (this.isCompletedStatus(status)) {
+      return 'Trackster completed the simulation generation workflow.';
+    }
+
+    if (this.isFailedStatus(status)) {
+      return 'Trackster stopped the simulation generation workflow because an error occurred.';
+    }
+
+    if (status.includes('planner')) {
+      return 'Trackster AI is creating the driving scenario.';
+    }
+
+    if (status.includes('behavior') || status.includes('behaviour')) {
+      return 'Trackster AI is generating signal behavior from the driving phases.';
+    }
+
+    if (status.includes('worker') || status.includes('queue')) {
+      return 'Trackster is preparing worker messages for BIN generation.';
+    }
+
+    if (status.includes('bin')) {
+      return 'Trackster is generating the simulation files.';
+    }
+
+    return 'Trackster is processing the simulation workflow.';
+  }
+
+  private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
+    const progress = scenarioDocument.progress || {};
+    const completedPhases = Number(progress.completedPhases || 0);
+    const totalPhases = Number(progress.totalPhases || 0);
+    const generatedBinCount = this.resolveGeneratedBinCountFromScenario(scenarioDocument);
+    const expectedBinCount = this.resolveExpectedBinCountFromScenario(scenarioDocument, monitor);
+
+    const parts: string[] = [];
+
+    if (totalPhases > 0) {
+      parts.push(`Behavior phases: ${completedPhases}/${totalPhases}`);
+    }
+
+    if (expectedBinCount > 0 && generatedBinCount !== null) {
+      parts.push(`BIN files: ${generatedBinCount}/${expectedBinCount}`);
+    }
+
+    parts.push(`Scenario: ${monitor.scenarioKey}`);
+
+    return parts.join(' · ');
+  }
+
+  private buildScenarioWorkflowSteps(scenarioDocument: ScenarioStatusDocument): GenerationWorkflowStep[] {
+    const status = String(scenarioDocument.status || '').toLowerCase();
+    const progress = scenarioDocument.progress || {};
+    const totalPhases = Number(progress.totalPhases || 0);
+    const completedPhases = Number(progress.completedPhases || 0);
+    const failedPhases = Number(progress.failedPhases || 0);
+    const generatedBinCount = this.resolveGeneratedBinCountFromScenario(scenarioDocument);
+    const expectedBinCount = Number(progress.expectedBinCount || scenarioDocument.output?.expectedBinCount || 0);
+
+    const plannerStatus: GenerationWorkflowStep['status'] =
+      status.includes('planner') && !status.includes('saved') && !status.includes('completed')
+        ? 'running'
+        : status.includes('failed') && !totalPhases
+          ? 'error'
+          : 'completed';
+
+    const behaviorStatus: GenerationWorkflowStep['status'] =
+      failedPhases > 0
+        ? 'error'
+        : totalPhases > 0 && completedPhases >= totalPhases
+          ? 'completed'
+          : status.includes('behavior') || status.includes('behaviour')
+            ? 'running'
+            : plannerStatus === 'completed'
+              ? 'pending'
+              : 'pending';
+
+    const workerStatus: GenerationWorkflowStep['status'] =
+      this.isCompletedStatus(status)
+        ? 'completed'
+        : status.includes('worker') || status.includes('queue')
+          ? 'running'
+          : behaviorStatus === 'completed'
+            ? 'pending'
+            : 'pending';
+
+    const binStatus: GenerationWorkflowStep['status'] =
+      this.isCompletedStatus(status)
+        ? 'completed'
+        : status.includes('bin')
+          ? 'running'
+          : workerStatus === 'completed'
+            ? 'pending'
+            : 'pending';
+
+    const finishedStatus: GenerationWorkflowStep['status'] =
+      this.isFailedStatus(status)
+        ? 'error'
+        : this.isCompletedStatus(status)
+          ? 'completed'
+          : 'pending';
+
+    return [
+      {
+        label: 'Driving planner',
+        status: plannerStatus,
+        detail: plannerStatus === 'completed' ? 'Planner completed' : 'Creating driving scenario'
+      },
+      {
+        label: 'Signal behavior',
+        status: behaviorStatus,
+        detail: totalPhases > 0 ? `${completedPhases}/${totalPhases} phases completed` : 'Waiting for planner phases'
+      },
+      {
+        label: 'Worker queue',
+        status: workerStatus,
+        detail: workerStatus === 'running' ? 'Preparing worker messages' : 'Waiting for signal behavior'
+      },
+      {
+        label: 'BIN generation',
+        status: binStatus,
+        detail: expectedBinCount > 0 && generatedBinCount !== null ? `${generatedBinCount}/${expectedBinCount} files` : 'Waiting for workers'
+      },
+      {
+        label: 'Finished',
+        status: finishedStatus,
+        detail: finishedStatus === 'completed' ? 'Simulation completed' : finishedStatus === 'error' ? 'Generation stopped' : 'Waiting for completion'
+      }
+    ];
+  }
+
+  private buildDefaultWorkflowSteps(firstStatus: GenerationWorkflowStep['status']): GenerationWorkflowStep[] {
+    return [
+      { label: 'Driving planner', status: firstStatus, detail: 'Waiting for scenario log' },
+      { label: 'Signal behavior', status: 'pending', detail: 'Waiting for planner' },
+      { label: 'Worker queue', status: 'pending', detail: 'Waiting for signal behavior' },
+      { label: 'BIN generation', status: 'pending', detail: 'Waiting for workers' },
+      { label: 'Finished', status: 'pending', detail: 'Waiting for completion' }
+    ];
+  }
+
+  private isScenarioCompleted(scenarioDocument: ScenarioStatusDocument): boolean {
+    const status = String(scenarioDocument.status || '').toLowerCase();
+
+    if (this.isCompletedStatus(status)) {
+      return true;
+    }
+
+    return this.resolveScenarioPercent(scenarioDocument) >= 100;
+  }
+
+  private isScenarioFailed(scenarioDocument: ScenarioStatusDocument): boolean {
+    const status = String(scenarioDocument.status || '').toLowerCase();
+    const failedPhases = Number(scenarioDocument.progress?.failedPhases || 0);
+
+    return this.isFailedStatus(status) || failedPhases > 0;
+  }
+
+  private isCompletedStatus(status: string): boolean {
+    const normalized = String(status || '').toLowerCase();
+
+    return [
+      'completed',
+      'generation_completed',
+      'simulation_completed',
+      'worker_completed',
+      'bin_generation_completed',
+      'behavior_completed',
+      'behaviour_completed',
+      'generated'
+    ].includes(normalized);
+  }
+
+  private isFailedStatus(status: string): boolean {
+    const normalized = String(status || '').toLowerCase();
+    return normalized.includes('failed') || normalized.includes('error');
+  }
+
+  private buildScenarioFailureMessage(scenarioDocument: ScenarioStatusDocument): string {
+    const lastErrorLog = [...(scenarioDocument.logs || [])]
+      .reverse()
+      .find((log) => String(log.level || '').toLowerCase() === 'error');
+
+    if (lastErrorLog?.message) {
+      const phaseText = lastErrorLog.phaseId ? `phase ${lastErrorLog.phaseId}: ` : '';
+      return `${phaseText}${lastErrorLog.message}`;
+    }
+
+    return scenarioDocument.currentStep || 'Simulation generation failed.';
+  }
+
+  private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
+    const generatedBinCount = this.resolveGeneratedBinCountFromScenario(scenarioDocument);
+    const expectedBinCount = this.resolveExpectedBinCountFromScenario(scenarioDocument, monitor);
+
+    if (generatedBinCount !== null && expectedBinCount > 0) {
+      const fileWord = generatedBinCount === 1 ? 'file was' : 'files were';
+      return `${generatedBinCount} simulation ${fileWord} generated successfully.`;
+    }
+
+    return 'The simulation workflow completed successfully.';
+  }
+
+  private resolveGeneratedBinCountFromScenario(scenarioDocument: ScenarioStatusDocument): number | null {
+    const candidates = [
+      scenarioDocument.progress?.generatedBinCount,
+      scenarioDocument.output?.generatedBinCount
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed)) {
+        return Math.max(0, Math.floor(parsed));
+      }
+    }
+
+    return null;
+  }
+
+  private resolveExpectedBinCountFromScenario(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): number {
+    const candidates = [
+      scenarioDocument.progress?.expectedBinCount,
+      scenarioDocument.output?.expectedBinCount,
+      monitor.expectedBinCount
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Math.floor(parsed);
+      }
+    }
+
+    return 0;
+  }
+
+  private isS3NotFoundError(error: unknown): boolean {
+    const record = error as { name?: string; Code?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    const name = String(record?.name || record?.Code || '').toLowerCase();
+    const message = String(record?.message || '').toLowerCase();
+
+    return (
+      record?.$metadata?.httpStatusCode === 404 ||
+      name.includes('nosuchkey') ||
+      name.includes('notfound') ||
+      message.includes('specified key does not exist')
+    );
   }
 
   private resolveGenerationMonitor(responseBody: unknown, requestBody: ReturnType<typeof this.buildEngineEnvelope>): GenerationMonitor | null {
     const bucket =
-      this.extractFirstString(responseBody, ['bucket', 'bucketName', 's3Bucket', 'outputBucket']) ||
+      this.extractFirstString(responseBody, ['scenarioBucketName', 'bucket', 'bucketName', 's3Bucket', 'outputBucket']) ||
       requestBody.s3Bucket;
 
-    const explicitPrefix = this.extractFirstString(responseBody, [
+    const scenarioKey = this.extractFirstString(responseBody, [
+      'scenarioKey',
+      'scenarioJsonKey'
+    ]);
+
+    const runFolder = this.extractFirstString(responseBody, [
+      'runFolder',
+      'outputFolder',
+      'destinationPrefix',
       'prefix',
       's3Prefix',
       'outputPrefix',
       'folder',
-      'folderName',
-      'runFolder',
-      'outputFolder',
-      'destinationPrefix'
+      'folderName'
     ]);
 
-    const binKey = this.extractFirstString(responseBody, [
-      'binKey',
-      's3Key',
-      'key',
-      'objectKey',
-      'outputKey',
-      'generatedBinKey'
-    ]);
-
-    const prefix = explicitPrefix || this.extractPrefixFromKey(binKey);
+    const resolvedScenarioKey = scenarioKey || (runFolder ? `${this.normalizeS3Prefix(runFolder)}scenario.json` : null);
+    const resolvedRunFolder = runFolder || this.extractPrefixFromKey(resolvedScenarioKey);
 
     const expectedBinCount =
       this.extractFirstNumber(responseBody, [
@@ -1681,20 +2081,20 @@ export class SimulatorComponent implements OnInit {
         'expectedFiles',
         'expectedFileCount',
         'expectedVehicles',
-        'enqueued_vehicles',
-        'enqueuedVehicles',
+        'acceptedVehicles',
         'binCount',
         'fileCount',
         'amountOfVehicles'
       ]) ?? Number(requestBody.amountOfVehicles);
 
-    if (!bucket || !prefix || !Number.isFinite(expectedBinCount) || expectedBinCount <= 0) {
+    if (!bucket || !resolvedScenarioKey || !Number.isFinite(expectedBinCount) || expectedBinCount <= 0) {
       return null;
     }
 
     return {
       bucket: bucket.trim(),
-      prefix: this.normalizeS3Prefix(prefix),
+      scenarioKey: this.normalizeS3Prefix(resolvedScenarioKey),
+      runFolder: this.normalizeS3Prefix(resolvedRunFolder || this.extractPrefixFromKey(resolvedScenarioKey) || ''),
       expectedBinCount: Math.max(1, Math.floor(expectedBinCount))
     };
   }
