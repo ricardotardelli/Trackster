@@ -1,20 +1,6 @@
 import { CommonModule } from '@angular/common';
-import {
-  AbstractControl,
-  FormBuilder,
-  FormsModule,
-  ReactiveFormsModule,
-  ValidationErrors,
-  Validators
-} from '@angular/forms';
-import {
-  Component,
-  ElementRef,
-  HostListener,
-  OnInit,
-  TemplateRef,
-  ViewChild
-} from '@angular/core';
+import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { Component, ElementRef, HostListener, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -28,92 +14,35 @@ import { PayloadComponent } from '../payloadmodule/payload.component';
 import { MapmoduleComponent } from '../mapmodule/mapmodule.component';
 import { interpolateGpsPerBlock } from '../interpmodule/interpmodule.util';
 
-interface RoutePoint {
-  lat: number;
-  lng: number;
-  label?: string;
-}
+interface RoutePoint { lat: number; lng: number; label?: string; }
 
-interface RoutePayload {
-  start: RoutePoint | null;
-  waypoints: Record<string, RoutePoint>;
-  destination: RoutePoint | null;
-}
+interface RoutePayload { start: RoutePoint | null; waypoints: Record<string, RoutePoint>; destination: RoutePoint | null; }
 
-interface CanFrameOption {
-  dbcFile: string;
-  canId: string;
-  messageName: string;
-  label: string;
-}
+interface CanFrameOption { dbcFile: string; canId: string; messageName: string; label: string; }
 
 type DistanceUnit = 'Km' | 'Mi';
 
 type OutputFormatValue = 'Trackster BIN';
 
-type SimulationModeValue =
-  | 'Time Window'
-  | 'Adaptive Blocks'
-  | 'Velocity Target'
-  | 'Distance Target';
+type SimulationModeValue =  | 'Time Window' | 'Adaptive Blocks' | 'Velocity Target' | 'Distance Target';
 
 type DriverProfileValue = | 'Balanced' | 'Efficiency' | 'Dynamic' | 'Performance' | 'City Cycle' | 'Cruise' | 'Terrain' | 'Fleet';
 
 type GpsCoordinateRle = [coordinate: string, repeat: number];
 
-interface DriverProfileOption {
-  value: DriverProfileValue;
-  label: string;
-  description: string;
-}
+interface DriverProfileOption { value: DriverProfileValue; label: string; description: string; }
 
-interface SimulationModeOption {
-  value: SimulationModeValue;
-  label: string;
-  description: string;
-}
+interface SimulationModeOption { value: SimulationModeValue; label: string; description: string; }
 
-interface DevelopmentRunManifestResolvedCanFrame {
-  dbcFile?: string;
-  canId?: string;
-  messageName?: string;
-  frame?: {
-    n?: string;
-  };
-}
+interface DevelopmentRunManifestResolvedCanFrame { dbcFile?: string; canId?: string; messageName?: string; frame?: { n?: string; }; }
 
-interface DevelopmentRunManifest {
-  dbc?: {
-    resolvedCanFrames?: DevelopmentRunManifestResolvedCanFrame[];
-    canFrames?: DevelopmentRunManifestResolvedCanFrame[];
-  };
-}
+interface DevelopmentRunManifest { dbc?: { resolvedCanFrames?: DevelopmentRunManifestResolvedCanFrame[]; canFrames?: DevelopmentRunManifestResolvedCanFrame[]; }; }
 
-interface GenerationMonitor {
-  bucket: string;
-  scenarioKey: string;
-  runFolder: string;
-  expectedBinCount: number;
-}
+interface GenerationMonitor { bucket: string; scenarioKey: string; runFolder: string; expectedBinCount: number; }
 
-interface ScenarioProgress {
-  totalPhases?: number;
-  completedPhases?: number;
-  failedPhases?: number;
-  processingPhases?: number;
-  percent?: number;
-  generatedBinCount?: number;
-  expectedBinCount?: number;
-}
+interface ScenarioProgress { totalPhases?: number; completedPhases?: number; failedPhases?: number; processingPhases?: number; percent?: number; generatedBinCount?: number; expectedBinCount?: number; }
 
-interface ScenarioLogEntry {
-  at?: string;
-  level?: string;
-  step?: string;
-  phaseId?: number | null;
-  message?: string;
-  validationErrors?: string[] | null;
-}
+interface ScenarioLogEntry { at?: string; level?: string; step?: string; phaseId?: number | null; message?: string; validationErrors?: string[] | null; }
 
 interface ScenarioStatusDocument {
   status?: string;
@@ -126,11 +55,7 @@ interface ScenarioStatusDocument {
   };
 }
 
-interface GenerationWorkflowStep {
-  label: string;
-  status: 'pending' | 'running' | 'completed' | 'error';
-  detail: string;
-}
+interface GenerationWorkflowStep { label: string; status: 'pending' | 'running' | 'completed' | 'error'; detail: string; }
 
 type GenerationWorkflowState = 'idle' | 'running' | 'success' | 'error';
 
