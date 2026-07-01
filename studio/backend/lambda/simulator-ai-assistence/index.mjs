@@ -7,7 +7,6 @@ import {
 } from '@aws-sdk/client-s3';
 import { HttpRequest } from '@smithy/protocol-http';
 import { SignatureV4 } from '@smithy/signature-v4';
-import { SQSClient, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
 
 const defaultHeaders = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
@@ -20,169 +19,843 @@ const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-
 const modelId = process.env.BEDROCK_MODEL_ID || 'google.gemma-4-31b';
 const mantleHost = `bedrock-mantle.${region}.api.aws`;
 const mantlePath = '/openai/v1/chat/completions';
-
 const s3Client = new S3Client({ region });
 
-const DEFAULT_PHASE_COUNT = Number.parseInt(process.env.AI_PHASE_COUNT || '6', 10);
 const DEFAULT_MAX_TOKENS = Number.parseInt(process.env.BEDROCK_MAX_TOKENS || '8192', 10);
-const DEFAULT_SQS_BATCH = Number.parseInt(process.env.SQS_BATCH || '10', 10);
-const DEFAULT_MAX_SAFE_SQS_BYTES = Number.parseInt(process.env.MAX_SAFE_SQS_BYTES || String(900 * 1024), 10);
+const DEFAULT_PLANNER_RETRIES = Number.parseInt(process.env.PLANNER_RETRIES || '1', 10);
+const DEFAULT_BEHAVIOR_RETRIES = Number.parseInt(process.env.BEHAVIOR_RETRIES || '1', 10);
+const DEFAULT_TEST_OUTPUT_PREFIX = '20260510221008/';
 
 export const handler = async (event) => {
+  const startedAt = Date.now();
+
   if (event.requestContext?.http?.method === 'OPTIONS' || event.httpMethod === 'OPTIONS') {
     return buildResponse(200, { success: true });
   }
 
   if (event.requestContext?.http?.method !== 'POST' && event.httpMethod !== 'POST') {
-    return buildResponse(405, {
-      success: false,
-      message: 'Method not allowed.'
-    });
+    return buildResponse(405, { success: false, message: 'Method not allowed.' });
   }
 
-  try {
-    const body = parseBody(event.body);
+  let body = {};
 
-    if (isDelegatedGenerationRequest(body)) {
-      const result = await handleDelegatedGeneration(body);
-      return buildResponse(202, result);
+  try {
+    body = parseBody(event.body);
+
+    const explicitAiPhase = sanitizeText(body?.aiPhase || body?.phase || body?.generation?.aiPhase).toLowerCase();
+    const eventSource = sanitizeText(event?.source);
+    const eventAction = sanitizeText(event?.action);
+
+    const aiPhase = explicitAiPhase || (
+      eventSource === 'trackster-orchestrator' || eventAction === 'run_full_ai_pipeline'
+        ? 'auto'
+        : 'planner'
+    );
+
+    if (aiPhase === 'auto') {
+      const autoResult = await runAutoPipeline(body, startedAt);
+      const processingTimeMs = Date.now() - startedAt;
+
+      return buildResponse(200, {
+        success: true,
+        status: autoResult.status,
+        aiPhase: 'auto',
+        processingTimeMs,
+        modelId,
+        scenarioS3: autoResult.scenarioS3,
+        progress: autoResult.progress,
+        currentStep: autoResult.currentStep
+      });
     }
 
-    const scenarioResult = await generateValidatedSignalDeltaScenario(body);
+    if (aiPhase === 'planner' || aiPhase === 'phase1' || aiPhase === 'plan') {
+      const plannerResult = await generateValidatedDrivingPlanner(body);
+      const scenarioS3 = await savePlannerScenarioJson({
+        body,
+        plannerResult,
+        processingTimeMs: Date.now() - startedAt
+      });
+      const processingTimeMs = Date.now() - startedAt;
 
-    return buildResponse(200, {
-      success: true,
-      modelId,
-      schemaVersion: scenarioResult.scenarioRequest.schemaVersion,
-      controlledSignals: scenarioResult.scenarioRequest.controlledSignals,
-      scenario: scenarioResult.scenario
+      return buildResponse(200, {
+        success: true,
+        status: 'planner_saved',
+        aiPhase: 'planner',
+        processingTimeMs,
+        modelId,
+        scenarioS3,
+        planner: plannerResult.planner
+      });
+    }
+
+    if (aiPhase === 'status') {
+      const statusResult = await readScenarioStatus(body);
+      const processingTimeMs = Date.now() - startedAt;
+
+      return buildResponse(200, {
+        success: true,
+        status: statusResult.scenarioDocument?.status || 'unknown',
+        aiPhase: 'status',
+        processingTimeMs,
+        scenarioS3: statusResult.scenarioS3,
+        progress: statusResult.scenarioDocument?.progress || null,
+        currentStep: statusResult.scenarioDocument?.currentStep || null,
+        logs: statusResult.scenarioDocument?.logs || [],
+        scenario: statusResult.scenarioDocument
+      });
+    }
+
+    if (aiPhase === 'behavior' || aiPhase === 'phase2' || aiPhase === 'behaviour' || aiPhase === 'next_behavior_phase') {
+      const behaviorResult = await runBehaviorPhase(body, { processNextPending: aiPhase === 'next_behavior_phase' });
+      const processingTimeMs = Date.now() - startedAt;
+
+      return buildResponse(200, {
+        success: true,
+        status: behaviorResult.status,
+        aiPhase: 'behavior',
+        processingTimeMs,
+        modelId,
+        scenarioS3: behaviorResult.scenarioS3,
+        progress: behaviorResult.progress,
+        currentStep: behaviorResult.currentStep,
+        phaseId: behaviorResult.phaseId,
+        phaseStatus: behaviorResult.phaseStatus,
+        signalBehaviorPhase: behaviorResult.signalBehaviorPhase || null
+      });
+    }
+
+    return buildResponse(400, {
+      success: false,
+      message: 'Invalid aiPhase. Use auto, planner, status, behavior or next_behavior_phase.'
     });
   } catch (error) {
-    console.error('Simulator AI assistance failed:', {
+    const processingTimeMs = Date.now() - startedAt;
+
+    console.error('Simulator AI assist failed:', {
+      processingTimeMs,
       name: error?.name,
       message: error?.message,
       stack: error?.stack,
-      validationErrors: error?.validationErrors || null
+      validationErrors: error?.validationErrors || null,
+      rawResponse: error?.rawResponse || null
     });
+
+    await tryWriteFailureToScenario(body, error);
 
     return buildResponse(500, {
       success: false,
-      message: 'Simulator AI assistance failed.',
-      error: error?.message || 'Unknown error'
+      message: 'Simulator AI assist failed.',
+      processingTimeMs,
+      error: error?.message || 'Unknown error',
+      validationErrors: error?.validationErrors || null
     });
   }
 };
 
-function isDelegatedGenerationRequest(body) {
-  return (
-    body?.action === 'generate_ai_behavior_and_enqueue_worker_messages' ||
-    Boolean(body?.generation?.baseMessage && Array.isArray(body?.generation?.vehicles))
-  );
-}
 
-async function handleDelegatedGeneration(body) {
-  const generation = body?.generation || {};
-  const baseMessage = generation.baseMessage;
-  const vehicles = Array.isArray(generation.vehicles) ? generation.vehicles : [];
-  const workQueueUrl = String(generation.workQueueUrl || '').trim();
-  const sqsBatch = toPositiveInteger(generation.sqsBatch, DEFAULT_SQS_BATCH);
-  const maxSafeSqsBytes = toPositiveInteger(generation.maxSafeSqsBytes, DEFAULT_MAX_SAFE_SQS_BYTES);
+async function runAutoPipeline(body, startedAt) {
+  const { bucket, key } = resolveScenarioLocation(body);
 
-  if (!baseMessage || typeof baseMessage !== 'object') {
-    throw new Error('Delegated generation payload is missing generation.baseMessage.');
+  if (!bucket) {
+    throw new Error('Unable to run auto AI pipeline because no S3 bucket was resolved.');
   }
 
-  if (!vehicles.length) {
-    throw new Error('Delegated generation payload is missing generation.vehicles.');
+  if (!key) {
+    throw new Error('Unable to run auto AI pipeline because no S3 key or output folder was resolved.');
   }
 
-  if (!workQueueUrl) {
-    throw new Error('Delegated generation payload is missing generation.workQueueUrl.');
-  }
+  await createInitialScenarioJson({ body, bucket, key });
 
-  const aiRequestBody = buildDelegatedScenarioRequestBody(body, baseMessage, vehicles);
-  const scenarioResult = await generateValidatedSignalDeltaScenario(aiRequestBody);
-
-  const scenarioS3 = await saveScenarioJson({
+  const plannerResult = await generateValidatedDrivingPlanner(body);
+  const scenarioS3 = await savePlannerScenarioJson({
     body,
-    generation,
-    baseMessage,
-    scenarioResult
+    plannerResult,
+    processingTimeMs: Date.now() - startedAt
   });
 
-  const aiBehaviorPlan = {
+  const planner = plannerResult.planner;
+  const totalPhases = Array.isArray(planner?.phases) ? planner.phases.length : 0;
+
+  for (const phase of planner.phases) {
+    await runBehaviorPhase(
+      {
+        ...body,
+        phaseId: Number(phase.id),
+        scenarioBucketName: bucket,
+        scenarioKey: key
+      },
+      { processNextPending: false }
+    );
+  }
+
+  let scenarioDocument = await readJsonFromS3(bucket, key);
+  scenarioDocument.status = 'ai_behavior_completed';
+  scenarioDocument.currentStep = 'Trackster AI completed the simulation behavior plan.';
+  scenarioDocument.updatedAt = new Date().toISOString();
+  scenarioDocument.progress = scenarioDocument.progress || {};
+  scenarioDocument.progress.totalPhases = totalPhases;
+  scenarioDocument.progress.completedPhases = totalPhases;
+  scenarioDocument.progress.failedPhases = 0;
+  scenarioDocument.progress.processingPhases = 0;
+  scenarioDocument.progress.percent = 100;
+  scenarioDocument.logs = appendScenarioLog(scenarioDocument.logs, {
+    level: 'info',
+    step: 'auto',
+    message: 'Auto AI pipeline completed.'
+  });
+
+  await putJsonToS3(bucket, key, scenarioDocument);
+
+  return {
+    scenarioS3,
+    status: scenarioDocument.status,
+    progress: scenarioDocument.progress,
+    currentStep: scenarioDocument.currentStep
+  };
+}
+
+async function createInitialScenarioJson({ body, bucket, key }) {
+  const now = new Date().toISOString();
+  const requestedSignals = extractRequestedSignals(body);
+  const plannerRequest = buildPlannerRequest(body);
+
+  const scenarioDocument = {
+    schemaVersion: 'trackster-ai-scenario-file-v1',
+    generatedAt: now,
+    updatedAt: now,
     source: 'trackster-simulator-ai-assist',
     lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
     modelId,
-    requestedAt: new Date().toISOString(),
-    request: scenarioResult.scenarioRequest,
-    scenario: scenarioResult.scenario,
-    scenarioS3
+    status: 'planner_processing',
+    currentStep: 'Trackster AI is preparing the simulation scenario.',
+    requestId: sanitizeText(body?.requestId),
+    runId: sanitizeText(body?.runId),
+    customerId: sanitizeText(body?.customerId || body?.clientId),
+    clientId: sanitizeText(body?.clientId || body?.customerId),
+    progress: {
+      totalPhases: 0,
+      completedPhases: 0,
+      failedPhases: 0,
+      processingPhases: 0,
+      percent: 0
+    },
+    logs: appendScenarioLog([], {
+      level: 'info',
+      step: 'auto',
+      message: 'Auto AI pipeline started.'
+    }),
+    planner: {
+      schemaVersion: 'trackster-driving-planner-v1',
+      request: plannerRequest,
+      result: null
+    },
+    signalBehaviorPlan: {
+      schemaVersion: 'trackster-signal-delta-plan-v1',
+      requestedSignals,
+      result: {
+        schemaVersion: 'trackster-signal-delta-plan-v1',
+        phases: []
+      }
+    }
   };
 
-  const enqueueResult = await enqueueWorkerMessages({
-    baseMessage,
-    vehicles,
-    workQueueUrl,
-    sqsBatch,
-    maxSafeSqsBytes,
-    aiBehaviorPlan
-  });
+  await putJsonToS3(bucket, key, scenarioDocument);
 
-  console.log('Simulator AI assistance completed delegated generation:', {
-    requestId: body?.requestId || null,
-    runId: body?.runId || baseMessage?.runId || null,
-    clientId: body?.clientId || baseMessage?.clientId || null,
-    vehicles: vehicles.length,
-    sentBatches: enqueueResult.sentBatches,
-    messageSizeBytes: enqueueResult.messageSizeBytes,
-    scenarioBucket: scenarioS3.bucket,
-    scenarioKey: scenarioS3.key,
-    promptBucket: scenarioResult.promptSource.bucket,
-    promptKey: scenarioResult.promptSource.key
-  });
+  return { bucket, key, fileName: 'scenario.json' };
+}
+
+async function readScenarioStatus(body) {
+  const { bucket, key } = resolveScenarioLocation(body);
+
+  if (!bucket) {
+    throw new Error('Unable to read scenario.json because no S3 bucket was resolved.');
+  }
+
+  if (!key) {
+    throw new Error('Unable to read scenario.json because no S3 key or output folder was resolved.');
+  }
+
+  const scenarioDocument = await readJsonFromS3(bucket, key);
 
   return {
-    success: true,
-    status: 'enqueued',
-    requestId: body?.requestId || null,
-    runId: body?.runId || baseMessage?.runId || null,
-    clientId: body?.clientId || baseMessage?.clientId || null,
-    modelId,
-    controlledSignals: scenarioResult.scenarioRequest.controlledSignals,
-    enqueuedVehicles: vehicles.length,
-    sentBatches: enqueueResult.sentBatches,
-    messageSizeBytes: enqueueResult.messageSizeBytes,
-    scenarioS3
+    scenarioS3: { bucket, key, fileName: 'scenario.json' },
+    scenarioDocument
   };
 }
 
-function buildDelegatedScenarioRequestBody(body, baseMessage, vehicles) {
-  const aiRequest = body?.aiRequest || {};
-  const availableSignals = normalizeStringArray(aiRequest.availableSignals).length
-    ? normalizeStringArray(aiRequest.availableSignals)
-    : extractAvailableSignalNamesFromCompiledDbc(baseMessage.compiledDbc);
+async function runBehaviorPhase(body, options = {}) {
+  const { bucket, key } = resolveScenarioLocation(body);
+
+  if (!bucket) {
+    throw new Error('Unable to read scenario.json because no S3 bucket was resolved.');
+  }
+
+  if (!key) {
+    throw new Error('Unable to read scenario.json because no S3 key or output folder was resolved.');
+  }
+
+  let scenarioDocument = await readJsonFromS3(bucket, key);
+  const planner = scenarioDocument?.planner?.result;
+  const plannerRequest = scenarioDocument?.planner?.request || buildPlannerRequest(body);
+
+  if (!planner || !Array.isArray(planner.phases) || !planner.phases.length) {
+    throw new Error('scenario.json does not contain planner.result.phases. Run aiPhase=planner first.');
+  }
+
+  const requestedSignals = resolveRequestedSignalsForBehavior(body, scenarioDocument);
+
+  if (!requestedSignals.length) {
+    throw new Error('Unable to generate signal behavior plan because no signals were resolved from the request or scenario.json. Send signals, selectedSignals or signalNames in the body.');
+  }
+
+  scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals);
+
+  const phase = resolveBehaviorPhaseToProcess({
+    body,
+    planner,
+    scenarioDocument,
+    processNextPending: options.processNextPending
+  });
+
+  if (!phase) {
+    scenarioDocument = updateScenarioProgress(scenarioDocument, planner);
+    scenarioDocument.status = 'behavior_completed';
+    scenarioDocument.currentStep = 'All behavior phases completed.';
+    scenarioDocument.updatedAt = new Date().toISOString();
+    scenarioDocument.logs = appendScenarioLog(scenarioDocument.logs, {
+      level: 'info',
+      step: 'behavior',
+      message: 'All behavior phases were already completed.'
+    });
+
+    await putJsonToS3(bucket, key, scenarioDocument);
+
+    return {
+      scenarioS3: { bucket, key, fileName: 'scenario.json' },
+      status: scenarioDocument.status,
+      progress: scenarioDocument.progress,
+      currentStep: scenarioDocument.currentStep,
+      phaseId: null,
+      phaseStatus: 'completed',
+      signalBehaviorPhase: null
+    };
+  }
+
+  scenarioDocument = markBehaviorPhaseProcessing(scenarioDocument, planner, phase.id);
+  await putJsonToS3(bucket, key, scenarioDocument);
+
+  try {
+    const singlePhasePlanner = {
+      ...planner,
+      phases: [phase]
+    };
+
+    const behaviorGeneration = await generateValidatedSignalBehaviorPlan({
+      body: { ...body, signals: requestedSignals },
+      plannerRequest,
+      planner: singlePhasePlanner
+    });
+
+    const behaviorPhase = behaviorGeneration.behaviorPlan.phases[0];
+    scenarioDocument = await readJsonFromS3(bucket, key);
+    scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals);
+    scenarioDocument = markBehaviorPhaseCompleted({
+      scenarioDocument,
+      planner,
+      phaseId: phase.id,
+      behaviorPhase,
+      behaviorGeneration
+    });
+
+    await putJsonToS3(bucket, key, scenarioDocument);
+
+    return {
+      scenarioS3: { bucket, key, fileName: 'scenario.json' },
+      status: scenarioDocument.status,
+      progress: scenarioDocument.progress,
+      currentStep: scenarioDocument.currentStep,
+      phaseId: phase.id,
+      phaseStatus: 'completed',
+      signalBehaviorPhase: behaviorPhase
+    };
+  } catch (error) {
+    scenarioDocument = await safeReadScenarioDocument(bucket, key, scenarioDocument);
+    scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals);
+    scenarioDocument = markBehaviorPhaseFailed({ scenarioDocument, planner, phaseId: phase.id, error });
+    await putJsonToS3(bucket, key, scenarioDocument);
+    throw error;
+  }
+}
+
+async function safeReadScenarioDocument(bucket, key, fallbackDocument) {
+  try {
+    return await readJsonFromS3(bucket, key);
+  } catch {
+    return fallbackDocument;
+  }
+}
+
+function resolveScenarioLocation(body) {
+  const generation = body?.generation || {};
+  const baseMessage = generation?.baseMessage || body?.baseMessage || {};
 
   return {
-    ...aiRequest,
-    durationSeconds: toPositiveInteger(aiRequest.durationSeconds, baseMessage.durationSec || 1200),
-    sampleIntervalSeconds: toPositiveInteger(aiRequest.sampleIntervalSeconds, baseMessage.intervalSec || 5),
-    requestedContext: sanitizeText(aiRequest.requestedContext) || 'realistic urban driving signal delta scenario',
-    driverProfile: sanitizeText(aiRequest.driverProfile) || sanitizeText(baseMessage.driverProfile) || 'Balanced',
-    targetSpeed: Number.isFinite(Number(aiRequest.targetSpeed)) ? Number(aiRequest.targetSpeed) : Number(baseMessage.speed),
-    distanceUnit: sanitizeText(aiRequest.distanceUnit) || sanitizeText(baseMessage.unity) || 'Km',
-    simulationMode: sanitizeText(aiRequest.simulationMode) || '',
-    generationType: sanitizeText(aiRequest.generationType) || '',
-    routeRegion: sanitizeText(aiRequest.routeRegion) || '',
-    initialDateTime: sanitizeText(aiRequest.initialDateTime) || '',
-    amountOfVehicles: vehicles.length,
-    selectedCanFrames: Array.isArray(baseMessage.canFrames) ? baseMessage.canFrames.length : 0,
-    availableSignals
+    bucket: resolveScenarioBucket(generation, baseMessage, body),
+    key: resolveScenarioKey(body, generation, baseMessage)
   };
 }
 
-async function saveScenarioJson({ body, generation, baseMessage, scenarioResult }) {
-  const bucket = resolveScenarioBucket(generation, baseMessage);
+function resolveRequestedSignalsForBehavior(body, scenarioDocument) {
+  const bodySignals = extractRequestedSignals(body);
+  if (bodySignals.length) return bodySignals;
+
+  const scenarioSignals = scenarioDocument?.signalBehaviorPlan?.requestedSignals;
+  if (Array.isArray(scenarioSignals)) return uniqueStrings(scenarioSignals.map((signal) => sanitizeSignalName(signal)));
+
+  return [];
+}
+
+function resolveBehaviorPhaseToProcess({ body, planner, scenarioDocument, processNextPending }) {
+  const explicitPhaseId = toPositiveInteger(body?.phaseId || body?.generation?.phaseId || body?.baseMessage?.phaseId, null);
+
+  if (explicitPhaseId) {
+    const phase = planner.phases.find((candidate) => Number(candidate.id) === explicitPhaseId);
+
+    if (!phase) {
+      throw new Error(`phaseId ${explicitPhaseId} does not exist in planner.`);
+    }
+
+    return phase;
+  }
+
+  if (!processNextPending) {
+    throw new Error('Behavior phase requires phaseId, or use aiPhase=next_behavior_phase.');
+  }
+
+  const completedPhaseIds = new Set(
+    (scenarioDocument?.signalBehaviorPlan?.result?.phases || [])
+      .filter((phase) => phase?.status === 'completed')
+      .map((phase) => Number(phase.phaseId))
+  );
+
+  return planner.phases.find((phase) => !completedPhaseIds.has(Number(phase.id))) || null;
+}
+
+function ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals = []) {
+  const now = new Date().toISOString();
+
+  const existingBehaviorPlan = scenarioDocument?.signalBehaviorPlan || {};
+  const existingResult = existingBehaviorPlan?.result || {};
+
+  return {
+    ...scenarioDocument,
+    updatedAt: now,
+    status: scenarioDocument?.status || 'planner_saved',
+    currentStep: scenarioDocument?.currentStep || 'Planner completed.',
+    progress: scenarioDocument?.progress || buildProgress(planner, existingResult.phases || []),
+    logs: Array.isArray(scenarioDocument?.logs) ? scenarioDocument.logs : [],
+    signalBehaviorPlan: {
+      schemaVersion: 'trackster-signal-delta-plan-v1',
+      ...existingBehaviorPlan,
+      requestedSignals: requestedSignals.length ? requestedSignals : existingBehaviorPlan.requestedSignals || [],
+      result: {
+        schemaVersion: 'trackster-signal-delta-plan-v1',
+        ...existingResult,
+        phases: Array.isArray(existingResult.phases) ? existingResult.phases : []
+      }
+    }
+  };
+}
+
+function markBehaviorPhaseProcessing(scenarioDocument, planner, phaseId) {
+  const totalPhases = planner.phases.length;
+  const phases = upsertBehaviorPhaseStatus(scenarioDocument.signalBehaviorPlan.result.phases, {
+    phaseId,
+    status: 'processing',
+    startedAt: new Date().toISOString()
+  });
+
+  const updatedDocument = {
+    ...scenarioDocument,
+    status: 'behavior_processing',
+    currentStep: `Generating behavior for phase ${phaseId} of ${totalPhases}.`,
+    updatedAt: new Date().toISOString(),
+    signalBehaviorPlan: {
+      ...scenarioDocument.signalBehaviorPlan,
+      result: {
+        ...scenarioDocument.signalBehaviorPlan.result,
+        phases
+      }
+    }
+  };
+
+  updatedDocument.progress = buildProgress(planner, phases);
+  updatedDocument.logs = appendScenarioLog(updatedDocument.logs, {
+    level: 'info',
+    step: 'behavior',
+    phaseId,
+    message: `Phase ${phaseId} behavior processing started.`
+  });
+
+  return updatedDocument;
+}
+
+function markBehaviorPhaseCompleted({ scenarioDocument, planner, phaseId, behaviorPhase, behaviorGeneration }) {
+  const completedPhase = {
+    ...behaviorPhase,
+    phaseId,
+    status: 'completed',
+    completedAt: new Date().toISOString(),
+    attempts: behaviorGeneration.attempts,
+    promptSource: behaviorGeneration.promptSource
+  };
+
+  const phases = upsertBehaviorPhaseStatus(scenarioDocument.signalBehaviorPlan.result.phases, completedPhase);
+  const completedCount = phases.filter((phase) => phase?.status === 'completed').length;
+  const totalPhases = planner.phases.length;
+  const allCompleted = completedCount >= totalPhases;
+
+  const updatedDocument = {
+    ...scenarioDocument,
+    status: allCompleted ? 'behavior_completed' : 'behavior_partial',
+    currentStep: allCompleted
+      ? 'All behavior phases completed.'
+      : `Behavior phase ${phaseId} completed. Waiting for next phase.`,
+    updatedAt: new Date().toISOString(),
+    signalBehaviorPlan: {
+      ...scenarioDocument.signalBehaviorPlan,
+      attempts: Number(scenarioDocument.signalBehaviorPlan.attempts || 0) + Number(behaviorGeneration.attempts || 1),
+      promptSource: behaviorGeneration.promptSource,
+      result: {
+        ...scenarioDocument.signalBehaviorPlan.result,
+        phases
+      }
+    }
+  };
+
+  updatedDocument.progress = buildProgress(planner, phases);
+  updatedDocument.logs = appendScenarioLog(updatedDocument.logs, {
+    level: 'info',
+    step: 'behavior',
+    phaseId,
+    message: `Phase ${phaseId} behavior completed.`
+  });
+
+  return updatedDocument;
+}
+
+function markBehaviorPhaseFailed({ scenarioDocument, planner, phaseId, error }) {
+  const rawModelResponse =
+    error?.rawResponse ||
+    error?.cause?.rawResponse ||
+    error?.cause?.cause?.rawResponse ||
+    null;
+
+  const failedPhase = {
+    phaseId,
+    status: 'failed',
+    failedAt: new Date().toISOString(),
+    error: error?.message || 'Unknown error',
+    validationErrors: error?.validationErrors || null,
+    rawModelResponse
+  };
+
+  const phases = upsertBehaviorPhaseStatus(scenarioDocument.signalBehaviorPlan.result.phases, failedPhase);
+
+  const updatedDocument = {
+    ...scenarioDocument,
+    status: 'behavior_failed',
+    currentStep: `Behavior generation failed while processing phase ${phaseId}.`,
+    updatedAt: new Date().toISOString(),
+    lastError: {
+      at: new Date().toISOString(),
+      step: 'behavior',
+      phaseId,
+      message: error?.message || 'Unknown error',
+      validationErrors: error?.validationErrors || null,
+      rawModelResponse
+    },
+    signalBehaviorPlan: {
+      ...scenarioDocument.signalBehaviorPlan,
+      result: {
+        ...scenarioDocument.signalBehaviorPlan.result,
+        phases
+      }
+    }
+  };
+
+  updatedDocument.progress = buildProgress(planner, phases);
+  updatedDocument.logs = appendScenarioLog(updatedDocument.logs, {
+    level: 'error',
+    step: 'behavior',
+    phaseId,
+    message: error?.message || 'Unknown error',
+    validationErrors: error?.validationErrors || null,
+    rawModelResponse
+  });
+
+  return updatedDocument;
+}
+
+function upsertBehaviorPhaseStatus(phases, phaseUpdate) {
+  const result = Array.isArray(phases) ? [...phases] : [];
+  const index = result.findIndex((phase) => Number(phase?.phaseId) === Number(phaseUpdate.phaseId));
+
+  if (index >= 0) {
+    result[index] = { ...result[index], ...phaseUpdate };
+  } else {
+    result.push(phaseUpdate);
+  }
+
+  return result.sort((a, b) => Number(a.phaseId) - Number(b.phaseId));
+}
+
+function buildProgress(planner, behaviorPhases = []) {
+  const totalPhases = Array.isArray(planner?.phases) ? planner.phases.length : 0;
+  const completedPhases = behaviorPhases.filter((phase) => phase?.status === 'completed').length;
+  const failedPhases = behaviorPhases.filter((phase) => phase?.status === 'failed').length;
+  const processingPhases = behaviorPhases.filter((phase) => phase?.status === 'processing').length;
+  const percent = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+
+  return {
+    totalPhases,
+    completedPhases,
+    failedPhases,
+    processingPhases,
+    percent
+  };
+}
+
+function appendScenarioLog(logs, entry) {
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  const logEntry = {
+    at: new Date().toISOString(),
+    level: entry.level || 'info',
+    step: entry.step || 'unknown',
+    phaseId: entry.phaseId ?? null,
+    message: entry.message || '',
+    validationErrors: entry.validationErrors || null
+  };
+
+  if (entry.rawModelResponse) {
+    logEntry.rawModelResponse = entry.rawModelResponse;
+  }
+
+  const nextLogs = [
+    ...safeLogs,
+    logEntry
+  ];
+
+  return nextLogs.slice(-200);
+}
+
+function updateScenarioProgress(scenarioDocument, planner) {
+  return {
+    ...scenarioDocument,
+    progress: buildProgress(planner, scenarioDocument?.signalBehaviorPlan?.result?.phases || [])
+  };
+}
+
+async function tryWriteFailureToScenario(body, error) {
+  try {
+    const { bucket, key } = resolveScenarioLocation(body);
+    if (!bucket || !key) return;
+
+    const scenarioDocument = await readJsonFromS3(bucket, key);
+    const planner = scenarioDocument?.planner?.result || { phases: [] };
+    const updatedDocument = {
+      ...scenarioDocument,
+      status: scenarioDocument?.status === 'behavior_processing' ? 'behavior_failed' : 'failed',
+      currentStep: error?.message || 'Simulator AI assist failed.',
+      updatedAt: new Date().toISOString(),
+      progress: buildProgress(planner, scenarioDocument?.signalBehaviorPlan?.result?.phases || []),
+      lastError: {
+        at: new Date().toISOString(),
+        message: error?.message || 'Unknown error',
+        validationErrors: error?.validationErrors || null,
+        rawModelResponse:
+          error?.rawResponse ||
+          error?.cause?.rawResponse ||
+          error?.cause?.cause?.rawResponse ||
+          null
+      },
+      logs: appendScenarioLog(scenarioDocument?.logs, {
+        level: 'error',
+        step: 'ai-assist',
+        message: error?.message || 'Unknown error',
+        validationErrors: error?.validationErrors || null,
+        rawModelResponse:
+          error?.rawResponse ||
+          error?.cause?.rawResponse ||
+          error?.cause?.cause?.rawResponse ||
+          null
+      })
+    };
+
+    await putJsonToS3(bucket, key, updatedDocument);
+  } catch (writeError) {
+    console.error('Unable to write failure status to scenario.json:', {
+      message: writeError?.message
+    });
+  }
+}
+
+async function generateValidatedDrivingPlanner(body) {
+  const plannerRequest = buildPlannerRequest(body);
+  const promptTemplateResult = await loadPromptTemplate('PHASE_PLAN_PROMPT_KEY');
+  const prompt = buildPlannerPrompt(promptTemplateResult.template, plannerRequest);
+
+  let lastError = null;
+  let lastRawResponse = null;
+  const attempts = Math.max(1, DEFAULT_PLANNER_RETRIES + 1);
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const effectivePrompt = attempt === 1 ? prompt : buildRetryPrompt(prompt, lastRawResponse, lastError);
+      const mantleResponse = await callBedrockMantle(effectivePrompt);
+      const responseText = extractTextFromMantleResponse(mantleResponse);
+      lastRawResponse = responseText;
+
+      const planner = parseJsonResponse(responseText);
+      const validation = validateDrivingPlanner(planner, plannerRequest);
+
+      if (!validation.valid) {
+        const validationError = new Error('Bedrock returned an invalid driving planner JSON.');
+        validationError.validationErrors = validation.errors;
+        validationError.rawResponse = responseText;
+        throw validationError;
+      }
+
+      return {
+        plannerRequest,
+        planner,
+        rawResponse: responseText,
+        promptSource: promptTemplateResult.source,
+        attempts: attempt
+      };
+    } catch (error) {
+      if (!error.rawResponse && lastRawResponse) {
+        error.rawResponse = lastRawResponse;
+      }
+
+      lastError = error;
+      console.error('Driving planner attempt failed:', {
+        attempt,
+        maxAttempts: attempts,
+        message: error?.message,
+        validationErrors: error?.validationErrors || null
+      });
+
+      if (attempt >= attempts) {
+        const finalError = new Error('Unable to generate a valid driving planner JSON.');
+        finalError.validationErrors = error?.validationErrors || null;
+        finalError.rawResponse = lastRawResponse;
+        finalError.cause = error;
+        throw finalError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Unable to generate driving planner JSON.');
+}
+
+async function generateValidatedSignalBehaviorPlan({ body, plannerRequest, planner }) {
+  const requestedSignals = extractRequestedSignals(body);
+
+  if (!requestedSignals.length) {
+    throw new Error('Unable to generate signal behavior plan because no signals were resolved from the request. Send signals, selectedSignals or signalNames in the body.');
+  }
+
+  const promptTemplateResult = await loadPromptTemplate('PHASE_BEHAVIOR_PROMPT_KEY');
+  const prompt = buildSignalBehaviorPrompt({
+    template: promptTemplateResult.template,
+    request: plannerRequest,
+    planner,
+    requestedSignals
+  });
+
+  let lastError = null;
+  let lastRawResponse = null;
+  const attempts = Math.max(1, DEFAULT_BEHAVIOR_RETRIES + 1);
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const effectivePrompt = attempt === 1 ? prompt : buildRetryPrompt(prompt, lastRawResponse, lastError);
+      const mantleResponse = await callBedrockMantle(effectivePrompt);
+      const responseText = extractTextFromMantleResponse(mantleResponse);
+      lastRawResponse = responseText;
+
+      const behaviorPlan = parseJsonResponse(responseText);
+      const validation = validateSignalBehaviorPlan({ behaviorPlan, planner, requestedSignals });
+
+      if (!validation.valid) {
+        const validationError = new Error('Bedrock returned an invalid signal behavior plan JSON.');
+        validationError.validationErrors = validation.errors;
+        validationError.rawResponse = responseText;
+        throw validationError;
+      }
+
+      return {
+        requestedSignals,
+        behaviorPlan,
+        rawResponse: responseText,
+        promptSource: promptTemplateResult.source,
+        attempts: attempt
+      };
+    } catch (error) {
+      if (!error.rawResponse && lastRawResponse) {
+        error.rawResponse = lastRawResponse;
+      }
+
+      lastError = error;
+      console.error('Signal behavior attempt failed:', {
+        attempt,
+        maxAttempts: attempts,
+        message: error?.message,
+        validationErrors: error?.validationErrors || null
+      });
+
+      if (attempt >= attempts) {
+        const finalError = new Error('Unable to generate a valid signal behavior plan JSON.');
+        finalError.validationErrors = error?.validationErrors || null;
+        finalError.rawResponse = lastRawResponse;
+        finalError.cause = error;
+        throw finalError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Unable to generate signal behavior plan JSON.');
+}
+
+function buildRetryPrompt(originalPrompt, previousResponse, previousError) {
+  const errorText = previousError?.validationErrors?.length
+    ? previousError.validationErrors.join('; ')
+    : previousError?.message || 'Invalid JSON response.';
+
+  return [
+    'Your previous response was invalid.',
+    '',
+    'Return ONLY valid JSON.',
+    'Do not include markdown.',
+    'Do not include explanations.',
+    'Do not include comments.',
+    'Do not include any text outside the JSON.',
+    '',
+    `Validation error: ${errorText}`,
+    '',
+    previousResponse ? `Previous invalid response:\n${previousResponse}` : '',
+    '',
+    'Generate the response again using the original instructions below.',
+    '',
+    originalPrompt
+  ].filter(Boolean).join('\n');
+}
+
+async function savePlannerScenarioJson({ body, plannerResult, processingTimeMs }) {
+  const generation = body?.generation || {};
+  const baseMessage = generation?.baseMessage || body?.baseMessage || {};
+  const bucket = resolveScenarioBucket(generation, baseMessage, body);
   const key = resolveScenarioKey(body, generation, baseMessage);
 
   if (!bucket) {
@@ -193,263 +866,147 @@ async function saveScenarioJson({ body, generation, baseMessage, scenarioResult 
     throw new Error('Unable to save scenario.json because no S3 key or output folder was resolved.');
   }
 
+  const requestedSignals = extractRequestedSignals(body);
   const scenarioDocument = {
     schemaVersion: 'trackster-ai-scenario-file-v1',
     generatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     source: 'trackster-simulator-ai-assist',
     lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
     modelId,
-    prompt: scenarioResult.promptSource,
-    requestId: body?.requestId || null,
-    runId: body?.runId || baseMessage?.runId || null,
-    clientId: body?.clientId || baseMessage?.clientId || null,
-    request: scenarioResult.scenarioRequest,
-    scenario: scenarioResult.scenario
+    status: 'planner_saved',
+    currentStep: 'Driving planner completed. Waiting for behavior phase generation.',
+    processingTimeMs,
+    progress: {
+      totalPhases: plannerResult.planner.phases.length,
+      completedPhases: 0,
+      failedPhases: 0,
+      processingPhases: 0,
+      percent: 0
+    },
+    logs: appendScenarioLog([], {
+      level: 'info',
+      step: 'planner',
+      message: 'Planner completed.'
+    }),
+    planner: {
+      schemaVersion: 'trackster-driving-planner-v1',
+      attempts: plannerResult.attempts,
+      promptSource: plannerResult.promptSource,
+      request: plannerResult.plannerRequest,
+      result: plannerResult.planner
+    },
+    signalBehaviorPlan: {
+      schemaVersion: 'trackster-signal-delta-plan-v1',
+      requestedSignals,
+      result: {
+        schemaVersion: 'trackster-signal-delta-plan-v1',
+        phases: []
+      }
+    }
   };
 
+  await putJsonToS3(bucket, key, scenarioDocument);
+
+  return { bucket, key, fileName: 'scenario.json' };
+}
+
+async function readJsonFromS3(bucket, key) {
+  const response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+
+  if (!response.Body) {
+    throw new Error(`S3 object is empty or unreadable: s3://${bucket}/${key}`);
+  }
+
+  const text = await response.Body.transformToString('utf8');
+  return JSON.parse(text);
+}
+
+async function putJsonToS3(bucket, key, document) {
   await s3Client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      Body: JSON.stringify(scenarioDocument, null, 2),
+      Body: JSON.stringify(document, null, 2),
       ContentType: 'application/json'
     })
   );
+}
+
+function buildPlannerRequest(body) {
+  const generation = body?.generation || {};
+  const baseMessage = generation?.baseMessage || body?.baseMessage || {};
+
+  const durationSeconds =
+    toPositiveInteger(body?.durationSeconds, null) ||
+    toPositiveInteger(body?.amountOfTimeSeconds, null) ||
+    toPositiveInteger(baseMessage?.durationSeconds, null) ||
+    toPositiveInteger(baseMessage?.durationSec, null) ||
+    hoursToSeconds(body?.amountOfTime) ||
+    hoursToSeconds(baseMessage?.amountOfTime) ||
+    1200;
+
+  const sampleIntervalSeconds =
+    toPositiveInteger(body?.sampleIntervalSeconds, null) ||
+    toPositiveInteger(body?.latencyTime, null) ||
+    toPositiveInteger(baseMessage?.sampleIntervalSeconds, null) ||
+    toPositiveInteger(baseMessage?.intervalSec, null) ||
+    toPositiveInteger(baseMessage?.latencyTime, null) ||
+    5;
+
+  const amountOfVehicles =
+    toPositiveInteger(body?.vehicleVolume, null) ||
+    toPositiveInteger(body?.amountOfVehicles, null) ||
+    toPositiveInteger(baseMessage?.vehicleVolume, null) ||
+    toPositiveInteger(baseMessage?.amountOfVehicles, null) ||
+    (Array.isArray(generation?.vehicles) ? generation.vehicles.length : null) ||
+    1;
+
+  const speedValue = toOptionalNumber(body?.speed ?? body?.targetSpeed ?? baseMessage?.speed ?? baseMessage?.targetSpeed);
+  const unit = sanitizeText(body?.unity || body?.distanceUnit || baseMessage?.unity || baseMessage?.distanceUnit) || 'Km';
 
   return {
-    bucket,
-    key,
-    fileName: 'scenario.json'
+    scenarioName: sanitizeText(body?.scenarioName || baseMessage?.scenarioName) || 'Trackster AI Simulation',
+    requestedContext:
+      sanitizeText(body?.requestedContext || baseMessage?.requestedContext) ||
+      buildDefaultRequestedContext(body, baseMessage),
+    driverProfile: sanitizeText(body?.driverProfile || baseMessage?.driverProfile) || 'Balanced',
+    targetSpeed: Number.isFinite(speedValue) ? speedValue : null,
+    targetSpeedText: Number.isFinite(speedValue) ? `${speedValue} ${unit}/h` : 'not specified',
+    distanceUnit: unit,
+    simulationMode: sanitizeText(body?.simulationMode || baseMessage?.simulationMode) || 'Time Window',
+    generationType: sanitizeText(body?.generationType || baseMessage?.generationType) || 'all_at_once',
+    routeRegion:
+      sanitizeText(body?.routeRegion || body?.gpsArea || baseMessage?.routeRegion || baseMessage?.gpsArea) ||
+      'not specified',
+    initialDateTime: sanitizeText(body?.initialDateTime || baseMessage?.initialDateTime) || 'not specified',
+    durationSeconds,
+    sampleIntervalSeconds,
+    vehicleVolume: amountOfVehicles
   };
 }
 
-function resolveScenarioBucket(generation, baseMessage) {
-  return sanitizeText(
-    generation?.scenarioBucketName ||
-      generation?.bucketName ||
-      generation?.outputBucketName ||
-      generation?.rawBucketName ||
-      baseMessage?.scenarioBucketName ||
-      baseMessage?.bucketName ||
-      baseMessage?.s3Bucket ||
-      baseMessage?.outputBucketName ||
-      baseMessage?.rawBucketName ||
-      baseMessage?.s3BucketName ||
-      process.env.SCENARIO_BUCKET_NAME ||
-      process.env.OUTPUT_BUCKET_NAME ||
-      process.env.RAW_BUCKET_NAME ||
-      process.env.BIN_BUCKET_NAME ||
-      process.env.S3_BUCKET_NAME
-  );
+function buildDefaultRequestedContext(body, baseMessage) {
+  const regionText = sanitizeText(body?.routeRegion || body?.gpsArea || baseMessage?.routeRegion || baseMessage?.gpsArea);
+  const amountOfTime = toPositiveInteger(body?.amountOfTime, null) || toPositiveInteger(baseMessage?.amountOfTime, null);
+  const timeText = amountOfTime ? `${amountOfTime} hour vehicle driving simulation` : 'vehicle driving simulation';
+  return regionText ? `Generate a realistic ${timeText} in ${regionText}.` : `Generate a realistic ${timeText}.`;
 }
 
-function resolveScenarioKey(body, generation, baseMessage) {
-  const explicitKey = sanitizeText(
-    generation?.scenarioKey ||
-      generation?.scenarioJsonKey ||
-      baseMessage?.scenarioKey ||
-      baseMessage?.scenarioJsonKey
-  );
-
-  if (explicitKey) {
-    return normalizeS3Key(explicitKey);
-  }
-
-  const existingArtifactKey = sanitizeText(
-    generation?.manifestKey ||
-      generation?.runManifestKey ||
-      generation?.binKey ||
-      generation?.s3Key ||
-      generation?.objectKey ||
-      baseMessage?.manifestKey ||
-      baseMessage?.runManifestKey ||
-      baseMessage?.binKey ||
-      baseMessage?.s3Key ||
-      baseMessage?.objectKey
-  );
-
-  const artifactFolder = extractFolderFromS3Key(existingArtifactKey);
-  if (artifactFolder) {
-    return `${normalizeS3Prefix(artifactFolder)}scenario.json`;
-  }
-
-  const folder = sanitizeText(
-    generation?.outputPrefix ||
-      generation?.s3Prefix ||
-      generation?.prefix ||
-      generation?.folderKey ||
-      generation?.folderPath ||
-      generation?.runPrefix ||
-      generation?.runFolder ||
-      generation?.outputFolder ||
-      generation?.destinationPrefix ||
-      baseMessage?.outputPrefix ||
-      baseMessage?.s3Prefix ||
-      baseMessage?.prefix ||
-      baseMessage?.folderKey ||
-      baseMessage?.folderPath ||
-      baseMessage?.runPrefix ||
-      baseMessage?.runFolder ||
-      baseMessage?.outputFolder ||
-      baseMessage?.destinationPrefix
-  );
-
-  if (folder) {
-    return `${normalizeS3Prefix(folder)}scenario.json`;
-  }
-
-  const clientId = sanitizeText(body?.clientId || baseMessage?.clientId);
-  const runId = sanitizeText(body?.runId || baseMessage?.runId || body?.requestId || baseMessage?.requestId);
-
-  if (clientId && runId) {
-    return `${normalizeS3Prefix(clientId)}${normalizeS3Prefix(runId)}scenario.json`;
-  }
-
-  return '';
-}
-
-function extractFolderFromS3Key(key) {
-  const normalized = normalizeS3Key(key);
-
-  if (!normalized) {
-    return '';
-  }
-
-  const lastSlashIndex = normalized.lastIndexOf('/');
-
-  if (lastSlashIndex < 0) {
-    return '';
-  }
-
-  return normalized.slice(0, lastSlashIndex + 1);
-}
-
-function normalizeS3Prefix(value) {
-  const normalized = normalizeS3Key(value);
-
-  if (!normalized) {
-    return '';
-  }
-
-  return normalized.endsWith('/') ? normalized : `${normalized}/`;
-}
-
-function normalizeS3Key(value) {
-  return String(value || '')
-    .trim()
-    .replace(/^\/+/g, '')
-    .replace(/\/{2,}/g, '/');
-}
-
-async function generateValidatedSignalDeltaScenario(body) {
-  const scenarioRequest = buildScenarioRequest(body);
-
-  const phasePlanPromptTemplate = await loadPromptTemplate('PHASE_PLAN_PROMPT_KEY');
-  const phasePlanPrompt = buildPhasePlanPrompt(phasePlanPromptTemplate.template, scenarioRequest);
-  const phasePlanResponse = await callBedrockMantle(phasePlanPrompt);
-  const phasePlanText = extractTextFromMantleResponse(phasePlanResponse);
-  const phasePlan = parseJsonResponse(phasePlanText);
-
-  const phasePlanValidation = validatePhasePlan(phasePlan, scenarioRequest);
-  if (!phasePlanValidation.valid) {
-    const error = new Error('Bedrock returned an invalid phase plan.');
-    error.validationErrors = phasePlanValidation.errors;
-    error.rawResponse = phasePlanText;
-    throw error;
-  }
-
-  const phaseBehaviorPromptTemplate = await loadPromptTemplate('PHASE_BEHAVIOR_PROMPT_KEY');
-  const behaviorPhases = [];
-  const rawBehaviorResponses = [];
-
-  for (let phaseIndex = 0; phaseIndex < phasePlan.ph.length; phaseIndex += 1) {
-    const phase = phasePlan.ph[phaseIndex];
-    const previousPhase = behaviorPhases[phaseIndex - 1] || null;
-
-    const phaseBehaviorPrompt = buildPhaseBehaviorPrompt(
-      phaseBehaviorPromptTemplate.template,
-      scenarioRequest,
-      phasePlan,
-      phase,
-      phaseIndex,
-      previousPhase
-    );
-
-    const phaseBehaviorResponse = await callBedrockMantle(phaseBehaviorPrompt);
-    const phaseBehaviorText = extractTextFromMantleResponse(phaseBehaviorResponse);
-    const phaseBehavior = parseJsonResponse(phaseBehaviorText);
-
-    const normalizedPhaseBehavior = normalizePhaseBehaviorResponse(phaseBehavior, phase);
-    const phaseBehaviorValidation = validateSinglePhaseBehavior(
-      normalizedPhaseBehavior,
-      scenarioRequest,
-      phase,
-      phaseIndex,
-      previousPhase
-    );
-
-    if (!phaseBehaviorValidation.valid) {
-      const error = new Error(`Bedrock returned an invalid behavior for phase ${phaseIndex}.`);
-      error.validationErrors = phaseBehaviorValidation.errors;
-      error.rawResponse = phaseBehaviorText;
-      throw error;
-    }
-
-    behaviorPhases.push(normalizedPhaseBehavior);
-    rawBehaviorResponses.push({
-      phaseIndex,
-      phaseName: phase.n,
-      rawResponse: phaseBehaviorText
-    });
-  }
-
-  const scenario = {
-    n: scenarioRequest.scenarioName,
-    dur: scenarioRequest.durationSeconds,
-    dt: scenarioRequest.sampleIntervalSeconds,
-    ph: behaviorPhases
-  };
-
-  const validation = validateSignalDeltaScenario(scenario, scenarioRequest);
-
-  if (!validation.valid) {
-    const error = new Error('Merged signal delta scenario is invalid.');
-    error.validationErrors = validation.errors;
-    error.rawResponse = JSON.stringify({ phasePlan, behaviorPhases }, null, 2);
-    throw error;
-  }
-
-  return {
-    scenarioRequest,
-    phasePlan,
-    scenario,
-    rawResponse: JSON.stringify({ phasePlan, behaviorPhases }, null, 2),
-    rawBehaviorResponses,
-    promptSource: {
-      phasePlan: phasePlanPromptTemplate.source,
-      phaseBehavior: phaseBehaviorPromptTemplate.source
-    }
-  };
-}
-
-async function loadPromptTemplate(promptKeyEnvironmentVariableName) {
+async function loadPromptTemplate(keyEnvName) {
   const bucket = sanitizeText(process.env.PROMPT_BUCKET);
-  const key = normalizeS3Key(process.env[promptKeyEnvironmentVariableName]);
 
   if (!bucket) {
     throw new Error('PROMPT_BUCKET environment variable was not defined.');
   }
 
+  const key = normalizeS3Key(process.env[keyEnvName]);
+
   if (!key) {
-    throw new Error(`${promptKeyEnvironmentVariableName} environment variable was not defined.`);
+    throw new Error(`${keyEnvName} environment variable was not defined.`);
   }
 
-  const response = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: bucket,
-      Key: key
-    })
-  );
+  const response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
 
   if (!response.Body) {
     throw new Error(`Prompt file is empty or unreadable: s3://${bucket}/${key}`);
@@ -461,341 +1018,105 @@ async function loadPromptTemplate(promptKeyEnvironmentVariableName) {
     throw new Error(`Prompt file is empty: s3://${bucket}/${key}`);
   }
 
-  return {
-    template,
-    source: {
-      bucket,
-      key
-    }
-  };
+  return { template, source: { bucket, key } };
 }
 
-function buildPhasePlanPrompt(template, request) {
-  return renderPromptTemplate(template, {
-    scenarioName: request.scenarioName,
-    durationSeconds: String(request.durationSeconds),
-    sampleIntervalSeconds: String(request.sampleIntervalSeconds),
-    phaseCount: String(request.phaseCount),
-    requestedContext: request.requestedContext,
-    driverProfile: request.driverProfile,
-    targetSpeed: formatTargetSpeed(request),
-    simulationMode: request.simulationMode || 'not specified',
-    generationType: request.generationType || 'not specified',
-    routeRegion: request.routeRegion || 'not specified',
-    initialDateTime: request.initialDateTime || 'not specified',
-    selectedCanFrames: String(request.selectedCanFrames),
-    amountOfVehicles: String(request.amountOfVehicles)
-  });
+function buildPlannerPrompt(template, request) {
+  return replaceCommonPromptVariables(template, request).trim();
 }
 
-function buildPhaseBehaviorPrompt(template, request, phasePlan, phase, phaseIndex, previousPhase) {
-  const availableSignalsText = request.controlledSignals.map((signal) => `- ${signal}`).join('\n');
-
-  return renderPromptTemplate(template, {
-    scenarioName: request.scenarioName,
-    durationSeconds: String(request.durationSeconds),
-    sampleIntervalSeconds: String(request.sampleIntervalSeconds),
-    phaseCount: String(request.phaseCount),
-    requestedContext: request.requestedContext,
-    driverProfile: request.driverProfile,
-    targetSpeed: formatTargetSpeed(request),
-    simulationMode: request.simulationMode || 'not specified',
-    generationType: request.generationType || 'not specified',
-    routeRegion: request.routeRegion || 'not specified',
-    initialDateTime: request.initialDateTime || 'not specified',
-    selectedCanFrames: String(request.selectedCanFrames),
-    amountOfVehicles: String(request.amountOfVehicles),
-    availableSignals: availableSignalsText,
-    phasePlanJson: JSON.stringify(phasePlan, null, 2),
-    phaseJson: JSON.stringify(phase, null, 2),
-    phaseIndex: String(phaseIndex),
-    phaseName: String(phase.n || ''),
-    phaseFrom: String(phase.from),
-    phaseTo: String(phase.to),
-    previousPhaseJson: previousPhase ? JSON.stringify(previousPhase, null, 2) : 'null'
-  });
+function buildSignalBehaviorPrompt({ template, request, planner, requestedSignals }) {
+  return replaceCommonPromptVariables(template, request)
+    .replaceAll('{{plannerJson}}', JSON.stringify(planner, null, 2))
+    .replaceAll('{{signalsJson}}', JSON.stringify(requestedSignals, null, 2))
+    .trim();
 }
 
-function renderPromptTemplate(template, values) {
-  let rendered = String(template || '');
-
-  for (const [key, value] of Object.entries(values)) {
-    rendered = rendered.replaceAll(`{{${key}}}`, String(value ?? ''));
-  }
-
-  return rendered.trim();
+function replaceCommonPromptVariables(template, request) {
+  return template
+    .replaceAll('{{scenarioName}}', request.scenarioName)
+    .replaceAll('{{requestedContext}}', request.requestedContext)
+    .replaceAll('{{driverProfile}}', request.driverProfile)
+    .replaceAll('{{targetSpeed}}', request.targetSpeedText)
+    .replaceAll('{{simulationMode}}', request.simulationMode || 'not specified')
+    .replaceAll('{{generationType}}', request.generationType || 'not specified')
+    .replaceAll('{{routeRegion}}', request.routeRegion || 'not specified')
+    .replaceAll('{{initialDateTime}}', request.initialDateTime || 'not specified')
+    .replaceAll('{{durationSeconds}}', String(request.durationSeconds))
+    .replaceAll('{{sampleIntervalSeconds}}', String(request.sampleIntervalSeconds))
+    .replaceAll('{{vehicleVolume}}', String(request.vehicleVolume));
 }
 
-function formatTargetSpeed(request) {
-  return Number.isFinite(request.targetSpeed)
-    ? `${request.targetSpeed} ${request.distanceUnit}/h`
-    : 'not specified';
-}
+function extractRequestedSignals(body) {
+  const generation = body?.generation || {};
+  const baseMessage = generation?.baseMessage || body?.baseMessage || {};
 
-function normalizePhaseBehaviorResponse(phaseBehavior, phasePlanPhase) {
-  if (phaseBehavior?.s && typeof phaseBehavior.s === 'object') {
-    return {
-      n: String(phaseBehavior.n || phasePlanPhase.n || '').trim(),
-      from: Number(phaseBehavior.from),
-      to: Number(phaseBehavior.to),
-      s: phaseBehavior.s
-    };
-  }
+  const candidateCollections = [
+    body?.signals,
+    body?.selectedSignals,
+    body?.signalNames,
+    generation?.signals,
+    generation?.selectedSignals,
+    generation?.signalNames,
+    baseMessage?.signals,
+    baseMessage?.selectedSignals,
+    baseMessage?.signalNames
+  ];
 
-  if (phaseBehavior?.phase?.s && typeof phaseBehavior.phase.s === 'object') {
-    return {
-      n: String(phaseBehavior.phase.n || phasePlanPhase.n || '').trim(),
-      from: Number(phaseBehavior.phase.from),
-      to: Number(phaseBehavior.phase.to),
-      s: phaseBehavior.phase.s
-    };
-  }
+  const signals = [];
 
-  return phaseBehavior;
-}
-
-function validatePhasePlan(phasePlan, request) {
-  const errors = [];
-
-  if (!phasePlan || typeof phasePlan !== 'object') {
-    errors.push('Phase plan must be an object.');
-    return { valid: false, errors };
-  }
-
-  if (typeof phasePlan.n !== 'string' || !phasePlan.n.trim()) {
-    errors.push('Phase plan n must be a non-empty string.');
-  }
-
-  if (Number(phasePlan.dur) !== Number(request.durationSeconds)) {
-    errors.push(`Phase plan dur must be exactly ${request.durationSeconds}.`);
-  }
-
-  if (Number(phasePlan.dt) !== Number(request.sampleIntervalSeconds)) {
-    errors.push(`Phase plan dt must be exactly ${request.sampleIntervalSeconds}.`);
-  }
-
-  if (!Array.isArray(phasePlan.ph) || phasePlan.ph.length !== request.phaseCount) {
-    errors.push(`Phase plan ph must contain exactly ${request.phaseCount} phases.`);
-    return { valid: false, errors };
-  }
-
-  let expectedFrom = 0;
-
-  for (let phaseIndex = 0; phaseIndex < phasePlan.ph.length; phaseIndex += 1) {
-    const phase = phasePlan.ph[phaseIndex];
-
-    if (!phase || typeof phase !== 'object') {
-      errors.push(`Phase plan ph[${phaseIndex}] must be an object.`);
+  for (const collection of candidateCollections) {
+    if (!Array.isArray(collection)) {
       continue;
     }
 
-    if (typeof phase.n !== 'string' || !phase.n.trim()) {
-      errors.push(`Phase plan ph[${phaseIndex}].n must be a non-empty string.`);
-    }
-
-    const from = Number(phase.from);
-    const to = Number(phase.to);
-
-    if (!Number.isFinite(from) || from !== expectedFrom) {
-      errors.push(`Phase plan ph[${phaseIndex}].from must be ${expectedFrom}.`);
-    }
-
-    if (!Number.isFinite(to) || to <= from) {
-      errors.push(`Phase plan ph[${phaseIndex}].to must be greater than from.`);
-    }
-
-    if (phase.s !== undefined) {
-      errors.push(`Phase plan ph[${phaseIndex}] must not contain signal behavior map s.`);
-    }
-
-    expectedFrom = to;
-  }
-
-  if (expectedFrom !== Number(request.durationSeconds)) {
-    errors.push(`Final phase plan phase must end at ${request.durationSeconds}.`);
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-function validateSinglePhaseBehavior(phaseBehavior, request, phasePlanPhase, phaseIndex, previousPhase) {
-  const errors = [];
-
-  if (!phaseBehavior || typeof phaseBehavior !== 'object') {
-    errors.push(`Phase behavior ${phaseIndex} must be an object.`);
-    return { valid: false, errors };
-  }
-
-  if (typeof phaseBehavior.n !== 'string' || !phaseBehavior.n.trim()) {
-    errors.push(`Phase behavior ${phaseIndex}.n must be a non-empty string.`);
-  }
-
-  if (String(phaseBehavior.n || '').trim() !== String(phasePlanPhase.n || '').trim()) {
-    errors.push(`Phase behavior ${phaseIndex}.n must match phase plan name ${phasePlanPhase.n}.`);
-  }
-
-  if (Number(phaseBehavior.from) !== Number(phasePlanPhase.from)) {
-    errors.push(`Phase behavior ${phaseIndex}.from must be ${phasePlanPhase.from}.`);
-  }
-
-  if (Number(phaseBehavior.to) !== Number(phasePlanPhase.to)) {
-    errors.push(`Phase behavior ${phaseIndex}.to must be ${phasePlanPhase.to}.`);
-  }
-
-  if (!phaseBehavior.s || typeof phaseBehavior.s !== 'object' || Array.isArray(phaseBehavior.s)) {
-    errors.push(`Phase behavior ${phaseIndex}.s must be a signal behavior map.`);
-    return { valid: false, errors };
-  }
-
-  const expectedSignals = new Set(request.controlledSignals);
-  const previousSignalEnds = new Map();
-
-  if (previousPhase?.s && typeof previousPhase.s === 'object') {
-    for (const [signalName, behavior] of Object.entries(previousPhase.s)) {
-      const end = Number(behavior?.end);
-      if (Number.isFinite(end)) {
-        previousSignalEnds.set(signalName, end);
+    for (const item of collection) {
+      const signalName = resolveSignalName(item);
+      if (signalName) {
+        signals.push(signalName);
       }
     }
   }
 
-  for (const signalName of expectedSignals) {
-    if (!Object.prototype.hasOwnProperty.call(phaseBehavior.s, signalName)) {
-      errors.push(`Phase behavior ${phaseIndex}.s is missing signal ${signalName}.`);
-    }
-  }
-
-  for (const signalName of Object.keys(phaseBehavior.s)) {
-    if (!expectedSignals.has(signalName)) {
-      errors.push(`Phase behavior ${phaseIndex}.s contains unexpected signal ${signalName}.`);
-    }
-  }
-
-  for (const [signalName, behavior] of Object.entries(phaseBehavior.s)) {
-    validateSignalBehavior(errors, behavior, signalName, phaseIndex, previousSignalEnds.get(signalName));
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
+  return uniqueStrings(signals);
 }
 
-function extractAvailableSignalNamesFromCompiledDbc(compiledDbc) {
-  const names = [];
-  const fields = Array.isArray(compiledDbc?.f) ? compiledDbc.f : [];
-  const nameIndex = fields.indexOf('n');
-
-  if (!compiledDbc?.m || typeof compiledDbc.m !== 'object') {
-    return names;
+function resolveSignalName(item) {
+  if (typeof item === 'string') {
+    return sanitizeSignalName(item);
   }
 
-  for (const entries of Object.values(compiledDbc.m)) {
-    if (!Array.isArray(entries)) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return '';
+  }
+
+  return sanitizeSignalName(item.signalName || item.name || item.signal || item.canSignalName || item.label);
+}
+
+function sanitizeSignalName(value) {
+  const text = sanitizeText(value);
+  return text ? text.replace(/[^\w.-]/g, '_').slice(0, 120) : '';
+}
+
+function uniqueStrings(values) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of values) {
+    if (!value || seen.has(value)) {
       continue;
     }
-
-    for (const entry of entries) {
-      const signals = Array.isArray(entry?.frame?.s) ? entry.frame.s : [];
-
-      for (const signal of signals) {
-        let signalName = '';
-
-        if (Array.isArray(signal)) {
-          const candidate = nameIndex >= 0 ? signal[nameIndex] : signal[8];
-          signalName = String(candidate || '').trim();
-        } else if (signal && typeof signal === 'object') {
-          signalName = String(signal.n || signal.name || '').trim();
-        }
-
-        if (signalName) {
-          names.push(signalName);
-        }
-      }
-    }
+    seen.add(value);
+    result.push(value);
   }
 
-  return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
-}
-
-async function enqueueWorkerMessages({
-  baseMessage,
-  vehicles,
-  workQueueUrl,
-  sqsBatch,
-  maxSafeSqsBytes,
-  aiBehaviorPlan
-}) {
-  const sqs = new SQSClient({ region });
-
-  const allEntries = vehicles.map((vehicle, index) => {
-    const messageBody = JSON.stringify({
-      ...baseMessage,
-      aiBehaviorPlan,
-      vin: vehicle.vin,
-      type: vehicle.type || 'car',
-      vehicleIndex: index
-    });
-
-    return {
-      Id: `v-${index}`,
-      MessageBody: messageBody
-    };
-  });
-
-  const probeBody = allEntries[0]?.MessageBody || '';
-  const messageSizeBytes = assertSafeSqsMessageSize(probeBody, maxSafeSqsBytes);
-
-  let sentBatches = 0;
-
-  for (let index = 0; index < allEntries.length; index += sqsBatch) {
-    const batch = allEntries.slice(index, index + sqsBatch);
-
-    const response = await sqs.send(
-      new SendMessageBatchCommand({
-        QueueUrl: workQueueUrl,
-        Entries: batch
-      })
-    );
-
-    sentBatches += 1;
-
-    if (response.Failed && response.Failed.length) {
-      console.error('Simulator AI assistance SQS batch failures:', JSON.stringify(response.Failed, null, 2));
-      throw new Error(`SQS SendMessageBatch failed with ${response.Failed.length} failed message(s).`);
-    }
-  }
-
-  return {
-    sentBatches,
-    messageSizeBytes
-  };
-}
-
-function assertSafeSqsMessageSize(messageBody, maxSafeSqsBytes) {
-  const sizeBytes = Buffer.byteLength(messageBody, 'utf8');
-
-  if (sizeBytes > maxSafeSqsBytes) {
-    throw new Error(
-      `SQS message body too large (${sizeBytes} bytes). Safe limit is ${maxSafeSqsBytes} bytes.`
-    );
-  }
-
-  return sizeBytes;
+  return result;
 }
 
 async function callBedrockMantle(prompt) {
   const requestBody = JSON.stringify({
     model: modelId,
-    messages: [
-      {
-        role: 'user',
-        content: prompt
-      }
-    ],
+    messages: [{ role: 'user', content: prompt }],
     temperature: 0.2,
     top_p: 0.9,
     max_tokens: DEFAULT_MAX_TOKENS
@@ -806,10 +1127,7 @@ async function callBedrockMantle(prompt) {
     hostname: mantleHost,
     method: 'POST',
     path: mantlePath,
-    headers: {
-      host: mantleHost,
-      'content-type': 'application/json'
-    },
+    headers: { host: mantleHost, 'content-type': 'application/json' },
     body: requestBody
   });
 
@@ -821,7 +1139,6 @@ async function callBedrockMantle(prompt) {
   });
 
   const signedRequest = await signer.sign(unsignedRequest);
-
   const response = await fetch(`https://${mantleHost}${mantlePath}`, {
     method: signedRequest.method,
     headers: signedRequest.headers,
@@ -847,87 +1164,342 @@ function extractTextFromMantleResponse(response) {
   return text.trim();
 }
 
-function buildScenarioRequest(body) {
-  const durationSeconds = toPositiveInteger(body?.durationSeconds, 1200);
-  const sampleIntervalSeconds = toPositiveInteger(body?.sampleIntervalSeconds, 5);
-  const availableSignals = normalizeStringArray(body?.availableSignals);
-  const controlledSignals = resolveControlledSignals(availableSignals);
+function parseJsonResponse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
 
-  return {
-    schemaVersion: 'trackster-ai-signal-delta-v1',
-    scenarioName: sanitizeText(body?.scenarioName) || 'Urban Driving Scenario',
-    durationSeconds,
-    sampleIntervalSeconds,
-    phaseCount: DEFAULT_PHASE_COUNT,
-    requestedContext: sanitizeText(body?.requestedContext) || 'realistic urban driving signal delta scenario',
-    driverProfile: sanitizeText(body?.driverProfile) || 'Balanced',
-    targetSpeed: toOptionalNumber(body?.targetSpeed),
-    distanceUnit: sanitizeText(body?.distanceUnit) || 'Km',
-    simulationMode: sanitizeText(body?.simulationMode) || 'Time Window',
-    generationType: sanitizeText(body?.generationType) || '',
-    routeRegion: sanitizeText(body?.routeRegion) || '',
-    initialDateTime: sanitizeText(body?.initialDateTime) || '',
-    amountOfVehicles: toPositiveInteger(body?.amountOfVehicles, 1),
-    selectedCanFrames: toPositiveInteger(body?.selectedCanFrames, 0),
-    availableSignals,
-    controlledSignals
-  };
+    if (firstBrace < 0 || lastBrace <= firstBrace) {
+      const parseError = new Error('Bedrock response is not valid JSON.');
+      parseError.rawResponse = text;
+      parseError.cause = error;
+      throw parseError;
+    }
+
+    try {
+      return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+    } catch (innerError) {
+      const parseError = new Error('Bedrock response JSON extraction failed.');
+      parseError.rawResponse = text;
+      parseError.cause = innerError;
+      throw parseError;
+    }
+  }
 }
 
-function resolveControlledSignals(availableSignals) {
-  const uniqueSignals = Array.from(new Set(availableSignals));
+function validateDrivingPlanner(planner, request) {
+  const errors = [];
 
-  if (!uniqueSignals.length) {
-    throw new Error('No available signals were found for AI scenario generation.');
+  if (!planner || typeof planner !== 'object' || Array.isArray(planner)) {
+    errors.push('Planner response must be an object.');
+    return { valid: false, errors };
   }
 
-  return uniqueSignals;
+  if (!isNonEmptyString(planner.scenarioName)) errors.push('scenarioName must be a non-empty string.');
+  if (!isNonEmptyString(planner.summary)) errors.push('summary must be a non-empty string.');
+  if (Number(planner.duration) !== Number(request.durationSeconds)) errors.push(`duration must be exactly ${request.durationSeconds}.`);
+  if (Number(planner.sampleInterval) !== Number(request.sampleIntervalSeconds)) errors.push(`sampleInterval must be exactly ${request.sampleIntervalSeconds}.`);
+
+  if (!planner.environment || typeof planner.environment !== 'object' || Array.isArray(planner.environment)) {
+    errors.push('environment must be an object.');
+  } else {
+    if (!isNonEmptyString(planner.environment.country)) errors.push('environment.country must be a non-empty string.');
+    if (!isNonEmptyString(planner.environment.weather)) errors.push('environment.weather must be a non-empty string.');
+    if (!isNonEmptyString(planner.environment.roadCondition)) errors.push('environment.roadCondition must be a non-empty string.');
+  }
+
+  if (!Array.isArray(planner.phases) || !planner.phases.length) {
+    errors.push('phases must be a non-empty array.');
+    return { valid: false, errors };
+  }
+
+  let expectedFrom = 0;
+
+  for (let index = 0; index < planner.phases.length; index += 1) {
+    const phase = planner.phases[index];
+
+    if (!phase || typeof phase !== 'object' || Array.isArray(phase)) {
+      errors.push(`phases[${index}] must be an object.`);
+      continue;
+    }
+
+    validateRequiredString(errors, phase, 'name', index);
+    validateRequiredString(errors, phase, 'description', index);
+    validateRequiredString(errors, phase, 'driverIntent', index);
+    validateRequiredString(errors, phase, 'roadType', index);
+    validateRequiredString(errors, phase, 'traffic', index);
+    validateRequiredString(errors, phase, 'weather', index);
+    validateRequiredString(errors, phase, 'roadCondition', index);
+    validateRequiredString(errors, phase, 'expectedTurns', index);
+
+    const id = Number(phase.id);
+    const from = Number(phase.from);
+    const to = Number(phase.to);
+    const speedTarget = Number(phase.speedTarget);
+    const expectedStops = Number(phase.expectedStops);
+    const aggressiveness = Number(phase.aggressiveness);
+
+    if (!Number.isInteger(id) || id !== index + 1) errors.push(`phases[${index}].id must be ${index + 1}.`);
+    if (!Number.isInteger(from)) errors.push(`phases[${index}].from must be a whole number.`);
+    if (!Number.isInteger(to)) errors.push(`phases[${index}].to must be a whole number.`);
+    if (Number.isInteger(from) && from !== expectedFrom) errors.push(`phases[${index}].from must be ${expectedFrom}.`);
+    if (Number.isInteger(from) && Number.isInteger(to) && to <= from) errors.push(`phases[${index}].to must be greater than from.`);
+    if (Number.isInteger(from) && Number.isInteger(to)) expectedFrom = to;
+    if (!Number.isFinite(speedTarget) || speedTarget < 0) errors.push(`phases[${index}].speedTarget must be a number greater than or equal to 0.`);
+    if (!Number.isInteger(expectedStops) || expectedStops < 0) errors.push(`phases[${index}].expectedStops must be an integer greater than or equal to 0.`);
+    if (!Number.isFinite(aggressiveness) || aggressiveness < 0 || aggressiveness > 1) errors.push(`phases[${index}].aggressiveness must be between 0.0 and 1.0.`);
+  }
+
+  if (expectedFrom !== Number(request.durationSeconds)) errors.push(`Final phase must end exactly at ${request.durationSeconds}.`);
+
+  const finalPhase = planner.phases[planner.phases.length - 1];
+  if (finalPhase && Number(finalPhase.speedTarget) !== 0) errors.push('Final phase must have speedTarget equal to 0.');
+
+  return { valid: errors.length === 0, errors };
 }
 
-function normalizeSignalNameForMatch(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
+function validateSignalBehaviorPlan({ behaviorPlan, planner, requestedSignals }) {
+  const errors = [];
+
+  if (!behaviorPlan || typeof behaviorPlan !== 'object' || Array.isArray(behaviorPlan)) {
+    errors.push('Signal behavior plan response must be an object.');
+    return { valid: false, errors };
+  }
+
+  if (behaviorPlan.schemaVersion !== 'trackster-signal-delta-plan-v1') {
+    errors.push('schemaVersion must be trackster-signal-delta-plan-v1.');
+  }
+
+  if (!Array.isArray(behaviorPlan.phases)) {
+    errors.push('phases must be an array.');
+    return { valid: false, errors };
+  }
+
+  if (behaviorPlan.phases.length !== planner.phases.length) {
+    errors.push(`phases length must be exactly ${planner.phases.length}.`);
+  }
+
+  const plannerPhaseById = new Map(planner.phases.map((phase) => [Number(phase.id), phase]));
+  const seenPhaseIds = new Set();
+
+  for (let index = 0; index < behaviorPlan.phases.length; index += 1) {
+    const behaviorPhase = behaviorPlan.phases[index];
+
+    if (!behaviorPhase || typeof behaviorPhase !== 'object' || Array.isArray(behaviorPhase)) {
+      errors.push(`phases[${index}] must be an object.`);
+      continue;
+    }
+
+    const phaseId = Number(behaviorPhase.phaseId);
+    if (!Number.isInteger(phaseId)) {
+      errors.push(`phases[${index}].phaseId must be an integer.`);
+      continue;
+    }
+
+    if (seenPhaseIds.has(phaseId)) errors.push(`phaseId ${phaseId} is duplicated.`);
+    seenPhaseIds.add(phaseId);
+    if (!plannerPhaseById.has(phaseId)) errors.push(`phaseId ${phaseId} does not exist in planner.`);
+
+    if (!behaviorPhase.signals || typeof behaviorPhase.signals !== 'object' || Array.isArray(behaviorPhase.signals)) {
+      errors.push(`phases[${index}].signals must be an object.`);
+      continue;
+    }
+
+    const signalNames = Object.keys(behaviorPhase.signals);
+    const missingSignals = requestedSignals.filter((signalName) => !Object.prototype.hasOwnProperty.call(behaviorPhase.signals, signalName));
+    const extraSignals = signalNames.filter((signalName) => !requestedSignals.includes(signalName));
+
+    if (missingSignals.length) errors.push(`phases[${index}] is missing signals: ${missingSignals.join(', ')}.`);
+    if (extraSignals.length) errors.push(`phases[${index}] contains extra signals: ${extraSignals.join(', ')}.`);
+
+    for (const signalName of signalNames) {
+      const signalBehavior = behaviorPhase.signals[signalName];
+
+      if (!signalBehavior || typeof signalBehavior !== 'object' || Array.isArray(signalBehavior)) {
+        errors.push(`phases[${index}].signals.${signalName} must be an object.`);
+        continue;
+      }
+
+      validateNumericField(errors, signalBehavior, 'start', `phases[${index}].signals.${signalName}`);
+      validateNumericField(errors, signalBehavior, 'end', `phases[${index}].signals.${signalName}`);
+      validateNumericField(errors, signalBehavior, 'min', `phases[${index}].signals.${signalName}`);
+      validateNumericField(errors, signalBehavior, 'max', `phases[${index}].signals.${signalName}`);
+
+      const min = Number(signalBehavior.min);
+      const max = Number(signalBehavior.max);
+      const start = Number(signalBehavior.start);
+      const end = Number(signalBehavior.end);
+
+      if (Number.isFinite(min) && Number.isFinite(max) && min > max) errors.push(`phases[${index}].signals.${signalName}.min must be less than or equal to max.`);
+      if (Number.isFinite(start) && Number.isFinite(min) && start < min) errors.push(`phases[${index}].signals.${signalName}.start must not be lower than min.`);
+      if (Number.isFinite(start) && Number.isFinite(max) && start > max) errors.push(`phases[${index}].signals.${signalName}.start must not be greater than max.`);
+      if (Number.isFinite(end) && Number.isFinite(min) && end < min) errors.push(`phases[${index}].signals.${signalName}.end must not be lower than min.`);
+      if (Number.isFinite(end) && Number.isFinite(max) && end > max) errors.push(`phases[${index}].signals.${signalName}.end must not be greater than max.`);
+
+      if (!Array.isArray(signalBehavior.d) || !signalBehavior.d.length) {
+        errors.push(`phases[${index}].signals.${signalName}.d must be a non-empty array.`);
+      } else {
+        for (let deltaIndex = 0; deltaIndex < signalBehavior.d.length; deltaIndex += 1) {
+          if (!Number.isFinite(Number(signalBehavior.d[deltaIndex]))) {
+            errors.push(`phases[${index}].signals.${signalName}.d[${deltaIndex}] must be numeric.`);
+          }
+        }
+      }
+    }
+  }
+
+  for (const plannerPhase of planner.phases) {
+    if (!seenPhaseIds.has(Number(plannerPhase.id))) {
+      errors.push(`phaseId ${plannerPhase.id} is missing from signal behavior plan.`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+function validateNumericField(errors, object, fieldName, path) {
+  if (!Number.isFinite(Number(object[fieldName]))) {
+    errors.push(`${path}.${fieldName} must be numeric.`);
+  }
+}
+
+function validateRequiredString(errors, phase, fieldName, index) {
+  if (!isNonEmptyString(phase[fieldName])) {
+    errors.push(`phases[${index}].${fieldName} must be a non-empty string.`);
+  }
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function resolveScenarioBucket(generation, baseMessage, body) {
+  return sanitizeText(
+    generation?.scenarioBucketName ||
+      generation?.bucketName ||
+      generation?.outputBucketName ||
+      generation?.rawBucketName ||
+      body?.scenarioBucketName ||
+      body?.bucketName ||
+      body?.s3Bucket ||
+      body?.outputBucketName ||
+      body?.rawBucketName ||
+      body?.s3BucketName ||
+      baseMessage?.scenarioBucketName ||
+      baseMessage?.bucketName ||
+      baseMessage?.s3Bucket ||
+      baseMessage?.outputBucketName ||
+      baseMessage?.rawBucketName ||
+      baseMessage?.s3BucketName ||
+      process.env.SCENARIO_BUCKET_NAME ||
+      process.env.OUTPUT_BUCKET_NAME ||
+      process.env.RAW_BUCKET_NAME ||
+      process.env.BIN_BUCKET_NAME ||
+      process.env.S3_BUCKET_NAME
+  );
+}
+
+function resolveScenarioKey(body, generation, baseMessage) {
+  const explicitKey = sanitizeText(
+    generation?.scenarioKey ||
+      generation?.scenarioJsonKey ||
+      body?.scenarioKey ||
+      body?.scenarioJsonKey ||
+      baseMessage?.scenarioKey ||
+      baseMessage?.scenarioJsonKey
+  );
+
+  if (explicitKey) return normalizeS3Key(explicitKey);
+
+  const existingArtifactKey = sanitizeText(
+    generation?.manifestKey ||
+      generation?.runManifestKey ||
+      generation?.binKey ||
+      generation?.s3Key ||
+      generation?.objectKey ||
+      body?.manifestKey ||
+      body?.runManifestKey ||
+      body?.binKey ||
+      body?.s3Key ||
+      body?.objectKey ||
+      baseMessage?.manifestKey ||
+      baseMessage?.runManifestKey ||
+      baseMessage?.binKey ||
+      baseMessage?.s3Key ||
+      baseMessage?.objectKey
+  );
+
+  const artifactFolder = extractFolderFromS3Key(existingArtifactKey);
+  if (artifactFolder) return `${normalizeS3Prefix(artifactFolder)}scenario.json`;
+
+  const folder = sanitizeText(
+    generation?.outputPrefix ||
+      generation?.s3Prefix ||
+      generation?.prefix ||
+      generation?.folderKey ||
+      generation?.folderPath ||
+      generation?.runPrefix ||
+      generation?.runFolder ||
+      generation?.outputFolder ||
+      generation?.destinationPrefix ||
+      body?.outputPrefix ||
+      body?.s3Prefix ||
+      body?.prefix ||
+      body?.folderKey ||
+      body?.folderPath ||
+      body?.runPrefix ||
+      body?.runFolder ||
+      body?.outputFolder ||
+      body?.destinationPrefix ||
+      baseMessage?.outputPrefix ||
+      baseMessage?.s3Prefix ||
+      baseMessage?.prefix ||
+      baseMessage?.folderKey ||
+      baseMessage?.folderPath ||
+      baseMessage?.runPrefix ||
+      baseMessage?.runFolder ||
+      baseMessage?.outputFolder ||
+      baseMessage?.destinationPrefix
+  );
+
+  if (folder) return `${normalizeS3Prefix(folder)}scenario.json`;
+
+  return `${normalizeS3Prefix(DEFAULT_TEST_OUTPUT_PREFIX)}scenario.json`;
+}
+
+function extractFolderFromS3Key(key) {
+  const normalized = normalizeS3Key(key);
+  if (!normalized) return '';
+  const lastSlashIndex = normalized.lastIndexOf('/');
+  return lastSlashIndex < 0 ? '' : normalized.slice(0, lastSlashIndex + 1);
+}
+
+function normalizeS3Prefix(value) {
+  const normalized = normalizeS3Key(value);
+  if (!normalized) return '';
+  return normalized.endsWith('/') ? normalized : `${normalized}/`;
+}
+
+function normalizeS3Key(value) {
+  return String(value || '').trim().replace(/^\/+/g, '').replace(/\/{2,}/g, '/');
 }
 
 function parseBody(rawBody) {
-  if (!rawBody) {
-    return {};
-  }
-
-  if (typeof rawBody === 'object') {
-    return rawBody;
-  }
-
+  if (!rawBody) return {};
+  if (typeof rawBody === 'object') return rawBody;
   return JSON.parse(rawBody);
 }
 
 function sanitizeText(value) {
-  if (typeof value !== 'string') {
-    return '';
-  }
-
+  if (typeof value !== 'string') return '';
   return value.trim().slice(0, 2000);
-}
-
-function normalizeStringArray(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => String(item || '').trim())
-    .filter(Boolean);
 }
 
 function toPositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value, 10);
-
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-
-  return parsed;
+  return !Number.isFinite(parsed) || parsed <= 0 ? fallback : parsed;
 }
 
 function toOptionalNumber(value) {
@@ -935,183 +1507,11 @@ function toOptionalNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseJsonResponse(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-
-    if (firstBrace < 0 || lastBrace <= firstBrace) {
-      throw new Error('Bedrock response is not valid JSON.');
-    }
-
-    const extractedJson = text.slice(firstBrace, lastBrace + 1);
-    return JSON.parse(extractedJson);
-  }
-}
-
-function validateSignalDeltaScenario(scenario, request) {
-  const errors = [];
-
-  if (!scenario || typeof scenario !== 'object') {
-    errors.push('Scenario must be an object.');
-    return { valid: false, errors };
-  }
-
-  if (typeof scenario.n !== 'string' || !scenario.n.trim()) {
-    errors.push('n must be a non-empty string.');
-  }
-
-  if (Number(scenario.dur) !== Number(request.durationSeconds)) {
-    errors.push(`dur must be exactly ${request.durationSeconds}.`);
-  }
-
-  if (Number(scenario.dt) !== Number(request.sampleIntervalSeconds)) {
-    errors.push(`dt must be exactly ${request.sampleIntervalSeconds}.`);
-  }
-
-  if (!Array.isArray(scenario.ph) || scenario.ph.length !== request.phaseCount) {
-    errors.push(`ph must contain exactly ${request.phaseCount} phases.`);
-    return { valid: false, errors };
-  }
-
-  let expectedFrom = 0;
-  const expectedSignals = new Set(request.controlledSignals);
-  const previousSignalEnds = new Map();
-
-  for (let phaseIndex = 0; phaseIndex < scenario.ph.length; phaseIndex += 1) {
-    const phase = scenario.ph[phaseIndex];
-
-    if (!phase || typeof phase !== 'object') {
-      errors.push(`ph[${phaseIndex}] must be an object.`);
-      continue;
-    }
-
-    if (typeof phase.n !== 'string' || !phase.n.trim()) {
-      errors.push(`ph[${phaseIndex}].n must be a non-empty string.`);
-    }
-
-    const from = Number(phase.from);
-    const to = Number(phase.to);
-
-    if (!Number.isFinite(from) || from !== expectedFrom) {
-      errors.push(`ph[${phaseIndex}].from must be ${expectedFrom}.`);
-    }
-
-    if (!Number.isFinite(to) || to <= from) {
-      errors.push(`ph[${phaseIndex}].to must be greater than from.`);
-    }
-
-    if (!phase.s || typeof phase.s !== 'object' || Array.isArray(phase.s)) {
-      errors.push(`ph[${phaseIndex}].s must be a signal behavior map.`);
-      continue;
-    }
-
-    for (const signalName of expectedSignals) {
-      if (!Object.prototype.hasOwnProperty.call(phase.s, signalName)) {
-        errors.push(`ph[${phaseIndex}].s is missing signal ${signalName}.`);
-      }
-    }
-
-    for (const signalName of Object.keys(phase.s)) {
-      if (!expectedSignals.has(signalName)) {
-        errors.push(`ph[${phaseIndex}].s contains unexpected signal ${signalName}.`);
-      }
-    }
-
-    for (const [signalName, behavior] of Object.entries(phase.s)) {
-      validateSignalBehavior(errors, behavior, signalName, phaseIndex, previousSignalEnds.get(signalName));
-
-      if (behavior && typeof behavior === 'object') {
-        const end = Number(behavior.end);
-        if (Number.isFinite(end)) {
-          previousSignalEnds.set(signalName, end);
-        }
-      }
-    }
-
-    expectedFrom = to;
-  }
-
-  if (expectedFrom !== Number(request.durationSeconds)) {
-    errors.push(`Final phase must end at ${request.durationSeconds}.`);
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-function validateSignalBehavior(errors, behavior, signalName, phaseIndex, previousEnd) {
-  if (!behavior || typeof behavior !== 'object') {
-    errors.push(`Signal behavior for ${signalName} in phase ${phaseIndex} must be an object.`);
-    return;
-  }
-
-  const start = Number(behavior.start);
-  const end = Number(behavior.end);
-  const min = Number(behavior.min);
-  const max = Number(behavior.max);
-
-  if (!Number.isFinite(start)) errors.push(`${signalName} phase ${phaseIndex}: start must be numeric.`);
-  if (!Number.isFinite(end)) errors.push(`${signalName} phase ${phaseIndex}: end must be numeric.`);
-  if (!Number.isFinite(min)) errors.push(`${signalName} phase ${phaseIndex}: min must be numeric.`);
-  if (!Number.isFinite(max)) errors.push(`${signalName} phase ${phaseIndex}: max must be numeric.`);
-
-  if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
-    errors.push(`${signalName} phase ${phaseIndex}: min cannot be greater than max.`);
-  }
-
-  if (Number.isFinite(start) && Number.isFinite(min) && Number.isFinite(max) && (start < min || start > max)) {
-    errors.push(`${signalName} phase ${phaseIndex}: start is outside min/max.`);
-  }
-
-  if (Number.isFinite(end) && Number.isFinite(min) && Number.isFinite(max) && (end < min || end > max)) {
-    errors.push(`${signalName} phase ${phaseIndex}: end is outside min/max.`);
-  }
-
-  if (Number.isFinite(previousEnd) && Number.isFinite(start)) {
-    const tolerance = Math.max(1, Math.abs(previousEnd) * 0.05);
-    if (Math.abs(start - previousEnd) > tolerance) {
-      errors.push(`${signalName} phase ${phaseIndex}: start is not coherent with previous phase end.`);
-    }
-  }
-
-  if (!Array.isArray(behavior.d) || behavior.d.length < 4 || behavior.d.length > 12) {
-    errors.push(`${signalName} phase ${phaseIndex}: d must contain between 4 and 12 numeric values.`);
-    return;
-  }
-
-  for (let index = 0; index < behavior.d.length; index += 1) {
-    if (!Number.isFinite(Number(behavior.d[index]))) {
-      errors.push(`${signalName} phase ${phaseIndex}: d[${index}] must be numeric.`);
-    }
-  }
-
-  if (isFuelLikeSignal(signalName)) {
-    if (Number.isFinite(end) && Number.isFinite(start) && end > start) {
-      errors.push(`${signalName} phase ${phaseIndex}: fuel-like signal end cannot be greater than start.`);
-    }
-
-    for (let index = 0; index < behavior.d.length; index += 1) {
-      if (Number(behavior.d[index]) > 0) {
-        errors.push(`${signalName} phase ${phaseIndex}: fuel-like signal deltas must never be positive.`);
-      }
-    }
-  }
-}
-
-function isFuelLikeSignal(signalName) {
-  const normalized = normalizeSignalNameForMatch(signalName);
-  return normalized.includes('fuel') && (normalized.includes('level') || normalized.includes('percent') || normalized.includes('pct'));
+function hoursToSeconds(value) {
+  const parsed = Number(value);
+  return !Number.isFinite(parsed) || parsed <= 0 ? null : Math.round(parsed * 3600);
 }
 
 function buildResponse(statusCode, body) {
-  return {
-    statusCode,
-    headers: defaultHeaders,
-    body: JSON.stringify(body)
-  };
+  return { statusCode, headers: defaultHeaders, body: JSON.stringify(body) };
 }

@@ -1,0 +1,180 @@
+You are an expert driving behavior planner.
+
+Your job is NOT to generate CAN signal values.
+
+Your only responsibility is to create a realistic driving plan that will later be converted into CAN signal behavior.
+
+Return ONLY valid JSON.
+
+Do not include markdown.
+Do not include explanations.
+Do not include comments.
+Do not include any text outside the JSON.
+
+The driving plan must be entirely based on the simulator request below.
+
+Simulator request:
+
+* Scenario name: {{scenarioName}}
+* Requested context: {{requestedContext}}
+* Driver profile: {{driverProfile}}
+* Target speed: {{targetSpeed}}
+* Simulation strategy: {{simulationMode}}
+* Generation mode: {{generationType}}
+* Route region: {{routeRegion}}
+* Initial date/time: {{initialDateTime}}
+* Duration: {{durationSeconds}}
+* Sample interval: {{sampleIntervalSeconds}}
+* Vehicle volume: {{vehicleVolume}}
+
+Driving rules:
+
+* The plan must be physically realistic.
+* The driver profile must influence acceleration, braking and cruising style.
+* Respect the requested target speed.
+* Adapt the scenario to the selected country or region.
+* The scenario must represent one continuous trip.
+* Phases must be coherent with each other.
+* Phase transitions must be smooth.
+* The first phase must begin with the vehicle stopped or leaving from a stopped condition.
+* The final phase must always end with the vehicle stopped.
+* The final phase must have speedTarget equal to 0.
+* Avoid repetitive or artificial phase sequences.
+* Include realistic traffic situations whenever appropriate.
+* Include realistic stops whenever appropriate.
+* Include turns whenever appropriate.
+* Weather and road conditions must be coherent with the selected region unless explicitly requested otherwise.
+* Use a reasonable number of phases according to the total simulation duration.
+* Avoid creating excessively short phases.
+* Avoid creating a single generic phase for the entire trip.
+
+Phase timing rules:
+
+* All "from" and "to" values must be expressed in whole seconds.
+* The first phase must start at 0.
+* The final phase must end exactly at {{durationSeconds}}.
+* Phases must be ordered chronologically.
+* Phases must not overlap.
+* There must be no time gaps between consecutive phases.
+* Each phase must start exactly when the previous phase ends.
+* Whenever possible, phase boundaries should align with {{sampleIntervalSeconds}}.
+
+Each phase must describe driving intent only.
+
+Do NOT describe CAN signals.
+Do NOT use CAN IDs.
+Do NOT use DBC message names.
+Do NOT generate vehicle signal values.
+
+For every phase provide:
+
+* id
+* name
+* from
+* to
+* description
+* driverIntent
+* roadType
+* traffic
+* weather
+* roadCondition
+* speedTarget
+* expectedStops
+* expectedTurns
+* aggressiveness
+
+Aggressiveness must be a decimal number between 0.0 and 1.0.
+
+RoadType examples:
+
+* Parking
+* Residential
+* Urban
+* Avenue
+* Highway
+* Rural
+
+DriverIntent examples:
+
+* Leaving Parking
+* Accelerating
+* Cruising
+* Following Traffic
+* Overtaking
+* Decelerating
+* Approaching Destination
+* Parking
+
+Traffic examples:
+
+* None
+* Light
+* Moderate
+* Heavy
+* Congested
+
+Weather examples:
+
+* Dry
+* Wet
+* Rain
+* Snow
+* Fog
+
+RoadCondition examples:
+
+* Good
+* Wet
+* Slippery
+
+ExpectedTurns examples:
+
+* none
+* left
+* right
+* multiple
+
+Before returning JSON verify:
+
+* Total duration equals {{durationSeconds}}.
+* Phases are ordered.
+* Phases do not overlap.
+* There are no time gaps between phases.
+* The first phase starts at 0.
+* The final phase ends exactly at {{durationSeconds}}.
+* The final phase has speedTarget equal to 0.
+* Every phase contains every required field.
+* The complete trip is realistic from start to finish.
+
+Return exactly this schema:
+
+{
+    "scenarioName": "string",
+    "summary": "string",
+    "duration": {{durationSeconds}},
+    "sampleInterval": {{sampleIntervalSeconds}},
+    "environment":
+    {
+        "country": "string",
+        "weather": "string",
+        "roadCondition": "string"
+    },
+    "phases":[
+        {
+            "id": 1,
+            "name": "string",
+            "from": 0,
+            "to": 0,
+            "description": "string",
+            "driverIntent": "string",
+            "roadType": "string",
+            "traffic": "string",
+            "weather": "string",
+            "roadCondition": "string",
+            "speedTarget": 0,
+            "expectedStops": 0,
+            "expectedTurns": "string",
+            "aggressiveness": 0.0
+        }
+    ]
+}

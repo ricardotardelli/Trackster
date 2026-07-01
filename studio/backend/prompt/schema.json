@@ -1,0 +1,24 @@
+{
+  "planner": {
+    "result": {
+      "phases": []
+    }
+  },
+  "signalBehaviorPlan": {
+    "schemaVersion": "trackster-signal-delta-plan-v1",
+    "phases": [
+      {
+        "phaseId": 1,
+        "signals": {
+          "VehicleSpeedKph": {
+            "start": 0,
+            "end": 30,
+            "min": 0,
+            "max": 35,
+            "d": [0.2, 0.4, 0.5, 0.3]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1550,7 +1550,7 @@ export class SimulatorComponent implements OnInit {
     this.generationWorkflowState = 'running';
     this.generationWorkflowTitle = title;
     this.generationWorkflowMessage = message;
-    this.generationWorkflowDetails = details;
+    this.generationWorkflowDetails = '';
 
     this.ensureGenerationWorkflowDialogOpen();
   }
@@ -1572,7 +1572,7 @@ export class SimulatorComponent implements OnInit {
     this.generationWorkflowState = 'success';
     this.generationWorkflowTitle = title;
     this.generationWorkflowMessage = message;
-    this.generationWorkflowDetails = details;
+    this.generationWorkflowDetails = '';
 
     this.ensureGenerationWorkflowDialogOpen();
   }
@@ -1581,7 +1581,7 @@ export class SimulatorComponent implements OnInit {
     this.generationWorkflowState = 'error';
     this.generationWorkflowTitle = title;
     this.generationWorkflowMessage = message;
-    this.generationWorkflowDetails = details;
+    this.generationWorkflowDetails = '';
 
     this.ensureGenerationWorkflowDialogOpen();
   }
@@ -1633,7 +1633,7 @@ export class SimulatorComponent implements OnInit {
       if (!exists) {
         this.generationWorkflowTitle = 'Preparing simulation...';
         this.generationWorkflowMessage = 'Waiting for Trackster AI to create the scenario log.';
-        this.generationWorkflowDetails = `Scenario file: ${monitor.scenarioKey}`;
+        this.generationWorkflowDetails = '';
         this.generationWorkflowProgress = 0;
         await this.delay(this.generationPollIntervalMs);
         continue;
@@ -1767,7 +1767,7 @@ export class SimulatorComponent implements OnInit {
     this.generationWorkflowProgress = this.resolveScenarioPercent(scenarioDocument);
     this.generationWorkflowTitle = this.resolveScenarioTitle(status);
     this.generationWorkflowMessage = scenarioDocument.currentStep || this.resolveScenarioMessage(status);
-    this.generationWorkflowDetails = this.buildScenarioDetails(scenarioDocument, monitor);
+    this.generationWorkflowDetails = '';
 
     if (this.isScenarioFailed(scenarioDocument)) {
       this.generationWorkflowState = 'error';
@@ -1891,8 +1891,10 @@ export class SimulatorComponent implements OnInit {
       normalizedStatus === 'bin_completed' ||
       normalizedStatus === 'generation_completed' ||
       normalizedStatus === 'worker_completed' ||
+      normalizedStatus === 'behavior_completed' ||
+      normalizedStatus === 'ai_behavior_completed' ||
       normalizedStatus === 'simulation_completed' ||
-      normalizedStatus.endsWith('_completed') && normalizedStatus.includes('bin')
+      normalizedStatus.endsWith('_completed')
     );
   }
 

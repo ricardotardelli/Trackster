@@ -700,11 +700,7 @@ button.payload-inline-toggle:focus-visible {
 }
 
 .decoder-export-details {
-  display: block;
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: #64748b;
+  display: none !important;
 }
 
 .decoder-export-spinner {

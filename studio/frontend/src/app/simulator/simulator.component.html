@@ -423,10 +423,6 @@
       *ngIf="generationWorkflowState === 'running' || generationWorkflowProgress > 0"
     ></mat-progress-bar>
 
-    <span class="decoder-export-details" *ngIf="generationWorkflowDetails">
-      {{ generationWorkflowDetails }}
-    </span>
-
     <button type="button" class="trackster-admin-button primary" *ngIf="generationWorkflowState === 'success' || generationWorkflowState === 'error'" (click)="closeGenerationWorkflowDialog()">
       <mat-icon>check_circle</mat-icon>
       <span>OK</span>

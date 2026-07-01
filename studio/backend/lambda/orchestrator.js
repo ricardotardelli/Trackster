@@ -234,6 +234,10 @@ function makeRunManifestKey(clientId, runId) {
   return `${clientId}/${runId}/run-manifest.json`;
 }
 
+function makeScenarioKey(clientId, runId) {
+  return `${clientId}/${runId}/scenario.json`;
+}
+
 function httpResp(code, obj) {
   return {
     statusCode: code,
@@ -718,6 +722,42 @@ function assertSafeSqsMessageSize(messageBody) {
   return sizeBytes;
 }
 
+function extractSignalNamesFromRuntimeCompiledDbc(compiledDbc) {
+  const signals = new Set();
+
+  for (const entries of Object.values(compiledDbc?.m || {})) {
+    if (!Array.isArray(entries)) {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const frameSignals = entry?.frame?.s || [];
+
+      for (const signal of frameSignals) {
+        const signalName = Array.isArray(signal)
+          ? signal[8]
+          : signal?.n || signal?.name;
+
+        if (signalName) {
+          signals.add(String(signalName).trim());
+        }
+      }
+    }
+  }
+
+  return Array.from(signals).filter(Boolean);
+}
+
+async function writeInitialScenarioLog(s3, bucket, key, scenarioLog) {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: JSON.stringify(scenarioLog, null, 2),
+      ContentType: "application/json"
+    })
+  );
+}
 
 function buildAiScenarioName(payload, runId) {
   const explicitName = String(payload?.aiScenarioName || payload?.scenarioName || "").trim();
@@ -763,17 +803,14 @@ function buildAiAssistEvent({
   unity,
   driverProfile,
   sqsBatch,
-  maxSafeSqsBytes
+  maxSafeSqsBytes,
+  scenarioBucketName,
+  scenarioKey,
+  signals
 }) {
-  const aiRequestBody = {
-    scenarioName: buildAiScenarioName(originalPayload, runId),
-    durationSeconds: durationSec,
-    requestedContext: buildAiRequestedContext(originalPayload, durationSec, speed, unity, driverProfile)
-  };
-
   return {
     source: "trackster-orchestrator",
-    action: "generate_ai_behavior_and_enqueue_worker_messages",
+    action: "run_full_ai_pipeline",
     requestContext: {
       http: {
         method: "POST"
@@ -788,7 +825,23 @@ function buildAiAssistEvent({
       runId,
       customerId: clientId,
       clientId,
-      aiRequest: aiRequestBody,
+
+
+      scenarioBucketName,
+      scenarioKey,
+      signals,
+
+      scenarioName: buildAiScenarioName(originalPayload, runId),
+      durationSeconds: durationSec,
+      sampleIntervalSeconds: baseMessage.intervalSec,
+      requestedContext: buildAiRequestedContext(originalPayload, durationSec, speed, unity, driverProfile),
+      driverProfile,
+      targetSpeed: speed,
+      unity,
+      generationType: originalPayload.generationType,
+      routeRegion: originalPayload.gpsArea || originalPayload.routeRegion || "",
+      initialDateTime: originalPayload.initialDateTime,
+
       generation: {
         baseMessage,
         vehicles,
@@ -982,6 +1035,8 @@ module.exports.handler = async (event, context) => {
     const sqsPayloadPreview = JSON.parse(probeBody);
 
     const runManifestKey = makeRunManifestKey(clientId, runId);
+    const scenarioKey = makeScenarioKey(clientId, runId);
+    const signals = extractSignalNamesFromRuntimeCompiledDbc(compiledDbc);
 
     const runManifest = {
       manifestVersion: 1,
@@ -997,6 +1052,7 @@ module.exports.handler = async (event, context) => {
         bucket: s3Bucket,
         runFolder: `${clientId}/${runId}`,
         manifestKey: runManifestKey,
+        scenarioKey,
         outputFormat
       },
 
@@ -1039,18 +1095,91 @@ module.exports.handler = async (event, context) => {
       vehicles,
 
       ai: {
-        status: "pending_ai_assist",
-        lambdaName: AI_ASSIST_LAMBDA_NAME
+        status: "ai_assist_requested",
+        lambdaName: AI_ASSIST_LAMBDA_NAME,
+        scenarioBucketName: s3Bucket,
+        scenarioKey,
+        requestedSignals: signals
       },
 
       sqs: {
         queueUrl: workQueueUrl,
         messageSizeBytes,
-        enqueueOwner: "ai-assistance"
+        enqueueOwner: "ai-assist"
       }
     };
 
     await writeRunManifest(s3, s3Bucket, runManifestKey, runManifest);
+
+    const initialScenarioLog = {
+      schemaVersion: "trackster-ai-scenario-file-v1",
+      generatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      source: "trackster-orchestrator",
+      requestId,
+      runId,
+      customerId: clientId,
+      clientId,
+      status: "ai_assist_requested",
+      currentStep: "Trackster AI request accepted. Preparing driving scenario.",
+      progress: {
+        totalPhases: 0,
+        completedPhases: 0,
+        failedPhases: 0,
+        processingPhases: 0,
+        percent: 0,
+        expectedBinCount: vehicles.length,
+        generatedBinCount: 0
+      },
+      output: {
+        bucket: s3Bucket,
+        runFolder: `${clientId}/${runId}`,
+        manifestKey: runManifestKey,
+        scenarioKey,
+        expectedBinCount: vehicles.length,
+        generatedBinCount: 0
+      },
+      logs: [
+        {
+          at: new Date().toISOString(),
+          level: "info",
+          step: "orchestrator",
+          phaseId: null,
+          message: "Orchestrator accepted the request and created the scenario log.",
+          validationErrors: null
+        }
+      ],
+      planner: {
+        schemaVersion: "trackster-driving-planner-v1",
+        request: {
+          scenarioName: buildAiScenarioName(p, runId),
+          durationSeconds: durationSec,
+          sampleIntervalSeconds: intervalSec,
+          requestedContext: buildAiRequestedContext(p, durationSec, speed, unity, driverProfile),
+          driverProfile,
+          targetSpeed: speed,
+          unity,
+          generationType,
+          routeRegion: p.gpsArea || p.routeRegion || "",
+          initialDateTime
+        },
+        result: null
+      },
+      signalBehaviorPlan: {
+        schemaVersion: "trackster-signal-delta-plan-v1",
+        requestedSignals: signals,
+        result: {
+          schemaVersion: "trackster-signal-delta-plan-v1",
+          phases: []
+        }
+      }
+    };
+
+    await writeInitialScenarioLog(s3, s3Bucket, scenarioKey, initialScenarioLog);
+
+    console.log(
+      `[ORCHESTRATOR] initial scenario log written: s3://${s3Bucket}/${scenarioKey}`
+    );
 
     console.log(
       `[ORCHESTRATOR] run manifest written: s3://${s3Bucket}/${runManifestKey}`
@@ -1075,7 +1204,10 @@ module.exports.handler = async (event, context) => {
       unity,
       driverProfile,
       sqsBatch: SQS_BATCH,
-      maxSafeSqsBytes: MAX_SAFE_SQS_BYTES
+      maxSafeSqsBytes: MAX_SAFE_SQS_BYTES,
+      scenarioBucketName: s3Bucket,
+      scenarioKey,
+      signals
     });
 
     await invokeAiAssistAsync(lambda, aiAssistEvent);
@@ -1129,7 +1261,9 @@ module.exports.handler = async (event, context) => {
       s3Bucket,
 
       runManifestKey,
+      scenarioKey,
       runFolder: `${clientId}/${runId}`,
+      requestedSignals: signals,
 
       sqsPayloadPreview
     });
