@@ -119,6 +119,22 @@ interface ScenarioStatusDocument {
   status?: string;
   currentStep?: string;
   progress?: ScenarioProgress;
+  behavior?: {
+    phases?: Array<{
+      phaseId?: number;
+      status?: string;
+      error?: {
+        message?: string;
+        validationErrors?: string[] | null;
+        rawModelResponse?: string | null;
+      } | null;
+    }>;
+  };
+  error?: {
+    message?: string;
+    validationErrors?: string[] | null;
+    rawModelResponse?: string | null;
+  } | null;
   logs?: ScenarioLogEntry[];
   output?: {
     generatedBinCount?: number;
@@ -1632,7 +1648,7 @@ export class SimulatorComponent implements OnInit {
 
       if (!exists) {
         this.generationWorkflowTitle = 'Preparing simulation...';
-        this.generationWorkflowMessage = 'Waiting for Trackster AI to create the scenario log.';
+        this.generationWorkflowMessage = 'Waiting for Trackster AI to prepare the simulation.';
         this.generationWorkflowDetails = '';
         this.generationWorkflowProgress = 0;
         await this.delay(this.generationPollIntervalMs);
@@ -1653,9 +1669,7 @@ export class SimulatorComponent implements OnInit {
       await this.delay(this.generationPollIntervalMs);
     }
 
-    throw new Error(
-      `Generation status check timed out while reading scenario.json: s3://${monitor.bucket}/${monitor.scenarioKey}`
-    );
+    throw new Error('Generation status check timed out while waiting for the simulation to complete.');
   }
 
   private async scenarioObjectExists(bucket: string, key: string): Promise<boolean> {
@@ -1796,14 +1810,14 @@ export class SimulatorComponent implements OnInit {
     const normalizedStatus = status.toLowerCase();
 
     if (this.isCompletedStatus(normalizedStatus)) {
-      return 'Simulation generated successfully.';
+      return 'Generation completed successfully.';
     }
 
     if (this.isFailedStatus(normalizedStatus)) {
       return 'Generation failed';
     }
 
-    if (normalizedStatus.includes('planner')) {
+    if (normalizedStatus.includes('planner') || normalizedStatus.includes('planning') || normalizedStatus.includes('preparing')) {
       return 'Planning simulation...';
     }
 
@@ -1816,7 +1830,7 @@ export class SimulatorComponent implements OnInit {
     }
 
     if (normalizedStatus.includes('bin')) {
-      return 'Generating BIN files...';
+      return 'Generating simulation files...';
     }
 
     return 'Generating realistic simulation...';
@@ -1826,14 +1840,18 @@ export class SimulatorComponent implements OnInit {
     const normalizedStatus = status.toLowerCase();
 
     if (this.isCompletedStatus(normalizedStatus)) {
-      return 'Trackster completed the simulation generation workflow.';
+      return 'The simulation has been generated successfully and is ready for use.';
     }
 
     if (this.isFailedStatus(normalizedStatus)) {
       return 'Trackster stopped the simulation generation workflow because an error occurred.';
     }
 
-    if (normalizedStatus.includes('planner')) {
+    if (normalizedStatus.includes('phase')) {
+      return status;
+    }
+
+    if (normalizedStatus.includes('planner') || normalizedStatus.includes('planning') || normalizedStatus.includes('preparing')) {
       return 'Trackster AI is creating the driving scenario.';
     }
 
@@ -1853,24 +1871,7 @@ export class SimulatorComponent implements OnInit {
   }
 
   private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
-    const progress = scenarioDocument.progress || {};
-    const generatedBinCount = this.resolveGeneratedBinCountFromScenario(scenarioDocument);
-    const expectedBinCount = this.resolveExpectedBinCountFromScenario(scenarioDocument, monitor);
-    const totalPhases = Number(progress.totalPhases || 0);
-    const completedPhases = Number(progress.completedPhases || 0);
-    const details: string[] = [];
-
-    if (totalPhases > 0) {
-      details.push(`Signal behavior: ${completedPhases}/${totalPhases}`);
-    }
-
-    if (generatedBinCount !== null && expectedBinCount > 0) {
-      details.push(`BIN files: ${generatedBinCount}/${expectedBinCount}`);
-    }
-
-    details.push(`Scenario file: ${monitor.scenarioKey}`);
-
-    return details.join(' · ');
+    return '';
   }
 
   private isScenarioCompleted(scenarioDocument: ScenarioStatusDocument): boolean {
@@ -1904,21 +1905,27 @@ export class SimulatorComponent implements OnInit {
   }
 
   private buildScenarioFailureMessage(scenarioDocument: ScenarioStatusDocument): string {
+    const phaseError = scenarioDocument.behavior?.phases
+      ?.find((phase) => phase?.error?.message)
+      ?.error?.message;
+
+    if (phaseError) {
+      return phaseError;
+    }
+
+    if (scenarioDocument.error?.message) {
+      return scenarioDocument.error.message;
+    }
+
     const latestError = [...(scenarioDocument.logs || [])]
       .reverse()
       .find((entry) => String(entry.level || '').toLowerCase() === 'error');
 
-    return latestError?.message || scenarioDocument.currentStep || 'Simulation generation failed.';
+    return latestError?.message || scenarioDocument.currentStep || scenarioDocument.status || 'Simulation generation failed.';
   }
 
   private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
-    const generatedBinCount = this.resolveGeneratedBinCountFromScenario(scenarioDocument);
-
-    if (generatedBinCount !== null) {
-      return this.buildGeneratedFilesSuccessMessage(generatedBinCount);
-    }
-
-    return `Simulation workflow completed successfully. Output folder: ${monitor.runFolder}`;
+    return 'The simulation has been generated successfully and is ready for use.';
   }
 
   private buildGeneratedFilesSuccessMessage(generatedFiles: number): string {

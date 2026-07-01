@@ -64,18 +64,6 @@
             {{ f.vinSuffix.value || 'Not provided' }}
           </span>
         </p>
-        <p>
-          <strong>S3 Bucket:</strong>
-          <span class="status-value" [class.status-ok]="f.s3Bucket.valid" [class.status-error]="!f.s3Bucket.valid">
-            {{ f.s3Bucket.value || 'Not provided' }}
-          </span>
-        </p>
-        <p>
-          <strong>Engine URL:</strong>
-          <span class="status-value" [class.status-ok]="f.engineUrl.valid" [class.status-error]="!f.engineUrl.valid">
-            {{ f.engineUrl.value || 'Not provided' }}
-          </span>
-        </p>
       </aside>
       <section class="workspace-body">
         <div class="workspace-body-header">

@@ -164,19 +164,53 @@ async function runAutoPipeline(body, startedAt) {
     throw new Error('Unable to run auto AI pipeline because no S3 key or output folder was resolved.');
   }
 
-  await createInitialScenarioJson({ body, bucket, key });
+  let scenarioDocument = await safeReadJsonFromS3(bucket, key);
+  const scenarioS3 = { bucket, key, fileName: 'scenario.json' };
 
-  const plannerResult = await generateValidatedDrivingPlanner(body);
-  const scenarioS3 = await savePlannerScenarioJson({
-    body,
-    plannerResult,
-    processingTimeMs: Date.now() - startedAt
-  });
+  if (isFinalScenarioStatus(scenarioDocument?.status)) {
+    return {
+      scenarioS3,
+      status: scenarioDocument.status,
+      progress: scenarioDocument.progress || null,
+      currentStep: scenarioDocument.status || null
+    };
+  }
 
-  const planner = plannerResult.planner;
+  let planner = getScenarioPlanner(scenarioDocument);
+
+  if (!planner || !Array.isArray(planner.phases) || !planner.phases.length) {
+    if (!scenarioDocument) {
+      await createInitialScenarioJson({ body, bucket, key });
+    }
+
+    const plannerResult = await generateValidatedDrivingPlanner(body);
+    await savePlannerScenarioJson({
+      body,
+      plannerResult,
+      processingTimeMs: Date.now() - startedAt
+    });
+
+    planner = plannerResult.planner;
+  }
+
   const totalPhases = Array.isArray(planner?.phases) ? planner.phases.length : 0;
 
   for (const phase of planner.phases) {
+    const latestScenarioDocument = await safeReadJsonFromS3(bucket, key);
+
+    if (isFinalScenarioStatus(latestScenarioDocument?.status)) {
+      return {
+        scenarioS3,
+        status: latestScenarioDocument.status,
+        progress: latestScenarioDocument.progress || null,
+        currentStep: latestScenarioDocument.status || null
+      };
+    }
+
+    if (isBehaviorPhaseCompleted(latestScenarioDocument, phase.id)) {
+      continue;
+    }
+
     await runBehaviorPhase(
       {
         ...body,
@@ -188,21 +222,22 @@ async function runAutoPipeline(body, startedAt) {
     );
   }
 
-  let scenarioDocument = await readJsonFromS3(bucket, key);
-  scenarioDocument.status = 'ai_behavior_completed';
-  scenarioDocument.currentStep = 'Trackster AI completed the simulation behavior plan.';
-  scenarioDocument.updatedAt = new Date().toISOString();
-  scenarioDocument.progress = scenarioDocument.progress || {};
-  scenarioDocument.progress.totalPhases = totalPhases;
-  scenarioDocument.progress.completedPhases = totalPhases;
-  scenarioDocument.progress.failedPhases = 0;
-  scenarioDocument.progress.processingPhases = 0;
-  scenarioDocument.progress.percent = 100;
-  scenarioDocument.logs = appendScenarioLog(scenarioDocument.logs, {
-    level: 'info',
-    step: 'auto',
-    message: 'Auto AI pipeline completed.'
-  });
+  scenarioDocument = await readJsonFromS3(bucket, key);
+  scenarioDocument = updateScenarioProgress(scenarioDocument, planner);
+
+  const completedPhases = Number(scenarioDocument?.progress?.completedPhases || 0);
+  const failedPhases = Number(scenarioDocument?.progress?.failedPhases || 0);
+
+  if (failedPhases > 0) {
+    scenarioDocument.status = 'Trackster AI behavior generation failed.';
+  } else if (totalPhases > 0 && completedPhases >= totalPhases) {
+    scenarioDocument.status = 'Trackster AI completed the simulation behavior plan.';
+    scenarioDocument.progress.totalPhases = totalPhases;
+    scenarioDocument.progress.completedPhases = totalPhases;
+    scenarioDocument.progress.failedPhases = 0;
+    scenarioDocument.progress.processingPhases = 0;
+    scenarioDocument.progress.percent = 100;
+  }
 
   await putJsonToS3(bucket, key, scenarioDocument);
 
@@ -210,52 +245,22 @@ async function runAutoPipeline(body, startedAt) {
     scenarioS3,
     status: scenarioDocument.status,
     progress: scenarioDocument.progress,
-    currentStep: scenarioDocument.currentStep
+    currentStep: scenarioDocument.status
   };
 }
 
 async function createInitialScenarioJson({ body, bucket, key }) {
-  const now = new Date().toISOString();
-  const requestedSignals = extractRequestedSignals(body);
-  const plannerRequest = buildPlannerRequest(body);
-
   const scenarioDocument = {
-    schemaVersion: 'trackster-ai-scenario-file-v1',
-    generatedAt: now,
-    updatedAt: now,
-    source: 'trackster-simulator-ai-assist',
-    lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
-    modelId,
-    status: 'planner_processing',
-    currentStep: 'Trackster AI is preparing the simulation scenario.',
-    requestId: sanitizeText(body?.requestId),
-    runId: sanitizeText(body?.runId),
-    customerId: sanitizeText(body?.customerId || body?.clientId),
-    clientId: sanitizeText(body?.clientId || body?.customerId),
+    status: 'Trackster AI is preparing the simulation scenario.',
     progress: {
       totalPhases: 0,
       completedPhases: 0,
       failedPhases: 0,
-      processingPhases: 0,
       percent: 0
     },
-    logs: appendScenarioLog([], {
-      level: 'info',
-      step: 'auto',
-      message: 'Auto AI pipeline started.'
-    }),
-    planner: {
-      schemaVersion: 'trackster-driving-planner-v1',
-      request: plannerRequest,
-      result: null
-    },
-    signalBehaviorPlan: {
-      schemaVersion: 'trackster-signal-delta-plan-v1',
-      requestedSignals,
-      result: {
-        schemaVersion: 'trackster-signal-delta-plan-v1',
-        phases: []
-      }
+    scenario: null,
+    behavior: {
+      phases: []
     }
   };
 
@@ -295,20 +300,20 @@ async function runBehaviorPhase(body, options = {}) {
   }
 
   let scenarioDocument = await readJsonFromS3(bucket, key);
-  const planner = scenarioDocument?.planner?.result;
-  const plannerRequest = scenarioDocument?.planner?.request || buildPlannerRequest(body);
+  const planner = getScenarioPlanner(scenarioDocument);
+  const plannerRequest = buildPlannerRequest(body);
 
   if (!planner || !Array.isArray(planner.phases) || !planner.phases.length) {
-    throw new Error('scenario.json does not contain planner.result.phases. Run aiPhase=planner first.');
+    throw new Error('scenario.json does not contain scenario.phases. Run aiPhase=planner first.');
   }
 
   const requestedSignals = resolveRequestedSignalsForBehavior(body, scenarioDocument);
 
   if (!requestedSignals.length) {
-    throw new Error('Unable to generate signal behavior plan because no signals were resolved from the request or scenario.json. Send signals, selectedSignals or signalNames in the body.');
+    throw new Error('Unable to generate signal behavior plan because no signals were resolved from the request. Send signals, selectedSignals or signalNames in the body.');
   }
 
-  scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals);
+  scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner);
 
   const phase = resolveBehaviorPhaseToProcess({
     body,
@@ -319,14 +324,7 @@ async function runBehaviorPhase(body, options = {}) {
 
   if (!phase) {
     scenarioDocument = updateScenarioProgress(scenarioDocument, planner);
-    scenarioDocument.status = 'behavior_completed';
-    scenarioDocument.currentStep = 'All behavior phases completed.';
-    scenarioDocument.updatedAt = new Date().toISOString();
-    scenarioDocument.logs = appendScenarioLog(scenarioDocument.logs, {
-      level: 'info',
-      step: 'behavior',
-      message: 'All behavior phases were already completed.'
-    });
+    scenarioDocument.status = 'All behavior phases completed.';
 
     await putJsonToS3(bucket, key, scenarioDocument);
 
@@ -334,7 +332,7 @@ async function runBehaviorPhase(body, options = {}) {
       scenarioS3: { bucket, key, fileName: 'scenario.json' },
       status: scenarioDocument.status,
       progress: scenarioDocument.progress,
-      currentStep: scenarioDocument.currentStep,
+      currentStep: scenarioDocument.status,
       phaseId: null,
       phaseStatus: 'completed',
       signalBehaviorPhase: null
@@ -358,13 +356,12 @@ async function runBehaviorPhase(body, options = {}) {
 
     const behaviorPhase = behaviorGeneration.behaviorPlan.phases[0];
     scenarioDocument = await readJsonFromS3(bucket, key);
-    scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals);
+    scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner);
     scenarioDocument = markBehaviorPhaseCompleted({
       scenarioDocument,
       planner,
       phaseId: phase.id,
-      behaviorPhase,
-      behaviorGeneration
+      behaviorPhase
     });
 
     await putJsonToS3(bucket, key, scenarioDocument);
@@ -373,18 +370,77 @@ async function runBehaviorPhase(body, options = {}) {
       scenarioS3: { bucket, key, fileName: 'scenario.json' },
       status: scenarioDocument.status,
       progress: scenarioDocument.progress,
-      currentStep: scenarioDocument.currentStep,
+      currentStep: scenarioDocument.status,
       phaseId: phase.id,
       phaseStatus: 'completed',
       signalBehaviorPhase: behaviorPhase
     };
   } catch (error) {
     scenarioDocument = await safeReadScenarioDocument(bucket, key, scenarioDocument);
-    scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals);
+    scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner);
     scenarioDocument = markBehaviorPhaseFailed({ scenarioDocument, planner, phaseId: phase.id, error });
     await putJsonToS3(bucket, key, scenarioDocument);
     throw error;
   }
+}
+
+async function safeReadJsonFromS3(bucket, key) {
+  try {
+    return await readJsonFromS3(bucket, key);
+  } catch (error) {
+    const name = String(error?.name || '');
+    const message = String(error?.message || '');
+
+    if (
+      name === 'NoSuchKey' ||
+      name === 'NotFound' ||
+      message.includes('NoSuchKey') ||
+      message.includes('not found')
+    ) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function isFinalScenarioStatus(status) {
+  const normalizedStatus = sanitizeText(status).toLowerCase();
+
+  return (
+    normalizedStatus.includes('completed') ||
+    normalizedStatus === 'completed' ||
+    normalizedStatus === 'success' ||
+    normalizedStatus === 'done' ||
+    normalizedStatus === 'finished'
+  );
+}
+
+function getScenarioPlanner(scenarioDocument) {
+  if (scenarioDocument?.scenario && Array.isArray(scenarioDocument.scenario.phases)) {
+    return scenarioDocument.scenario;
+  }
+
+  if (scenarioDocument?.planner?.result && Array.isArray(scenarioDocument.planner.result.phases)) {
+    return scenarioDocument.planner.result;
+  }
+
+  return null;
+}
+
+function getBehaviorPhases(scenarioDocument) {
+  const phases =
+    scenarioDocument?.behavior?.phases ||
+    scenarioDocument?.signalBehaviorPlan?.result?.phases;
+
+  return Array.isArray(phases) ? phases : [];
+}
+
+function isBehaviorPhaseCompleted(scenarioDocument, phaseId) {
+  return getBehaviorPhases(scenarioDocument).some((phase) =>
+    Number(phase?.phaseId) === Number(phaseId) &&
+    String(phase?.status || '').toLowerCase() === 'completed'
+  );
 }
 
 async function safeReadScenarioDocument(bucket, key, fallbackDocument) {
@@ -409,9 +465,6 @@ function resolveRequestedSignalsForBehavior(body, scenarioDocument) {
   const bodySignals = extractRequestedSignals(body);
   if (bodySignals.length) return bodySignals;
 
-  const scenarioSignals = scenarioDocument?.signalBehaviorPlan?.requestedSignals;
-  if (Array.isArray(scenarioSignals)) return uniqueStrings(scenarioSignals.map((signal) => sanitizeSignalName(signal)));
-
   return [];
 }
 
@@ -425,6 +478,10 @@ function resolveBehaviorPhaseToProcess({ body, planner, scenarioDocument, proces
       throw new Error(`phaseId ${explicitPhaseId} does not exist in planner.`);
     }
 
+    if (isBehaviorPhaseCompleted(scenarioDocument, explicitPhaseId)) {
+      return null;
+    }
+
     return phase;
   }
 
@@ -433,7 +490,7 @@ function resolveBehaviorPhaseToProcess({ body, planner, scenarioDocument, proces
   }
 
   const completedPhaseIds = new Set(
-    (scenarioDocument?.signalBehaviorPlan?.result?.phases || [])
+    getBehaviorPhases(scenarioDocument)
       .filter((phase) => phase?.status === 'completed')
       .map((phase) => Number(phase.phaseId))
   );
@@ -441,105 +498,61 @@ function resolveBehaviorPhaseToProcess({ body, planner, scenarioDocument, proces
   return planner.phases.find((phase) => !completedPhaseIds.has(Number(phase.id))) || null;
 }
 
-function ensureScenarioRuntimeFields(scenarioDocument, planner, requestedSignals = []) {
-  const now = new Date().toISOString();
-
-  const existingBehaviorPlan = scenarioDocument?.signalBehaviorPlan || {};
-  const existingResult = existingBehaviorPlan?.result || {};
-
+function ensureScenarioRuntimeFields(scenarioDocument, planner) {
   return {
-    ...scenarioDocument,
-    updatedAt: now,
-    status: scenarioDocument?.status || 'planner_saved',
-    currentStep: scenarioDocument?.currentStep || 'Planner completed.',
-    progress: scenarioDocument?.progress || buildProgress(planner, existingResult.phases || []),
-    logs: Array.isArray(scenarioDocument?.logs) ? scenarioDocument.logs : [],
-    signalBehaviorPlan: {
-      schemaVersion: 'trackster-signal-delta-plan-v1',
-      ...existingBehaviorPlan,
-      requestedSignals: requestedSignals.length ? requestedSignals : existingBehaviorPlan.requestedSignals || [],
-      result: {
-        schemaVersion: 'trackster-signal-delta-plan-v1',
-        ...existingResult,
-        phases: Array.isArray(existingResult.phases) ? existingResult.phases : []
-      }
+    status: scenarioDocument?.status || 'Planner completed.',
+    progress: scenarioDocument?.progress || buildProgress(planner, getBehaviorPhases(scenarioDocument)),
+    scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+    behavior: {
+      phases: getBehaviorPhases(scenarioDocument)
     }
   };
 }
 
 function markBehaviorPhaseProcessing(scenarioDocument, planner, phaseId) {
   const totalPhases = planner.phases.length;
-  const phases = upsertBehaviorPhaseStatus(scenarioDocument.signalBehaviorPlan.result.phases, {
+  const phases = upsertBehaviorPhaseStatus(getBehaviorPhases(scenarioDocument), {
     phaseId,
     status: 'processing',
-    startedAt: new Date().toISOString()
+    signals: {},
+    error: null
   });
 
   const updatedDocument = {
-    ...scenarioDocument,
-    status: 'behavior_processing',
-    currentStep: `Generating behavior for phase ${phaseId} of ${totalPhases}.`,
-    updatedAt: new Date().toISOString(),
-    signalBehaviorPlan: {
-      ...scenarioDocument.signalBehaviorPlan,
-      result: {
-        ...scenarioDocument.signalBehaviorPlan.result,
-        phases
-      }
+    status: `Generating behavior for phase ${phaseId} of ${totalPhases}.`,
+    progress: buildProgress(planner, phases),
+    scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+    behavior: {
+      phases
     }
   };
-
-  updatedDocument.progress = buildProgress(planner, phases);
-  updatedDocument.logs = appendScenarioLog(updatedDocument.logs, {
-    level: 'info',
-    step: 'behavior',
-    phaseId,
-    message: `Phase ${phaseId} behavior processing started.`
-  });
 
   return updatedDocument;
 }
 
-function markBehaviorPhaseCompleted({ scenarioDocument, planner, phaseId, behaviorPhase, behaviorGeneration }) {
+function markBehaviorPhaseCompleted({ scenarioDocument, planner, phaseId, behaviorPhase }) {
   const completedPhase = {
-    ...behaviorPhase,
     phaseId,
     status: 'completed',
-    completedAt: new Date().toISOString(),
-    attempts: behaviorGeneration.attempts,
-    promptSource: behaviorGeneration.promptSource
+    signals: behaviorPhase?.signals || {},
+    error: null
   };
 
-  const phases = upsertBehaviorPhaseStatus(scenarioDocument.signalBehaviorPlan.result.phases, completedPhase);
+  const phases = upsertBehaviorPhaseStatus(getBehaviorPhases(scenarioDocument), completedPhase);
   const completedCount = phases.filter((phase) => phase?.status === 'completed').length;
   const totalPhases = planner.phases.length;
   const allCompleted = completedCount >= totalPhases;
 
   const updatedDocument = {
-    ...scenarioDocument,
-    status: allCompleted ? 'behavior_completed' : 'behavior_partial',
-    currentStep: allCompleted
+    status: allCompleted
       ? 'All behavior phases completed.'
       : `Behavior phase ${phaseId} completed. Waiting for next phase.`,
-    updatedAt: new Date().toISOString(),
-    signalBehaviorPlan: {
-      ...scenarioDocument.signalBehaviorPlan,
-      attempts: Number(scenarioDocument.signalBehaviorPlan.attempts || 0) + Number(behaviorGeneration.attempts || 1),
-      promptSource: behaviorGeneration.promptSource,
-      result: {
-        ...scenarioDocument.signalBehaviorPlan.result,
-        phases
-      }
+    progress: buildProgress(planner, phases),
+    scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+    behavior: {
+      phases
     }
   };
-
-  updatedDocument.progress = buildProgress(planner, phases);
-  updatedDocument.logs = appendScenarioLog(updatedDocument.logs, {
-    level: 'info',
-    step: 'behavior',
-    phaseId,
-    message: `Phase ${phaseId} behavior completed.`
-  });
 
   return updatedDocument;
 }
@@ -554,45 +567,24 @@ function markBehaviorPhaseFailed({ scenarioDocument, planner, phaseId, error }) 
   const failedPhase = {
     phaseId,
     status: 'failed',
-    failedAt: new Date().toISOString(),
-    error: error?.message || 'Unknown error',
-    validationErrors: error?.validationErrors || null,
-    rawModelResponse
-  };
-
-  const phases = upsertBehaviorPhaseStatus(scenarioDocument.signalBehaviorPlan.result.phases, failedPhase);
-
-  const updatedDocument = {
-    ...scenarioDocument,
-    status: 'behavior_failed',
-    currentStep: `Behavior generation failed while processing phase ${phaseId}.`,
-    updatedAt: new Date().toISOString(),
-    lastError: {
-      at: new Date().toISOString(),
-      step: 'behavior',
-      phaseId,
+    signals: {},
+    error: {
       message: error?.message || 'Unknown error',
       validationErrors: error?.validationErrors || null,
       rawModelResponse
-    },
-    signalBehaviorPlan: {
-      ...scenarioDocument.signalBehaviorPlan,
-      result: {
-        ...scenarioDocument.signalBehaviorPlan.result,
-        phases
-      }
     }
   };
 
-  updatedDocument.progress = buildProgress(planner, phases);
-  updatedDocument.logs = appendScenarioLog(updatedDocument.logs, {
-    level: 'error',
-    step: 'behavior',
-    phaseId,
-    message: error?.message || 'Unknown error',
-    validationErrors: error?.validationErrors || null,
-    rawModelResponse
-  });
+  const phases = upsertBehaviorPhaseStatus(getBehaviorPhases(scenarioDocument), failedPhase);
+
+  const updatedDocument = {
+    status: `Behavior generation failed while processing phase ${phaseId}.`,
+    progress: buildProgress(planner, phases),
+    scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+    behavior: {
+      phases
+    }
+  };
 
   return updatedDocument;
 }
@@ -608,6 +600,30 @@ function upsertBehaviorPhaseStatus(phases, phaseUpdate) {
   }
 
   return result.sort((a, b) => Number(a.phaseId) - Number(b.phaseId));
+}
+
+function simplifyScenario(planner) {
+  if (!planner || typeof planner !== 'object') {
+    return null;
+  }
+
+  return {
+    duration: planner.duration,
+    sampleInterval: planner.sampleInterval,
+    environment: planner.environment || null,
+    phases: Array.isArray(planner.phases)
+      ? planner.phases.map((phase) => ({
+          id: phase.id,
+          name: phase.name,
+          from: phase.from,
+          to: phase.to,
+          speedTarget: phase.speedTarget,
+          driverIntent: phase.driverIntent,
+          roadType: phase.roadType,
+          traffic: phase.traffic
+        }))
+      : []
+  };
 }
 
 function buildProgress(planner, behaviorPhases = []) {
@@ -650,9 +666,15 @@ function appendScenarioLog(logs, entry) {
 }
 
 function updateScenarioProgress(scenarioDocument, planner) {
+  const phases = getBehaviorPhases(scenarioDocument);
+
   return {
-    ...scenarioDocument,
-    progress: buildProgress(planner, scenarioDocument?.signalBehaviorPlan?.result?.phases || [])
+    status: scenarioDocument?.status || 'Processing simulation scenario.',
+    progress: buildProgress(planner, phases),
+    scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+    behavior: {
+      phases
+    }
   };
 }
 
@@ -662,37 +684,57 @@ async function tryWriteFailureToScenario(body, error) {
     if (!bucket || !key) return;
 
     const scenarioDocument = await readJsonFromS3(bucket, key);
-    const planner = scenarioDocument?.planner?.result || { phases: [] };
-    const updatedDocument = {
-      ...scenarioDocument,
-      status: scenarioDocument?.status === 'behavior_processing' ? 'behavior_failed' : 'failed',
-      currentStep: error?.message || 'Simulator AI assist failed.',
-      updatedAt: new Date().toISOString(),
-      progress: buildProgress(planner, scenarioDocument?.signalBehaviorPlan?.result?.phases || []),
-      lastError: {
-        at: new Date().toISOString(),
-        message: error?.message || 'Unknown error',
-        validationErrors: error?.validationErrors || null,
-        rawModelResponse:
-          error?.rawResponse ||
-          error?.cause?.rawResponse ||
-          error?.cause?.cause?.rawResponse ||
-          null
-      },
-      logs: appendScenarioLog(scenarioDocument?.logs, {
-        level: 'error',
-        step: 'ai-assist',
-        message: error?.message || 'Unknown error',
-        validationErrors: error?.validationErrors || null,
-        rawModelResponse:
-          error?.rawResponse ||
-          error?.cause?.rawResponse ||
-          error?.cause?.cause?.rawResponse ||
-          null
-      })
-    };
+    const planner = getScenarioPlanner(scenarioDocument) || { phases: [] };
+    const phaseId = toPositiveInteger(body?.phaseId || body?.generation?.phaseId || body?.baseMessage?.phaseId, null);
+    const phases = getBehaviorPhases(scenarioDocument);
 
-    await putJsonToS3(bucket, key, updatedDocument);
+    if (phaseId) {
+      const failedPhase = {
+        phaseId,
+        status: 'failed',
+        signals: {},
+        error: {
+          message: error?.message || 'Unknown error',
+          validationErrors: error?.validationErrors || null,
+          rawModelResponse:
+            error?.rawResponse ||
+            error?.cause?.rawResponse ||
+            error?.cause?.cause?.rawResponse ||
+            null
+        }
+      };
+
+      const updatedPhases = upsertBehaviorPhaseStatus(phases, failedPhase);
+
+      await putJsonToS3(bucket, key, {
+        status: error?.message || 'Simulator AI assist failed.',
+        progress: buildProgress(planner, updatedPhases),
+        scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+        behavior: {
+          phases: updatedPhases
+        }
+      });
+
+      return;
+    }
+
+    await putJsonToS3(bucket, key, {
+      status: error?.message || 'Simulator AI assist failed.',
+      progress: buildProgress(planner, phases),
+      scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
+      behavior: {
+        phases
+      },
+      error: {
+        message: error?.message || 'Unknown error',
+        validationErrors: error?.validationErrors || null,
+        rawModelResponse:
+          error?.rawResponse ||
+          error?.cause?.rawResponse ||
+          error?.cause?.cause?.rawResponse ||
+          null
+      }
+    });
   } catch (writeError) {
     console.error('Unable to write failure status to scenario.json:', {
       message: writeError?.message
@@ -866,43 +908,15 @@ async function savePlannerScenarioJson({ body, plannerResult, processingTimeMs }
     throw new Error('Unable to save scenario.json because no S3 key or output folder was resolved.');
   }
 
-  const requestedSignals = extractRequestedSignals(body);
+  const existingDocument = await safeReadJsonFromS3(bucket, key);
+  const existingBehaviorPhases = getBehaviorPhases(existingDocument);
+
   const scenarioDocument = {
-    schemaVersion: 'trackster-ai-scenario-file-v1',
-    generatedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'trackster-simulator-ai-assist',
-    lambdaName: process.env.AWS_LAMBDA_FUNCTION_NAME || 'trackster-simulator-ai-assist',
-    modelId,
-    status: 'planner_saved',
-    currentStep: 'Driving planner completed. Waiting for behavior phase generation.',
-    processingTimeMs,
-    progress: {
-      totalPhases: plannerResult.planner.phases.length,
-      completedPhases: 0,
-      failedPhases: 0,
-      processingPhases: 0,
-      percent: 0
-    },
-    logs: appendScenarioLog([], {
-      level: 'info',
-      step: 'planner',
-      message: 'Planner completed.'
-    }),
-    planner: {
-      schemaVersion: 'trackster-driving-planner-v1',
-      attempts: plannerResult.attempts,
-      promptSource: plannerResult.promptSource,
-      request: plannerResult.plannerRequest,
-      result: plannerResult.planner
-    },
-    signalBehaviorPlan: {
-      schemaVersion: 'trackster-signal-delta-plan-v1',
-      requestedSignals,
-      result: {
-        schemaVersion: 'trackster-signal-delta-plan-v1',
-        phases: []
-      }
+    status: 'Driving planner completed. Waiting for behavior phase generation.',
+    progress: buildProgress(plannerResult.planner, existingBehaviorPhases),
+    scenario: simplifyScenario(plannerResult.planner),
+    behavior: {
+      phases: existingBehaviorPhases
     }
   };
 
