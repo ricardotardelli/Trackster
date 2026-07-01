@@ -408,11 +408,12 @@ function isFinalScenarioStatus(status) {
   const normalizedStatus = sanitizeText(status).toLowerCase();
 
   return (
-    normalizedStatus.includes('completed') ||
     normalizedStatus === 'completed' ||
     normalizedStatus === 'success' ||
     normalizedStatus === 'done' ||
-    normalizedStatus === 'finished'
+    normalizedStatus === 'finished' ||
+    normalizedStatus === 'all behavior phases completed.' ||
+    normalizedStatus === 'trackster ai completed the simulation behavior plan.'
   );
 }
 

@@ -1875,19 +1875,43 @@ export class SimulatorComponent implements OnInit {
   }
 
   private isScenarioCompleted(scenarioDocument: ScenarioStatusDocument): boolean {
-    return this.isCompletedStatus(String(scenarioDocument.status || '').toLowerCase());
+    if (this.isCompletedStatus(String(scenarioDocument.status || ''))) {
+      return true;
+    }
+
+    const progress = scenarioDocument.progress || {};
+    const totalPhases = Number(progress.totalPhases || 0);
+    const completedPhases = Number(progress.completedPhases || 0);
+    const failedPhases = Number(progress.failedPhases || 0);
+    const percent = Number(progress.percent || 0);
+
+    return (
+      totalPhases > 0 &&
+      completedPhases >= totalPhases &&
+      failedPhases === 0 &&
+      percent >= 100
+    );
   }
 
   private isScenarioFailed(scenarioDocument: ScenarioStatusDocument): boolean {
     const progress = scenarioDocument.progress || {};
-    return this.isFailedStatus(String(scenarioDocument.status || '').toLowerCase()) || Number(progress.failedPhases || 0) > 0;
+    const hasPhaseError = !!scenarioDocument.behavior?.phases?.some((phase) => !!phase?.error);
+
+    return (
+      this.isFailedStatus(String(scenarioDocument.status || '')) ||
+      Number(progress.failedPhases || 0) > 0 ||
+      hasPhaseError ||
+      !!scenarioDocument.error
+    );
   }
 
   private isCompletedStatus(status: string): boolean {
-    const normalizedStatus = status.toLowerCase();
+    const normalizedStatus = status.toLowerCase().trim();
+
     return (
       normalizedStatus === 'completed' ||
       normalizedStatus === 'success' ||
+      normalizedStatus === 'done' ||
       normalizedStatus === 'finished' ||
       normalizedStatus === 'bin_completed' ||
       normalizedStatus === 'generation_completed' ||
@@ -1895,6 +1919,8 @@ export class SimulatorComponent implements OnInit {
       normalizedStatus === 'behavior_completed' ||
       normalizedStatus === 'ai_behavior_completed' ||
       normalizedStatus === 'simulation_completed' ||
+      normalizedStatus === 'all behavior phases completed.' ||
+      normalizedStatus === 'trackster ai completed the simulation behavior plan.' ||
       normalizedStatus.endsWith('_completed')
     );
   }
