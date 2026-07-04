@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "trackster-driving-planner-v1",
+  "scenarioName": "Trackster AI Simulation",
+  "summary": "...",
+  "duration": 3600,
+  "sampleInterval": 5,
+  "environment": {
+    "country": "Portugal",
+    "weather": "Dry",
+    "roadCondition": "Good"
+  },
+  "initialSignalState": {
+    "IGNITION": 0,
+    "ENABLE_MOTORS": 0,
+    "BATT_VOLTAGE": 398,
+    "BATT_PERCENTAGE": 82,
+    "MCU_TEMP": 24,
+    "ApedPosScal_Pc_Actl": 0,
+    "SPEED_L": 0,
+    "SPEED_R": 0,
+    "LKASVehicleSpeed": 0,
+    "WhlRr_W_Meas": 0,
+    "WhlRl_W_Meas": 0,
+    "WhlFr_W_Meas": 0,
+    "WhlFl_W_Meas": 0,
+    "TORQUE_L": 0,
+    "TORQUE_R": 0,
+    "SteWhlAn_No_Cnt": 0,
+    "VehLong_A_Actl": 0,
+    "FrictionBrakePressure": 0,
+    "Brake_Lights": 0
+  },
+  "phases": [
+    {
+      "id": 1,
+      "name": "Parking Departure",
+      "from": 0,
+      "to": 300,
+      "speedTarget": 20,
+      "driverIntent": "Leaving Parking",
+      "roadType": "Parking",
+      "traffic": "Light"
+    }
+  ]
+}

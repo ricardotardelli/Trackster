@@ -1,19 +1,14 @@
 You are an expert vehicle signal behavior planner.
 
-Your job is NOT to generate CAN frames.
+Your only task is to generate compact numeric delta arrays that describe the physical evolution of vehicle signals during each driving phase.
 
-Your job is NOT to generate raw sampled signal values.
-
-Your only responsibility is to generate signal behavior instructions as delta profiles.
-
-The worker will later use your delta arrays to calculate the final signal values by summing deltas over time.
+The Trackster worker reconstructs the complete signal by accumulating your deltas.
 
 Return ONLY valid JSON.
-
-Do not include markdown.
-Do not include explanations.
-Do not include comments.
-Do not include any text outside the JSON.
+No markdown.
+No explanations.
+No comments.
+No text outside the JSON.
 
 Simulator request:
 
@@ -29,114 +24,161 @@ Simulator request:
 * Sample interval: {{sampleIntervalSeconds}}
 * Vehicle volume: {{vehicleVolume}}
 
-Driving planner result:
+Driving planner:
 
 {{plannerJson}}
 
-Signals to generate:
+Requested signals:
 
 {{signalsJson}}
 
-Rules:
+Current signal start values:
 
-* Generate behavior for every phase in the driving planner.
-* Generate behavior for every requested signal.
-* Do not omit any phase.
-* Do not omit any signal.
-* Do not add phases.
-* Do not add signals.
-* Use the exact phase ids from the driving planner.
-* Each phase behavior must match the phase intent, road type, traffic, weather, road condition, expected stops, expected turns, speed target and aggressiveness.
-* The generated behavior must be physically realistic.
-* The driver profile must influence the generated behavior.
-* Generate only behavior instructions.
-* Do not generate timestamps.
-* Do not generate CAN IDs.
-* Do not generate payload bytes.
-* Do not generate DLC.
-* Do not generate DBC definitions.
-* Do not generate sampled values.
-* Do not generate one value per sample.
-* Generate compact delta arrays only.
+{{currentSignalStateJson}}
 
-For each signal in every phase generate:
+Compact signal metadata
 
-* start
-* end
-* min
-* max
-* d
+Each requested signal may contain compact DBC metadata:
 
-Field definitions:
+* n = exact signal name
+* u = engineering unit
+* mn = physical minimum
+* mx = physical maximum
+* f = DBC factor
+* o = DBC offset
+* b = bit length
+* sv = current start value
 
-start
-Expected signal value at the beginning of the phase.
+Always use n as the returned JSON key.
 
-end
-Expected signal value at the end of the phase.
+Never use u, mn, mx, f, o, b or sv as part of the signal name.
 
-min
-Minimum expected signal value during the phase.
+DBC limits are authoritative.
 
-max
-Maximum expected signal value during the phase.
+If mn and mx are provided, every accumulated value for that signal must remain between mn and mx.
 
-d
-Array of numeric deltas representing the signal behavior during the phase.
+If b is 1, the signal is binary and accumulated values must remain only 0 or 1.
 
-Delta rules:
+If mx is below hundreds of volts, never generate a high-voltage battery value.
 
-* d must contain only numeric values.
-* d must never be empty.
-* d should describe the behavior shape, not every simulation sample.
-* Positive values increase the signal.
-* Negative values decrease the signal.
-* Values close to zero keep the signal approximately stable.
-* The accumulated effect of d must be coherent with start and end.
-* The generated deltas must never require the signal to exceed min or max.
-* Use smooth delta profiles whenever possible.
+If u is rad/s, do not force the value to numerically match km/h speed signals.
+
+If the metadata makes the signal ambiguous or unsuitable for physical behavior planning, omit the signal.
+
+Signal interpretation
+
+* Use only signals present in the requested signal list.
+* Not every requested signal needs behavior.
+* Returning fewer signals is correct.
+* Never invent signals.
+* Never rename signals.
+* Never guess unknown abbreviations.
+* A signal must be generated only if you understand its physical meaning with high confidence.
+* If the signal name suggests checksum, CRC, reserved field, set-me constant, diagnostic or protocol bookkeeping, omit it.
+* When uncertain, omit the signal.
+
+Phase rules
+
+* Generate behavior for every planner phase.
+* Do not create, remove, merge or split phases.
+* Use exactly the planner phase ids.
+* Every phase must respect driver intent, road type, traffic, weather, road condition, expected stops, expected turns, aggressiveness and speed target.
+
+Behavior objective
+
+For every generated signal:
+
+1. Read its current start value from sv or currentSignalStateJson.
+2. Determine the physical objective imposed by the planner.
+3. Determine how that signal should physically evolve during the phase.
+4. Generate deltas whose accumulated effect reconstructs that evolution while respecting DBC limits.
+
+Delta rules
+
+* Every signal value must be a non-empty numeric array.
+* Positive deltas increase the signal.
+* Negative deltas decrease the signal.
+* Near-zero deltas keep the signal approximately stable.
+* Deltas describe behavior transitions, not simulation samples.
+* Use smooth profiles.
 * Avoid unrealistic oscillations.
-* Aggressive driving should produce larger delta magnitudes.
-* Calm driving should produce smaller delta magnitudes.
-* Cruising phases should produce nearly stable deltas.
-* Acceleration phases should generally produce positive deltas for propulsion-related signals.
-* Braking phases should generally produce negative deltas for propulsion-related signals.
-* Parking phases should progressively drive vehicle-motion-related signals to zero.
+* Use the minimum number of deltas required.
+* Typical arrays contain 3 to 10 values.
+* Maximum array length is 20.
+* Never repeat values merely to represent elapsed time.
 
-Output schema:
+Physical consistency
+
+Vehicle dynamics must remain physically coherent.
+
+Vehicle speed, wheel speeds, acceleration, accelerator position, brake pressure, torque and steering must describe the same vehicle motion.
+
+During acceleration:
+
+* speed increases
+* acceleration is mostly positive
+* accelerator generally increases
+* torque generally increases
+* brake remains inactive
+
+During braking:
+
+* speed decreases
+* acceleration becomes negative
+* accelerator decreases
+* torque decreases
+* brake pressure increases
+* brake lights may activate if the signal is binary and requested
+
+During cruising:
+
+* speed remains close to the planner target
+* acceleration oscillates around zero
+* steering remains small unless road geometry requires otherwise
+
+During parking:
+
+* vehicle-motion-related signals progressively converge toward zero
+* longitudinal acceleration converges toward zero when the vehicle is stopped
+* steering may become larger
+* brake activity may increase
+
+Slow-changing signals
+
+Battery percentage, battery voltage, fuel level, temperatures and odometer evolve gradually.
+
+Battery percentage should normally change only by a few percentage points during one hour of typical urban driving.
+
+Battery voltage must remain in the DBC physical range and in the same scale as the supplied start value.
+
+Temperatures change gradually.
+
+Output schema
 
 {
-    "schemaVersion": "trackster-signal-delta-plan-v1",
-    "phases":
-    [
-        {
-            "phaseId": 1,
-            "signals":
-            {
-                "SignalName":
-                {
-                    "start": 0,
-                    "end": 0,
-                    "min": 0,
-                    "max": 0,
-                    "d":
-                    [
-                        0
-                    ]
-                }
-            }
-        }
-    ]
+  "schemaVersion":"trackster-signal-delta-plan-v1",
+  "phases":[
+    {
+      "phaseId":1,
+      "signals":{
+        "SignalName":[0]
+      }
+    }
+  ]
 }
 
-Before returning JSON verify:
+Before returning JSON verify
 
-* The JSON is valid.
-* Every planner phase exists exactly once.
-* Every requested signal exists in every phase.
-* No additional phases were created.
-* No additional signals were created.
-* Every signal contains start, end, min, max and d.
-* Every d array contains only numeric values.
-* Every generated behavior is coherent with the corresponding driving phase.
-* The final phase progressively brings vehicle-motion-related signals to a stopped condition where appropriate.
+* JSON is valid.
+* Every planner phase appears exactly once.
+* No extra phases exist.
+* Every returned signal key is exactly one requested signal n value.
+* Unknown or ambiguous signals have been omitted.
+* Every signal value is a non-empty numeric array.
+* Every delta is numeric.
+* Every accumulated value respects mn and mx when provided.
+* Every b=1 signal accumulates only to 0 or 1.
+* Battery percentage remains physically realistic.
+* Battery voltage remains in the DBC physical range and same engineering scale.
+* Longitudinal acceleration is compatible with speed changes and converges toward zero whenever vehicle speed reaches zero.
+* The final reconstructed speed of every phase remains compatible with the planner speedTarget.

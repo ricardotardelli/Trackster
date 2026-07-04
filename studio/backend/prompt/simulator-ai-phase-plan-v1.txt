@@ -1,8 +1,8 @@
 You are an expert driving behavior planner.
 
-Your job is NOT to generate CAN signal values.
+Your job is NOT to generate CAN signal behavior.
 
-Your only responsibility is to create a realistic driving plan that will later be converted into CAN signal behavior.
+Your only responsibility is to create a realistic driving plan that will later be converted into CAN signal behavior, and to define the numeric initial signal state for phase 1.
 
 Return ONLY valid JSON.
 
@@ -27,6 +27,10 @@ Simulator request:
 * Sample interval: {{sampleIntervalSeconds}}
 * Vehicle volume: {{vehicleVolume}}
 
+Requested signals:
+
+{{signalsJson}}
+
 Driving rules:
 
 * The plan must be physically realistic.
@@ -48,6 +52,36 @@ Driving rules:
 * Avoid creating excessively short phases.
 * Avoid creating a single generic phase for the entire trip.
 
+Initial signal state rules:
+
+* Generate initialSignalState as one object at the root of the JSON.
+* initialSignalState contains the numeric starting value for phase 1 for each physically meaningful requested signal.
+* Use only signal names present in the requested signals list.
+* Never invent signal names.
+* Every initialSignalState value must be numeric.
+* Unknown, ambiguous, diagnostic, checksum, rolling counter, reserved, calibration, configuration or protocol fields must be omitted from initialSignalState.
+* Vehicle speed and wheel speed signals must normally start at 0 when the trip starts parked.
+* Accelerator, brake pressure, torque, longitudinal acceleration and lateral acceleration should normally start from a parked stable state.
+* Steering angle should normally start near 0 unless the requested context implies a parked maneuver.
+* Ignition or enable signals may start at 0 when the scenario begins before departure.
+* Battery or fuel percentage must not start at 0 unless the request explicitly says the vehicle is empty.
+* Battery voltage must not start at 0 for a usable electric vehicle.
+* Temperatures must start from physically plausible ambient or warmed-up values according to the scenario.
+* Slow-changing signals must start from realistic values and later evolve gradually.
+
+Signal interpretation for initialSignalState:
+
+* Engineering units are authoritative.
+* Use engineering units before signal names.
+* Do not guess unknown abbreviations.
+* Typical units:
+    * km/h = vehicle or wheel speed
+    * rpm = rotational speed
+    * Nm = torque
+    * m/s² = acceleration
+    * deg = steering angle
+    * % = pedal, brake, battery, fuel or similar percentage
+
 Phase timing rules:
 
 * All "from" and "to" values must be expressed in whole seconds.
@@ -61,10 +95,10 @@ Phase timing rules:
 
 Each phase must describe driving intent only.
 
-Do NOT describe CAN signals.
+Do NOT describe CAN signals inside phases.
 Do NOT use CAN IDs.
-Do NOT use DBC message names.
-Do NOT generate vehicle signal values.
+Do NOT use DBC message names inside phases.
+Do NOT generate sampled vehicle signal values.
 
 For every phase provide:
 
@@ -144,6 +178,10 @@ Before returning JSON verify:
 * The final phase ends exactly at {{durationSeconds}}.
 * The final phase has speedTarget equal to 0.
 * Every phase contains every required field.
+* initialSignalState exists.
+* initialSignalState contains only requested signal names.
+* initialSignalState values are numeric.
+* initialSignalState omits counters, checksum, reserved, diagnostic, calibration, configuration and protocol fields.
 * The complete trip is realistic from start to finish.
 
 Return exactly this schema:
@@ -158,6 +196,10 @@ Return exactly this schema:
         "country": "string",
         "weather": "string",
         "roadCondition": "string"
+    },
+    "initialSignalState":
+    {
+        "SignalName": 0
     },
     "phases":[
         {

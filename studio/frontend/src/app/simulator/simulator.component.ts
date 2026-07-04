@@ -136,6 +136,8 @@ interface ScenarioStatusDocument {
     rawModelResponse?: string | null;
   } | null;
   logs?: ScenarioLogEntry[];
+  signalKnowledge?: unknown;
+  signalKnowledgeS3?: unknown;
   output?: {
     generatedBinCount?: number;
     expectedBinCount?: number;
@@ -619,8 +621,8 @@ export class SimulatorComponent implements OnInit {
     this.formStatus = 'awaiting_response';
     this.isSubmitting = true;
     this.openGenerationModal(
-      'Starting generation...',
-      'Sending the simulation request to the orchestrator.'
+      'Starting signal knowledge analysis...',
+      'Sending the selected CAN signals to Trackster AI for semantic analysis.'
     );
 
     try {
@@ -723,8 +725,8 @@ export class SimulatorComponent implements OnInit {
         if (monitor) {
           this.formStatus = 'generating';
           this.openGenerationModal(
-            'Generating realistic simulation...',
-            'Trackster AI is composing a realistic driving scenario based on the selected signals.'
+            'Analyzing signal knowledge...',
+            'Trackster AI is analyzing the selected CAN signals and preparing the signal knowledge base.'
           );
 
           const scenarioDocument = await this.waitForScenarioCompletion(monitor);
@@ -740,7 +742,7 @@ export class SimulatorComponent implements OnInit {
             generatedBinCount
           });
           this.openGenerationSuccessModal(
-            'Generation completed successfully.',
+            'Signal knowledge generated successfully.',
             this.buildScenarioSuccessMessage(scenarioDocument, monitor)
           );
         } else {
@@ -753,15 +755,15 @@ export class SimulatorComponent implements OnInit {
             generatedBinCount: null
           });
           this.openGenerationSuccessModal(
-            'Generation request accepted.',
-            'The simulation request was accepted successfully.'
+            'Signal knowledge request accepted.',
+            'The signal knowledge request was accepted successfully.'
           );
         }
       } else {
         this.setPayloadValue(JSON.stringify(result, null, 2));
         this.openGenerationErrorModal(
           'Generation failed',
-          `The simulation request failed with status ${response.status}.`,
+          `The signal knowledge request failed with status ${response.status}.`,
           this.describeHttpStatus(response.status)
         );
       }
@@ -795,7 +797,7 @@ export class SimulatorComponent implements OnInit {
 
       this.openGenerationErrorModal(
         'Generation failed',
-        String(details['message'] || 'Unable to complete the simulation generation.'),
+        String(details['message'] || 'Unable to complete the signal knowledge generation.'),
         'Please check the browser console and try again.'
       );
     } finally {
@@ -1647,8 +1649,8 @@ export class SimulatorComponent implements OnInit {
       const exists = await this.scenarioObjectExists(monitor.bucket, monitor.scenarioKey);
 
       if (!exists) {
-        this.generationWorkflowTitle = 'Preparing simulation...';
-        this.generationWorkflowMessage = 'Waiting for Trackster AI to prepare the simulation.';
+        this.generationWorkflowTitle = 'Preparing signal knowledge...';
+        this.generationWorkflowMessage = 'Waiting for Trackster AI to start analyzing the selected signals.';
         this.generationWorkflowDetails = '';
         this.generationWorkflowProgress = 0;
         await this.delay(this.generationPollIntervalMs);
@@ -1809,8 +1811,16 @@ export class SimulatorComponent implements OnInit {
   private resolveScenarioTitle(status: string): string {
     const normalizedStatus = status.toLowerCase();
 
+    if (normalizedStatus.includes('signal knowledge')) {
+      if (this.isCompletedStatus(normalizedStatus)) {
+        return 'Signal knowledge generated successfully.';
+      }
+
+      return 'Analyzing signal knowledge...';
+    }
+
     if (this.isCompletedStatus(normalizedStatus)) {
-      return 'Generation completed successfully.';
+      return 'Signal knowledge generated successfully.';
     }
 
     if (this.isFailedStatus(normalizedStatus)) {
@@ -1839,8 +1849,16 @@ export class SimulatorComponent implements OnInit {
   private resolveScenarioMessage(status: string): string {
     const normalizedStatus = status.toLowerCase();
 
+    if (normalizedStatus.includes('signal knowledge')) {
+      if (this.isCompletedStatus(normalizedStatus)) {
+        return 'The signal knowledge base has been generated successfully.';
+      }
+
+      return 'Trackster AI is analyzing the selected CAN signals and deciding which ones can be used for behavior generation.';
+    }
+
     if (this.isCompletedStatus(normalizedStatus)) {
-      return 'The simulation has been generated successfully and is ready for use.';
+      return 'The signal knowledge base has been generated successfully.';
     }
 
     if (this.isFailedStatus(normalizedStatus)) {
@@ -1867,7 +1885,7 @@ export class SimulatorComponent implements OnInit {
       return 'Trackster is generating the simulation files.';
     }
 
-    return 'Trackster is processing the simulation workflow.';
+    return 'Trackster AI is processing the signal knowledge workflow.';
   }
 
   private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
@@ -1951,7 +1969,11 @@ export class SimulatorComponent implements OnInit {
   }
 
   private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
-    return 'The simulation has been generated successfully and is ready for use.';
+    if (scenarioDocument.signalKnowledge) {
+      return 'The signal knowledge base has been generated successfully.';
+    }
+
+    return 'The signal knowledge base has been generated successfully.';
   }
 
   private buildGeneratedFilesSuccessMessage(generatedFiles: number): string {

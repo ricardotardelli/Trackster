@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "trackster-signal-knowledge-v1",
+  "signals": [
+    {
+      "name": "VehicleSpeed",
+      "meaning": "Vehicle longitudinal speed",
+      "generateBehavior": true,
+      "reason": "Primary vehicle speed signal."
+    },
+    {
+      "name": "CRC8",
+      "meaning": "Frame checksum",
+      "generateBehavior": false,
+      "reason": "Protocol integrity field."
+    }
+  ]
+}
