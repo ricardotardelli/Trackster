@@ -50,7 +50,7 @@ export const handler = async (event) => {
     const aiPhase = explicitAiPhase || (
       eventSource === 'trackster-orchestrator' || eventAction === 'run_full_ai_pipeline'
         ? 'auto'
-        : 'signal_knowledge'
+        : 'auto'
     );
 
     if (aiPhase === 'auto') {
@@ -65,14 +65,27 @@ export const handler = async (event) => {
         modelId,
         scenarioS3: autoResult.scenarioS3,
         signalKnowledgeS3: autoResult.signalKnowledgeS3,
-        signalKnowledge: autoResult.signalKnowledge
+        signalKnowledge: autoResult.signalKnowledge,
+        planner: autoResult.planner
       });
     }
 
     if (aiPhase === 'planner' || aiPhase === 'phase1' || aiPhase === 'plan') {
-      return buildResponse(400, {
-        success: false,
-        message: 'Planner phase is temporarily disabled. Current AI assist execution only generates signal knowledge.'
+      const plannerResult = await runPlannerPhase(body, {
+        processingTimeMs: Date.now() - startedAt
+      });
+      const processingTimeMs = Date.now() - startedAt;
+
+      return buildResponse(200, {
+        success: true,
+        status: plannerResult.status,
+        aiPhase: 'planner',
+        processingTimeMs,
+        modelId,
+        scenarioS3: plannerResult.scenarioS3,
+        signalKnowledgeS3: plannerResult.signalKnowledgeS3 || null,
+        signalKnowledge: plannerResult.signalKnowledge || null,
+        planner: plannerResult.planner
       });
     }
 
@@ -152,13 +165,84 @@ async function runAutoPipeline(body, startedAt) {
     processingTimeMs: Date.now() - startedAt
   });
 
+  const plannerResult = await runPlannerPhase(body, {
+    signalKnowledge: knowledgeResult.signalKnowledge,
+    signalKnowledgeS3: knowledgeResult.signalKnowledgeS3,
+    processingTimeMs: Date.now() - startedAt
+  });
+
   return {
-    status: knowledgeResult.status,
-    scenarioS3: knowledgeResult.scenarioS3,
+    status: plannerResult.status,
+    scenarioS3: plannerResult.scenarioS3,
     signalKnowledgeS3: knowledgeResult.signalKnowledgeS3,
     signalKnowledge: knowledgeResult.signalKnowledge,
-    progress: knowledgeResult.progress,
-    currentStep: knowledgeResult.currentStep
+    planner: plannerResult.planner,
+    progress: plannerResult.progress,
+    currentStep: plannerResult.currentStep
+  };
+}
+
+
+async function runPlannerPhase(body, options = {}) {
+  const signalKnowledgeContext = await resolveSignalKnowledgeForPlanner(body, options);
+  const plannerGeneration = await generateValidatedDrivingPlanner(body, signalKnowledgeContext.signalKnowledge);
+  const scenarioS3 = await savePlannerScenarioJson({
+    body,
+    plannerResult: plannerGeneration,
+    signalKnowledge: signalKnowledgeContext.signalKnowledge,
+    processingTimeMs: Math.max(0, Math.round(Number(options.processingTimeMs || 0)))
+  });
+
+  return {
+    status: 'Driving planner completed. Waiting for behavior phase generation.',
+    scenarioS3,
+    signalKnowledgeS3: signalKnowledgeContext.signalKnowledgeS3 || null,
+    signalKnowledge: signalKnowledgeContext.signalKnowledge,
+    planner: plannerGeneration.planner,
+    progress: buildProgress(plannerGeneration.planner, []),
+    currentStep: 'Driving planner completed. Waiting for behavior phase generation.'
+  };
+}
+
+async function resolveSignalKnowledgeForPlanner(body, options = {}) {
+  if (options.signalKnowledge?.schemaVersion === 'trackster-signal-knowledge-v1') {
+    return {
+      signalKnowledge: options.signalKnowledge,
+      signalKnowledgeS3: options.signalKnowledgeS3 || null
+    };
+  }
+
+  if (body?.signalKnowledge?.schemaVersion === 'trackster-signal-knowledge-v1') {
+    return {
+      signalKnowledge: normalizeSignalKnowledge(
+        body.signalKnowledge,
+        extractRequestedSignalMetadata(body).map((signal) => signal.name)
+      ),
+      signalKnowledgeS3: null
+    };
+  }
+
+  try {
+    const { bucket, key } = resolveScenarioLocation(body);
+    if (bucket && key) {
+      const scenarioDocument = await safeReadJsonFromS3(bucket, key);
+      if (scenarioDocument?.signalKnowledge?.schemaVersion === 'trackster-signal-knowledge-v1') {
+        return {
+          signalKnowledge: scenarioDocument.signalKnowledge,
+          signalKnowledgeS3: scenarioDocument.signalKnowledgeS3 || null
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('Unable to reuse signal knowledge from scenario.json. Generating a new one.', {
+      message: error?.message
+    });
+  }
+
+  const knowledgeResult = await runSignalKnowledgePhase(body);
+  return {
+    signalKnowledge: knowledgeResult.signalKnowledge,
+    signalKnowledgeS3: knowledgeResult.signalKnowledgeS3
   };
 }
 
@@ -458,6 +542,16 @@ function expandSignalsForKnowledgePrompt(signalMetadata = []) {
       }
 
       const result = { signalName };
+
+      const messageName = sanitizeText(signal?.messageName || signal?.frameName || signal?.canMessageName);
+      if (messageName) result.messageName = messageName;
+
+      const canId = sanitizeText(signal?.canId || signal?.canID || signal?.id);
+      if (canId) result.canId = canId;
+
+      const dbcFile = sanitizeText(signal?.dbcFile || signal?.dbc || signal?.sourceDbc);
+      if (dbcFile) result.dbcFile = dbcFile;
+
       const engineeringUnit = sanitizeEngineeringUnit(signal?.u || signal?.unit || signal?.engineeringUnit);
       if (engineeringUnit) result.engineeringUnit = engineeringUnit;
 
@@ -537,6 +631,24 @@ function validateSignalKnowledge(signalKnowledge, requestedSignalNames) {
     if (!isNonEmptyString(signal.reason)) {
       errors.push(`signals[${index}].reason must be a non-empty string.`);
     }
+
+    if (!Object.prototype.hasOwnProperty.call(signal, 'dependency')) {
+      errors.push(`signals[${index}].dependency must be present and must be null or an exact requested signal name.`);
+    } else if (signal.dependency !== null) {
+      if (typeof signal.dependency !== 'string' || !signal.dependency.trim()) {
+        errors.push(`signals[${index}].dependency must be null or a non-empty string.`);
+      } else {
+        const dependency = signal.dependency.trim();
+
+        if (!requestedSet.has(dependency)) {
+          errors.push(`signals[${index}].dependency is not in requested signals: ${dependency}.`);
+        }
+
+        if (dependency === name) {
+          errors.push(`signals[${index}].dependency cannot reference the same signal: ${dependency}.`);
+        }
+      }
+    }
   }
 
   for (const requestedSignalName of requestedSignalNames) {
@@ -549,6 +661,24 @@ function validateSignalKnowledge(signalKnowledge, requestedSignalNames) {
     valid: errors.length === 0,
     errors
   };
+}
+
+function normalizeSignalDependency(value, requestedSet, signalName) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const dependency = value.trim();
+
+  if (!dependency || dependency === signalName || !requestedSet.has(dependency)) {
+    return null;
+  }
+
+  return dependency;
 }
 
 function normalizeSignalKnowledge(signalKnowledge, requestedSignalNames) {
@@ -569,7 +699,8 @@ function normalizeSignalKnowledge(signalKnowledge, requestedSignalNames) {
       name,
       meaning: sanitizeText(signal.meaning) || 'Unknown',
       generateBehavior: Boolean(signal.generateBehavior),
-      reason: sanitizeText(signal.reason) || 'No reason provided.'
+      reason: sanitizeText(signal.reason) || 'No reason provided.',
+      dependency: normalizeSignalDependency(signal.dependency, requestedSet, name)
     });
   }
 
@@ -1303,11 +1434,11 @@ async function tryWriteFailureToScenario(body, error) {
   }
 }
 
-async function generateValidatedDrivingPlanner(body) {
+async function generateValidatedDrivingPlanner(body, signalKnowledge = null) {
   const plannerRequest = buildPlannerRequest(body);
   const requestedSignalMetadata = extractRequestedSignalMetadata(body);
   const promptTemplateResult = await loadPromptTemplate('PHASE_PLAN_PROMPT_KEY');
-  const prompt = buildPlannerPrompt(promptTemplateResult.template, plannerRequest, requestedSignalMetadata);
+  const prompt = buildPlannerPrompt(promptTemplateResult.template, plannerRequest, requestedSignalMetadata, signalKnowledge);
 
   let lastError = null;
   let lastRawResponse = null;
@@ -1474,7 +1605,7 @@ function buildRetryPrompt(originalPrompt, previousResponse, previousError) {
   ].filter(Boolean).join('\n');
 }
 
-async function savePlannerScenarioJson({ body, plannerResult, processingTimeMs }) {
+async function savePlannerScenarioJson({ body, plannerResult, signalKnowledge = null, processingTimeMs }) {
   const generation = body?.generation || {};
   const baseMessage = generation?.baseMessage || body?.baseMessage || {};
   const bucket = resolveScenarioBucket(generation, baseMessage, body);
@@ -1496,7 +1627,7 @@ async function savePlannerScenarioJson({ body, plannerResult, processingTimeMs }
     progress: buildProgress(plannerResult.planner, existingBehaviorPhases),
     processingTimeMs,
     scenario: simplifyScenario(plannerResult.planner),
-    signalKnowledge: existingDocument?.signalKnowledge || null,
+    signalKnowledge: signalKnowledge || existingDocument?.signalKnowledge || null,
     behavior: {
       phases: existingBehaviorPhases
     }
@@ -1658,9 +1789,10 @@ async function loadPromptTemplate(keyEnvName) {
   return { template, source: { bucket, key } };
 }
 
-function buildPlannerPrompt(template, request, requestedSignalMetadata = []) {
+function buildPlannerPrompt(template, request, requestedSignalMetadata = [], signalKnowledge = null) {
   return replaceCommonPromptVariables(template, request)
     .replaceAll('{{signalsJson}}', JSON.stringify(requestedSignalMetadata || [], null, 2))
+    .replaceAll('{{signalKnowledgeJson}}', JSON.stringify(signalKnowledge || { schemaVersion: 'trackster-signal-knowledge-v1', signals: [] }, null, 2))
     .trim();
 }
 
@@ -1824,6 +1956,22 @@ function buildRequestedSignalMetadata(item, signalName) {
   if (unit) result.unit = unit;
 
   if (item && typeof item === 'object' && !Array.isArray(item)) {
+    const messageName = sanitizeText(
+      item.messageName ||
+        item.frameName ||
+        item.canMessageName ||
+        item.message?.name ||
+        item.frame?.n ||
+        item.frame?.name
+    );
+    if (messageName) result.messageName = messageName;
+
+    const canId = sanitizeText(item.canId || item.canID || item.id || item.frameId || item.messageId);
+    if (canId) result.canId = canId;
+
+    const dbcFile = sanitizeText(item.dbcFile || item.dbc || item.sourceDbc || item.dbcName);
+    if (dbcFile) result.dbcFile = dbcFile;
+
     const physicalMin = firstFiniteNumber(item.mn, item.physicalMin, item.min, item.minimum);
     if (Number.isFinite(physicalMin)) result.mn = physicalMin;
 
@@ -1865,6 +2013,9 @@ function uniqueSignalMetadata(values) {
     seen.add(value.name);
 
     const item = { name: value.name };
+    if (value.messageName) item.messageName = value.messageName;
+    if (value.canId) item.canId = value.canId;
+    if (value.dbcFile) item.dbcFile = value.dbcFile;
     if (value.unit) item.unit = value.unit;
     if (Number.isFinite(Number(value.mn))) item.mn = Number(value.mn);
     if (Number.isFinite(Number(value.mx))) item.mx = Number(value.mx);
@@ -1983,23 +2134,62 @@ function parseJsonResponse(text) {
     return JSON.parse(text);
   } catch (error) {
     const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
 
-    if (firstBrace < 0 || lastBrace <= firstBrace) {
+    if (firstBrace < 0) {
       const parseError = new Error('Bedrock response is not valid JSON.');
       parseError.rawResponse = text;
       parseError.cause = error;
       throw parseError;
     }
 
-    try {
-      return JSON.parse(text.slice(firstBrace, lastBrace + 1));
-    } catch (innerError) {
-      const parseError = new Error('Bedrock response JSON extraction failed.');
-      parseError.rawResponse = text;
-      parseError.cause = innerError;
-      throw parseError;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = firstBrace; index < text.length; index += 1) {
+      const character = text[index];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (character === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (character === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (character === '{') {
+        depth += 1;
+      } else if (character === '}') {
+        depth -= 1;
+      }
+
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(firstBrace, index + 1));
+        } catch (innerError) {
+          const parseError = new Error('Bedrock response JSON extraction failed.');
+          parseError.rawResponse = text;
+          parseError.cause = innerError;
+          throw parseError;
+        }
+      }
     }
+
+    const parseError = new Error('Bedrock response JSON extraction failed.');
+    parseError.rawResponse = text;
+    parseError.cause = error;
+    throw parseError;
   }
 }
 

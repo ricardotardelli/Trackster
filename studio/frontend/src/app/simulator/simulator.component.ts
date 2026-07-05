@@ -138,6 +138,9 @@ interface ScenarioStatusDocument {
   logs?: ScenarioLogEntry[];
   signalKnowledge?: unknown;
   signalKnowledgeS3?: unknown;
+  scenario?: {
+    phases?: unknown[];
+  } | null;
   output?: {
     generatedBinCount?: number;
     expectedBinCount?: number;
@@ -742,7 +745,7 @@ export class SimulatorComponent implements OnInit {
             generatedBinCount
           });
           this.openGenerationSuccessModal(
-            'Signal knowledge generated successfully.',
+            this.buildScenarioSuccessTitle(scenarioDocument),
             this.buildScenarioSuccessMessage(scenarioDocument, monitor)
           );
         } else {
@@ -1811,89 +1814,128 @@ export class SimulatorComponent implements OnInit {
   private resolveScenarioTitle(status: string): string {
     const normalizedStatus = status.toLowerCase();
 
-    if (normalizedStatus.includes('signal knowledge')) {
-      if (this.isCompletedStatus(normalizedStatus)) {
-        return 'Signal knowledge generated successfully.';
-      }
-
-      return 'Analyzing signal knowledge...';
-    }
-
-    if (this.isCompletedStatus(normalizedStatus)) {
-      return 'Signal knowledge generated successfully.';
-    }
-
     if (this.isFailedStatus(normalizedStatus)) {
       return 'Generation failed';
     }
 
-    if (normalizedStatus.includes('planner') || normalizedStatus.includes('planning') || normalizedStatus.includes('preparing')) {
-      return 'Planning simulation...';
+    if (normalizedStatus.includes('signal knowledge')) {
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'Signal knowledge completed.'
+        : 'Analyzing signal knowledge...';
+    }
+
+    if (
+      normalizedStatus.includes('planner') ||
+      normalizedStatus.includes('planning') ||
+      normalizedStatus.includes('driving scenario') ||
+      normalizedStatus.includes('preparing')
+    ) {
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'Driving scenario planned successfully.'
+        : 'Planning simulation...';
     }
 
     if (normalizedStatus.includes('behavior') || normalizedStatus.includes('behaviour')) {
-      return 'Generating signal behavior...';
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'Signal behavior generated successfully.'
+        : 'Generating signal behavior...';
     }
 
     if (normalizedStatus.includes('worker') || normalizedStatus.includes('queue')) {
       return 'Preparing simulation files...';
     }
 
-    if (normalizedStatus.includes('bin')) {
-      return 'Generating simulation files...';
-    }
-
-    return 'Generating realistic simulation...';
-  }
-
-  private resolveScenarioMessage(status: string): string {
-    const normalizedStatus = status.toLowerCase();
-
-    if (normalizedStatus.includes('signal knowledge')) {
-      if (this.isCompletedStatus(normalizedStatus)) {
-        return 'The signal knowledge base has been generated successfully.';
-      }
-
-      return 'Trackster AI is analyzing the selected CAN signals and deciding which ones can be used for behavior generation.';
+    if (normalizedStatus.includes('bin') || normalizedStatus.includes('simulation file')) {
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'Simulation files generated successfully.'
+        : 'Generating simulation files...';
     }
 
     if (this.isCompletedStatus(normalizedStatus)) {
-      return 'The signal knowledge base has been generated successfully.';
+      return 'Generation completed successfully.';
     }
+
+    return 'Generating realistic simulation...';
+}
+
+  private resolveScenarioMessage(status: string): string {
+    const normalizedStatus = status.toLowerCase();
 
     if (this.isFailedStatus(normalizedStatus)) {
       return 'Trackster stopped the simulation generation workflow because an error occurred.';
     }
 
-    if (normalizedStatus.includes('phase')) {
-      return status;
+    if (normalizedStatus.includes('signal knowledge')) {
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'The signal knowledge base has been generated. Trackster AI is preparing the driving scenario.'
+        : 'Trackster AI is analyzing the selected CAN signals and deciding which ones can be used for behavior generation.';
     }
 
-    if (normalizedStatus.includes('planner') || normalizedStatus.includes('planning') || normalizedStatus.includes('preparing')) {
-      return 'Trackster AI is creating the driving scenario.';
+    if (
+      normalizedStatus.includes('planner') ||
+      normalizedStatus.includes('planning') ||
+      normalizedStatus.includes('driving scenario') ||
+      normalizedStatus.includes('preparing')
+    ) {
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'The driving scenario plan has been generated successfully.'
+        : 'Trackster AI is creating the driving scenario.';
     }
 
     if (normalizedStatus.includes('behavior') || normalizedStatus.includes('behaviour')) {
-      return 'Trackster AI is generating signal behavior from the driving scenario.';
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'The signal behavior plan has been generated successfully.'
+        : 'Trackster AI is generating signal behavior from the driving scenario.';
     }
 
     if (normalizedStatus.includes('worker') || normalizedStatus.includes('queue')) {
       return 'Trackster is preparing the simulation workers.';
     }
 
-    if (normalizedStatus.includes('bin')) {
-      return 'Trackster is generating the simulation files.';
+    if (normalizedStatus.includes('bin') || normalizedStatus.includes('simulation file')) {
+      return this.isCompletedStatus(normalizedStatus)
+        ? 'The simulation files have been generated successfully.'
+        : 'Trackster is generating the simulation files.';
     }
 
-    return 'Trackster AI is processing the signal knowledge workflow.';
-  }
+    if (normalizedStatus.includes('phase')) {
+      return status;
+    }
+
+    if (this.isCompletedStatus(normalizedStatus)) {
+      return 'The Trackster AI generation workflow has completed successfully.';
+    }
+
+    return 'Trackster AI is processing the simulation workflow.';
+}
 
   private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
     return '';
   }
 
   private isScenarioCompleted(scenarioDocument: ScenarioStatusDocument): boolean {
-    if (this.isCompletedStatus(String(scenarioDocument.status || ''))) {
+    const status = String(scenarioDocument.status || '');
+    const normalizedStatus = status.toLowerCase().trim();
+    const hasScenarioPlan = Array.isArray(scenarioDocument.scenario?.phases) && scenarioDocument.scenario.phases.length > 0;
+    const hasOnlySignalKnowledge = !!scenarioDocument.signalKnowledge && !hasScenarioPlan;
+
+    if (hasOnlySignalKnowledge) {
+      return false;
+    }
+
+    if (
+      hasScenarioPlan &&
+      (
+        normalizedStatus.includes('planner completed') ||
+        normalizedStatus.includes('driving planner completed') ||
+        normalizedStatus.includes('driving scenario completed') ||
+        normalizedStatus.includes('driving scenario planned')
+      )
+    ) {
+      return true;
+    }
+
+    if (this.isCompletedStatus(status)) {
       return true;
     }
 
@@ -1907,7 +1949,8 @@ export class SimulatorComponent implements OnInit {
       totalPhases > 0 &&
       completedPhases >= totalPhases &&
       failedPhases === 0 &&
-      percent >= 100
+      percent >= 100 &&
+      !hasOnlySignalKnowledge
     );
   }
 
@@ -1968,12 +2011,25 @@ export class SimulatorComponent implements OnInit {
     return latestError?.message || scenarioDocument.currentStep || scenarioDocument.status || 'Simulation generation failed.';
   }
 
-  private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
-    if (scenarioDocument.signalKnowledge) {
-      return 'The signal knowledge base has been generated successfully.';
+  private buildScenarioSuccessTitle(scenarioDocument: ScenarioStatusDocument): string {
+    if (Array.isArray(scenarioDocument.scenario?.phases) && scenarioDocument.scenario.phases.length > 0) {
+      return 'Driving scenario planned successfully.';
     }
 
-    return 'The signal knowledge base has been generated successfully.';
+    return 'Generation completed successfully.';
+  }
+
+  private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
+    const phaseCount = Array.isArray(scenarioDocument.scenario?.phases)
+      ? scenarioDocument.scenario.phases.length
+      : 0;
+
+    if (phaseCount > 0) {
+      const phaseWord = phaseCount === 1 ? 'phase was' : 'phases were';
+      return `The driving scenario was generated successfully and ${phaseCount} ${phaseWord} planned.`;
+    }
+
+    return scenarioDocument.currentStep || scenarioDocument.status || 'The Trackster AI generation workflow completed successfully.';
   }
 
   private buildGeneratedFilesSuccessMessage(generatedFiles: number): string {
