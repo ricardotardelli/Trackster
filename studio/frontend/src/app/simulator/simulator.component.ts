@@ -97,10 +97,12 @@ interface GenerationMonitor {
 }
 
 interface ScenarioProgress {
+  stage?: string;
   totalPhases?: number;
   completedPhases?: number;
   failedPhases?: number;
   processingPhases?: number;
+  currentPhase?: number;
   percent?: number;
   generatedBinCount?: number;
   expectedBinCount?: number;
@@ -1784,8 +1786,8 @@ export class SimulatorComponent implements OnInit {
     const status = String(scenarioDocument.status || 'running');
 
     this.generationWorkflowProgress = this.resolveScenarioPercent(scenarioDocument);
-    this.generationWorkflowTitle = this.resolveScenarioTitle(status);
-    this.generationWorkflowMessage = scenarioDocument.currentStep || this.resolveScenarioMessage(status);
+    this.generationWorkflowTitle = this.resolveScenarioTitle(status, scenarioDocument);
+    this.generationWorkflowMessage = scenarioDocument.currentStep || this.resolveScenarioMessage(status, scenarioDocument);
     this.generationWorkflowDetails = '';
 
     if (this.isScenarioFailed(scenarioDocument)) {
@@ -1803,25 +1805,31 @@ export class SimulatorComponent implements OnInit {
 
     const totalPhases = Number(progress.totalPhases);
     const completedPhases = Number(progress.completedPhases);
+    const processingPhases = Number(progress.processingPhases || 0);
 
     if (Number.isFinite(totalPhases) && totalPhases > 0 && Number.isFinite(completedPhases)) {
-      return Math.max(0, Math.min(100, Math.round((completedPhases / totalPhases) * 100)));
+      const weightedCompleted = completedPhases + (processingPhases > 0 ? 0.5 : 0);
+      return Math.max(0, Math.min(100, Math.round((weightedCompleted / totalPhases) * 100)));
     }
 
     return 0;
   }
 
-  private resolveScenarioTitle(status: string): string {
+  private resolveScenarioTitle(status: string, scenarioDocument?: ScenarioStatusDocument): string {
     const normalizedStatus = status.toLowerCase();
 
     if (this.isFailedStatus(normalizedStatus)) {
       return 'Generation failed';
     }
 
+    if (this.isBehaviorWorkflow(scenarioDocument, normalizedStatus)) {
+      return this.isScenarioBehaviorCompleted(scenarioDocument)
+        ? 'Signal behavior generated successfully.'
+        : 'Generating signal behavior...';
+    }
+
     if (normalizedStatus.includes('signal knowledge')) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'Signal knowledge completed.'
-        : 'Analyzing signal knowledge...';
+      return 'Analyzing signal knowledge...';
     }
 
     if (
@@ -1830,15 +1838,7 @@ export class SimulatorComponent implements OnInit {
       normalizedStatus.includes('driving scenario') ||
       normalizedStatus.includes('preparing')
     ) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'Driving scenario planned successfully.'
-        : 'Planning simulation...';
-    }
-
-    if (normalizedStatus.includes('behavior') || normalizedStatus.includes('behaviour')) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'Signal behavior generated successfully.'
-        : 'Generating signal behavior...';
+      return 'Planning simulation...';
     }
 
     if (normalizedStatus.includes('worker') || normalizedStatus.includes('queue')) {
@@ -1856,19 +1856,33 @@ export class SimulatorComponent implements OnInit {
     }
 
     return 'Generating realistic simulation...';
-}
+  }
 
-  private resolveScenarioMessage(status: string): string {
+  private resolveScenarioMessage(status: string, scenarioDocument?: ScenarioStatusDocument): string {
     const normalizedStatus = status.toLowerCase();
 
     if (this.isFailedStatus(normalizedStatus)) {
       return 'Trackster stopped the simulation generation workflow because an error occurred.';
     }
 
+    if (this.isBehaviorWorkflow(scenarioDocument, normalizedStatus)) {
+      const progress = scenarioDocument?.progress || {};
+      const totalPhases = Number(progress.totalPhases || 0);
+      const currentPhase = Number(progress.currentPhase || 0);
+
+      if (this.isScenarioBehaviorCompleted(scenarioDocument)) {
+        return 'The signal behavior plan has been generated successfully.';
+      }
+
+      if (totalPhases > 0 && currentPhase > 0) {
+        return `Trackster AI is generating behavior phase ${currentPhase} of ${totalPhases}.`;
+      }
+
+      return 'Trackster AI is generating signal behavior from the driving scenario.';
+    }
+
     if (normalizedStatus.includes('signal knowledge')) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'The signal knowledge base has been generated. Trackster AI is preparing the driving scenario.'
-        : 'Trackster AI is analyzing the selected CAN signals and deciding which ones can be used for behavior generation.';
+      return 'Trackster AI is analyzing the selected CAN signals and deciding which ones can be used for behavior generation.';
     }
 
     if (
@@ -1877,15 +1891,7 @@ export class SimulatorComponent implements OnInit {
       normalizedStatus.includes('driving scenario') ||
       normalizedStatus.includes('preparing')
     ) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'The driving scenario plan has been generated successfully.'
-        : 'Trackster AI is creating the driving scenario.';
-    }
-
-    if (normalizedStatus.includes('behavior') || normalizedStatus.includes('behaviour')) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'The signal behavior plan has been generated successfully.'
-        : 'Trackster AI is generating signal behavior from the driving scenario.';
+      return 'Trackster AI is creating the driving scenario.';
     }
 
     if (normalizedStatus.includes('worker') || normalizedStatus.includes('queue')) {
@@ -1907,7 +1913,7 @@ export class SimulatorComponent implements OnInit {
     }
 
     return 'Trackster AI is processing the simulation workflow.';
-}
+  }
 
   private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
     return '';
@@ -1923,34 +1929,57 @@ export class SimulatorComponent implements OnInit {
       return false;
     }
 
-    if (
-      hasScenarioPlan &&
-      (
-        normalizedStatus.includes('planner completed') ||
-        normalizedStatus.includes('driving planner completed') ||
-        normalizedStatus.includes('driving scenario completed') ||
-        normalizedStatus.includes('driving scenario planned')
-      )
-    ) {
-      return true;
+    if (this.isBehaviorWorkflow(scenarioDocument, normalizedStatus)) {
+      return this.isScenarioBehaviorCompleted(scenarioDocument);
     }
 
     if (this.isCompletedStatus(status)) {
       return true;
     }
 
-    const progress = scenarioDocument.progress || {};
+    return false;
+  }
+
+  private isScenarioBehaviorCompleted(scenarioDocument?: ScenarioStatusDocument): boolean {
+    const progress = scenarioDocument?.progress || {};
     const totalPhases = Number(progress.totalPhases || 0);
     const completedPhases = Number(progress.completedPhases || 0);
     const failedPhases = Number(progress.failedPhases || 0);
+    const processingPhases = Number(progress.processingPhases || 0);
     const percent = Number(progress.percent || 0);
+    const behaviorPhases = scenarioDocument?.behavior?.phases || [];
+    const completedBehaviorPhases = behaviorPhases.filter((phase) =>
+      String(phase?.status || '').toLowerCase() === 'completed'
+    ).length;
+    const status = String(scenarioDocument?.status || '').toLowerCase().trim();
 
     return (
       totalPhases > 0 &&
       completedPhases >= totalPhases &&
+      completedBehaviorPhases >= totalPhases &&
       failedPhases === 0 &&
+      processingPhases === 0 &&
       percent >= 100 &&
-      !hasOnlySignalKnowledge
+      (
+        status === 'all behavior phases completed.' ||
+        status === 'behavior_completed' ||
+        status === 'ai_behavior_completed' ||
+        status.includes('behavior phases completed') ||
+        status.includes('behavior completed')
+      )
+    );
+  }
+
+  private isBehaviorWorkflow(scenarioDocument?: ScenarioStatusDocument, normalizedStatus = ''): boolean {
+    const progress = scenarioDocument?.progress || {};
+    const hasScenarioPlan = Array.isArray(scenarioDocument?.scenario?.phases) && scenarioDocument.scenario.phases.length > 0;
+
+    return (
+      String(progress.stage || '').toLowerCase() === 'behavior' ||
+      normalizedStatus.includes('behavior') ||
+      normalizedStatus.includes('behaviour') ||
+      normalizedStatus.includes('waiting for behavior phase generation') ||
+      hasScenarioPlan
     );
   }
 
@@ -1977,11 +2006,7 @@ export class SimulatorComponent implements OnInit {
       normalizedStatus === 'bin_completed' ||
       normalizedStatus === 'generation_completed' ||
       normalizedStatus === 'worker_completed' ||
-      normalizedStatus === 'behavior_completed' ||
-      normalizedStatus === 'ai_behavior_completed' ||
       normalizedStatus === 'simulation_completed' ||
-      normalizedStatus === 'all behavior phases completed.' ||
-      normalizedStatus === 'trackster ai completed the simulation behavior plan.' ||
       normalizedStatus.endsWith('_completed')
     );
   }
@@ -2012,21 +2037,20 @@ export class SimulatorComponent implements OnInit {
   }
 
   private buildScenarioSuccessTitle(scenarioDocument: ScenarioStatusDocument): string {
-    if (Array.isArray(scenarioDocument.scenario?.phases) && scenarioDocument.scenario.phases.length > 0) {
-      return 'Driving scenario planned successfully.';
+    if (this.isScenarioBehaviorCompleted(scenarioDocument)) {
+      return 'Signal behavior generated successfully.';
     }
 
     return 'Generation completed successfully.';
   }
 
   private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
-    const phaseCount = Array.isArray(scenarioDocument.scenario?.phases)
-      ? scenarioDocument.scenario.phases.length
-      : 0;
+    const progress = scenarioDocument.progress || {};
+    const completedPhases = Number(progress.completedPhases || 0);
+    const totalPhases = Number(progress.totalPhases || 0);
 
-    if (phaseCount > 0) {
-      const phaseWord = phaseCount === 1 ? 'phase was' : 'phases were';
-      return `The driving scenario was generated successfully and ${phaseCount} ${phaseWord} planned.`;
+    if (this.isScenarioBehaviorCompleted(scenarioDocument) && totalPhases > 0) {
+      return `The signal behavior plan was generated successfully for ${completedPhases} of ${totalPhases} phases.`;
     }
 
     return scenarioDocument.currentStep || scenarioDocument.status || 'The Trackster AI generation workflow completed successfully.';

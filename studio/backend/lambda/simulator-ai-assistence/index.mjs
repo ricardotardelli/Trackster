@@ -125,16 +125,51 @@ export const handler = async (event) => {
       });
     }
 
-    if (aiPhase === 'behavior' || aiPhase === 'phase2' || aiPhase === 'behaviour' || aiPhase === 'next_behavior_phase') {
-      return buildResponse(400, {
-        success: false,
-        message: 'Behavior phase is temporarily disabled. Current AI assist execution only generates signal knowledge.'
+    if (aiPhase === 'behavior' || aiPhase === 'phase2' || aiPhase === 'behaviour') {
+      const behaviorResult = await runBehaviorPipeline(body, {
+        processingTimeMs: Date.now() - startedAt
+      });
+      const processingTimeMs = Date.now() - startedAt;
+
+      return buildResponse(200, {
+        success: true,
+        status: behaviorResult.status,
+        aiPhase: 'behavior',
+        processingTimeMs,
+        modelId,
+        scenarioS3: behaviorResult.scenarioS3,
+        progress: behaviorResult.progress,
+        currentStep: behaviorResult.currentStep,
+        completedPhases: behaviorResult.completedPhases,
+        totalPhases: behaviorResult.totalPhases
+      });
+    }
+
+    if (aiPhase === 'next_behavior_phase') {
+      const behaviorResult = await runBehaviorPhase(body, {
+        processNextPending: true,
+        processingTimeMs: Date.now() - startedAt
+      });
+      const processingTimeMs = Date.now() - startedAt;
+
+      return buildResponse(200, {
+        success: true,
+        status: behaviorResult.status,
+        aiPhase: 'next_behavior_phase',
+        processingTimeMs,
+        modelId,
+        scenarioS3: behaviorResult.scenarioS3,
+        progress: behaviorResult.progress,
+        currentStep: behaviorResult.currentStep,
+        phaseId: behaviorResult.phaseId,
+        phaseStatus: behaviorResult.phaseStatus,
+        signalBehaviorPhase: behaviorResult.signalBehaviorPhase
       });
     }
 
     return buildResponse(400, {
       success: false,
-      message: 'Invalid aiPhase. Use auto or signal_knowledge.'
+      message: 'Invalid aiPhase. Use auto, signal_knowledge, planner, behavior, next_behavior_phase or status.'
     });
   } catch (error) {
     const processingTimeMs = Date.now() - startedAt;
@@ -1045,6 +1080,67 @@ function normalizeSignalKnowledge(signalKnowledge, requestedSignalNames, entryMe
 }
 
 
+
+async function runBehaviorPipeline(body, options = {}) {
+  const { bucket, key } = resolveScenarioLocation(body);
+
+  if (!bucket) {
+    throw new Error('Unable to read scenario.json because no S3 bucket was resolved.');
+  }
+
+  if (!key) {
+    throw new Error('Unable to read scenario.json because no S3 key or output folder was resolved.');
+  }
+
+  let scenarioDocument = await readJsonFromS3(bucket, key);
+  const planner = getScenarioPlanner(scenarioDocument);
+
+  if (!planner || !Array.isArray(planner.phases) || !planner.phases.length) {
+    throw new Error('scenario.json does not contain scenario.phases. Run aiPhase=planner first.');
+  }
+
+  const startedAt = Date.now();
+  let completedInThisRun = 0;
+  let lastResult = null;
+
+  scenarioDocument = ensureScenarioRuntimeFields(scenarioDocument, planner);
+  scenarioDocument.status = 'Generating behavior phases.';
+  scenarioDocument.currentStep = 'Generating behavior phases.';
+  scenarioDocument.progress = buildProgress(planner, getBehaviorPhases(scenarioDocument));
+  await putJsonToS3(bucket, key, scenarioDocument);
+
+  while (true) {
+    lastResult = await runBehaviorPhase(body, {
+      processNextPending: true,
+      processingTimeMs: Date.now() - startedAt
+    });
+
+    if (lastResult.phaseId === null || lastResult.phaseStatus === 'completed_without_pending_phase') {
+      break;
+    }
+
+    completedInThisRun += lastResult.phaseStatus === 'completed' ? 1 : 0;
+
+    scenarioDocument = await readJsonFromS3(bucket, key);
+    const progress = scenarioDocument?.progress || {};
+
+    if (Number(progress.completedPhases || 0) >= Number(progress.totalPhases || planner.phases.length)) {
+      break;
+    }
+  }
+
+  scenarioDocument = await readJsonFromS3(bucket, key);
+
+  return {
+    scenarioS3: { bucket, key, fileName: 'scenario.json' },
+    status: scenarioDocument?.status || lastResult?.status || 'Behavior phases completed.',
+    progress: scenarioDocument?.progress || lastResult?.progress || buildProgress(planner, getBehaviorPhases(scenarioDocument)),
+    currentStep: scenarioDocument?.currentStep || scenarioDocument?.status || lastResult?.currentStep || 'Behavior phases completed.',
+    completedPhases: Number(scenarioDocument?.progress?.completedPhases || 0),
+    totalPhases: Number(scenarioDocument?.progress?.totalPhases || planner.phases.length),
+    phasesCompletedInThisRun: completedInThisRun
+  };
+}
 async function runBehaviorPhase(body, options = {}) {
   const { bucket, key } = resolveScenarioLocation(body);
 
@@ -1082,6 +1178,7 @@ async function runBehaviorPhase(body, options = {}) {
   if (!phase) {
     scenarioDocument = updateScenarioProgress(scenarioDocument, planner);
     scenarioDocument.status = 'All behavior phases completed.';
+    scenarioDocument.currentStep = 'All behavior phases completed.';
 
     await putJsonToS3(bucket, key, scenarioDocument);
 
@@ -1270,6 +1367,7 @@ function resolveBehaviorPhaseToProcess({ body, planner, scenarioDocument, proces
 function ensureScenarioRuntimeFields(scenarioDocument, planner) {
   return {
     status: scenarioDocument?.status || 'Planner completed.',
+    currentStep: scenarioDocument?.currentStep || scenarioDocument?.status || 'Planner completed.',
     progress: scenarioDocument?.progress || buildProgress(planner, getBehaviorPhases(scenarioDocument)),
     scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
     signalKnowledge: scenarioDocument?.signalKnowledge || null,
@@ -1291,7 +1389,8 @@ function markBehaviorPhaseProcessing(scenarioDocument, planner, phaseId) {
   });
 
   const updatedDocument = {
-    status: `Generating behavior for phase ${phaseId} of ${totalPhases}.`,
+    status: `Generating behavior phase ${phaseId} of ${totalPhases}.`,
+    currentStep: `Generating behavior phase ${phaseId} of ${totalPhases}.`,
     progress: buildProgress(planner, phases),
     processingTimeMs: getTotalProcessingTimeMs(scenarioDocument, phases),
     scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
@@ -1324,6 +1423,9 @@ function markBehaviorPhaseCompleted({ scenarioDocument, planner, phaseId, behavi
 
   const updatedDocument = {
     status: allCompleted
+      ? 'All behavior phases completed.'
+      : `Behavior phase ${phaseId} completed. Waiting for next phase.`,
+    currentStep: allCompleted
       ? 'All behavior phases completed.'
       : `Behavior phase ${phaseId} completed. Waiting for next phase.`,
     progress: buildProgress(planner, phases),
@@ -1361,6 +1463,7 @@ function markBehaviorPhaseFailed({ scenarioDocument, planner, phaseId, error, pr
 
   const updatedDocument = {
     status: `Behavior generation failed while processing phase ${phaseId}.`,
+    currentStep: `Behavior generation failed while processing phase ${phaseId}.`,
     progress: buildProgress(planner, phases),
     processingTimeMs: getTotalProcessingTimeMs(scenarioDocument, phases),
     scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
@@ -1648,16 +1751,24 @@ function getTotalProcessingTimeMs(scenarioDocument, behaviorPhases = []) {
 
 function buildProgress(planner, behaviorPhases = []) {
   const totalPhases = Array.isArray(planner?.phases) ? planner.phases.length : 0;
-  const completedPhases = behaviorPhases.filter((phase) => phase?.status === 'completed').length;
-  const failedPhases = behaviorPhases.filter((phase) => phase?.status === 'failed').length;
-  const processingPhases = behaviorPhases.filter((phase) => phase?.status === 'processing').length;
-  const percent = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+  const safeBehaviorPhases = Array.isArray(behaviorPhases) ? behaviorPhases : [];
+  const completedPhases = safeBehaviorPhases.filter((phase) => phase?.status === 'completed').length;
+  const failedPhases = safeBehaviorPhases.filter((phase) => phase?.status === 'failed').length;
+  const processingPhases = safeBehaviorPhases.filter((phase) => phase?.status === 'processing').length;
+  const processingPhase = safeBehaviorPhases.find((phase) => phase?.status === 'processing');
+  const currentPhase = processingPhase
+    ? Number(processingPhase.phaseId)
+    : (completedPhases < totalPhases ? completedPhases + 1 : totalPhases);
+  const weightedCompleted = completedPhases + (processingPhases > 0 ? 0.5 : 0);
+  const percent = totalPhases > 0 ? Math.min(100, Math.max(0, Math.round((weightedCompleted / totalPhases) * 100))) : 0;
 
   return {
+    stage: 'behavior',
     totalPhases,
     completedPhases,
     failedPhases,
     processingPhases,
+    currentPhase,
     percent
   };
 }
@@ -1690,6 +1801,7 @@ function updateScenarioProgress(scenarioDocument, planner) {
 
   return {
     status: scenarioDocument?.status || 'Processing simulation scenario.',
+    currentStep: scenarioDocument?.currentStep || scenarioDocument?.status || 'Processing simulation scenario.',
     progress: buildProgress(planner, phases),
     processingTimeMs: getTotalProcessingTimeMs(scenarioDocument, phases),
     scenario: simplifyScenario(getScenarioPlanner(scenarioDocument) || planner),
@@ -1840,15 +1952,21 @@ async function generateValidatedSignalBehaviorPlan({
   phaseId
 }) {
   const requestedSignalMetadata = extractRequestedSignalMetadata(body);
-  const requestedSignals = requestedSignalMetadata.map((signal) => signal.name);
+  const signalKnowledge = getBehaviorSignalKnowledge(scenarioDocument);
+  const behaviorSignalMetadata = filterSignalMetadataBySignalKnowledge(requestedSignalMetadata, signalKnowledge);
+  const requestedSignals = behaviorSignalMetadata.map((signal) => signal.name);
   const currentSignalState = buildCurrentSignalState({
     scenarioDocument,
     phaseId,
     requestedSignals
   });
+  const signalsForPrompt = buildBehaviorSignalsForPrompt({
+    requestedSignalMetadata: behaviorSignalMetadata,
+    currentSignalState
+  });
 
   if (!requestedSignals.length) {
-    throw new Error('Unable to generate signal behavior plan because no signals were resolved from the request. Send signals, selectedSignals or signalNames in the body.');
+    throw new Error('Unable to generate signal behavior plan because no behavior-capable signals were resolved from the request. Run signal_knowledge first and make sure at least one requested signal has generateBehavior=true.');
   }
 
   const promptTemplateResult = await loadPromptTemplate('PHASE_BEHAVIOR_PROMPT_KEY');
@@ -1857,8 +1975,10 @@ async function generateValidatedSignalBehaviorPlan({
     request: plannerRequest,
     planner,
     requestedSignals,
-    requestedSignalMetadata,
-    currentSignalState
+    requestedSignalMetadata: behaviorSignalMetadata,
+    signalsForPrompt,
+    currentSignalState,
+    signalKnowledge
   });
 
   let lastError = null;
@@ -2136,22 +2256,114 @@ function buildSignalBehaviorPrompt({
   planner,
   requestedSignals,
   requestedSignalMetadata,
-  currentSignalState
+  signalsForPrompt,
+  currentSignalState,
+  signalKnowledge
 }) {
-  const signalsForPrompt = Array.isArray(requestedSignalMetadata) && requestedSignalMetadata.length
-    ? requestedSignalMetadata
-    : requestedSignals;
+  const effectiveSignalsForPrompt = Array.isArray(signalsForPrompt) && signalsForPrompt.length
+    ? signalsForPrompt
+    : buildBehaviorSignalsForPrompt({ requestedSignalMetadata, currentSignalState });
 
   const plannerJson = JSON.stringify(planner, null, 2);
   const phaseObjective = buildPhaseObjectiveText(planner);
-
-  return replaceCommonPromptVariables(template, request)
+  const prompt = replaceCommonPromptVariables(template, request)
     .replaceAll('{{plannerJson}}', phaseObjective ? `${plannerJson}\n\n${phaseObjective}` : plannerJson)
-    .replaceAll('{{signalsJson}}', JSON.stringify(signalsForPrompt, null, 2))
+    .replaceAll('{{signalsJson}}', JSON.stringify(effectiveSignalsForPrompt.length ? effectiveSignalsForPrompt : requestedSignals, null, 2))
     .replaceAll('{{currentSignalStateJson}}', JSON.stringify(currentSignalState || {}, null, 2))
+    .replaceAll('{{signalKnowledgeJson}}', JSON.stringify(signalKnowledge || { schemaVersion: 'trackster-signal-knowledge-v1', signals: [] }, null, 2))
     .trim();
+
+  assertNoUnresolvedPromptVariables(prompt, 'PHASE_BEHAVIOR_PROMPT_KEY');
+
+  console.log('Behavior prompt prepared:', {
+    phaseIds: Array.isArray(planner?.phases) ? planner.phases.map((phase) => phase.id) : [],
+    requestedSignals: Array.isArray(requestedSignals) ? requestedSignals.length : 0,
+    signalsForPrompt: Array.isArray(effectiveSignalsForPrompt) ? effectiveSignalsForPrompt.length : 0,
+    hasSignalKnowledge: signalKnowledge?.schemaVersion === 'trackster-signal-knowledge-v1',
+    promptLength: prompt.length
+  });
+
+  return prompt;
 }
 
+
+function getBehaviorSignalKnowledge(scenarioDocument) {
+  const signalKnowledge = scenarioDocument?.signalKnowledge;
+
+  if (signalKnowledge?.schemaVersion === 'trackster-signal-knowledge-v1' && Array.isArray(signalKnowledge.signals)) {
+    return signalKnowledge;
+  }
+
+  return {
+    schemaVersion: 'trackster-signal-knowledge-v1',
+    signals: []
+  };
+}
+
+function filterSignalMetadataBySignalKnowledge(requestedSignalMetadata, signalKnowledge) {
+  const metadata = Array.isArray(requestedSignalMetadata) ? requestedSignalMetadata : [];
+  const knowledgeSignals = Array.isArray(signalKnowledge?.signals) ? signalKnowledge.signals : [];
+
+  if (!knowledgeSignals.length) {
+    return metadata;
+  }
+
+  const allowed = new Set(
+    knowledgeSignals
+      .filter((signal) => signal?.generateBehavior === true)
+      .map((signal) => sanitizeSignalName(signal?.name || signal?.signalName || signal?.n))
+      .filter(Boolean)
+  );
+
+  if (!allowed.size) {
+    return [];
+  }
+
+  return metadata.filter((signal) => allowed.has(signal.name));
+}
+
+function buildBehaviorSignalsForPrompt({ requestedSignalMetadata, currentSignalState }) {
+  const metadata = Array.isArray(requestedSignalMetadata) ? requestedSignalMetadata : [];
+
+  return metadata
+    .map((signal) => {
+      const name = sanitizeSignalName(signal?.name || signal?.n || signal?.signalName);
+
+      if (!name) {
+        return null;
+      }
+
+      const result = { n: name };
+      const unit = sanitizeEngineeringUnit(signal?.u || signal?.unit || signal?.engineeringUnit);
+      if (unit) result.u = unit;
+
+      if (Number.isFinite(Number(signal?.mn))) result.mn = Number(signal.mn);
+      if (Number.isFinite(Number(signal?.mx))) result.mx = Number(signal.mx);
+      if (Number.isFinite(Number(signal?.f))) result.f = Number(signal.f);
+      if (Number.isFinite(Number(signal?.o))) result.o = Number(signal.o);
+      if (Number.isInteger(Number(signal?.b))) result.b = Number(signal.b);
+
+      const startValue = currentSignalState && Object.prototype.hasOwnProperty.call(currentSignalState, name)
+        ? Number(currentSignalState[name])
+        : Number.NaN;
+
+      if (Number.isFinite(startValue)) {
+        result.sv = roundSignalValue(startValue);
+      }
+
+      return result;
+    })
+    .filter(Boolean);
+}
+
+function assertNoUnresolvedPromptVariables(prompt, promptName) {
+  const unresolved = String(prompt || '').match(/{{\s*[^}]+\s*}}/g);
+
+  if (unresolved?.length) {
+    const unique = [...new Set(unresolved)];
+    throw new Error(`${promptName} contains unresolved prompt variables: ${unique.join(', ')}`);
+  }
+}
 function buildCurrentSignalState({ scenarioDocument, phaseId, requestedSignals }) {
   const currentSignalState = {};
 
