@@ -207,14 +207,21 @@ async function runAutoPipeline(body, startedAt) {
     processingTimeMs: Date.now() - startedAt
   });
 
+  const behaviorResult = await runBehaviorPipeline(body, {
+    processingTimeMs: Date.now() - startedAt
+  });
+
   return {
-    status: plannerResult.status,
-    scenarioS3: plannerResult.scenarioS3,
+    status: behaviorResult.status,
+    scenarioS3: behaviorResult.scenarioS3 || plannerResult.scenarioS3,
     signalKnowledgeS3: knowledgeResult.signalKnowledgeS3,
     signalKnowledge: knowledgeResult.signalKnowledge,
     planner: plannerResult.planner,
-    progress: plannerResult.progress,
-    currentStep: plannerResult.currentStep
+    progress: behaviorResult.progress,
+    currentStep: behaviorResult.currentStep,
+    completedPhases: behaviorResult.completedPhases,
+    totalPhases: behaviorResult.totalPhases,
+    phasesCompletedInThisRun: behaviorResult.phasesCompletedInThisRun
   };
 }
 
