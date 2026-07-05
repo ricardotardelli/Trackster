@@ -42,6 +42,7 @@ export const handler = async (event) => {
 
   try {
     body = parseBody(event.body);
+    body.__authenticatedUser = resolveAuthenticatedUserFromEvent(event, body);
 
     const explicitAiPhase = sanitizeText(body?.aiPhase || body?.phase || body?.generation?.aiPhase).toLowerCase();
     const eventSource = sanitizeText(event?.source);
@@ -185,6 +186,21 @@ async function runAutoPipeline(body, startedAt) {
 
 async function runPlannerPhase(body, options = {}) {
   const signalKnowledgeContext = await resolveSignalKnowledgeForPlanner(body, options);
+
+  await writeScenarioProgressMessage(body, {
+    status: 'Trackster is generating the driving plan...',
+    currentStep: 'Trackster is generating the driving plan...',
+    progress: {
+      totalPhases: 2,
+      completedPhases: 1,
+      failedPhases: 0,
+      processingPhases: 1,
+      percent: 50
+    },
+    signalKnowledge: signalKnowledgeContext.signalKnowledge,
+    signalKnowledgeS3: signalKnowledgeContext.signalKnowledgeS3 || null
+  });
+
   const plannerGeneration = await generateValidatedDrivingPlanner(body, signalKnowledgeContext.signalKnowledge);
   const scenarioS3 = await savePlannerScenarioJson({
     body,
@@ -379,13 +395,54 @@ async function putSignalKnowledgeToS3(body, signalKnowledge) {
 }
 
 async function runSignalKnowledgePhase(body, options = {}) {
-  const signalKnowledge = await generateValidatedSignalKnowledge(body);
-  const signalKnowledgeS3 = await putSignalKnowledgeToS3(body, signalKnowledge);
+  const requestedSignalMetadata = expandSignalsForKnowledgePrompt(extractRequestedSignalMetadata(body));
+
+  if (!requestedSignalMetadata.length) {
+    throw new Error('Unable to generate signal knowledge because no signals were resolved from the request.');
+  }
+
+  const signalKnowledgeS3 = resolveSignalKnowledgeLocation(body);
+
+  await writeScenarioProgressMessage(body, {
+    status: 'Trackster is checking the previously recognized signal dictionary...',
+    currentStep: 'Trackster is checking the previously recognized signal dictionary...',
+    progress: {
+      totalPhases: 2,
+      completedPhases: 0,
+      failedPhases: 0,
+      processingPhases: 1,
+      percent: 10
+    },
+    signalKnowledgeS3
+  });
+
+  const existingSignalKnowledge = await readExistingSignalKnowledge(signalKnowledgeS3);
+  const mergeResult = await buildIncrementalSignalKnowledge({
+    body,
+    requestedSignalMetadata,
+    existingSignalKnowledge,
+    onProgress: async (progressMessage) => {
+      await writeScenarioProgressMessage(body, {
+        ...progressMessage,
+        signalKnowledgeS3
+      });
+    }
+  });
+
+  await putJsonToS3(signalKnowledgeS3.bucket, signalKnowledgeS3.key, mergeResult.signalKnowledge);
+
   const scenarioS3 = await saveSignalKnowledgeCompletedScenarioJson({
     body,
-    signalKnowledge,
+    signalKnowledge: mergeResult.signalKnowledge,
     signalKnowledgeS3,
     processingTimeMs: Math.max(0, Math.round(Number(options.processingTimeMs || 0)))
+  });
+
+  console.log('Signal knowledge dictionary resolved:', {
+    requestedSignals: requestedSignalMetadata.length,
+    existingSignals: mergeResult.existingCount,
+    generatedSignals: mergeResult.generatedCount,
+    totalDictionarySignals: mergeResult.signalKnowledge.signals.length
   });
 
   return {
@@ -400,8 +457,267 @@ async function runSignalKnowledgePhase(body, options = {}) {
       percent: 100
     },
     currentStep: 'Trackster AI completed the simulation behavior plan.',
-    signalKnowledge
+    signalKnowledge: mergeResult.signalKnowledge
   };
+}
+
+async function readExistingSignalKnowledge(location) {
+  const existing = await safeReadJsonFromS3(location.bucket, location.key);
+
+  if (!existing) {
+    return null;
+  }
+
+  if (existing?.schemaVersion !== 'trackster-signal-knowledge-v1' || !Array.isArray(existing?.signals)) {
+    console.warn('Existing signal-knowledge.json is not a valid Trackster signal dictionary. It will not be reused.', {
+      bucket: location.bucket,
+      key: location.key
+    });
+
+    return null;
+  }
+
+  return existing;
+}
+
+async function buildIncrementalSignalKnowledge({ body, requestedSignalMetadata, existingSignalKnowledge, onProgress = null }) {
+  const existingSignals = Array.isArray(existingSignalKnowledge?.signals)
+    ? existingSignalKnowledge.signals.filter((signal) => sanitizeSignalName(signal?.name || signal?.signalName || signal?.n))
+    : [];
+
+  const existingSignalNames = new Set(
+    existingSignals.map((signal) => sanitizeSignalName(signal?.name || signal?.signalName || signal?.n)).filter(Boolean)
+  );
+
+  const missingSignalMetadata = requestedSignalMetadata.filter((signal) => !existingSignalNames.has(signal.signalName));
+  let generatedSignalKnowledge = {
+    schemaVersion: 'trackster-signal-knowledge-v1',
+    signals: []
+  };
+
+  if (typeof onProgress === 'function') {
+    const knownRequestedCount = requestedSignalMetadata.length - missingSignalMetadata.length;
+
+    if (missingSignalMetadata.length) {
+      await onProgress({
+        status: `${knownRequestedCount} known signals found. ${missingSignalMetadata.length} new signals require AI recognition.`,
+        currentStep: `${knownRequestedCount} known signals found. ${missingSignalMetadata.length} new signals require AI recognition.`,
+        progress: {
+          totalPhases: 2,
+          completedPhases: 0,
+          failedPhases: 0,
+          processingPhases: 1,
+          percent: 20
+        }
+      });
+
+      await onProgress({
+        status: 'Recognizing new vehicle signals...',
+        currentStep: 'Recognizing new vehicle signals...',
+        progress: {
+          totalPhases: 2,
+          completedPhases: 0,
+          failedPhases: 0,
+          processingPhases: 1,
+          percent: 25
+        }
+      });
+    } else {
+      await onProgress({
+        status: 'All requested signals are already known in the signal dictionary.',
+        currentStep: 'All requested signals are already known in the signal dictionary.',
+        progress: {
+          totalPhases: 2,
+          completedPhases: 1,
+          failedPhases: 0,
+          processingPhases: 0,
+          percent: 45
+        }
+      });
+    }
+  }
+
+  if (missingSignalMetadata.length) {
+    generatedSignalKnowledge = await generateValidatedSignalKnowledge(body, {
+      requestedSignalMetadata: missingSignalMetadata,
+      entryMetadata: buildSignalKnowledgeEntryMetadata(body)
+    });
+
+    if (typeof onProgress === 'function') {
+      await onProgress({
+        status: 'Updating the signal dictionary...',
+        currentStep: 'Updating the signal dictionary...',
+        progress: {
+          totalPhases: 2,
+          completedPhases: 0,
+          failedPhases: 0,
+          processingPhases: 1,
+          percent: 40
+        }
+      });
+    }
+  }
+
+  const mergedSignalKnowledge = mergeSignalKnowledgeWithoutOverwriting({
+    existingSignalKnowledge,
+    generatedSignalKnowledge
+  });
+
+  return {
+    signalKnowledge: mergedSignalKnowledge,
+    existingCount: existingSignalNames.size,
+    generatedCount: generatedSignalKnowledge.signals.length,
+    missingCount: missingSignalMetadata.length
+  };
+}
+
+function mergeSignalKnowledgeWithoutOverwriting({ existingSignalKnowledge, generatedSignalKnowledge }) {
+  const mergedSignals = [];
+  const seen = new Set();
+
+  for (const signal of existingSignalKnowledge?.signals || []) {
+    const name = sanitizeSignalName(signal?.name || signal?.signalName || signal?.n);
+
+    if (!name || seen.has(name)) {
+      continue;
+    }
+
+    seen.add(name);
+    mergedSignals.push({
+      ...signal,
+      name
+    });
+  }
+
+  for (const signal of generatedSignalKnowledge?.signals || []) {
+    const name = sanitizeSignalName(signal?.name || signal?.signalName || signal?.n);
+
+    if (!name || seen.has(name)) {
+      continue;
+    }
+
+    seen.add(name);
+    mergedSignals.push({
+      ...signal,
+      name
+    });
+  }
+
+  return {
+    schemaVersion: 'trackster-signal-knowledge-v1',
+    signals: mergedSignals
+  };
+}
+
+function buildSignalKnowledgeEntryMetadata(body) {
+  return {
+    source: 'ai',
+    lastUpdated: buildTracksterTimestamp(new Date()),
+    author: resolveSignalKnowledgeAuthor(body)
+  };
+}
+
+function resolveSignalKnowledgeAuthor(body) {
+  return sanitizeText(
+    body?.__authenticatedUser?.username ||
+      body?.__authenticatedUser?.email ||
+      body?.authenticatedUser?.username ||
+      body?.authenticatedUser?.email ||
+      body?.user?.username ||
+      body?.user?.email ||
+      body?.username ||
+      body?.email ||
+      body?.author
+  ) || 'trackster-ai';
+}
+
+function resolveAuthenticatedUserFromEvent(event, body = {}) {
+  const claims =
+    event?.requestContext?.authorizer?.jwt?.claims ||
+    event?.requestContext?.authorizer?.claims ||
+    event?.requestContext?.authorizer ||
+    {};
+
+  const username = sanitizeText(
+    claims['cognito:username'] ||
+      claims.username ||
+      claims.preferred_username ||
+      body?.authenticatedUser?.username ||
+      body?.user?.username ||
+      body?.username
+  );
+
+  const email = sanitizeText(
+    claims.email ||
+      body?.authenticatedUser?.email ||
+      body?.user?.email ||
+      body?.email
+  );
+
+  return {
+    username,
+    email
+  };
+}
+
+function buildTracksterTimestamp(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+
+  return [
+    date.getUTCFullYear(),
+    pad(date.getUTCMonth() + 1),
+    pad(date.getUTCDate()),
+    pad(date.getUTCHours()),
+    pad(date.getUTCMinutes()),
+    pad(date.getUTCSeconds())
+  ].join('');
+}
+
+async function writeScenarioProgressMessage(body, {
+  status,
+  currentStep = status,
+  progress = null,
+  signalKnowledge = undefined,
+  signalKnowledgeS3 = undefined
+}) {
+  try {
+    const { bucket, key } = resolveScenarioLocation(body);
+
+    if (!bucket || !key) {
+      return;
+    }
+
+    const existingDocument = await safeReadJsonFromS3(bucket, key);
+    const scenarioDocument = {
+      ...(existingDocument && typeof existingDocument === 'object' && !Array.isArray(existingDocument) ? existingDocument : {}),
+      status: sanitizeText(status) || 'Trackster is processing the simulation scenario.',
+      currentStep: sanitizeText(currentStep) || sanitizeText(status) || 'Trackster is processing the simulation scenario.',
+      progress: progress || existingDocument?.progress || {
+        totalPhases: 0,
+        completedPhases: 0,
+        failedPhases: 0,
+        processingPhases: 1,
+        percent: 0
+      },
+      scenario: existingDocument?.scenario || null,
+      signalKnowledge: signalKnowledge !== undefined ? signalKnowledge : existingDocument?.signalKnowledge || null,
+      behavior: existingDocument?.behavior || {
+        phases: []
+      }
+    };
+
+    if (signalKnowledgeS3 !== undefined) {
+      scenarioDocument.signalKnowledgeS3 = signalKnowledgeS3;
+    } else if (existingDocument?.signalKnowledgeS3) {
+      scenarioDocument.signalKnowledgeS3 = existingDocument.signalKnowledgeS3;
+    }
+
+    await putJsonToS3(bucket, key, scenarioDocument);
+  } catch (error) {
+    console.warn('Unable to write scenario progress message:', {
+      message: error?.message
+    });
+  }
 }
 
 async function saveSignalKnowledgeCompletedScenarioJson({ body, signalKnowledge, signalKnowledgeS3, processingTimeMs }) {
@@ -464,8 +780,10 @@ function attachSignalKnowledgeToScenarioDocument(scenarioDocument, signalKnowled
   };
 }
 
-async function generateValidatedSignalKnowledge(body) {
-  const requestedSignalMetadata = expandSignalsForKnowledgePrompt(extractRequestedSignalMetadata(body));
+async function generateValidatedSignalKnowledge(body, options = {}) {
+  const requestedSignalMetadata = expandSignalsForKnowledgePrompt(
+    options.requestedSignalMetadata || extractRequestedSignalMetadata(body)
+  );
 
   if (!requestedSignalMetadata.length) {
     throw new Error('Unable to generate signal knowledge because no signals were resolved from the request.');
@@ -495,7 +813,11 @@ async function generateValidatedSignalKnowledge(body) {
         throw validationError;
       }
 
-      return normalizeSignalKnowledge(signalKnowledge, requestedSignalMetadata.map((signal) => signal.signalName));
+      return normalizeSignalKnowledge(
+        signalKnowledge,
+        requestedSignalMetadata.map((signal) => signal.signalName),
+        options.entryMetadata || null
+      );
     } catch (error) {
       if (!error.rawResponse && lastRawResponse) {
         error.rawResponse = lastRawResponse;
@@ -681,7 +1003,7 @@ function normalizeSignalDependency(value, requestedSet, signalName) {
   return dependency;
 }
 
-function normalizeSignalKnowledge(signalKnowledge, requestedSignalNames) {
+function normalizeSignalKnowledge(signalKnowledge, requestedSignalNames, entryMetadata = null) {
   const requestedSet = new Set(requestedSignalNames);
   const seen = new Set();
   const signals = [];
@@ -695,13 +1017,25 @@ function normalizeSignalKnowledge(signalKnowledge, requestedSignalNames) {
 
     seen.add(name);
 
-    signals.push({
+    const normalizedSignal = {
       name,
       meaning: sanitizeText(signal.meaning) || 'Unknown',
       generateBehavior: Boolean(signal.generateBehavior),
       reason: sanitizeText(signal.reason) || 'No reason provided.',
       dependency: normalizeSignalDependency(signal.dependency, requestedSet, name)
-    });
+    };
+
+    if (entryMetadata && typeof entryMetadata === 'object' && !Array.isArray(entryMetadata)) {
+      const source = sanitizeText(entryMetadata.source);
+      const lastUpdated = sanitizeText(entryMetadata.lastUpdated);
+      const author = sanitizeText(entryMetadata.author);
+
+      if (source) normalizedSignal.source = source;
+      if (lastUpdated) normalizedSignal.lastUpdated = lastUpdated;
+      if (author) normalizedSignal.author = author;
+    }
+
+    signals.push(normalizedSignal);
   }
 
   return {
