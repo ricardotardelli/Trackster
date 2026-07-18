@@ -1,18 +1,13 @@
 {
-  "name": "simulator-ai-assistence",
+  "name": "trackster-ai-assist-mantle-openai-sdk",
   "version": "1.0.0",
-  "description": "Trackster Simulator AI assistance Lambda using Amazon Bedrock Mantle",
-  "main": "simulator-ai-assistence.js",
+  "description": "Trackster AI Assist Lambda using Bedrock Mantle OpenAI SDK",
+  "main": "index.mjs",
   "type": "module",
+  "dependencies": {
+    "openai": "^5.10.2"
+  },
   "scripts": {
     "zip": "powershell Compress-Archive -Path index.mjs,package.json,package-lock.json,node_modules -DestinationPath simulator-ai-assistence.zip -Force"
-  },
-  "dependencies": {
-    "@aws-crypto/sha256-js": "^5.2.0",
-    "@aws-sdk/client-s3": "^3.948.0",
-    "@aws-sdk/client-sqs": "^3.948.0",
-    "@aws-sdk/credential-provider-node": "^3.948.0",
-    "@smithy/protocol-http": "^5.3.5",
-    "@smithy/signature-v4": "^5.3.5"
   }
 }

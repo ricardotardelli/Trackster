@@ -1,12 +1,9 @@
-import { Sha256 } from '@aws-crypto/sha256-js';
-import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import OpenAI from 'openai';
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand
 } from '@aws-sdk/client-s3';
-import { HttpRequest } from '@smithy/protocol-http';
-import { SignatureV4 } from '@smithy/signature-v4';
 
 const defaultHeaders = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
@@ -18,10 +15,12 @@ const defaultHeaders = {
 const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
 const modelId = process.env.BEDROCK_MODEL_ID || 'google.gemma-4-31b';
 const mantleHost = `bedrock-mantle.${region}.api.aws`;
-const mantlePath = '/openai/v1/chat/completions';
+const mantleBaseUrl = process.env.OPENAI_BASE_URL || `https://${mantleHost}/v1`;
+const mantleProjectId = process.env.OPENAI_PROJECT_ID || 'default';
 const s3Client = new S3Client({ region });
 
-const DEFAULT_MAX_TOKENS = Number.parseInt(process.env.BEDROCK_MAX_TOKENS || '8192', 10);
+const DEFAULT_MAX_TOKENS = Number.parseInt(process.env.BEDROCK_MAX_TOKENS || '4096', 10);
+const DEFAULT_AI_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '120000', 10);
 const DEFAULT_PLANNER_RETRIES = Number.parseInt(process.env.PLANNER_RETRIES || '1', 10);
 const DEFAULT_BEHAVIOR_RETRIES = Number.parseInt(process.env.BEHAVIOR_RETRIES || '1', 10);
 const DEFAULT_TEST_OUTPUT_PREFIX = '20260510221008/';
@@ -2632,7 +2631,13 @@ function uniqueStrings(values) {
 }
 
 async function callBedrockMantle(prompt) {
-  const requestBody = JSON.stringify({
+  const apiKey = sanitizeText(process.env.OPENAI_API_KEY || process.env.AWS_BEARER_TOKEN_BEDROCK);
+
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable was not defined. Create a Bedrock Mantle API key and set OPENAI_API_KEY.');
+  }
+
+  const requestBodyPreview = JSON.stringify({
     model: modelId,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.2,
@@ -2640,36 +2645,96 @@ async function callBedrockMantle(prompt) {
     max_tokens: DEFAULT_MAX_TOKENS
   });
 
-  const unsignedRequest = new HttpRequest({
-    protocol: 'https:',
-    hostname: mantleHost,
-    method: 'POST',
-    path: mantlePath,
-    headers: { host: mantleHost, 'content-type': 'application/json' },
-    body: requestBody
-  });
+  const requestStartedAt = Date.now();
+  const timeoutMs = Number.isFinite(DEFAULT_AI_REQUEST_TIMEOUT_MS) && DEFAULT_AI_REQUEST_TIMEOUT_MS > 0
+    ? DEFAULT_AI_REQUEST_TIMEOUT_MS
+    : 90000;
 
-  const signer = new SignatureV4({
-    credentials: defaultProvider(),
+  console.log('Bedrock Mantle OpenAI SDK request preparing:', {
+    modelId,
     region,
-    service: 'bedrock-mantle',
-    sha256: Sha256
+    baseUrl: mantleBaseUrl,
+    projectId: mantleProjectId,
+    promptLength: String(prompt || '').length,
+    requestBodyBytes: Buffer.byteLength(requestBodyPreview, 'utf8'),
+    maxTokens: DEFAULT_MAX_TOKENS,
+    timeoutMs
   });
 
-  const signedRequest = await signer.sign(unsignedRequest);
-  const response = await fetch(`https://${mantleHost}${mantlePath}`, {
-    method: signedRequest.method,
-    headers: signedRequest.headers,
-    body: requestBody
+  const client = new OpenAI({
+    baseURL: mantleBaseUrl,
+    apiKey,
+    timeout: timeoutMs,
+    defaultHeaders: {
+      'OpenAI-Project': mantleProjectId
+    }
   });
 
-  const responseText = await response.text();
+  try {
+    console.log('Bedrock Mantle OpenAI SDK request started:', {
+      elapsedMs: Date.now() - requestStartedAt
+    });
 
-  if (!response.ok) {
-    throw new Error(`Bedrock Mantle request failed with status ${response.status}: ${responseText}`);
+    const response = await client.chat.completions.create({
+      model: modelId,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+      top_p: 0.9,
+      max_tokens: DEFAULT_MAX_TOKENS
+    });
+
+    console.log('Bedrock Mantle OpenAI SDK response received:', {
+      elapsedMs: Date.now() - requestStartedAt,
+      responseId: response?.id || null,
+      model: response?.model || null,
+      choices: Array.isArray(response?.choices) ? response.choices.length : 0,
+      usage: response?.usage || null
+    });
+
+    return response;
+  } catch (error) {
+    const elapsedMs = Date.now() - requestStartedAt;
+
+    console.error('Bedrock Mantle OpenAI SDK request failed:', {
+      elapsedMs,
+      timeoutMs,
+      status: error?.status || null,
+      requestId: error?.request_id || error?.requestID || null,
+      errorCode: error?.code || error?.error?.code || null,
+      errorType: error?.type || error?.error?.type || null,
+      errorParam: error?.param || error?.error?.param || null,
+      ...buildErrorLogDetails(error)
+    });
+
+    if (error?.status) {
+      error.rawResponse = JSON.stringify({
+        status: error.status,
+        code: error?.code || error?.error?.code || null,
+        type: error?.type || error?.error?.type || null,
+        message: error?.message || null
+      });
+    }
+
+    throw error;
   }
+}
 
-  return JSON.parse(responseText);
+function buildErrorLogDetails(error) {
+  const cause = error?.cause;
+
+  return {
+    name: error?.name || null,
+    message: error?.message || null,
+    code: error?.code || null,
+    stack: error?.stack || null,
+    causeName: cause?.name || null,
+    causeMessage: cause?.message || null,
+    causeCode: cause?.code || null,
+    causeErrno: cause?.errno || null,
+    causeSyscall: cause?.syscall || null,
+    causeHostname: cause?.hostname || null,
+    causeStack: cause?.stack || null
+  };
 }
 
 function extractTextFromMantleResponse(response) {

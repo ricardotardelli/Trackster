@@ -1,0 +1,13 @@
+{
+  "name": "open-ai-mantle-test",
+  "version": "1.0.0",
+  "description": "open-ai-mantle-test",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "zip": "powershell Compress-Archive -Path index.mjs,package.json,package-lock.json,node_modules -DestinationPath simulator-ai-assistence.zip -Force"
+  },
+  "dependencies": {
+    "openai": "^5.10.2"
+  }
+}
