@@ -1,11 +1,6 @@
 import { Amplify } from 'aws-amplify';
 import { Injectable } from '@angular/core';
-import {
-  fetchAuthSession,
-  signInWithRedirect,
-  signOut,
-  getCurrentUser
-} from 'aws-amplify/auth';
+import { fetchAuthSession, signInWithRedirect, signOut, getCurrentUser } from 'aws-amplify/auth';
 import { cognitoConfig } from './cognito.config';
 import { environment } from '../../environments/environment';
 
@@ -41,6 +36,10 @@ function isAuthDisabled(): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private readonly tracksterAdminGroup = 'trackster-admins';
+  private readonly clientAdminGroupSuffix = '-admins';
+  private readonly clientUserGroupSuffix = '-users';
+
   private readonly devProfile: 'trackster_admin' | 'client_admin' | 'client_user' = 'trackster_admin';
   private readonly devClientId = '00000000';
 
@@ -170,9 +169,6 @@ export class AuthService {
       const idTokenPayload = session.tokens?.idToken?.payload ?? {};
       const accessTokenPayload = session.tokens?.accessToken?.payload ?? {};
 
-      console.log('Trackster Cognito access token:', accessToken);
-      console.log('Trackster Cognito id token:', idToken);
-
       const groups = this.getStringArrayClaim(
         idTokenPayload,
         'cognito:groups',
@@ -190,9 +186,9 @@ export class AuthService {
       const email = this.getStringClaim(idTokenPayload, 'email');
       const name = this.getStringClaim(idTokenPayload, 'name');
 
-      const globalRole = this.resolveGlobalRole(idTokenPayload, accessTokenPayload, groups);
-      const clientRole = this.resolveClientRole(idTokenPayload, accessTokenPayload, groups, globalRole);
       const clientId = this.resolveClientId(idTokenPayload);
+      const globalRole = this.resolveGlobalRole(groups);
+      const clientRole = this.resolveClientRole(clientId, groups, globalRole);
 
       return {
         isAuthenticated: true,
@@ -235,7 +231,7 @@ export class AuthService {
         globalRole: 'trackster_admin',
         clientRole: 'client_admin',
         clientId: this.devClientId,
-        groups: ['trackster_admin', 'client_admin'],
+        groups: [this.tracksterAdminGroup],
         idToken: null,
         accessToken: null
       };
@@ -251,7 +247,7 @@ export class AuthService {
         globalRole: null,
         clientRole: 'client_admin',
         clientId: this.devClientId,
-        groups: ['client_admin'],
+        groups: [`${this.devClientId}${this.clientAdminGroupSuffix}`],
         idToken: null,
         accessToken: null
       };
@@ -266,7 +262,7 @@ export class AuthService {
       globalRole: null,
       clientRole: 'client_user',
       clientId: this.devClientId,
-      groups: ['client_user'],
+      groups: [`${this.devClientId}${this.clientUserGroupSuffix}`],
       idToken: null,
       accessToken: null
     };
@@ -319,44 +315,31 @@ export class AuthService {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  private resolveGlobalRole(
-    idTokenPayload: Record<string, unknown>,
-    accessTokenPayload: Record<string, unknown>,
-    groups: string[]
-  ): TracksterGlobalRole {
-    const claimValue = this.getStringClaim(idTokenPayload, 'custom:global_role')
-      || this.getStringClaim(accessTokenPayload, 'custom:global_role')
-      || this.getStringClaim(idTokenPayload, 'global_role')
-      || this.getStringClaim(accessTokenPayload, 'global_role');
-
-    if (claimValue === 'trackster_admin' || groups.includes('trackster_admin')) {
-      return 'trackster_admin';
-    }
-
-    return null;
+  private resolveGlobalRole(groups: string[]): TracksterGlobalRole {
+    return groups.includes(this.tracksterAdminGroup)
+      ? 'trackster_admin'
+      : null;
   }
 
   private resolveClientRole(
-    idTokenPayload: Record<string, unknown>,
-    accessTokenPayload: Record<string, unknown>,
+    clientId: string,
     groups: string[],
     globalRole: TracksterGlobalRole
   ): TracksterClientRole {
-    const claimValue = this.getStringClaim(idTokenPayload, 'custom:client_role')
-      || this.getStringClaim(accessTokenPayload, 'custom:client_role')
-      || this.getStringClaim(idTokenPayload, 'client_role')
-      || this.getStringClaim(accessTokenPayload, 'client_role');
-
-    if (claimValue === 'client_admin' || groups.includes('client_admin')) {
-      return 'client_admin';
-    }
-
-    if (claimValue === 'client_user' || groups.includes('client_user')) {
-      return 'client_user';
-    }
-
     if (globalRole === 'trackster_admin') {
       return 'client_admin';
+    }
+
+    if (!clientId) {
+      return null;
+    }
+
+    if (groups.includes(`${clientId}${this.clientAdminGroupSuffix}`)) {
+      return 'client_admin';
+    }
+
+    if (groups.includes(`${clientId}${this.clientUserGroupSuffix}`)) {
+      return 'client_user';
     }
 
     return null;
