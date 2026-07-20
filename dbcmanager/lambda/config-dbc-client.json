@@ -1,6 +1,0 @@
-{
-  "clientId": "customer-a",
-  "region": "us-east-1",
-  "dbcS3Path": "s3://trackster-customer-dbc/original/Bus_A.dbc",
-    "encoding": "auto"
-}

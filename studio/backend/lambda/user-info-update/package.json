@@ -1,16 +1,12 @@
 {
   "name": "user-info-update",
   "version": "1.0.0",
-  "description": "",
-  "main": "iser-info-update.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "private": true,
+  "type": "module",
   "dependencies": {
-    "pg": "^8.21.0"
+    "@aws-sdk/client-cognito-identity-provider": "^3.0.0"
+  },
+  "scripts": {
+    "zip": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Compress-Archive -Path index.mjs,package.json -DestinationPath user-info-update.zip -Force\""
   }
 }

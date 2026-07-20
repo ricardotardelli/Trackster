@@ -1,31 +1,217 @@
-import pg from 'pg';
 import {
-  LambdaClient,
-  InvokeCommand
-} from '@aws-sdk/client-lambda';
+  AdminAddUserToGroupCommand,
+  AdminCreateUserCommand,
+  AdminDeleteUserCommand,
+  AdminGetUserCommand,
+  AdminListGroupsForUserCommand,
+  CognitoIdentityProviderClient,
+  GetGroupCommand
+} from '@aws-sdk/client-cognito-identity-provider';
 
-const { Client } = pg;
+const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || '';
+const REGION = process.env.AWS_REGION || process.env.REGION || 'eu-west-1';
+const TRACKSTER_ADMINS_GROUP = 'trackster-admins';
+const CLIENT_ID_PATTERN = /^\d{8}$/;
 
-const lambdaClient = new LambdaClient({
-  region: process.env.AWS_REGION || process.env.LAMBDA_REGION || 'us-east-1'
-});
+const cognito = new CognitoIdentityProviderClient({ region: REGION });
 
-const defaultHeaders = {
+const headers = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
   'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-  'Access-Control-Allow-Methods': 'OPTIONS,POST'
+  'Access-Control-Allow-Methods': 'OPTIONS,POST',
+  'Content-Type': 'application/json'
 };
 
-function response(statusCode, body) {
-  return {
-    statusCode,
-    headers: defaultHeaders,
-    body: JSON.stringify(body)
-  };
-}
+export const handler = async (event) => {
+  const method = getMethod(event);
+
+  console.log('Trackster add client user request', {
+    method,
+    path: event?.rawPath || event?.path,
+    requestId: event?.requestContext?.requestId || null
+  });
+
+  if (method === 'OPTIONS') return reply(200, { success: true });
+  if (method !== 'POST') {
+    return reply(405, {
+      success: false,
+      message: 'Method not allowed.',
+      receivedMethod: method || null
+    });
+  }
+
+  let createdUsername = '';
+
+  try {
+    if (!USER_POOL_ID) {
+      throw new Error('Missing required environment variable COGNITO_USER_POOL_ID.');
+    }
+
+    const authenticatedUsername = getAuthenticatedUsername(event);
+    if (!authenticatedUsername) {
+      return reply(401, {
+        success: false,
+        message: 'Authenticated username not found in token.'
+      });
+    }
+
+    const body = parseBody(event);
+    const username = clean(body.username);
+    const email = clean(body.email).toLowerCase();
+    const fullName = clean(body.fullName);
+    const requestedClientId = clean(body.clientId);
+    const requestedRole = normalizeRole(body.role);
+    const temporaryPassword = clean(body.temporaryPassword);
+
+    const validationError = validateInput({
+      username,
+      email,
+      fullName,
+      requestedClientId,
+      requestedRole
+    });
+
+    if (validationError) {
+      return reply(400, { success: false, message: validationError });
+    }
+
+    const requester = await getRequester(authenticatedUsername);
+    if (!requester) {
+      return reply(403, {
+        success: false,
+        message: 'Authenticated user was not found in Cognito.'
+      });
+    }
+
+    if (!requester.active) {
+      return reply(403, {
+        success: false,
+        message: 'Your administrator account is inactive.'
+      });
+    }
+
+    const authorization = await resolveTargetClient(requester, requestedClientId);
+    if (!authorization.success) {
+      return reply(authorization.statusCode, {
+        success: false,
+        message: authorization.message
+      });
+    }
+
+    const clientId = authorization.clientId;
+    const client = await getClientContext(clientId);
+
+    if (!client.exists) {
+      return reply(404, { success: false, message: 'Client not found.' });
+    }
+
+    if (client.status !== 'active') {
+      return reply(400, {
+        success: false,
+        message: 'Cannot create users for an inactive client.'
+      });
+    }
+
+    const groupName = requestedRole === 'client_admin'
+      ? `${clientId}-admins`
+      : `${clientId}-users`;
+
+    if (!(await getGroupOrNull(groupName))) {
+      return reply(404, {
+        success: false,
+        message: 'The target Cognito group was not found.'
+      });
+    }
+
+    const createInput = {
+      UserPoolId: USER_POOL_ID,
+      Username: username,
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'name', Value: fullName }
+      ],
+      DesiredDeliveryMediums: ['EMAIL']
+    };
+
+    if (temporaryPassword) {
+      createInput.TemporaryPassword = temporaryPassword;
+    }
+
+    const created = await cognito.send(new AdminCreateUserCommand(createInput));
+    createdUsername = created.User?.Username || username;
+
+    await cognito.send(new AdminAddUserToGroupCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: createdUsername,
+      GroupName: groupName
+    }));
+
+    return reply(200, {
+      success: true,
+      message: 'User created successfully.',
+      externalLoginCreated: true,
+      temporaryPasswordCreated: Boolean(temporaryPassword),
+      createdUser: {
+        username: createdUsername,
+        email,
+        fullName,
+        globalRole: null,
+        clientRole: requestedRole,
+        role: requestedRole,
+        clientId,
+        status: 'active'
+      }
+    });
+  } catch (error) {
+    if (createdUsername) {
+      try {
+        await cognito.send(new AdminDeleteUserCommand({
+          UserPoolId: USER_POOL_ID,
+          Username: createdUsername
+        }));
+      } catch (cleanupError) {
+        console.error('Unable to cleanup Cognito user after failure', cleanupError);
+      }
+    }
+
+    console.error('Unable to create Trackster client user', {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack
+    });
+
+    if (error?.name === 'UsernameExistsException') {
+      return reply(409, {
+        success: false,
+        message: 'A user with this username already exists.',
+        cognitoError: error?.name
+      });
+    }
+
+    if (error?.name === 'AliasExistsException') {
+      return reply(409, {
+        success: false,
+        message: 'This email is already verified as an alias for another user.',
+        cognitoError: error?.name
+      });
+    }
+
+    if (error?.name === 'InvalidPasswordException' || error?.name === 'InvalidParameterException') {
+      return reply(400, {
+        success: false,
+        message: error?.message || 'Invalid Cognito user data.'
+      });
+    }
+
+    return reply(500, {
+      success: false,
+      message: error?.message || 'Internal server error while creating user.'
+    });
+  }
+};
 
 function getMethod(event) {
-  return (
+  return String(
     event?.httpMethod ||
     event?.requestContext?.http?.method ||
     event?.requestContext?.httpMethod ||
@@ -35,481 +221,192 @@ function getMethod(event) {
 
 function getAuthenticatedUsername(event) {
   const claims =
-    event?.requestContext?.authorizer?.claims ||
     event?.requestContext?.authorizer?.jwt?.claims ||
+    event?.requestContext?.authorizer?.claims ||
     {};
 
-  return (
+  return clean(
     claims['cognito:username'] ||
     claims.username ||
-    null
+    claims.preferred_username ||
+    claims.email ||
+    ''
   );
 }
 
 function parseBody(event) {
-  if (!event.body) {
-    return {};
-  }
+  if (!event?.body) return {};
+  if (typeof event.body === 'object') return event.body;
 
-  if (event.isBase64Encoded) {
-    return JSON.parse(Buffer.from(event.body, 'base64').toString('utf8'));
-  }
+  const text = event.isBase64Encoded
+    ? Buffer.from(event.body, 'base64').toString('utf8')
+    : event.body;
 
-  return JSON.parse(event.body);
+  return JSON.parse(text);
 }
 
-function normalizeString(value) {
+function clean(value) {
   return String(value || '').trim();
 }
 
 function normalizeRole(value) {
-  const role = normalizeString(value);
-
-  if (role === 'client_admin') {
-    return 'client_admin';
-  }
-
-  return 'client_user';
+  const role = clean(value).toLowerCase();
+  if (role === 'client_admin' || role === 'client_user') return role;
+  return '';
 }
 
-async function createDbClient() {
-  const client = new Client({
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT || 5432),
-    database: process.env.DB_NAME,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-  });
-
-  await client.connect();
-  return client;
+function validateInput({ username, email, fullName, requestedClientId, requestedRole }) {
+  if (!username) return 'Missing required field: username.';
+  if (!email) return 'Missing required field: email.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Invalid email.';
+  if (!fullName) return 'Missing required field: fullName.';
+  if (!requestedRole) return 'Invalid role. Expected client_admin or client_user.';
+  if (requestedClientId && !CLIENT_ID_PATTERN.test(requestedClientId)) {
+    return 'clientId must contain exactly 8 digits.';
+  }
+  return '';
 }
 
-async function createUserInIdentityProvider(identityPayload) {
-  const functionName = process.env.IDENTITY_CREATE_FUNCTION_NAME;
-
-  if (!functionName) {
-    throw new Error('Missing required environment variable: IDENTITY_CREATE_FUNCTION_NAME');
-  }
-
-  const command = new InvokeCommand({
-    FunctionName: functionName,
-    InvocationType: 'RequestResponse',
-    Payload: Buffer.from(JSON.stringify(identityPayload))
-  });
-
-  const result = await lambdaClient.send(command);
-
-  if (result.FunctionError) {
-    const resultPayloadText = result.Payload
-      ? Buffer.from(result.Payload).toString('utf8')
-      : '';
-
-    console.error('Identity create function error:', resultPayloadText);
-
-    throw new Error('Unable to create external login account.');
-  }
-
-  const resultPayloadText = result.Payload
-    ? Buffer.from(result.Payload).toString('utf8')
-    : '{}';
-
-  const parsedIdentityResponse = JSON.parse(resultPayloadText);
-
-  if (!parsedIdentityResponse.success) {
-    throw new Error(parsedIdentityResponse.message || 'Unable to create external login account.');
-  }
-
-  return parsedIdentityResponse;
-}
-
-async function deleteUserFromIdentityProviderIfExists(username) {
-  const functionName = process.env.IDENTITY_DELETE_FUNCTION_NAME;
-
-  if (!functionName) {
-    return {
-      deleted: false,
-      cleanupSkipped: true
-    };
-  }
-
-  const command = new InvokeCommand({
-    FunctionName: functionName,
-    InvocationType: 'RequestResponse',
-    Payload: Buffer.from(JSON.stringify({ username }))
-  });
-
-  const result = await lambdaClient.send(command);
-
-  if (result.FunctionError) {
-    const resultPayloadText = result.Payload
-      ? Buffer.from(result.Payload).toString('utf8')
-      : '';
-
-    console.error('Identity cleanup function error:', resultPayloadText);
+async function getRequester(username) {
+  try {
+    const [user, groups] = await Promise.all([
+      cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: username })),
+      listGroupsForUser(username)
+    ]);
 
     return {
-      deleted: false,
-      cleanupFailed: true
+      active: user.Enabled === true && user.UserStatus !== 'ARCHIVED',
+      groups
     };
+  } catch (error) {
+    if (error?.name === 'UserNotFoundException') return null;
+    throw error;
   }
-
-  const resultPayloadText = result.Payload
-    ? Buffer.from(result.Payload).toString('utf8')
-    : '{}';
-
-  const parsedIdentityResponse = JSON.parse(resultPayloadText);
-
-  return {
-    deleted: !!parsedIdentityResponse.externalLoginDeleted,
-    wasMissing: !!parsedIdentityResponse.externalLoginWasMissing
-  };
 }
 
-export const handler = async (event) => {
-  const method = getMethod(event);
+async function listGroupsForUser(username) {
+  const names = [];
+  let nextToken;
 
-  if (method === 'OPTIONS') {
-    return response(200, { success: true });
+  do {
+    const result = await cognito.send(new AdminListGroupsForUserCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: username,
+      Limit: 60,
+      NextToken: nextToken
+    }));
+
+    for (const group of result.Groups || []) {
+      if (group.GroupName) names.push(group.GroupName);
+    }
+
+    nextToken = result.NextToken;
+  } while (nextToken);
+
+  return names;
+}
+
+async function resolveTargetClient(requester, requestedClientId) {
+  if (requester.groups.includes(TRACKSTER_ADMINS_GROUP)) {
+    if (!requestedClientId) {
+      return {
+        success: false,
+        statusCode: 400,
+        message: 'Missing required field: clientId.'
+      };
+    }
+
+    return { success: true, clientId: requestedClientId };
   }
 
-  if (method !== 'POST') {
-    return response(405, {
+  const clientIds = requester.groups
+    .map((group) => clean(group).match(/^(\d{8})-admins$/)?.[1] || '')
+    .filter(Boolean);
+
+  if (!clientIds.length) {
+    return {
       success: false,
-      message: 'Method not allowed.',
-      receivedMethod: method || null
-    });
+      statusCode: 403,
+      message: 'Access denied. Only administrators can create users.'
+    };
   }
 
-  let client;
-  let externalLoginCreated = false;
-  let createdUsername = '';
+  if (requestedClientId && !clientIds.includes(requestedClientId)) {
+    return {
+      success: false,
+      statusCode: 403,
+      message: 'Access denied. Administrators can only create users for their own client.'
+    };
+  }
+
+  if (!requestedClientId && clientIds.length > 1) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: 'Missing required field: clientId.'
+    };
+  }
+
+  const clientId = requestedClientId || clientIds[0];
+  const client = await getClientContext(clientId);
+
+  if (!client.exists || client.status !== 'active') {
+    return {
+      success: false,
+      statusCode: 403,
+      message: 'Your administrator account is inactive.'
+    };
+  }
+
+  return { success: true, clientId };
+}
+
+async function getClientContext(clientId) {
+  const [adminGroup, userGroup] = await Promise.all([
+    getGroupOrNull(`${clientId}-admins`),
+    getGroupOrNull(`${clientId}-users`)
+  ]);
+
+  if (!adminGroup && !userGroup) return { exists: false, status: '' };
+
+  const status =
+    parseGroupStatus(adminGroup?.Description) ||
+    parseGroupStatus(userGroup?.Description) ||
+    'active';
+
+  return { exists: true, status };
+}
+
+function parseGroupStatus(description) {
+  const raw = clean(description);
+  if (!raw) return '';
 
   try {
-    const authenticatedUsername = getAuthenticatedUsername(event);
-
-    if (!authenticatedUsername) {
-      return response(401, {
-        success: false,
-        message: 'Authenticated username not found in token.'
-      });
-    }
-
-    const body = parseBody(event);
-
-    const username = normalizeString(body.username);
-    const email = normalizeString(body.email).toLowerCase();
-    const fullName = normalizeString(body.fullName);
-    const requestedClientId = normalizeString(body.clientId);
-    const requestedRole = normalizeRole(body.role);
-    const temporaryPassword = normalizeString(body.temporaryPassword);
-
-    if (!username) {
-      return response(400, {
-        success: false,
-        message: 'Missing required field: username.'
-      });
-    }
-
-    if (!email) {
-      return response(400, {
-        success: false,
-        message: 'Missing required field: email.'
-      });
-    }
-
-    if (!email.includes('@')) {
-      return response(400, {
-        success: false,
-        message: 'Invalid email.'
-      });
-    }
-
-    client = await createDbClient();
-
-    await client.query('BEGIN');
-
-    const requesterResult = await client.query(
-      `
-      SELECT
-        u.id,
-        u.username,
-        u.email,
-        u.full_name,
-        u.status AS user_status,
-        r.role_code AS role_code,
-        cu.client_id,
-        c.status AS client_status
-      FROM trackster_users u
-      INNER JOIN trackster_roles r
-        ON r.id = u.role_id
-      LEFT JOIN trackster_client_users cu
-        ON cu.user_id = u.id
-      LEFT JOIN trackster_clients c
-        ON c.client_id = cu.client_id
-      WHERE LOWER(u.username) = LOWER($1)
-      ORDER BY
-        CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
-        cu.created_at ASC
-      LIMIT 1
-      `,
-      [authenticatedUsername]
-    );
-
-    if (requesterResult.rowCount === 0) {
-      await client.query('ROLLBACK');
-
-      return response(403, {
-        success: false,
-        message: 'Authenticated user was not found in Trackster database.'
-      });
-    }
-
-    const requester = requesterResult.rows[0];
-
-    const requesterIsTracksterAdmin =
-      requester.role_code === 'trackster_admin';
-
-    const requesterIsClientAdmin =
-      requester.role_code === 'client_admin';
-
-    if (!requesterIsTracksterAdmin && !requesterIsClientAdmin) {
-      await client.query('ROLLBACK');
-
-      return response(403, {
-        success: false,
-        message: 'Access denied. Only administrators can create users.'
-      });
-    }
-
-    if (
-      requester.user_status !== 'active' ||
-      (requesterIsClientAdmin && requester.client_status !== 'active')
-    ) {
-      await client.query('ROLLBACK');
-
-      return response(403, {
-        success: false,
-        message: 'Your administrator account is inactive.'
-      });
-    }
-
-    const targetClientId = requesterIsTracksterAdmin
-      ? requestedClientId
-      : requester.client_id;
-
-    if (!targetClientId) {
-      await client.query('ROLLBACK');
-
-      return response(400, {
-        success: false,
-        message: 'Missing required field: clientId.'
-      });
-    }
-
-    if (
-      requesterIsClientAdmin &&
-      requestedClientId &&
-      requestedClientId !== requester.client_id
-    ) {
-      await client.query('ROLLBACK');
-
-      return response(403, {
-        success: false,
-        message: 'Access denied. Administrators can only create users for their own client.'
-      });
-    }
-
-    const clientResult = await client.query(
-      `
-      SELECT
-        id,
-        client_id,
-        company_name,
-        status
-      FROM trackster_clients
-      WHERE client_id = $1
-      LIMIT 1
-      `,
-      [targetClientId]
-    );
-
-    if (clientResult.rowCount === 0) {
-      await client.query('ROLLBACK');
-
-      return response(404, {
-        success: false,
-        message: 'Client not found.'
-      });
-    }
-
-    const targetClient = clientResult.rows[0];
-
-    if (targetClient.status !== 'active') {
-      await client.query('ROLLBACK');
-
-      return response(400, {
-        success: false,
-        message: 'Cannot create users for an inactive client.'
-      });
-    }
-
-    const existingUserResult = await client.query(
-      `
-      SELECT
-        id,
-        username
-      FROM trackster_users
-      WHERE LOWER(username) = LOWER($1)
-      LIMIT 1
-      `,
-      [username]
-    );
-
-    if (existingUserResult.rowCount > 0) {
-      await client.query('ROLLBACK');
-
-      return response(409, {
-        success: false,
-        message: 'A user with this username already exists.'
-      });
-    }
-
-    const roleResult = await client.query(
-      `
-      SELECT
-        id,
-        role_code
-      FROM trackster_roles
-      WHERE role_code = $1
-      LIMIT 1
-      `,
-      [requestedRole]
-    );
-
-    if (roleResult.rowCount === 0) {
-      await client.query('ROLLBACK');
-
-      return response(400, {
-        success: false,
-        message: 'Requested role was not found in Trackster database.'
-      });
-    }
-
-    const userRole = roleResult.rows[0];
-
-    const identityCreateResult = await createUserInIdentityProvider({
-      username,
-      email,
-      fullName,
-      clientId: targetClient.client_id,
-      temporaryPassword
-    });
-
-    externalLoginCreated = true;
-    createdUsername = username;
-
-    const insertedUserResult = await client.query(
-      `
-      INSERT INTO trackster_users (
-        username,
-        email,
-        full_name,
-        role_id,
-        status,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        $1,
-        $2,
-        $3,
-        $4,
-        'active',
-        NOW(),
-        NOW()
-      )
-      RETURNING
-        id,
-        username,
-        email,
-        full_name,
-        status
-      `,
-      [
-        username,
-        email,
-        fullName,
-        userRole.id
-      ]
-    );
-
-    const insertedUser = insertedUserResult.rows[0];
-
-    await client.query(
-      `
-      INSERT INTO trackster_client_users (
-        client_id,
-        user_id,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        $1,
-        $2,
-        NOW(),
-        NOW()
-      )
-      `,
-      [
-        targetClient.client_id,
-        insertedUser.id
-      ]
-    );
-
-    await client.query('COMMIT');
-
-    return response(200, {
-      success: true,
-      message: 'User created successfully.',
-      externalLoginCreated: !!identityCreateResult.externalLoginCreated,
-      temporaryPasswordCreated: !!identityCreateResult.temporaryPasswordCreated,
-      createdUser: {
-        username: insertedUser.username,
-        email: insertedUser.email,
-        fullName: insertedUser.full_name,
-        globalRole: userRole.role_code === 'trackster_admin' ? 'trackster_admin' : null,
-        clientRole: userRole.role_code !== 'trackster_admin' ? userRole.role_code : null,
-        role: userRole.role_code,
-        clientId: targetClient.client_id,
-        status: insertedUser.status
-      }
-    });
-  } catch (error) {
-    if (client) {
-      try {
-        await client.query('ROLLBACK');
-      } catch {}
-    }
-
-    if (externalLoginCreated && createdUsername) {
-      try {
-        await deleteUserFromIdentityProviderIfExists(createdUsername);
-      } catch (cleanupError) {
-        console.error('Unable to cleanup external login after database failure:', cleanupError);
-      }
-    }
-
-    console.error('create-trackster-user error:', error);
-
-    return response(500, {
-      success: false,
-      message: error?.message || 'Internal server error while creating user.'
-    });
-  } finally {
-    if (client) {
-      await client.end();
-    }
+    const parsed = JSON.parse(raw);
+    const status = clean(parsed?.status).toLowerCase();
+    if (status === 'inactive' || status === 'suspended') return status;
+    return 'active';
+  } catch {
+    return 'active';
   }
-};
+}
+
+async function getGroupOrNull(groupName) {
+  try {
+    return await cognito.send(new GetGroupCommand({
+      UserPoolId: USER_POOL_ID,
+      GroupName: groupName
+    }));
+  } catch (error) {
+    if (error?.name === 'ResourceNotFoundException') return null;
+    throw error;
+  }
+}
+
+function reply(statusCode, body) {
+  return {
+    statusCode,
+    headers,
+    body: JSON.stringify(body)
+  };
+}

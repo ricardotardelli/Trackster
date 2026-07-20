@@ -1,8 +1,17 @@
-import pg from "pg";
-
-const { Pool } = pg;
+import {
+  AdminGetUserCommand,
+  AdminListGroupsForUserCommand,
+  CognitoIdentityProviderClient,
+  GetGroupCommand,
+  ListUsersInGroupCommand
+} from "@aws-sdk/client-cognito-identity-provider";
 
 const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+const userPoolId = process.env.COGNITO_USER_POOL_ID || "";
+const region = process.env.AWS_REGION || process.env.REGION || "eu-west-1";
+
+const TRACKSTER_ADMINS_GROUP = "trackster-admins";
+const CLIENT_ID_PATTERN = /^\d{8}$/;
 
 const defaultHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,
@@ -11,21 +20,7 @@ const defaultHeaders = {
   "Content-Type": "application/json"
 };
 
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 5432),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: process.env.DB_SSL === "true"
-    ? {
-        rejectUnauthorized: false
-      }
-    : false,
-  max: Number(process.env.DB_POOL_MAX || 2),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000
-});
+const cognitoClient = new CognitoIdentityProviderClient({ region });
 
 export const handler = async (event) => {
   console.log("Trackster admin list client users request", {
@@ -37,9 +32,7 @@ export const handler = async (event) => {
   const method = event?.requestContext?.http?.method || event?.httpMethod;
 
   if (method === "OPTIONS") {
-    return buildResponse(200, {
-      success: true
-    });
+    return buildResponse(200, { success: true });
   }
 
   if (method !== "GET") {
@@ -50,6 +43,8 @@ export const handler = async (event) => {
   }
 
   try {
+    validateEnvironment();
+
     const username = getAuthenticatedUsername(event);
 
     if (!username) {
@@ -64,7 +59,7 @@ export const handler = async (event) => {
     if (!authenticatedUser) {
       return buildResponse(404, {
         success: false,
-        error: "Authenticated user was not found in Trackster database."
+        error: "Authenticated user was not found in Cognito."
       });
     }
 
@@ -75,9 +70,11 @@ export const handler = async (event) => {
       });
     }
 
-    const requestedClientId = (event?.queryStringParameters?.clientId || "").trim();
+    const requestedClientId = String(
+      event?.queryStringParameters?.clientId || ""
+    ).trim();
 
-    const authorizationResult = resolveAuthorizedClientId(
+    const authorizationResult = await resolveAuthorizedClientId(
       authenticatedUser,
       requestedClientId
     );
@@ -97,7 +94,11 @@ export const handler = async (event) => {
       users
     });
   } catch (error) {
-    console.error("Unable to list Trackster client users", error);
+    console.error("Unable to list Trackster client users", {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack
+    });
 
     return buildResponse(500, {
       success: false,
@@ -106,13 +107,20 @@ export const handler = async (event) => {
   }
 };
 
+function validateEnvironment() {
+  if (!userPoolId) {
+    throw new Error(
+      "Missing required environment variable COGNITO_USER_POOL_ID."
+    );
+  }
+}
+
 function getAuthenticatedUsername(event) {
   const httpApiClaims = event?.requestContext?.authorizer?.jwt?.claims;
   const restApiClaims = event?.requestContext?.authorizer?.claims;
-
   const claims = httpApiClaims || restApiClaims || {};
 
-  return (
+  return String(
     claims["cognito:username"] ||
     claims.username ||
     claims.preferred_username ||
@@ -122,69 +130,91 @@ function getAuthenticatedUsername(event) {
 }
 
 async function getAuthenticatedUserContext(username) {
-  const query = `
-    SELECT
-      u.id AS user_id,
-      u.username,
-      u.email,
-      u.full_name,
-      u.status AS user_status,
+  try {
+    const [userResponse, groupNames] = await Promise.all([
+      cognitoClient.send(
+        new AdminGetUserCommand({
+          UserPoolId: userPoolId,
+          Username: username
+        })
+      ),
+      listGroupsForUser(username)
+    ]);
 
-      r.role_code AS user_role,
+    return {
+      username: userResponse.Username || username,
+      email: getAttributeValue(userResponse.UserAttributes, "email"),
+      fullName: getFullName(userResponse.UserAttributes),
+      status: isUserActive(userResponse) ? "active" : "inactive",
+      groupNames
+    };
+  } catch (error) {
+    if (error?.name === "UserNotFoundException") {
+      return null;
+    }
 
-      cu.client_id,
-
-      c.status AS client_status
-
-    FROM trackster_users u
-
-    INNER JOIN trackster_roles r
-      ON r.id = u.role_id
-
-    LEFT JOIN trackster_client_users cu
-      ON cu.user_id = u.id
-
-    LEFT JOIN trackster_clients c
-      ON c.client_id = cu.client_id
-
-    WHERE LOWER(u.username) = LOWER($1)
-
-    ORDER BY
-      CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
-      cu.created_at ASC
-  `;
-
-  const result = await pool.query(query, [username]);
-
-  if (result.rows.length === 0) {
-    return null;
+    throw error;
   }
-
-  const firstRow = result.rows[0];
-
-  return {
-    id: firstRow.user_id,
-    username: firstRow.username,
-    email: firstRow.email || "",
-    fullName: firstRow.full_name || "",
-    status: firstRow.user_status,
-    role: firstRow.user_role || null,
-    clientAssociations: result.rows
-      .filter((row) => row.client_id)
-      .map((row) => ({
-        clientId: row.client_id,
-        clientStatus: row.client_status || null
-      }))
-  };
 }
 
-function resolveAuthorizedClientId(authenticatedUser, requestedClientId) {
-  if (authenticatedUser.role === "trackster_admin") {
+async function listGroupsForUser(username) {
+  const groupNames = [];
+  let nextToken;
+
+  do {
+    const response = await cognitoClient.send(
+      new AdminListGroupsForUserCommand({
+        UserPoolId: userPoolId,
+        Username: username,
+        Limit: 60,
+        NextToken: nextToken
+      })
+    );
+
+    for (const group of response.Groups || []) {
+      if (group.GroupName) {
+        groupNames.push(group.GroupName);
+      }
+    }
+
+    nextToken = response.NextToken;
+  } while (nextToken);
+
+  return groupNames;
+}
+
+async function resolveAuthorizedClientId(
+  authenticatedUser,
+  requestedClientId
+) {
+  const isTracksterAdmin = authenticatedUser.groupNames.includes(
+    TRACKSTER_ADMINS_GROUP
+  );
+
+  if (isTracksterAdmin) {
     if (!requestedClientId) {
       return {
         success: false,
         statusCode: 400,
         error: "clientId is required for trackster_admin users."
+      };
+    }
+
+    if (!CLIENT_ID_PATTERN.test(requestedClientId)) {
+      return {
+        success: false,
+        statusCode: 400,
+        error: "clientId must contain exactly 8 digits."
+      };
+    }
+
+    const clientContext = await getClientContext(requestedClientId);
+
+    if (!clientContext.exists) {
+      return {
+        success: false,
+        statusCode: 404,
+        error: "Client was not found."
       };
     }
 
@@ -194,95 +224,296 @@ function resolveAuthorizedClientId(authenticatedUser, requestedClientId) {
     };
   }
 
-  if (authenticatedUser.role !== "client_admin") {
+  const clientAdminIds = authenticatedUser.groupNames
+    .map(extractClientIdFromAdminGroup)
+    .filter(Boolean);
+
+  if (clientAdminIds.length === 0) {
     return {
       success: false,
       statusCode: 403,
-      error: "Only trackster_admin or active client_admin users can list client users."
+      error:
+        "Only trackster_admin or active client_admin users can list client users."
     };
   }
 
-  const activeClientAssociation = authenticatedUser.clientAssociations.find(
-    (association) => association.clientStatus === "active"
-  );
+  let authorizedClientId;
 
-  if (!activeClientAssociation) {
+  if (requestedClientId) {
+    if (!CLIENT_ID_PATTERN.test(requestedClientId)) {
+      return {
+        success: false,
+        statusCode: 400,
+        error: "clientId must contain exactly 8 digits."
+      };
+    }
+
+    if (!clientAdminIds.includes(requestedClientId)) {
+      return {
+        success: false,
+        statusCode: 403,
+        error: "client_admin users cannot list users from another client."
+      };
+    }
+
+    authorizedClientId = requestedClientId;
+  } else if (clientAdminIds.length === 1) {
+    authorizedClientId = clientAdminIds[0];
+  } else {
     return {
       success: false,
-      statusCode: 403,
-      error: "Only trackster_admin or active client_admin users can list client users."
+      statusCode: 400,
+      error:
+        "clientId is required when the authenticated user administers more than one client."
     };
   }
 
-  if (
-    requestedClientId &&
-    requestedClientId !== activeClientAssociation.clientId
-  ) {
+  const clientContext = await getClientContext(authorizedClientId);
+
+  if (!clientContext.exists || clientContext.status !== "active") {
     return {
       success: false,
       statusCode: 403,
-      error: "client_admin users cannot list users from another client."
+      error:
+        "Only trackster_admin or active client_admin users can list client users."
     };
   }
 
   return {
     success: true,
-    clientId: activeClientAssociation.clientId
+    clientId: authorizedClientId
   };
 }
 
-async function listClientUsers(clientId) {
-  const query = `
-    SELECT
-      u.username,
-      u.full_name,
-      u.email,
-      u.status AS user_status,
-
-      r.role_code AS user_role,
-
-      cu.client_id
-
-    FROM trackster_client_users cu
-
-    INNER JOIN trackster_users u
-      ON u.id = cu.user_id
-
-    INNER JOIN trackster_roles r
-      ON r.id = u.role_id
-
-    WHERE cu.client_id = $1
-
-    ORDER BY
-      CASE r.role_code
-        WHEN 'client_admin' THEN 0
-        ELSE 1
-      END,
-      LOWER(u.username) ASC
-  `;
-
-  const result = await pool.query(query, [clientId]);
-
-  return result.rows.map((row) => ({
-    username: row.username,
-    fullName: row.full_name || "",
-    email: row.email || "",
-    role: row.user_role,
-    status: toUiStatus(row.user_status),
-    clientId: row.client_id
-  }));
+function extractClientIdFromAdminGroup(groupName) {
+  const match = String(groupName || "").match(/^(\d{8})-admins$/);
+  return match ? match[1] : "";
 }
 
-function toUiStatus(status) {
-  if (status === "active") {
-    return "Active";
+async function getClientContext(clientId) {
+  const adminGroupName = `${clientId}-admins`;
+  const userGroupName = `${clientId}-users`;
+
+  const [adminGroup, userGroup] = await Promise.all([
+    getGroupOrNull(adminGroupName),
+    getGroupOrNull(userGroupName)
+  ]);
+
+  if (!adminGroup && !userGroup) {
+    return {
+      exists: false,
+      status: ""
+    };
   }
 
-  if (status === "suspended") {
+  const adminMetadata = parseClientDescription(adminGroup?.Description);
+  const userMetadata = parseClientDescription(userGroup?.Description);
+
+  return {
+    exists: true,
+    status: normalizeClientStatus(
+      adminMetadata.status ||
+      userMetadata.status ||
+      "active"
+    )
+  };
+}
+
+async function getGroupOrNull(groupName) {
+  try {
+    return await cognitoClient.send(
+      new GetGroupCommand({
+        UserPoolId: userPoolId,
+        GroupName: groupName
+      })
+    );
+  } catch (error) {
+    if (error?.name === "ResourceNotFoundException") {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function parseClientDescription(description) {
+  const rawDescription = String(description || "").trim();
+
+  if (!rawDescription) {
+    return { status: "" };
+  }
+
+  try {
+    const parsed = JSON.parse(rawDescription);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
+    ) {
+      return {
+        status: String(parsed.status || "")
+          .trim()
+          .toLowerCase()
+      };
+    }
+  } catch {
+    // Legacy description: company name only.
+  }
+
+  return { status: "active" };
+}
+
+function normalizeClientStatus(status) {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "inactive" || normalized === "suspended") {
+    return normalized;
+  }
+
+  return "active";
+}
+
+async function listClientUsers(clientId) {
+  const adminGroupName = `${clientId}-admins`;
+  const userGroupName = `${clientId}-users`;
+
+  const [adminUsers, regularUsers] = await Promise.all([
+    listUsersInGroup(adminGroupName),
+    listUsersInGroup(userGroupName)
+  ]);
+
+  const usersByUsername = new Map();
+
+  for (const user of regularUsers) {
+    const normalized = normalizeUser(
+      user,
+      "client_user",
+      clientId
+    );
+
+    usersByUsername.set(
+      normalized.username.toLowerCase(),
+      normalized
+    );
+  }
+
+  for (const user of adminUsers) {
+    const normalized = normalizeUser(
+      user,
+      "client_admin",
+      clientId
+    );
+
+    usersByUsername.set(
+      normalized.username.toLowerCase(),
+      normalized
+    );
+  }
+
+  return Array.from(usersByUsername.values()).sort(compareUsers);
+}
+
+async function listUsersInGroup(groupName) {
+  const users = [];
+  let nextToken;
+
+  do {
+    try {
+      const response = await cognitoClient.send(
+        new ListUsersInGroupCommand({
+          UserPoolId: userPoolId,
+          GroupName: groupName,
+          Limit: 60,
+          NextToken: nextToken
+        })
+      );
+
+      users.push(...(response.Users || []));
+      nextToken = response.NextToken;
+    } catch (error) {
+      if (error?.name === "ResourceNotFoundException") {
+        return [];
+      }
+
+      throw error;
+    }
+  } while (nextToken);
+
+  return users;
+}
+
+function normalizeUser(user, role, clientId) {
+  const attributes = user.Attributes || [];
+
+  return {
+    username: user.Username || "",
+    fullName: getFullName(attributes),
+    email: getAttributeValue(attributes, "email"),
+    role,
+    status: toUiUserStatus(user, attributes),
+    clientId
+  };
+}
+
+function getFullName(attributes) {
+  return (
+    getAttributeValue(attributes, "name") ||
+    getAttributeValue(attributes, "custom:fullName") ||
+    [
+      getAttributeValue(attributes, "given_name"),
+      getAttributeValue(attributes, "family_name")
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
+function getAttributeValue(attributes, attributeName) {
+  const attribute = (attributes || []).find(
+    (item) => item.Name === attributeName
+  );
+
+  return attribute?.Value || "";
+}
+
+function isUserActive(user) {
+  return (
+    user?.Enabled === true &&
+    user?.UserStatus !== "ARCHIVED"
+  );
+}
+
+function toUiUserStatus(user, attributes) {
+  const storedStatus = String(
+    getAttributeValue(attributes, "custom:status") || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (storedStatus === "suspended") {
     return "Suspended";
   }
 
-  return "Inactive";
+  if (!isUserActive(user)) {
+    return "Inactive";
+  }
+
+  return "Active";
+}
+
+function compareUsers(first, second) {
+  if (first.role !== second.role) {
+    return first.role === "client_admin" ? -1 : 1;
+  }
+
+  return first.username.localeCompare(
+    second.username,
+    undefined,
+    { sensitivity: "base" }
+  );
 }
 
 function buildResponse(statusCode, body) {

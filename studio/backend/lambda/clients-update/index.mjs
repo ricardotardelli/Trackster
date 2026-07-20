@@ -1,8 +1,24 @@
-import pg from "pg";
-
-const { Pool } = pg;
+import {
+  AdminDisableUserCommand,
+  AdminGetUserCommand,
+  AdminListGroupsForUserCommand,
+  CognitoIdentityProviderClient,
+  ListGroupsCommand,
+  ListUsersInGroupCommand,
+  UpdateGroupCommand
+} from "@aws-sdk/client-cognito-identity-provider";
 
 const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+const userPoolId = process.env.COGNITO_USER_POOL_ID || "";
+const region =
+  process.env.AWS_REGION ||
+  process.env.REGION ||
+  "us-east-1";
+
+const TRACKSTER_ADMINS_GROUP = "trackster-admins";
+const CLIENT_ID_PATTERN = /^\d{8}$/;
+const CLIENT_GROUP_PATTERN = /^(\d{8})-(admins|users)$/;
+const validStatuses = ["active", "inactive", "suspended"];
 
 const defaultHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,
@@ -11,31 +27,23 @@ const defaultHeaders = {
   "Content-Type": "application/json"
 };
 
-const validStatuses = ["active", "inactive", "suspended"];
-
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 5432),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: process.env.DB_SSL === "true"
-    ? {
-        rejectUnauthorized: false
-      }
-    : false,
-  max: Number(process.env.DB_POOL_MAX || 2),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000
+const cognitoClient = new CognitoIdentityProviderClient({
+  region
 });
 
 export const handler = async (event) => {
   console.log("Trackster admin update client request", {
-    method: event?.requestContext?.http?.method || event?.httpMethod,
-    path: event?.rawPath || event?.path
+    method:
+      event?.requestContext?.http?.method ||
+      event?.httpMethod,
+    path:
+      event?.rawPath ||
+      event?.path
   });
 
-  const method = event?.requestContext?.http?.method || event?.httpMethod;
+  const method =
+    event?.requestContext?.http?.method ||
+    event?.httpMethod;
 
   if (method === "OPTIONS") {
     return buildResponse(200, {
@@ -50,24 +58,27 @@ export const handler = async (event) => {
     });
   }
 
-  const dbClient = await pool.connect();
-
   try {
+    validateEnvironment();
+
     const username = getAuthenticatedUsername(event);
 
     if (!username) {
       return buildResponse(401, {
         success: false,
-        error: "Authenticated username was not found in token claims."
+        error:
+          "Authenticated username was not found in token claims."
       });
     }
 
-    const authenticatedUser = await getAuthenticatedUserContext(dbClient, username);
+    const authenticatedUser =
+      await getAuthenticatedUserContext(username);
 
     if (!authenticatedUser) {
       return buildResponse(404, {
         success: false,
-        error: "Authenticated user was not found in Trackster database."
+        error:
+          "Authenticated user was not found in Trackster database."
       });
     }
 
@@ -78,21 +89,47 @@ export const handler = async (event) => {
       });
     }
 
-    if (authenticatedUser.role !== "trackster_admin") {
+    if (
+      authenticatedUser.role !==
+      "trackster_admin"
+    ) {
       return buildResponse(403, {
         success: false,
-        error: "Only active trackster_admin users can update clients."
+        error:
+          "Only active trackster_admin users can update clients."
       });
     }
 
     const body = parseBody(event);
 
-    const clientId = String(body.clientId || "").trim();
-    const contactName = String(body.contactName || "").trim();
-    const email = String(body.email || body.companyEmail || "").trim();
-    const phone = String(body.phone || "").trim();
-    const country = String(body.country || "").trim();
-    const status = normalizeClientStatus(body.status, body.action, body.enabled);
+    const clientId = String(
+      body.clientId || ""
+    ).trim();
+
+    const contactName = String(
+      body.contactName || ""
+    ).trim();
+
+    const email = String(
+      body.email ||
+      body.companyEmail ||
+      ""
+    ).trim();
+
+    const phone = String(
+      body.phone || ""
+    ).trim();
+
+    const country = String(
+      body.country || ""
+    ).trim();
+
+    const requestedStatus =
+      normalizeClientStatus(
+        body.status,
+        body.action,
+        body.enabled
+      );
 
     if (!clientId) {
       return buildResponse(400, {
@@ -101,67 +138,121 @@ export const handler = async (event) => {
       });
     }
 
-    if (!validStatuses.includes(status)) {
+    if (!CLIENT_ID_PATTERN.test(clientId)) {
+      return buildResponse(400, {
+        success: false,
+        error: "Invalid clientId."
+      });
+    }
+
+    if (
+      !validStatuses.includes(
+        requestedStatus
+      )
+    ) {
       return buildResponse(400, {
         success: false,
         error: "Invalid client status."
       });
     }
 
-    await dbClient.query("BEGIN");
+    const clientContext =
+      await getClientContext(clientId);
 
-    const existingClient = await getClient(dbClient, clientId);
-
-    if (!existingClient) {
-      await dbClient.query("ROLLBACK");
-
+    if (!clientContext) {
       return buildResponse(404, {
         success: false,
         error: "Client was not found."
       });
     }
 
-    const updatedClient = await updateClient(dbClient, {
-      clientId,
-      contactName,
-      email,
-      phone,
-      country,
-      status
-    });
+    const updatedMetadata = {
+      name: String(
+        body.name ??
+        clientContext.name ??
+        ""
+      ).trim(),
+      status: requestedStatus,
+      contactName: String(
+        body.contactName ??
+        clientContext.contactName ??
+        ""
+      ).trim(),
+      email: String(
+        body.email ??
+        body.companyEmail ??
+        clientContext.email ??
+        ""
+      ).trim(),
+      phone: String(
+        body.phone ??
+        clientContext.phone ??
+        ""
+      ).trim(),
+      country: String(
+        body.country ??
+        clientContext.country ??
+        ""
+      ).trim()
+    };
+
+    await updateClientGroupMetadata(
+      clientContext,
+      updatedMetadata
+    );
 
     let deactivatedUsers = [];
 
-    if (status === "inactive") {
-      deactivatedUsers = await deactivateClientUsers(dbClient, clientId);
+    if (updatedMetadata.status === "inactive") {
+      deactivatedUsers =
+        await deactivateClientUsers(
+          clientContext.adminUsers,
+          clientContext.regularUsers
+        );
     }
-
-    await dbClient.query("COMMIT");
 
     return buildResponse(200, {
       success: true,
-      message: "Client updated successfully.",
-      updatedClient,
-      deactivatedUsersCount: deactivatedUsers.length,
+      message:
+        "Client updated successfully.",
+      updatedClient: {
+        clientId,
+        name: updatedMetadata.name,
+        email: updatedMetadata.email,
+        contactName:
+          updatedMetadata.contactName,
+        phone: updatedMetadata.phone,
+        country: updatedMetadata.country,
+        status: updatedMetadata.status
+      },
+      deactivatedUsersCount:
+        deactivatedUsers.length,
       deactivatedUsers
     });
   } catch (error) {
-    try {
-      await dbClient.query("ROLLBACK");
-    } catch (rollbackError) {
-      console.error("Unable to rollback Trackster client update transaction", rollbackError);
-    }
-
-    console.error("Unable to update Trackster client", error);
+    console.error(
+      "Unable to update Trackster client",
+      {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack
+      }
+    );
 
     return buildResponse(500, {
       success: false,
       error: "Unable to update client."
     });
-  } finally {
-    dbClient.release();
   }
 };
+
+function validateEnvironment() {
+  if (!userPoolId) {
+    throw new Error(
+      "Missing required environment variable COGNITO_USER_POOL_ID."
+    );
+  }
+}
 
 function parseBody(event) {
   if (!event?.body) {
@@ -175,28 +266,51 @@ function parseBody(event) {
   }
 }
 
-function normalizeClientStatus(status, action, enabled) {
-  const normalizedAction = String(action || "").trim().toLowerCase();
+function normalizeClientStatus(
+  status,
+  action,
+  enabled
+) {
+  const normalizedAction = String(
+    action || ""
+  )
+    .trim()
+    .toLowerCase();
 
   if (normalizedAction === "activate") {
     return "active";
   }
 
-  if (normalizedAction === "deactivate" || normalizedAction === "disable") {
+  if (
+    normalizedAction === "deactivate" ||
+    normalizedAction === "disable"
+  ) {
     return "inactive";
   }
 
-  if (typeof enabled === "boolean") {
-    return enabled ? "active" : "inactive";
+  if (normalizedAction === "suspend") {
+    return "suspended";
   }
 
-  const normalizedStatus = String(status || "").trim().toLowerCase();
+  if (typeof enabled === "boolean") {
+    return enabled
+      ? "active"
+      : "inactive";
+  }
+
+  const normalizedStatus = String(
+    status || ""
+  )
+    .trim()
+    .toLowerCase();
 
   if (normalizedStatus === "active") {
     return "active";
   }
 
-  if (normalizedStatus === "suspended") {
+  if (
+    normalizedStatus === "suspended"
+  ) {
     return "suspended";
   }
 
@@ -204,10 +318,18 @@ function normalizeClientStatus(status, action, enabled) {
 }
 
 function getAuthenticatedUsername(event) {
-  const httpApiClaims = event?.requestContext?.authorizer?.jwt?.claims;
-  const restApiClaims = event?.requestContext?.authorizer?.claims;
+  const httpApiClaims =
+    event?.requestContext?.authorizer
+      ?.jwt?.claims;
 
-  const claims = httpApiClaims || restApiClaims || {};
+  const restApiClaims =
+    event?.requestContext?.authorizer
+      ?.claims;
+
+  const claims =
+    httpApiClaims ||
+    restApiClaims ||
+    {};
 
   return String(
     claims["cognito:username"] ||
@@ -218,133 +340,492 @@ function getAuthenticatedUsername(event) {
   ).trim();
 }
 
-async function getAuthenticatedUserContext(dbClient, username) {
-  const query = `
-    SELECT
-      u.id AS user_id,
-      u.username,
-      u.email,
-      u.full_name,
-      u.status AS user_status,
-      r.role_code AS user_role
-    FROM trackster_users u
-    INNER JOIN trackster_roles r
-      ON r.id = u.role_id
-    WHERE LOWER(u.username) = LOWER($1)
-    LIMIT 1
-  `;
+async function getAuthenticatedUserContext(
+  username
+) {
+  try {
+    const [userResponse, groups] =
+      await Promise.all([
+        cognitoClient.send(
+          new AdminGetUserCommand({
+            UserPoolId: userPoolId,
+            Username: username
+          })
+        ),
+        listGroupsForUser(username)
+      ]);
 
-  const result = await dbClient.query(query, [username]);
-
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  const row = result.rows[0];
-
-  return {
-    id: row.user_id,
-    username: row.username,
-    email: row.email || "",
-    fullName: row.full_name || "",
-    status: row.user_status,
-    role: row.user_role || null
-  };
-}
-
-async function getClient(dbClient, clientId) {
-  const query = `
-    SELECT
-      id,
-      client_id,
-      status
-    FROM trackster_clients
-    WHERE client_id = $1
-    LIMIT 1
-  `;
-
-  const result = await dbClient.query(query, [clientId]);
-
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return result.rows[0];
-}
-
-async function updateClient(dbClient, client) {
-  const query = `
-    UPDATE trackster_clients
-    SET
-      contact_name = $2,
-      company_email = $3,
-      phone = $4,
-      country = $5,
-      status = $6,
-      updated_at = NOW()
-    WHERE client_id = $1
-    RETURNING
-      client_id,
-      company_name,
-      company_email,
-      contact_name,
-      phone,
-      country,
-      status
-  `;
-
-  const result = await dbClient.query(query, [
-    client.clientId,
-    client.contactName,
-    client.email,
-    client.phone,
-    client.country,
-    client.status
-  ]);
-
-  const row = result.rows[0];
-
-  return {
-    clientId: row.client_id,
-    name: row.company_name || "",
-    email: row.company_email || "",
-    contactName: row.contact_name || "",
-    phone: row.phone || "",
-    country: row.country || "",
-    status: row.status || "inactive"
-  };
-}
-
-async function deactivateClientUsers(dbClient, clientId) {
-  const query = `
-    UPDATE trackster_users u
-    SET
-      status = 'inactive',
-      updated_at = NOW()
-    WHERE u.id IN (
-      SELECT cu.user_id
-      FROM trackster_client_users cu
-      WHERE cu.client_id = $1
+    const role = groups.includes(
+      TRACKSTER_ADMINS_GROUP
     )
-    AND u.status <> 'inactive'
-    RETURNING
-      u.username,
-      u.email,
-      u.full_name,
-      u.status
-  `;
+      ? "trackster_admin"
+      : getClientRole(groups);
 
-  const result = await dbClient.query(query, [clientId]);
+    return {
+      id: getAttributeValue(
+        userResponse.UserAttributes,
+        "sub"
+      ),
+      username:
+        userResponse.Username ||
+        username,
+      email: getAttributeValue(
+        userResponse.UserAttributes,
+        "email"
+      ),
+      fullName:
+        getAttributeValue(
+          userResponse.UserAttributes,
+          "name"
+        ) ||
+        getAttributeValue(
+          userResponse.UserAttributes,
+          "custom:fullName"
+        ),
+      status: isCognitoUserActive(
+        userResponse
+      )
+        ? "active"
+        : "inactive",
+      role
+    };
+  } catch (error) {
+    if (
+      error?.name ===
+      "UserNotFoundException"
+    ) {
+      return null;
+    }
 
-  return result.rows.map((row) => ({
-    username: row.username,
-    email: row.email || "",
-    fullName: row.full_name || "",
-    status: row.status || "inactive"
-  }));
+    throw error;
+  }
 }
 
-function buildResponse(statusCode, body) {
+async function listGroupsForUser(username) {
+  const groupNames = [];
+  let nextToken;
+
+  do {
+    const response =
+      await cognitoClient.send(
+        new AdminListGroupsForUserCommand({
+          UserPoolId: userPoolId,
+          Username: username,
+          Limit: 60,
+          NextToken: nextToken
+        })
+      );
+
+    for (
+      const group of
+      response.Groups || []
+    ) {
+      if (group.GroupName) {
+        groupNames.push(
+          group.GroupName
+        );
+      }
+    }
+
+    nextToken =
+      response.NextToken;
+  } while (nextToken);
+
+  return groupNames;
+}
+
+function getClientRole(groupNames) {
+  for (const groupName of groupNames) {
+    const match =
+      CLIENT_GROUP_PATTERN.exec(
+        groupName
+      );
+
+    if (!match) {
+      continue;
+    }
+
+    return match[2] === "admins"
+      ? "client_admin"
+      : "client_user";
+  }
+
+  return null;
+}
+
+function isCognitoUserActive(user) {
+  return (
+    user?.Enabled === true &&
+    user?.UserStatus !== "ARCHIVED"
+  );
+}
+
+async function getClientContext(
+  clientId
+) {
+  const groups =
+    await listAllCognitoGroups();
+
+  const adminGroup =
+    groups.find(
+      (group) =>
+        group.GroupName ===
+        `${clientId}-admins`
+    ) || null;
+
+  const userGroup =
+    groups.find(
+      (group) =>
+        group.GroupName ===
+        `${clientId}-users`
+    ) || null;
+
+  if (!adminGroup && !userGroup) {
+    return null;
+  }
+
+  const [adminUsers, regularUsers] =
+    await Promise.all([
+      adminGroup?.GroupName
+        ? listAllUsersInGroup(
+            adminGroup.GroupName
+          )
+        : Promise.resolve([]),
+
+      userGroup?.GroupName
+        ? listAllUsersInGroup(
+            userGroup.GroupName
+          )
+        : Promise.resolve([])
+    ]);
+
+  const adminMetadata =
+    parseClientGroupDescription(
+      adminGroup?.Description
+    );
+
+  const userMetadata =
+    parseClientGroupDescription(
+      userGroup?.Description
+    );
+
+  return {
+    clientId,
+    name:
+      adminMetadata.name ||
+      userMetadata.name ||
+      "",
+    status:
+      normalizeStoredClientStatus(
+        adminMetadata.status ||
+        userMetadata.status ||
+        "active"
+      ),
+    contactName:
+      adminMetadata.contactName ||
+      userMetadata.contactName ||
+      "",
+    email:
+      adminMetadata.email ||
+      userMetadata.email ||
+      "",
+    phone:
+      adminMetadata.phone ||
+      userMetadata.phone ||
+      "",
+    country:
+      adminMetadata.country ||
+      userMetadata.country ||
+      "",
+    adminGroup,
+    userGroup,
+    adminUsers,
+    regularUsers
+  };
+}
+
+async function listAllCognitoGroups() {
+  const groups = [];
+  let nextToken;
+
+  do {
+    const response =
+      await cognitoClient.send(
+        new ListGroupsCommand({
+          UserPoolId: userPoolId,
+          Limit: 60,
+          NextToken: nextToken
+        })
+      );
+
+    groups.push(
+      ...(response.Groups || [])
+    );
+
+    nextToken =
+      response.NextToken;
+  } while (nextToken);
+
+  return groups;
+}
+
+function parseClientGroupDescription(
+  description
+) {
+  const rawDescription = String(
+    description || ""
+  ).trim();
+
+  if (!rawDescription) {
+    return {
+      name: "",
+      status: "",
+      contactName: "",
+      email: "",
+      phone: "",
+      country: ""
+    };
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawDescription);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
+    ) {
+      return {
+        name: String(
+          parsed.name || ""
+        ).trim(),
+        status: String(
+          parsed.status || ""
+        )
+          .trim()
+          .toLowerCase(),
+        contactName: String(
+          parsed.contactName || ""
+        ).trim(),
+        email: String(
+          parsed.email || ""
+        ).trim(),
+        phone: String(
+          parsed.phone || ""
+        ).trim(),
+        country: String(
+          parsed.country || ""
+        ).trim()
+      };
+    }
+  } catch {
+    /*
+     * Compatibilidade com grupos antigos:
+     * Description contendo apenas o nome.
+     */
+  }
+
+  return {
+    name: rawDescription,
+    status: "active",
+    contactName: "",
+    email: "",
+    phone: "",
+    country: ""
+  };
+}
+
+function normalizeStoredClientStatus(
+  status
+) {
+  const normalized = String(
+    status || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  return validStatuses.includes(
+    normalized
+  )
+    ? normalized
+    : "active";
+}
+
+async function updateClientGroupMetadata(
+  clientContext,
+  metadata
+) {
+  const description =
+    JSON.stringify({
+      name: metadata.name,
+      status: metadata.status,
+      contactName: metadata.contactName,
+      email: metadata.email,
+      phone: metadata.phone,
+      country: metadata.country
+    });
+
+  const commands = [];
+
+  if (
+    clientContext.adminGroup
+      ?.GroupName
+  ) {
+    commands.push(
+      cognitoClient.send(
+        new UpdateGroupCommand({
+          UserPoolId: userPoolId,
+          GroupName:
+            clientContext.adminGroup
+              .GroupName,
+          Description: description
+        })
+      )
+    );
+  }
+
+  if (
+    clientContext.userGroup
+      ?.GroupName
+  ) {
+    commands.push(
+      cognitoClient.send(
+        new UpdateGroupCommand({
+          UserPoolId: userPoolId,
+          GroupName:
+            clientContext.userGroup
+              .GroupName,
+          Description: description
+        })
+      )
+    );
+  }
+
+  await Promise.all(commands);
+}
+
+async function deactivateClientUsers(
+  adminUsers,
+  regularUsers
+) {
+  const usersByUsername =
+    new Map();
+
+  for (
+    const user of [
+      ...(adminUsers || []),
+      ...(regularUsers || [])
+    ]
+  ) {
+    if (
+      user.Username &&
+      isCognitoUserActive(user)
+    ) {
+      usersByUsername.set(
+        user.Username,
+        user
+      );
+    }
+  }
+
+  const deactivatedUsers = [];
+
+  for (
+    const user of
+    usersByUsername.values()
+  ) {
+    await cognitoClient.send(
+      new AdminDisableUserCommand({
+        UserPoolId: userPoolId,
+        Username: user.Username
+      })
+    );
+
+    const attributes =
+      getUserAttributes(
+        user.Attributes
+      );
+
+    deactivatedUsers.push({
+      username: user.Username,
+      email:
+        attributes.email || "",
+      fullName:
+        attributes.name ||
+        attributes[
+          "custom:fullName"
+        ] ||
+        "",
+      status: "inactive"
+    });
+  }
+
+  return deactivatedUsers;
+}
+
+async function listAllUsersInGroup(
+  groupName
+) {
+  const users = [];
+  let nextToken;
+
+  do {
+    const response =
+      await cognitoClient.send(
+        new ListUsersInGroupCommand({
+          UserPoolId: userPoolId,
+          GroupName: groupName,
+          Limit: 60,
+          NextToken: nextToken
+        })
+      );
+
+    users.push(
+      ...(response.Users || [])
+    );
+
+    nextToken =
+      response.NextToken;
+  } while (nextToken);
+
+  return users;
+}
+
+function getUserAttributes(
+  attributes
+) {
+  return Object.fromEntries(
+    (attributes || [])
+      .filter(
+        (attribute) =>
+          attribute?.Name
+      )
+      .map((attribute) => [
+        attribute.Name,
+        attribute.Value || ""
+      ])
+  );
+}
+
+function getAttributeValue(
+  attributes,
+  attributeName
+) {
+  const attribute =
+    (attributes || []).find(
+      (item) =>
+        item.Name ===
+        attributeName
+    );
+
+  return attribute?.Value || "";
+}
+
+function buildResponse(
+  statusCode,
+  body
+) {
   return {
     statusCode,
     headers: defaultHeaders,

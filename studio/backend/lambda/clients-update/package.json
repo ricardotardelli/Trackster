@@ -1,9 +1,12 @@
 {
-  "name": "clients-info-get",
+  "name": "trackster-admin-update-clients",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
-  "main": "index.mjs",
   "dependencies": {
-    "pg": "^8.13.1"
+    "@aws-sdk/client-cognito-identity-provider": "^3.0.0"
+  },
+  "scripts": {
+    "zip": "powershell -Command \"Compress-Archive * -DestinationPath trackster-admin-update-clients.zip -Force\""
   }
 }

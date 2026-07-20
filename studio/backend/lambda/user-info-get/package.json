@@ -1,0 +1,12 @@
+{
+  "name": "user-info-get",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.0.0"
+  },
+  "scripts": {
+    "zip": "powershell -Command \"Compress-Archive * -DestinationPath user-info-get.zip -Force\""
+  }
+}

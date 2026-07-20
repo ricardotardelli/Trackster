@@ -1,9 +1,12 @@
 {
-  "name": "delete-trackster-user",
+  "name": "client-users-delete",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-lambda": "^3.699.0",
-    "pg": "^8.13.1"
+    "@aws-sdk/client-cognito-identity-provider": "^3.0.0"
+  },
+  "scripts": {
+    "zip": "powershell -Command \"Compress-Archive * -DestinationPath client-users-delete.zip -Force\""
   }
 }

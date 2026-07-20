@@ -1,46 +1,54 @@
-import pg from "pg";
+import {
+  AdminGetUserCommand,
+  AdminUpdateUserAttributesCommand,
+  CognitoIdentityProviderClient
+} from "@aws-sdk/client-cognito-identity-provider";
 
-const { Pool } = pg;
+const userPoolId =
+  process.env.COGNITO_USER_POOL_ID || "";
 
-const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+const region =
+  process.env.AWS_REGION ||
+  process.env.REGION ||
+  "eu-west-1";
+
+const allowedOrigin =
+  process.env.ALLOWED_ORIGIN || "*";
+
+const cognitoClient =
+  new CognitoIdentityProviderClient({
+    region
+  });
 
 const defaultHeaders = {
-  "Access-Control-Allow-Origin": allowedOrigin,
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Access-Control-Allow-Methods": "OPTIONS,POST",
-  "Content-Type": "application/json"
+  "Access-Control-Allow-Origin":
+    allowedOrigin,
+  "Access-Control-Allow-Headers":
+    "Content-Type,Authorization",
+  "Access-Control-Allow-Methods":
+    "OPTIONS,POST",
+  "Content-Type":
+    "application/json"
 };
 
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 5432),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: process.env.DB_SSL === "true"
-    ? {
-        rejectUnauthorized: false
-      }
-    : false,
-  max: 2,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000
-});
-
 export const handler = async (event) => {
-  const method = getHttpMethod(event);
+  const method =
+    getHttpMethod(event);
 
   try {
-    console.log("Incoming update user profile request debug:", {
-      method,
-      hasAuthorizationHeader: Boolean(
-        event.headers?.authorization || event.headers?.Authorization
-      ),
-      hasBody: Boolean(event.body),
-      bodyPreview: typeof event.body === "string"
-        ? event.body.substring(0, 160)
-        : event.body
-    });
+    console.log(
+      "Incoming update user profile request",
+      {
+        method,
+        hasAuthorizationHeader:
+          Boolean(
+            event?.headers?.authorization ||
+            event?.headers?.Authorization
+          ),
+        hasBody:
+          Boolean(event?.body)
+      }
+    );
 
     if (method === "OPTIONS") {
       return response(200, {
@@ -51,193 +59,280 @@ export const handler = async (event) => {
     if (method !== "POST") {
       return response(405, {
         success: false,
-        message: "Method not allowed"
+        message:
+          "Method not allowed"
       });
     }
 
-    const username = extractUsername(event);
+    if (!userPoolId) {
+      throw new Error(
+        "COGNITO_USER_POOL_ID is not configured."
+      );
+    }
 
-    console.log("Authenticated user debug:", {
-      hasUsername: Boolean(username),
-      username
-    });
+    const username =
+      extractUsername(event);
 
     if (!username) {
       return response(401, {
         success: false,
-        message: "Authenticated username was not found"
+        message:
+          "Authenticated username was not found"
       });
     }
 
-    const body = parseBody(event.body);
+    const body =
+      parseBody(event);
 
-    const fullName = readString(body.fullName);
-    const email = readString(body.email).toLowerCase();
+    const fullName =
+      readString(
+        body.fullName
+      );
 
-    console.log("User profile payload debug:", {
-      hasFullName: Boolean(fullName),
-      hasEmail: Boolean(email),
-      fullNameLength: fullName.length,
-      emailLength: email.length
-    });
+    const email =
+      readString(
+        body.email
+      ).toLowerCase();
 
     if (!fullName || !email) {
       return response(400, {
         success: false,
-        message: "fullName and email are required"
+        message:
+          "fullName and email are required"
       });
     }
 
-    if (!isValidEmail(email)) {
-      return response(400, {
-        success: false,
-        message: "Invalid email format"
-      });
-    }
-
-    const client = await pool.connect();
-
-    try {
-      await client.query("BEGIN");
-
-      const updateResult = await client.query(
-        `
-          UPDATE trackster_users
-          SET
-              full_name = $1,
-              email = $2,
-              updated_at = NOW()
-          WHERE username = $3
-            AND status = 'active'
-          RETURNING
-              id,
-              username,
-              email,
-              full_name,
-              status,
-              created_at,
-              updated_at
-        `,
-        [fullName, email, username]
+    const user =
+      await cognitoClient.send(
+        new AdminGetUserCommand({
+          UserPoolId:
+            userPoolId,
+          Username:
+            username
+        })
       );
 
-      if (updateResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-
-        return response(404, {
-          success: false,
-          message: "Active user was not found"
-        });
-      }
-
-      await client.query("COMMIT");
-
-      const updatedUser = updateResult.rows[0];
-
-      return response(200, {
-        success: true,
-        message: "User profile updated successfully",
-        user: {
-          id: updatedUser.id,
-          username: updatedUser.username,
-          email: updatedUser.email,
-          fullName: updatedUser.full_name,
-          status: updatedUser.status,
-          createdAt: updatedUser.created_at,
-          updatedAt: updatedUser.updated_at
-        }
+    if (user.Enabled !== true) {
+      return response(404, {
+        success: false,
+        message:
+          "Active user was not found"
       });
-    } catch (error) {
-      await client.query("ROLLBACK");
-
-      if (error?.code === "23505") {
-        return response(409, {
-          success: false,
-          message: "Email is already used by another user"
-        });
-      }
-
-      throw error;
-    } finally {
-      client.release();
     }
-  } catch (error) {
-    console.error("Update user profile full error:", error);
 
-    console.error("Update user profile summarized error:", {
-      name: error?.name,
-      message: error?.message,
-      code: error?.code,
-      detail: error?.detail,
-      constraint: error?.constraint
+    const resolvedUsername =
+      user.Username ||
+      username;
+
+    await cognitoClient.send(
+      new AdminUpdateUserAttributesCommand({
+        UserPoolId:
+          userPoolId,
+        Username:
+          resolvedUsername,
+        UserAttributes: [
+          {
+            Name: "name",
+            Value: fullName
+          },
+          {
+            Name: "email",
+            Value: email
+          }
+        ]
+      })
+    );
+
+    const updatedUser =
+      await cognitoClient.send(
+        new AdminGetUserCommand({
+          UserPoolId:
+            userPoolId,
+          Username:
+            resolvedUsername
+        })
+      );
+
+    return response(200, {
+      success: true,
+      message:
+        "User profile updated successfully",
+      user: {
+        id:
+          getAttribute(
+            updatedUser.UserAttributes,
+            "sub"
+          ),
+        username:
+          updatedUser.Username ||
+          resolvedUsername,
+        email:
+          getAttribute(
+            updatedUser.UserAttributes,
+            "email"
+          ),
+        fullName:
+          getAttribute(
+            updatedUser.UserAttributes,
+            "name"
+          ),
+        status:
+          updatedUser.Enabled === true
+            ? "active"
+            : "inactive",
+        createdAt:
+          updatedUser.UserCreateDate ||
+          null,
+        updatedAt:
+          updatedUser.UserLastModifiedDate ||
+          null
+      }
     });
+  } catch (error) {
+    console.error(
+      "Update user profile error",
+      {
+        name:
+          error?.name,
+        message:
+          error?.message,
+        code:
+          error?.code,
+        stack:
+          error?.stack
+      }
+    );
+
+    if (
+      error?.name ===
+      "UserNotFoundException"
+    ) {
+      return response(404, {
+        success: false,
+        message:
+          "Active user was not found"
+      });
+    }
+
+    if (
+      error?.name ===
+      "AliasExistsException"
+    ) {
+      return response(409, {
+        success: false,
+        message:
+          "Email is already used by another user"
+      });
+    }
+
+    if (
+      error?.name ===
+      "InvalidParameterException"
+    ) {
+      return response(400, {
+        success: false,
+        message:
+          error?.message ||
+          "Invalid Cognito user data"
+      });
+    }
 
     return response(500, {
       success: false,
-      message: "Internal server error"
+      message:
+        error?.message ||
+        "Internal server error"
     });
   }
 };
 
 function getHttpMethod(event) {
   return (
-    event.httpMethod ||
-    event.requestContext?.http?.method ||
-    event.requestContext?.httpMethod ||
+    event?.httpMethod ||
+    event?.requestContext?.http?.method ||
+    event?.requestContext?.httpMethod ||
     ""
   ).toUpperCase();
 }
 
 function extractUsername(event) {
   const claims =
-    event.requestContext?.authorizer?.jwt?.claims ||
-    event.requestContext?.authorizer?.claims ||
+    event?.requestContext?.authorizer
+      ?.jwt?.claims ||
+    event?.requestContext?.authorizer
+      ?.claims ||
     {};
 
   return (
-    readString(claims["cognito:username"]) ||
-    readString(claims.username) ||
-    readString(claims["preferred_username"])
+    readString(
+      claims["cognito:username"]
+    ) ||
+    readString(
+      claims.username
+    ) ||
+    readString(
+      claims.preferred_username
+    ) ||
+    readString(
+      claims.email
+    )
   );
 }
 
-function parseBody(rawBody) {
-  if (!rawBody) {
+function parseBody(event) {
+  if (!event?.body) {
     return {};
   }
 
-  if (typeof rawBody === "object") {
-    return rawBody;
+  if (
+    typeof event.body === "object"
+  ) {
+    return event.body;
   }
 
-  try {
-    return JSON.parse(rawBody);
-  } catch (error) {
-    console.error("Invalid JSON body:", {
-      message: error.message,
-      bodyPreview: String(rawBody).substring(0, 160)
-    });
+  const rawBody =
+    event.isBase64Encoded
+      ? Buffer.from(
+          event.body,
+          "base64"
+        ).toString("utf8")
+      : event.body;
 
-    return {};
-  }
+  return JSON.parse(rawBody);
+}
+
+function getAttribute(
+  attributes,
+  name
+) {
+  return (
+    (attributes || []).find(
+      (attribute) =>
+        attribute.Name === name
+    )?.Value ||
+    ""
+  );
 }
 
 function readString(value) {
-  if (typeof value !== "string") {
+  if (
+    typeof value !== "string"
+  ) {
     return "";
   }
 
   return value.trim();
 }
 
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function response(statusCode, body) {
+function response(
+  statusCode,
+  body
+) {
   return {
     statusCode,
-    headers: defaultHeaders,
-    body: JSON.stringify(body)
+    headers:
+      defaultHeaders,
+    body:
+      JSON.stringify(body)
   };
 }
