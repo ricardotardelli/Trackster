@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { generateLlmResponse, getAiProviderInfo } from './providers/llm-provider.mjs';
 import {
   S3Client,
   PutObjectCommand,
@@ -13,18 +13,80 @@ const defaultHeaders = {
 };
 
 const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
-const modelId = process.env.BEDROCK_MODEL_ID || 'google.gemma-4-31b';
-const mantleHost = `bedrock-mantle.${region}.api.aws`;
-const mantleBaseUrl = process.env.OPENAI_BASE_URL || `https://${mantleHost}/v1`;
-const mantleProjectId = process.env.OPENAI_PROJECT_ID || 'default';
+const aiProviderInfo = getAiProviderInfo();
+const modelId = aiProviderInfo.model;
 const s3Client = new S3Client({ region });
 
-const DEFAULT_MAX_TOKENS = Number.parseInt(process.env.BEDROCK_MAX_TOKENS || '4096', 10);
+const DEFAULT_MAX_TOKENS = Number.parseInt(
+  process.env.AI_MAX_TOKENS ||
+  process.env.BEDROCK_MAX_TOKENS ||
+  '4096',
+  10
+);
 const DEFAULT_AI_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '120000', 10);
 const DEFAULT_PLANNER_RETRIES = Number.parseInt(process.env.PLANNER_RETRIES || '1', 10);
 const DEFAULT_BEHAVIOR_RETRIES = Number.parseInt(process.env.BEHAVIOR_RETRIES || '1', 10);
+const DEFAULT_SIGNAL_KNOWLEDGE_BATCH_SIZE = normalizeSignalKnowledgeBatchSize(
+  process.env.SIGNAL_KNOWLEDGE_BATCH_SIZE
+);
 const DEFAULT_TEST_OUTPUT_PREFIX = '20260510221008/';
 const DEFAULT_SIGNAL_KNOWLEDGE_PROMPT_KEY = 'prompts/simulator-signal-knowledge-v1.txt';
+
+
+const SIGNAL_KNOWLEDGE_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    schemaVersion: {
+      type: 'string',
+      enum: ['trackster-signal-knowledge-v1']
+    },
+    signals: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'Exact requested signal name.'
+          },
+          meaning: {
+            type: 'string',
+            description: 'Short engineering meaning.'
+          },
+          generateBehavior: {
+            type: 'boolean',
+            description: 'Whether Trackster should generate dynamic behavior for this signal.'
+          },
+          reason: {
+            type: 'string',
+            description: 'Short objective classification reason.'
+          },
+          dependency: {
+            type: 'string',
+            description: 'Exact name of another requested signal that is the immediate physical cause, or null.',
+            nullable: true
+          }
+        },
+        required: [
+          'name',
+          'meaning',
+          'generateBehavior',
+          'reason',
+          'dependency'
+        ],
+        propertyOrdering: [
+          'name',
+          'meaning',
+          'generateBehavior',
+          'reason',
+          'dependency'
+        ]
+      }
+    }
+  },
+  required: ['schemaVersion', 'signals'],
+  propertyOrdering: ['schemaVersion', 'signals']
+};
 
 export const handler = async (event) => {
   const startedAt = Date.now();
@@ -462,6 +524,7 @@ async function runSignalKnowledgePhase(body, options = {}) {
     body,
     requestedSignalMetadata,
     existingSignalKnowledge,
+    signalKnowledgeS3,
     onProgress: async (progressMessage) => {
       await writeScenarioProgressMessage(body, {
         ...progressMessage,
@@ -521,7 +584,13 @@ async function readExistingSignalKnowledge(location) {
   return existing;
 }
 
-async function buildIncrementalSignalKnowledge({ body, requestedSignalMetadata, existingSignalKnowledge, onProgress = null }) {
+async function buildIncrementalSignalKnowledge({
+  body,
+  requestedSignalMetadata,
+  existingSignalKnowledge,
+  signalKnowledgeS3,
+  onProgress = null
+}) {
   const existingSignals = Array.isArray(existingSignalKnowledge?.signals)
     ? existingSignalKnowledge.signals.filter((signal) => sanitizeSignalName(signal?.name || signal?.signalName || signal?.n))
     : [];
@@ -579,10 +648,95 @@ async function buildIncrementalSignalKnowledge({ body, requestedSignalMetadata, 
   }
 
   if (missingSignalMetadata.length) {
-    generatedSignalKnowledge = await generateValidatedSignalKnowledge(body, {
-      requestedSignalMetadata: missingSignalMetadata,
-      entryMetadata: buildSignalKnowledgeEntryMetadata(body)
+    const batches = chunkArray(
+      missingSignalMetadata,
+      DEFAULT_SIGNAL_KNOWLEDGE_BATCH_SIZE
+    );
+
+    const generatedSignals = [];
+    const entryMetadata = buildSignalKnowledgeEntryMetadata(body);
+
+    console.log('Signal knowledge batch generation started:', {
+      missingSignals: missingSignalMetadata.length,
+      batchSize: DEFAULT_SIGNAL_KNOWLEDGE_BATCH_SIZE,
+      totalBatches: batches.length
     });
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
+      const batch = batches[batchIndex];
+      const batchNumber = batchIndex + 1;
+
+      if (typeof onProgress === 'function') {
+        const progressPercent = Math.min(
+          39,
+          25 + Math.floor((batchIndex / Math.max(1, batches.length)) * 14)
+        );
+
+        await onProgress({
+          status: `Recognizing new vehicle signals - batch ${batchNumber} of ${batches.length}...`,
+          currentStep: `Recognizing new vehicle signals - batch ${batchNumber} of ${batches.length}...`,
+          progress: {
+            totalPhases: 2,
+            completedPhases: 0,
+            failedPhases: 0,
+            processingPhases: 1,
+            percent: progressPercent
+          }
+        });
+      }
+
+      console.log('Signal knowledge batch request:', {
+        batchNumber,
+        totalBatches: batches.length,
+        signalCount: batch.length,
+        signalNames: batch.map((signal) => signal.signalName)
+      });
+
+      const batchSignalKnowledge = await generateValidatedSignalKnowledge(body, {
+        requestedSignalMetadata: batch,
+        entryMetadata,
+        batchNumber,
+        totalBatches: batches.length,
+        signalKnowledgeS3
+      });
+
+      generatedSignals.push(...batchSignalKnowledge.signals);
+
+      const checkpointSignalKnowledge = mergeSignalKnowledgeWithoutOverwriting({
+        existingSignalKnowledge,
+        generatedSignalKnowledge: {
+          schemaVersion: 'trackster-signal-knowledge-v1',
+          signals: generatedSignals
+        }
+      });
+
+      if (!signalKnowledgeS3?.bucket || !signalKnowledgeS3?.key) {
+        throw new Error(
+          'Unable to persist signal knowledge batch checkpoint because the S3 location was not resolved.'
+        );
+      }
+
+      await putJsonToS3(
+        signalKnowledgeS3.bucket,
+        signalKnowledgeS3.key,
+        checkpointSignalKnowledge
+      );
+
+      console.log('Signal knowledge batch completed and checkpoint saved:', {
+        batchNumber,
+        totalBatches: batches.length,
+        generatedSignals: batchSignalKnowledge.signals.length,
+        accumulatedSignals: generatedSignals.length,
+        checkpointSignals: checkpointSignalKnowledge.signals.length,
+        bucket: signalKnowledgeS3.bucket,
+        key: signalKnowledgeS3.key
+      });
+    }
+
+    generatedSignalKnowledge = {
+      schemaVersion: 'trackster-signal-knowledge-v1',
+      signals: generatedSignals
+    };
 
     if (typeof onProgress === 'function') {
       await onProgress({
@@ -610,6 +764,31 @@ async function buildIncrementalSignalKnowledge({ body, requestedSignalMetadata, 
     generatedCount: generatedSignalKnowledge.signals.length,
     missingCount: missingSignalMetadata.length
   };
+}
+
+function normalizeSignalKnowledgeBatchSize(value) {
+  const parsed = Number.parseInt(String(value || '20'), 10);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return 20;
+  }
+
+  return Math.min(parsed, 100);
+}
+
+function chunkArray(items, batchSize) {
+  if (!Array.isArray(items) || !items.length) {
+    return [];
+  }
+
+  const safeBatchSize = Math.max(1, Number.parseInt(String(batchSize || 20), 10) || 20);
+  const batches = [];
+
+  for (let index = 0; index < items.length; index += safeBatchSize) {
+    batches.push(items.slice(index, index + safeBatchSize));
+  }
+
+  return batches;
 }
 
 function mergeSignalKnowledgeWithoutOverwriting({ existingSignalKnowledge, generatedSignalKnowledge }) {
@@ -840,15 +1019,29 @@ async function generateValidatedSignalKnowledge(body, options = {}) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const effectivePrompt = attempt === 1 ? prompt : buildRetryPrompt(prompt, lastRawResponse, lastError);
-      const mantleResponse = await callBedrockMantle(effectivePrompt);
-      const responseText = extractTextFromMantleResponse(mantleResponse);
+
+      await writeSignalKnowledgeDebugRequest({
+        body,
+        options,
+        attempt,
+        prompt: effectivePrompt,
+        requestedSignalMetadata
+      });
+
+      const aiResponse = await callAiProvider(effectivePrompt, {
+        responseMimeType: 'application/json',
+        responseSchema: SIGNAL_KNOWLEDGE_RESPONSE_SCHEMA,
+        temperature: 0,
+        topP: 1
+      });
+      const responseText = extractTextFromAiResponse(aiResponse);
       lastRawResponse = responseText;
 
       const signalKnowledge = parseJsonResponse(responseText);
       const validation = validateSignalKnowledge(signalKnowledge, requestedSignalMetadata.map((signal) => signal.signalName));
 
       if (!validation.valid) {
-        const validationError = new Error('Bedrock returned an invalid signal knowledge JSON.');
+        const validationError = new Error('AI provider returned an invalid signal knowledge JSON.');
         validationError.validationErrors = validation.errors;
         validationError.rawResponse = responseText;
         throw validationError;
@@ -889,6 +1082,71 @@ function buildSignalKnowledgePrompt(template, requestedSignalMetadata) {
   return template
     .replaceAll('{{signalsJson}}', JSON.stringify(requestedSignalMetadata || [], null, 2))
     .trim();
+}
+
+async function writeSignalKnowledgeDebugRequest({
+  body,
+  options = {},
+  attempt,
+  prompt,
+  requestedSignalMetadata
+}) {
+  try {
+    const location = options.signalKnowledgeS3 || resolveSignalKnowledgeLocation(body);
+
+    if (!location?.bucket || !location?.key) {
+      return;
+    }
+
+    const batchNumber = Number.isInteger(Number(options.batchNumber))
+      ? Number(options.batchNumber)
+      : 1;
+    const totalBatches = Number.isInteger(Number(options.totalBatches))
+      ? Number(options.totalBatches)
+      : 1;
+    const safeAttempt = Math.max(1, Number.parseInt(String(attempt || 1), 10) || 1);
+    const prefix = location.key.includes('/')
+      ? location.key.slice(0, location.key.lastIndexOf('/') + 1)
+      : '';
+    const paddedBatchNumber = String(batchNumber).padStart(2, '0');
+    const debugKey = `${prefix}debug/signal-knowledge-batch-${paddedBatchNumber}-attempt-${safeAttempt}-request.json`;
+
+    const debugDocument = {
+      generatedAt: new Date().toISOString(),
+      provider: aiProviderInfo.provider,
+      modelId,
+      batchNumber,
+      totalBatches,
+      attempt: safeAttempt,
+      signalCount: requestedSignalMetadata.length,
+      signalNames: requestedSignalMetadata.map((signal) => signal.signalName),
+      requestedSignalMetadata,
+      prompt,
+      generationConfig: {
+        maxOutputTokens: DEFAULT_MAX_TOKENS,
+        timeoutMs: DEFAULT_AI_REQUEST_TIMEOUT_MS,
+        temperature: 0,
+        topP: 1,
+        responseMimeType: 'application/json',
+        responseSchema: SIGNAL_KNOWLEDGE_RESPONSE_SCHEMA
+      }
+    };
+
+    await putJsonToS3(location.bucket, debugKey, debugDocument);
+
+    console.log('Signal knowledge debug request saved:', {
+      bucket: location.bucket,
+      key: debugKey,
+      batchNumber,
+      totalBatches,
+      attempt: safeAttempt,
+      signalCount: requestedSignalMetadata.length
+    });
+  } catch (error) {
+    console.warn('Unable to save signal knowledge debug request:', {
+      message: error?.message
+    });
+  }
 }
 
 function expandSignalsForKnowledgePrompt(signalMetadata = []) {
@@ -1899,8 +2157,8 @@ async function generateValidatedDrivingPlanner(body, signalKnowledge = null) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const effectivePrompt = attempt === 1 ? prompt : buildRetryPrompt(prompt, lastRawResponse, lastError);
-      const mantleResponse = await callBedrockMantle(effectivePrompt);
-      const responseText = extractTextFromMantleResponse(mantleResponse);
+      const aiResponse = await callAiProvider(effectivePrompt);
+      const responseText = extractTextFromAiResponse(aiResponse);
       lastRawResponse = responseText;
 
       const planner = parseJsonResponse(responseText);
@@ -1911,7 +2169,7 @@ async function generateValidatedDrivingPlanner(body, signalKnowledge = null) {
       );
 
       if (!validation.valid) {
-        const validationError = new Error('Bedrock returned an invalid driving planner JSON.');
+        const validationError = new Error('AI provider returned an invalid driving planner JSON.');
         validationError.validationErrors = validation.errors;
         validationError.rawResponse = responseText;
         throw validationError;
@@ -1994,15 +2252,15 @@ async function generateValidatedSignalBehaviorPlan({
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const effectivePrompt = attempt === 1 ? prompt : buildRetryPrompt(prompt, lastRawResponse, lastError);
-      const mantleResponse = await callBedrockMantle(effectivePrompt);
-      const responseText = extractTextFromMantleResponse(mantleResponse);
+      const aiResponse = await callAiProvider(effectivePrompt);
+      const responseText = extractTextFromAiResponse(aiResponse);
       lastRawResponse = responseText;
 
       const behaviorPlan = parseJsonResponse(responseText);
       const validation = validateSignalBehaviorPlan({ behaviorPlan, planner, requestedSignals });
 
       if (!validation.valid) {
-        const validationError = new Error('Bedrock returned an invalid signal behavior plan JSON.');
+        const validationError = new Error('AI provider returned an invalid signal behavior plan JSON.');
         validationError.validationErrors = validation.errors;
         validationError.rawResponse = responseText;
         throw validationError;
@@ -2630,84 +2888,74 @@ function uniqueStrings(values) {
   return result;
 }
 
-async function callBedrockMantle(prompt) {
-  const apiKey = sanitizeText(process.env.OPENAI_API_KEY || process.env.AWS_BEARER_TOKEN_BEDROCK);
-
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable was not defined. Create a Bedrock Mantle API key and set OPENAI_API_KEY.');
-  }
-
-  const requestBodyPreview = JSON.stringify({
-    model: modelId,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.2,
-    top_p: 0.9,
-    max_tokens: DEFAULT_MAX_TOKENS
-  });
-
+async function callAiProvider(prompt, options = {}) {
   const requestStartedAt = Date.now();
   const timeoutMs = Number.isFinite(DEFAULT_AI_REQUEST_TIMEOUT_MS) && DEFAULT_AI_REQUEST_TIMEOUT_MS > 0
     ? DEFAULT_AI_REQUEST_TIMEOUT_MS
     : 90000;
 
-  console.log('Bedrock Mantle OpenAI SDK request preparing:', {
-    modelId,
-    region,
-    baseUrl: mantleBaseUrl,
-    projectId: mantleProjectId,
-    promptLength: String(prompt || '').length,
-    requestBodyBytes: Buffer.byteLength(requestBodyPreview, 'utf8'),
-    maxTokens: DEFAULT_MAX_TOKENS,
-    timeoutMs
-  });
+  const responseMimeType = sanitizeText(options.responseMimeType);
+  const responseSchema = options.responseSchema && typeof options.responseSchema === 'object'
+    ? options.responseSchema
+    : null;
+  const temperature = Number.isFinite(Number(options.temperature))
+    ? Number(options.temperature)
+    : 0.2;
+  const topP = Number.isFinite(Number(options.topP))
+    ? Number(options.topP)
+    : 0.9;
 
-  const client = new OpenAI({
-    baseURL: mantleBaseUrl,
-    apiKey,
-    timeout: timeoutMs,
-    defaultHeaders: {
-      'OpenAI-Project': mantleProjectId
-    }
+  console.log('AI provider request preparing:', {
+    provider: aiProviderInfo.provider,
+    modelId,
+    promptLength: String(prompt || '').length,
+    maxTokens: DEFAULT_MAX_TOKENS,
+    timeoutMs,
+    temperature,
+    topP,
+    structuredOutput: Boolean(responseMimeType && responseSchema)
   });
 
   try {
-    console.log('Bedrock Mantle OpenAI SDK request started:', {
-      elapsedMs: Date.now() - requestStartedAt
+    const response = await generateLlmResponse({
+      prompt,
+      maxTokens: DEFAULT_MAX_TOKENS,
+      temperature,
+      topP,
+      timeoutMs,
+      responseMimeType: responseMimeType || undefined,
+      responseSchema: responseSchema || undefined
     });
 
-    const response = await client.chat.completions.create({
-      model: modelId,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
-      top_p: 0.9,
-      max_tokens: DEFAULT_MAX_TOKENS
-    });
-
-    console.log('Bedrock Mantle OpenAI SDK response received:', {
+    console.log('AI provider response received:', {
       elapsedMs: Date.now() - requestStartedAt,
-      responseId: response?.id || null,
-      model: response?.model || null,
-      choices: Array.isArray(response?.choices) ? response.choices.length : 0,
-      usage: response?.usage || null
+      provider: response?.provider || aiProviderInfo.provider,
+      model: response?.model || modelId,
+      requestId: response?.requestId || null,
+      inputTokens: response?.inputTokens ?? null,
+      outputTokens: response?.outputTokens ?? null,
+      totalTokens: response?.totalTokens ?? null
     });
 
     return response;
   } catch (error) {
     const elapsedMs = Date.now() - requestStartedAt;
 
-    console.error('Bedrock Mantle OpenAI SDK request failed:', {
+    console.error('AI provider request failed:', {
       elapsedMs,
       timeoutMs,
+      provider: aiProviderInfo.provider,
+      modelId,
       status: error?.status || null,
-      requestId: error?.request_id || error?.requestID || null,
+      requestId: error?.requestId || error?.request_id || error?.requestID || null,
       errorCode: error?.code || error?.error?.code || null,
-      errorType: error?.type || error?.error?.type || null,
-      errorParam: error?.param || error?.error?.param || null,
+      retryable: error?.retryable ?? null,
       ...buildErrorLogDetails(error)
     });
 
-    if (error?.status) {
+    if (!error.rawResponse && error?.status) {
       error.rawResponse = JSON.stringify({
+        provider: aiProviderInfo.provider,
         status: error.status,
         code: error?.code || error?.error?.code || null,
         type: error?.type || error?.error?.type || null,
@@ -2737,11 +2985,13 @@ function buildErrorLogDetails(error) {
   };
 }
 
-function extractTextFromMantleResponse(response) {
-  const text = response?.choices?.[0]?.message?.content;
+function extractTextFromAiResponse(response) {
+  const text = response?.text;
 
   if (typeof text !== 'string' || !text.trim()) {
-    throw new Error('Bedrock Mantle response text is empty.');
+    const error = new Error('AI provider response text is empty.');
+    error.rawResponse = response ? JSON.stringify(response) : null;
+    throw error;
   }
 
   return text.trim();
@@ -2754,7 +3004,7 @@ function parseJsonResponse(text) {
     const firstBrace = text.indexOf('{');
 
     if (firstBrace < 0) {
-      const parseError = new Error('Bedrock response is not valid JSON.');
+      const parseError = new Error('AI provider response is not valid JSON.');
       parseError.rawResponse = text;
       parseError.cause = error;
       throw parseError;

@@ -1,17 +1,6 @@
 You are an expert vehicle CAN signal knowledge classifier.
 
-Your only responsibility is to classify requested CAN signals into a reusable Trackster Signal Dictionary.
-
-Return ONLY valid JSON.
-
-Never generate CAN frames.
-Never generate sampled values.
-Never generate behaviors.
-Never generate scenarios.
-
-Your output will be reused and persisted by Trackster as a permanent signal dictionary.
-
-The purpose of this dictionary is to identify which signals represent the normal dynamic driving behavior of a vehicle.
+Your only responsibility is to classify requested CAN signals for the Trackster Signal Dictionary.
 
 Trackster generates realistic vehicle dynamics.
 It does NOT simulate ECU internal logic, protocol implementation, controller algorithms, dashboard rendering or software state machines.
@@ -20,225 +9,131 @@ Requested signals
 
 {{signalsJson}}
 
-For each signal:
-1. Analyze the signal name.
-2. Analyze the CAN message name when provided.
-3. Analyze its engineering unit.
-4. Analyze its DBC limits.
-5. Analyze its factor, offset and bit length.
-6. Infer the most probable engineering meaning.
-7. Decide whether the signal should participate in Trackster dynamic driving behavior generation.
+For every requested signal:
 
-Rules
+- Preserve the exact signal name.
+- Use CAN message name only as supporting context.
+- Consider engineering unit, DBC limits, factor, offset and bit length when available.
+- Infer the most probable engineering meaning.
+- Decide whether Trackster should generate dynamic behavior.
+- Assign a dependency only when another requested signal is its immediate physical cause.
+- Keep meaning and reason short and objective.
+. Every requested signal MUST appear exactly once in the "signals" array.
 
-* Never invent a meaning only because the signal name looks familiar.
-* Use messageName only as context to disambiguate the signal, not as the returned signal name.
-* If messageName or signal name contains CMD, COMMAND, CONFIG, LIMIT, MAX, MIN, CALIB, INIT, STATUS, STATE, MODE, DIAG, FAULT, ERROR, REQUEST or REQ, treat the signal conservatively.
-* Signals that represent limits, configured maximums, setpoints, calibration values, initialization values, diagnostic states, faults, requests, commands, modes, statuses or internal controller states must be false for behavior generation unless the signal is clearly part of normal vehicle dynamic behavior.
-* Signals with names containing MAX, MIN, LIMIT, THRESHOLD, CONFIG, CALIB, INIT, SET_ME or SETME must normally be false for behavior generation unless the signal is clearly part of normal vehicle dynamic behavior.
-* Protocol fields including Counter, RollingCounter, Checksum, CRC, Alive, Timestamp, Reserved, Padding or bookkeeping must always be generateBehavior=false.
-* If the physical or engineering meaning cannot be inferred with reasonable confidence, set generateBehavior=false.
+General rules
 
-Behavior suitability
+- Never invent DBC information or unsupported meanings.
+- Never infer signals that were not requested.
+- If uncertain, classify the signal as generateBehavior=false.
 
-generateBehavior=true only if the signal represents dynamic driving behavior that Trackster should actively simulate.
+Behavior classification
 
-generateBehavior does NOT mean the signal merely changes during driving.
+Use generateBehavior=true only for measurable physical quantities that naturally evolve during normal vehicle operation, including:
 
-Many signals change during driving but are only consequences of ECU software decisions, dashboard logic, controller state machines, warnings, alerts, HUD rendering or driver assistance software.
-
-Trackster should actively simulate signals that naturally evolve during normal vehicle operation because of:
 - driver inputs
-- vehicle motion
-- powertrain dynamics
 - steering dynamics
 - braking dynamics
+- powertrain dynamics
+- vehicle motion
 - suspension dynamics
-- electrical propulsion dynamics
+- electrical propulsion
 - thermal behavior
+- externally observable physical outputs directly caused by those quantities (for example BrakeLights)
 
-Examples of generateBehavior=true:
-- VehicleSpeed
-- WheelSpeed
-- MotorSpeed
-- MotorCurrent
-- MotorTorque
-- BrakePressure
-- BrakeLights
-- AcceleratorPedal
-- BrakePedal
-- SteeringAngle
-- YawRate
-- PitchRate
-- RollRate
-- Acceleration
-- BatteryVoltage
-- MotorTemperature
-- CoolantTemperature
+Use generateBehavior=false for:
 
-generateBehavior=false for signals that should not be directly generated as vehicle dynamic behavior, including:
-- Counters
-- Checksums
-- CRCs
-- Alive fields
-- Protocol status
-- Reserved values
-- Diagnostic information
-- Frame bookkeeping
-- Timing information
-- Unknown signals
-- Configuration values
-- Command signals
-- Request signals
-- Limit signals
-- Diagnostic fault or error status signals
-- Calibration fields
-- Initialization fields
-- ECU internal states
-- Controller outputs
-- Controller modes
-- Software decisions
-- Dashboard indicators
-- HUD rendering
-- Warnings
-- Alerts
-- Chimes
-- Availability flags
-- Enable flags
-- Button presses
-- User interface states
+- protocol fields
+- counters
+- rolling counters
+- checksums
+- CRC
+- alive fields
+- timestamps
+- reserved fields
+- padding
+- commands
+- requests
+- configuration
+- calibration
+- initialization
+- limits
+- setpoints
+- modes
+- states
+- status signals
+- controller outputs
+- ECU internal logic
+- software decisions
+- dashboard or HUD information
+- user-interface signals
+- diagnostic information
+- faults
+- warnings
+- availability flags
+- enable flags
 
-Examples of generateBehavior=false:
-- LKAS_Mode
-- Hands_Warning
-- Hands_Warning_W_Chime
-- Lines_Hud
-- Cruise_State
-- Steer_Angle_Req
-- ENABLE_MOTORS
-- Door_FL_Open
-- Door_FR_Open
-- Door_RL_Open
-- Door_RR_Open
+Treat names containing terms such as:
+
+CMD
+COMMAND
+CONFIG
+CALIB
+INIT
+LIMIT
+MAX
+MIN
+SET_ME
+SETME
+REQUEST
+REQ
+MODE
+STATE
+STATUS
+DIAG
+FAULT
+ERROR
+CHECKSUM
+COUNTER
+CRC
+ALIVE
+RESERVED
+
+as generateBehavior=false unless the signal clearly represents a measured physical quantity.
+
+Controller-specific representations
+
+When both a generic physical signal and a controller-specific representation of the same physical quantity are present, prefer the generic physical signal.
+
+Example:
+   VehicleSpeed → generateBehavior=true
+   LKASVehicleSpeed → normally generateBehavior=false
 
 Dependency
+dependency represents an immediate physical cause only.
+Use dependency=null whenever uncertain.
+Never create:
+- self-dependencies
+- circular dependencies
+- reversed physical dependencies
+- dependencies on protocol, command, configuration, status or diagnostic signals
 
-- Only reference another signal that exists in the provided signal list.
-- Dependency represents the immediate upstream cause in the real physical chain of events.
-- Dependency does NOT represent correlation.
-- Dependency does NOT represent mathematical similarity.
-- Dependency does NOT represent signals that usually change together.
-- Always ask: "What physically changes first?"
-- Use dependency only when there is a direct, strong, causal and physically meaningful relationship between two provided signals.
-- Prefer null when no meaningful relationship exists.
-- Prefer null over weak, indirect or speculative relationships.
-- Never create circular dependencies.
-- Always keep the dependency graph acyclic.
-- Prefer primary physical quantities as dependency sources.
-- Driver inputs, torque, brake pressure, steering angle, wheel speed and vehicle motion signals should normally be dependency sources.
-- A measured sensor value is usually a source of information, not a consequence.
-- Never make a measured sensor depend on a quantity calculated from that sensor.
-- Never use a derived signal as the dependency of its physical source.
-- If the dependency exists only because one signal is mathematically calculated from another, prefer null unless there is a clear physical causal relationship.
-- When uncertain whether a sensor is the source or the consequence, prefer dependency=null.
-- Battery state of charge, battery percentage and battery voltage are related battery measurements, but one should not be treated as the direct physical cause of the other. Prefer dependency=null for battery SOC/percentage unless a clear non-derived causal battery signal is provided.
-- Do not use voltage as the dependency of battery percentage or state of charge merely because voltage can be used to estimate SOC.
-- If a signal is a system-specific representation of a physical quantity, such as LKAS vehicle speed, treat it as generateBehavior=true only when no clearer generic physical equivalent is available in the provided signal list. If a clearer generic physical speed or wheel speed signal exists, treat the system-specific representation conservatively.
+Use this physical direction whenever applicable:
 
-Preferred dependency hierarchy:
+Driver Input
+→ Torque / Brake Pressure
+→ Motor Current
+→ Motor Speed
+→ Wheel Speed
+→ Vehicle Speed
+→ Derived Physical Quantities
 
-1. Driver inputs
-   Accelerator
-   Brake
-   Steering
-
-2. Generated force
-   Torque
-   Brake Pressure
-
-3. Electrical quantities
-   Motor Current
-   Voltage
-   Phase Current
-
-4. Rotational quantities
-   Motor Speed
-   Wheel Speed
-   Electrical Angle
-
-5. Vehicle motion
-   Vehicle Speed
-   Yaw
-   Pitch
-   Roll
-   Acceleration
-
-6. Derived outputs
-   Brake Lights
-
-Examples of correct dependencies:
-    "Brake_Lights" -> "Brake_Drv_Appl"
-    "VehicleSpeed" -> "WheelSpeed"
-    "MotorSpeed" -> "HallSensor"
-    "Torque" -> "AcceleratorPedal"
-    "MotorCurrent" -> "Torque"
-    "ElectricalAngle" -> "MotorSpeed"
-
-Examples of correct null dependencies:
-    "BatteryPercentage" -> null
-    "BatteryStateOfCharge" -> null
-    "BatteryVoltage" -> null
-    "HallSensor" -> null
-    "AngleSensor" -> null
-
-Examples of incorrect dependencies:
-    "WheelSpeed" -> "VehicleSpeed"
-    "HallSensor" -> "MotorSpeed"
-    "BatteryPercentage" -> "BatteryVoltage"
-    "BatteryStateOfCharge" -> "BatteryVoltage"
-    "BatteryVoltage" -> "BatteryPercentage"
-    "HUD" -> "LaneCurvature"
-    "HandsWarning" -> "HandsOff"
-
-Output schema:
-
-{
-  "schemaVersion": "trackster-signal-knowledge-v1",
-  "signals": [
-    {
-      "name": "Brake_Lights",
-      "meaning": "Brake lamp state",
-      "generateBehavior": true,
-      "reason": "Binary signal representing brake lamp state.",
-      "dependency": null | "valid_signal_name"
-    }
-  ]
-}
-
-Final self-check
-
-Before returning JSON, mentally replay one hour of realistic driving.
-
-For every signal ask:
-- Would this signal naturally evolve because the vehicle is being driven?
-- Or would it only change because an ECU, controller, dashboard or software decided to change it?
-
-Only the first category should use generateBehavior=true.
-
-When uncertain:
-- generateBehavior=false
-- dependency=null
-
-Validation
-
-Before returning JSON verify:
-- Valid JSON.
-- Every requested signal appears exactly once.
-- No extra signals.
-- generateBehavior is boolean.
-- Unknown signals must be generateBehavior=false.
-- No invented signal names.
-- No invented DBC information.
-- Do not copy messageName, canId, dbcFile, unit, min, max, factor, offset or bit length into the output.
-- No markdown.
-- No explanations or any character outside valid JSON.
+Typical examples:
+   MotorTorque → AcceleratorPedal
+   BrakePressure → BrakePedal
+   MotorCurrent → MotorTorque
+   MotorSpeed → MotorCurrent
+   WheelSpeed → MotorSpeed
+   VehicleSpeed → WheelSpeed
+   ElectricalAngle → MotorSpeed
+   Never invert this chain.
+   BatteryVoltage and BatteryPercentage should normally use dependency=null unless another requested signal is clearly their immediate physical cause.

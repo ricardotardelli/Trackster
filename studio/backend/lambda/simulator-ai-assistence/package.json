@@ -1,13 +1,13 @@
 {
-  "name": "trackster-ai-assist-mantle-openai-sdk",
+  "name": "trackster-simulator-ai-assist",
   "version": "1.0.0",
-  "description": "Trackster AI Assist Lambda using Bedrock Mantle OpenAI SDK",
-  "main": "index.mjs",
+  "private": true,
   "type": "module",
   "dependencies": {
-    "openai": "^5.10.2"
+    "@google/genai": "^2.13.0",
+    "openai": "^5.12.2"
   },
   "scripts": {
-    "zip": "powershell Compress-Archive -Path index.mjs,package.json,package-lock.json,node_modules -DestinationPath simulator-ai-assistence.zip -Force"
+    "zip": "powershell -Command \"Compress-Archive * -DestinationPath simulator-ai-assist.zip -Force\""
   }
 }
