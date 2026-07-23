@@ -626,8 +626,8 @@ export class SimulatorComponent implements OnInit {
     this.formStatus = 'awaiting_response';
     this.isSubmitting = true;
     this.openGenerationModal(
-      'Starting signal knowledge analysis...',
-      'Sending the selected CAN signals to Trackster AI for semantic analysis.'
+      'Preparing signal analysis...',
+      'Trackster is preparing the selected CAN signals for analysis.'
     );
 
     try {
@@ -663,8 +663,8 @@ export class SimulatorComponent implements OnInit {
           generatedBinCount: 0
         });
         this.openGenerationSuccessModal(
-          'Generation completed successfully.',
-          'Local mode completed without sending the request to the orchestrator.'
+          'Signals analyzed successfully.',
+          'Local mode completed without sending the signal analysis request.'
         );
         return;
       }
@@ -730,8 +730,8 @@ export class SimulatorComponent implements OnInit {
         if (monitor) {
           this.formStatus = 'generating';
           this.openGenerationModal(
-            'Analyzing signal knowledge...',
-            'Trackster AI is analyzing the selected CAN signals and preparing the signal knowledge base.'
+            'Analyzing selected signals...',
+            'Trackster is checking the signal dictionary and identifying any unknown signals.'
           );
 
           const scenarioDocument = await this.waitForScenarioCompletion(monitor);
@@ -760,15 +760,15 @@ export class SimulatorComponent implements OnInit {
             generatedBinCount: null
           });
           this.openGenerationSuccessModal(
-            'Signal knowledge request accepted.',
-            'The signal knowledge request was accepted successfully.'
+            'Signal analysis request accepted.',
+            'The selected signals were submitted successfully for analysis.'
           );
         }
       } else {
         this.setPayloadValue(JSON.stringify(result, null, 2));
         this.openGenerationErrorModal(
-          'Generation failed',
-          `The signal knowledge request failed with status ${response.status}.`,
+          'Signal analysis failed',
+          `The signal analysis request failed with status ${response.status}.`,
           this.describeHttpStatus(response.status)
         );
       }
@@ -801,8 +801,8 @@ export class SimulatorComponent implements OnInit {
       }, null, 2));
 
       this.openGenerationErrorModal(
-        'Generation failed',
-        String(details['message'] || 'Unable to complete the signal knowledge generation.'),
+        'Signal analysis failed',
+        String(details['message'] || 'Unable to complete the signal analysis.'),
         'Please check the browser console and try again.'
       );
     } finally {
@@ -1654,8 +1654,8 @@ export class SimulatorComponent implements OnInit {
       const exists = await this.scenarioObjectExists(monitor.bucket, monitor.scenarioKey);
 
       if (!exists) {
-        this.generationWorkflowTitle = 'Preparing signal knowledge...';
-        this.generationWorkflowMessage = 'Waiting for Trackster AI to start analyzing the selected signals.';
+        this.generationWorkflowTitle = 'Preparing signal analysis...';
+        this.generationWorkflowMessage = 'Waiting for Trackster to initialize the signal analysis.';
         this.generationWorkflowDetails = '';
         this.generationWorkflowProgress = 0;
         await this.delay(this.generationPollIntervalMs);
@@ -1676,7 +1676,7 @@ export class SimulatorComponent implements OnInit {
       await this.delay(this.generationPollIntervalMs);
     }
 
-    throw new Error('Generation status check timed out while waiting for the simulation to complete.');
+    throw new Error('Signal analysis status check timed out before the signals were saved.');
   }
 
   private async scenarioObjectExists(bucket: string, key: string): Promise<boolean> {
@@ -1787,7 +1787,7 @@ export class SimulatorComponent implements OnInit {
 
     this.generationWorkflowProgress = this.resolveScenarioPercent(scenarioDocument);
     this.generationWorkflowTitle = this.resolveScenarioTitle(status, scenarioDocument);
-    this.generationWorkflowMessage = scenarioDocument.currentStep || this.resolveScenarioMessage(status, scenarioDocument);
+    this.generationWorkflowMessage = this.resolveScenarioMessage(status, scenarioDocument);
     this.generationWorkflowDetails = '';
 
     if (this.isScenarioFailed(scenarioDocument)) {
@@ -1796,123 +1796,122 @@ export class SimulatorComponent implements OnInit {
   }
 
   private resolveScenarioPercent(scenarioDocument: ScenarioStatusDocument): number {
-    const progress = scenarioDocument.progress || {};
-    const directPercent = Number(progress.percent);
-
-    if (Number.isFinite(directPercent)) {
-      return Math.max(0, Math.min(100, Math.round(directPercent)));
+    if (this.hasSavedSignalKnowledge(scenarioDocument)) {
+      return 100;
     }
 
-    const totalPhases = Number(progress.totalPhases);
-    const completedPhases = Number(progress.completedPhases);
-    const processingPhases = Number(progress.processingPhases || 0);
+    const workflowText = this.buildSignalWorkflowText(scenarioDocument);
 
-    if (Number.isFinite(totalPhases) && totalPhases > 0 && Number.isFinite(completedPhases)) {
-      const weightedCompleted = completedPhases + (processingPhases > 0 ? 0.5 : 0);
-      return Math.max(0, Math.min(100, Math.round((weightedCompleted / totalPhases) * 100)));
+    if (workflowText.includes('saving') || workflowText.includes('persist') || workflowText.includes('writing')) {
+      return 90;
     }
 
-    return 0;
+    if (
+      workflowText.includes('unknown signal') ||
+      workflowText.includes('new signal') ||
+      workflowText.includes('ai assistance') ||
+      workflowText.includes('semantic analysis') ||
+      workflowText.includes('signal knowledge')
+    ) {
+      return 70;
+    }
+
+    if (workflowText.includes('dictionary') || workflowText.includes('existing signal')) {
+      return 40;
+    }
+
+    if (workflowText.includes('prepar') || workflowText.includes('start') || workflowText.includes('initial')) {
+      return 15;
+    }
+
+    return 10;
   }
 
   private resolveScenarioTitle(status: string, scenarioDocument?: ScenarioStatusDocument): string {
     const normalizedStatus = status.toLowerCase();
 
     if (this.isFailedStatus(normalizedStatus)) {
-      return 'Generation failed';
+      return 'Signal analysis failed';
     }
 
-    if (this.isBehaviorWorkflow(scenarioDocument, normalizedStatus)) {
-      return this.isScenarioBehaviorCompleted(scenarioDocument)
-        ? 'Signal behavior generated successfully.'
-        : 'Generating signal behavior...';
+    if (scenarioDocument && this.hasSavedSignalKnowledge(scenarioDocument)) {
+      return 'Signals analyzed successfully.';
     }
 
-    if (normalizedStatus.includes('signal knowledge')) {
-      return 'Analyzing signal knowledge...';
+    const workflowText = scenarioDocument
+      ? this.buildSignalWorkflowText(scenarioDocument)
+      : normalizedStatus;
+
+    if (workflowText.includes('saving') || workflowText.includes('persist') || workflowText.includes('writing')) {
+      return 'Saving signal knowledge...';
     }
 
     if (
-      normalizedStatus.includes('planner') ||
-      normalizedStatus.includes('planning') ||
-      normalizedStatus.includes('driving scenario') ||
-      normalizedStatus.includes('preparing')
+      workflowText.includes('unknown signal') ||
+      workflowText.includes('new signal') ||
+      workflowText.includes('ai assistance') ||
+      workflowText.includes('semantic analysis') ||
+      workflowText.includes('signal knowledge')
     ) {
-      return 'Planning simulation...';
+      return 'Identifying unknown signals...';
     }
 
-    if (normalizedStatus.includes('worker') || normalizedStatus.includes('queue')) {
-      return 'Preparing simulation files...';
+    if (workflowText.includes('dictionary') || workflowText.includes('existing signal')) {
+      return 'Checking signal dictionary...';
     }
 
-    if (normalizedStatus.includes('bin') || normalizedStatus.includes('simulation file')) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'Simulation files generated successfully.'
-        : 'Generating simulation files...';
-    }
-
-    if (this.isCompletedStatus(normalizedStatus)) {
-      return 'Generation completed successfully.';
-    }
-
-    return 'Generating realistic simulation...';
+    return 'Preparing signal analysis...';
   }
 
   private resolveScenarioMessage(status: string, scenarioDocument?: ScenarioStatusDocument): string {
     const normalizedStatus = status.toLowerCase();
 
     if (this.isFailedStatus(normalizedStatus)) {
-      return 'Trackster stopped the simulation generation workflow because an error occurred.';
+      return 'Trackster stopped the signal analysis because an error occurred.';
     }
 
-    if (this.isBehaviorWorkflow(scenarioDocument, normalizedStatus)) {
-      const progress = scenarioDocument?.progress || {};
-      const totalPhases = Number(progress.totalPhases || 0);
-      const currentPhase = Number(progress.currentPhase || 0);
-
-      if (this.isScenarioBehaviorCompleted(scenarioDocument)) {
-        return 'The signal behavior plan has been generated successfully.';
-      }
-
-      if (totalPhases > 0 && currentPhase > 0) {
-        return `Trackster AI is generating behavior phase ${currentPhase} of ${totalPhases}.`;
-      }
-
-      return 'Trackster AI is generating signal behavior from the driving scenario.';
+    if (scenarioDocument && this.hasSavedSignalKnowledge(scenarioDocument)) {
+      return 'The selected signals were analyzed and saved successfully in the scenario.';
     }
 
-    if (normalizedStatus.includes('signal knowledge')) {
-      return 'Trackster AI is analyzing the selected CAN signals and deciding which ones can be used for behavior generation.';
+    const workflowText = scenarioDocument
+      ? this.buildSignalWorkflowText(scenarioDocument)
+      : normalizedStatus;
+
+    if (workflowText.includes('saving') || workflowText.includes('persist') || workflowText.includes('writing')) {
+      return 'Trackster is saving the analyzed signals in the scenario.';
     }
 
     if (
-      normalizedStatus.includes('planner') ||
-      normalizedStatus.includes('planning') ||
-      normalizedStatus.includes('driving scenario') ||
-      normalizedStatus.includes('preparing')
+      workflowText.includes('unknown signal') ||
+      workflowText.includes('new signal') ||
+      workflowText.includes('ai assistance') ||
+      workflowText.includes('semantic analysis') ||
+      workflowText.includes('signal knowledge')
     ) {
-      return 'Trackster AI is creating the driving scenario.';
+      return 'Trackster is identifying and classifying signals that are not yet in the dictionary.';
     }
 
-    if (normalizedStatus.includes('worker') || normalizedStatus.includes('queue')) {
-      return 'Trackster is preparing the simulation workers.';
+    if (workflowText.includes('dictionary') || workflowText.includes('existing signal')) {
+      return 'Trackster is checking which selected signals are already known.';
     }
 
-    if (normalizedStatus.includes('bin') || normalizedStatus.includes('simulation file')) {
-      return this.isCompletedStatus(normalizedStatus)
-        ? 'The simulation files have been generated successfully.'
-        : 'Trackster is generating the simulation files.';
-    }
+    return 'Trackster is preparing the selected CAN signals for analysis.';
+  }
 
-    if (normalizedStatus.includes('phase')) {
-      return status;
-    }
+  private buildSignalWorkflowText(scenarioDocument: ScenarioStatusDocument): string {
+    const logText = (scenarioDocument.logs || [])
+      .map((entry) => `${entry.step || ''} ${entry.message || ''}`)
+      .join(' ');
 
-    if (this.isCompletedStatus(normalizedStatus)) {
-      return 'The Trackster AI generation workflow has completed successfully.';
-    }
-
-    return 'Trackster AI is processing the simulation workflow.';
+    return [
+      scenarioDocument.status || '',
+      scenarioDocument.currentStep || '',
+      scenarioDocument.progress?.stage || '',
+      logText
+    ]
+      .join(' ')
+      .toLowerCase();
   }
 
   private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
@@ -1920,24 +1919,42 @@ export class SimulatorComponent implements OnInit {
   }
 
   private isScenarioCompleted(scenarioDocument: ScenarioStatusDocument): boolean {
-    const status = String(scenarioDocument.status || '');
-    const normalizedStatus = status.toLowerCase().trim();
-    const hasScenarioPlan = Array.isArray(scenarioDocument.scenario?.phases) && scenarioDocument.scenario.phases.length > 0;
-    const hasOnlySignalKnowledge = !!scenarioDocument.signalKnowledge && !hasScenarioPlan;
-
-    if (hasOnlySignalKnowledge) {
-      return false;
-    }
-
-    if (this.isBehaviorWorkflow(scenarioDocument, normalizedStatus)) {
-      return this.isScenarioBehaviorCompleted(scenarioDocument);
-    }
-
-    if (this.isCompletedStatus(status)) {
+    if (this.hasSavedSignalKnowledge(scenarioDocument)) {
       return true;
     }
 
-    return false;
+    const normalizedStatus = String(scenarioDocument.status || '').toLowerCase().trim();
+
+    return (
+      normalizedStatus === 'signals_saved' ||
+      normalizedStatus === 'signal_knowledge_saved' ||
+      normalizedStatus === 'signal_knowledge_completed'
+    );
+  }
+
+  private hasSavedSignalKnowledge(scenarioDocument: ScenarioStatusDocument): boolean {
+    return this.hasMeaningfulValue(scenarioDocument.signalKnowledge) ||
+      this.hasMeaningfulValue(scenarioDocument.signalKnowledgeS3);
+  }
+
+  private hasMeaningfulValue(value: unknown): boolean {
+    if (value === null || value === undefined) {
+      return false;
+    }
+
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+
+    if (typeof value === 'object') {
+      return Object.keys(value as Record<string, unknown>).length > 0;
+    }
+
+    if (typeof value === 'string') {
+      return value.trim().length > 0;
+    }
+
+    return true;
   }
 
   private isScenarioBehaviorCompleted(scenarioDocument?: ScenarioStatusDocument): boolean {
@@ -2037,23 +2054,11 @@ export class SimulatorComponent implements OnInit {
   }
 
   private buildScenarioSuccessTitle(scenarioDocument: ScenarioStatusDocument): string {
-    if (this.isScenarioBehaviorCompleted(scenarioDocument)) {
-      return 'Signal behavior generated successfully.';
-    }
-
-    return 'Generation completed successfully.';
+    return 'Signals analyzed successfully.';
   }
 
   private buildScenarioSuccessMessage(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
-    const progress = scenarioDocument.progress || {};
-    const completedPhases = Number(progress.completedPhases || 0);
-    const totalPhases = Number(progress.totalPhases || 0);
-
-    if (this.isScenarioBehaviorCompleted(scenarioDocument) && totalPhases > 0) {
-      return `The signal behavior plan was generated successfully for ${completedPhases} of ${totalPhases} phases.`;
-    }
-
-    return scenarioDocument.currentStep || scenarioDocument.status || 'The Trackster AI generation workflow completed successfully.';
+    return 'The selected signals were analyzed and saved successfully in the scenario.';
   }
 
   private buildGeneratedFilesSuccessMessage(generatedFiles: number): string {
