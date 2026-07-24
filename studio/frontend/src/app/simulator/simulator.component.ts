@@ -1782,12 +1782,15 @@ export class SimulatorComponent implements OnInit {
     return String(body);
   }
 
-  private applyScenarioDocumentToWorkflow(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): void {
-    const status = String(scenarioDocument.status || 'running');
+  private applyScenarioDocumentToWorkflow(
+    scenarioDocument: ScenarioStatusDocument,
+    monitor: GenerationMonitor
+  ): void {
+    void monitor;
 
     this.generationWorkflowProgress = this.resolveScenarioPercent(scenarioDocument);
-    this.generationWorkflowTitle = this.resolveScenarioTitle(status, scenarioDocument);
-    this.generationWorkflowMessage = this.resolveScenarioMessage(status, scenarioDocument);
+    this.generationWorkflowTitle = this.resolveScenarioTitle(scenarioDocument);
+    this.generationWorkflowMessage = this.resolveScenarioMessage(scenarioDocument);
     this.generationWorkflowDetails = '';
 
     if (this.isScenarioFailed(scenarioDocument)) {
@@ -1796,165 +1799,93 @@ export class SimulatorComponent implements OnInit {
   }
 
   private resolveScenarioPercent(scenarioDocument: ScenarioStatusDocument): number {
-    if (this.hasSavedSignalKnowledge(scenarioDocument)) {
+    const progress = scenarioDocument.progress || {};
+    const totalBatches = Math.max(0, Number(progress.totalPhases || 0));
+    const completedBatches = Math.max(0, Number(progress.completedPhases || 0));
+
+    if (this.isScenarioCompleted(scenarioDocument)) {
       return 100;
     }
 
-    const workflowText = this.buildSignalWorkflowText(scenarioDocument);
-
-    if (workflowText.includes('saving') || workflowText.includes('persist') || workflowText.includes('writing')) {
-      return 90;
+    if (totalBatches <= 0) {
+      return 0;
     }
 
-    if (
-      workflowText.includes('unknown signal') ||
-      workflowText.includes('new signal') ||
-      workflowText.includes('ai assistance') ||
-      workflowText.includes('semantic analysis') ||
-      workflowText.includes('signal knowledge')
-    ) {
-      return 70;
-    }
-
-    if (workflowText.includes('dictionary') || workflowText.includes('existing signal')) {
-      return 40;
-    }
-
-    if (workflowText.includes('prepar') || workflowText.includes('start') || workflowText.includes('initial')) {
-      return 15;
-    }
-
-    return 10;
+    return Math.min(100, Math.max(0, Math.round((completedBatches / totalBatches) * 100)));
   }
 
-  private resolveScenarioTitle(status: string, scenarioDocument?: ScenarioStatusDocument): string {
-    const normalizedStatus = status.toLowerCase();
-
-    if (this.isFailedStatus(normalizedStatus)) {
-      return 'Signal analysis failed';
+  private resolveScenarioTitle(scenarioDocument: ScenarioStatusDocument): string {
+    if (this.isScenarioFailed(scenarioDocument)) {
+      return 'Signal generation failed';
     }
 
-    if (scenarioDocument && this.hasSavedSignalKnowledge(scenarioDocument)) {
-      return 'Signals analyzed successfully.';
+    if (this.isScenarioCompleted(scenarioDocument)) {
+      return 'Signals generated successfully.';
     }
 
-    const workflowText = scenarioDocument
-      ? this.buildSignalWorkflowText(scenarioDocument)
-      : normalizedStatus;
+    const totalBatches = Math.max(0, Number(scenarioDocument.progress?.totalPhases || 0));
 
-    if (workflowText.includes('saving') || workflowText.includes('persist') || workflowText.includes('writing')) {
-      return 'Saving signal knowledge...';
-    }
-
-    if (
-      workflowText.includes('unknown signal') ||
-      workflowText.includes('new signal') ||
-      workflowText.includes('ai assistance') ||
-      workflowText.includes('semantic analysis') ||
-      workflowText.includes('signal knowledge')
-    ) {
-      return 'Identifying unknown signals...';
-    }
-
-    if (workflowText.includes('dictionary') || workflowText.includes('existing signal')) {
-      return 'Checking signal dictionary...';
-    }
-
-    return 'Preparing signal analysis...';
+    return totalBatches > 0
+      ? 'Generating signals...'
+      : 'Preparing signal analysis...';
   }
 
-  private resolveScenarioMessage(status: string, scenarioDocument?: ScenarioStatusDocument): string {
-    const normalizedStatus = status.toLowerCase();
-
-    if (this.isFailedStatus(normalizedStatus)) {
-      return 'Trackster stopped the signal analysis because an error occurred.';
+  private resolveScenarioMessage(scenarioDocument: ScenarioStatusDocument): string {
+    if (this.isScenarioFailed(scenarioDocument)) {
+      return 'Trackster stopped signal generation because an error occurred.';
     }
 
-    if (scenarioDocument && this.hasSavedSignalKnowledge(scenarioDocument)) {
-      return 'The selected signals were analyzed and saved successfully in the scenario.';
+    if (this.isScenarioCompleted(scenarioDocument)) {
+      return 'The selected signals were generated and saved successfully.';
     }
 
-    const workflowText = scenarioDocument
-      ? this.buildSignalWorkflowText(scenarioDocument)
-      : normalizedStatus;
+    const progress = scenarioDocument.progress || {};
+    const totalBatches = Math.max(0, Number(progress.totalPhases || 0));
+    const currentBatch = Math.max(
+      0,
+      Number(progress.currentPhase || 0),
+      Math.min(totalBatches, Number(progress.completedPhases || 0) + 1)
+    );
 
-    if (workflowText.includes('saving') || workflowText.includes('persist') || workflowText.includes('writing')) {
-      return 'Trackster is saving the analyzed signals in the scenario.';
-    }
-
-    if (
-      workflowText.includes('unknown signal') ||
-      workflowText.includes('new signal') ||
-      workflowText.includes('ai assistance') ||
-      workflowText.includes('semantic analysis') ||
-      workflowText.includes('signal knowledge')
-    ) {
-      return 'Trackster is identifying and classifying signals that are not yet in the dictionary.';
-    }
-
-    if (workflowText.includes('dictionary') || workflowText.includes('existing signal')) {
-      return 'Trackster is checking which selected signals are already known.';
+    if (totalBatches > 0 && currentBatch > 0) {
+      return `Generating signals batch ${Math.min(currentBatch, totalBatches)}/${totalBatches}`;
     }
 
     return 'Trackster is preparing the selected CAN signals for analysis.';
   }
 
-  private buildSignalWorkflowText(scenarioDocument: ScenarioStatusDocument): string {
-    const logText = (scenarioDocument.logs || [])
-      .map((entry) => `${entry.step || ''} ${entry.message || ''}`)
-      .join(' ');
-
-    return [
-      scenarioDocument.status || '',
-      scenarioDocument.currentStep || '',
-      scenarioDocument.progress?.stage || '',
-      logText
-    ]
-      .join(' ')
-      .toLowerCase();
-  }
-
-  private buildScenarioDetails(scenarioDocument: ScenarioStatusDocument, monitor: GenerationMonitor): string {
+  private buildScenarioDetails(
+    scenarioDocument: ScenarioStatusDocument,
+    monitor: GenerationMonitor
+  ): string {
+    void scenarioDocument;
+    void monitor;
     return '';
   }
 
   private isScenarioCompleted(scenarioDocument: ScenarioStatusDocument): boolean {
-    if (this.hasSavedSignalKnowledge(scenarioDocument)) {
-      return true;
-    }
-
     const normalizedStatus = String(scenarioDocument.status || '').toLowerCase().trim();
+    const progress = scenarioDocument.progress || {};
+    const totalBatches = Math.max(0, Number(progress.totalPhases || 0));
+    const completedBatches = Math.max(0, Number(progress.completedPhases || 0));
+    const failedBatches = Math.max(0, Number(progress.failedPhases || 0));
+    const processingBatches = Math.max(0, Number(progress.processingPhases || 0));
 
-    return (
+    if (
+      normalizedStatus === 'completed' ||
       normalizedStatus === 'signals_saved' ||
       normalizedStatus === 'signal_knowledge_saved' ||
       normalizedStatus === 'signal_knowledge_completed'
+    ) {
+      return failedBatches === 0 && processingBatches === 0;
+    }
+
+    return (
+      totalBatches > 0 &&
+      completedBatches >= totalBatches &&
+      failedBatches === 0 &&
+      processingBatches === 0
     );
-  }
-
-  private hasSavedSignalKnowledge(scenarioDocument: ScenarioStatusDocument): boolean {
-    return this.hasMeaningfulValue(scenarioDocument.signalKnowledge) ||
-      this.hasMeaningfulValue(scenarioDocument.signalKnowledgeS3);
-  }
-
-  private hasMeaningfulValue(value: unknown): boolean {
-    if (value === null || value === undefined) {
-      return false;
-    }
-
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
-
-    if (typeof value === 'object') {
-      return Object.keys(value as Record<string, unknown>).length > 0;
-    }
-
-    if (typeof value === 'string') {
-      return value.trim().length > 0;
-    }
-
-    return true;
   }
 
   private isScenarioBehaviorCompleted(scenarioDocument?: ScenarioStatusDocument): boolean {
